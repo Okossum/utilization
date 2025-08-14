@@ -340,6 +340,7 @@ export function UploadPanel({
     const colBusinessUnit = lowered.indexOf('business unit');
     const colCC = lowered.indexOf('compentence center (cc)') !== -1 ? lowered.indexOf('compentence center (cc)') : (lowered.indexOf('competence center') !== -1 ? lowered.indexOf('competence center') : lowered.indexOf('cc'));
     const colTeam = lowered.indexOf('team');
+    const colLBS = lowered.indexOf('lbs');
     const colPerson = lowered.indexOf('name');
     if (colPerson === -1) return { isValid: false, error: 'Spalte "Name" nicht gefunden', rows: [], debug: [...debug, 'Spalte "Name" nicht gefunden'] };
 
@@ -390,12 +391,13 @@ export function UploadPanel({
         const kv = Math.max(0, Math.min(100, Math.round((100 - parsedNkv) * 10) / 10));
         values[w.key] = kv;
       }
-      rowsOut.push({ person: personKey, personDisplay, cc: colCC !== -1 ? row[colCC] : undefined, team: colTeam !== -1 ? row[colTeam] : undefined, bu: colBusinessUnit !== -1 ? row[colBusinessUnit] : undefined, values });
+      rowsOut.push({ person: personKey, personDisplay, cc: colCC !== -1 ? row[colCC] : undefined, team: colTeam !== -1 ? row[colTeam] : undefined, bu: colBusinessUnit !== -1 ? row[colBusinessUnit] : undefined, lbs: colLBS !== -1 ? row[colLBS] : undefined, values });
     }
 
-    const previewHeader = ['Name', ...weeks.map(k => k.key)];
+    const previewHeader = ['Name', 'LBS', ...weeks.map(k => k.key)];
     const previewBody: string[][] = rowsOut.slice(0, 5).map(r => [
       r.personDisplay,
+      r.lbs || '',
       ...weeks.map(k => (r.values[k.key] === undefined ? '' : `${r.values[k.key]}%`))
     ]);
     debug.push(`Beispiel Person: ${rowsOut[0]?.personDisplay || '-'} → Keys: ${Object.keys(rowsOut[0]?.values || {}).slice(0, 5).join(', ')}`);
