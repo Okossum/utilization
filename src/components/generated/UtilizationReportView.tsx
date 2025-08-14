@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { getISOWeek, getISOWeekYear } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, Car } from 'lucide-react';
+import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, Car, ChefHat } from 'lucide-react';
 import { DataUploadSection } from './DataUploadSection';
 import { MultiSelectFilter } from './MultiSelectFilter';
 import { PersonFilterBar } from './PersonFilterBar';
@@ -586,6 +586,14 @@ export function UtilizationReportView() {
                               <GraduationCap className="w-4 h-4" />
                             </span>
                           )}
+                          {/* Chef-Icon für Führungskräfte basierend auf LBS */}
+                          {(personMeta.get(person)?.lbs?.toLowerCase().includes('competence center lead - senior manager') || 
+                            personMeta.get(person)?.lbs?.toLowerCase().includes('team lead - manager')) && (
+                            <span className="text-blue-600" title="Führungskraft">
+                              <ChefHat className="w-4 h-4" />
+                            </span>
+                          )}
+
                           <span>{person}</span>
                           {plannedByPerson[person]?.planned ? <span title="Geplanter Einsatz" className="inline-block w-2 h-2 rounded-full bg-amber-500" /> : null}
                         </div>
