@@ -1,10 +1,16 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { getISOWeek, getISOWeekYear } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus } from 'lucide-react';
-import { UploadPanel } from './UploadPanel';
+import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, Car } from 'lucide-react';
+import { DataUploadSection } from './DataUploadSection';
+import { MultiSelectFilter } from './MultiSelectFilter';
 import { PersonFilterBar } from './PersonFilterBar';
 import { KpiCardsGrid } from './KpiCardsGrid';
 import { UtilizationChartSection } from './UtilizationChartSection';
+import { UtilizationTrendChart } from './UtilizationTrendChart';
+import { PlannedEngagementEditor, PlannedEngagement } from './PlannedEngagementEditor';
+import { StatusLabelSelector } from './StatusLabelSelector';
+import { TravelReadinessSelector } from './TravelReadinessSelector';
 interface UtilizationData {
   person: string;
   week: string;
@@ -13,7 +19,7 @@ interface UtilizationData {
 }
 interface UploadedFile {
   name: string;
-  data: UtilizationData[];
+  data: any[];
   isValid: boolean;
   error?: string;
 }
@@ -23,10 +29,98 @@ export function UtilizationReportView() {
     einsatzplan?: UploadedFile;
   }>({});
   const [selectedPersons, setSelectedPersons] = useState<string[]>([]);
+  const [filterCC, setFilterCC] = useState<string[]>([]);
+  const [filterLBS, setFilterLBS] = useState<string[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [forecastStartWeek, setForecastStartWeek] = useState(33);
+  const currentWeek = getISOWeek(new Date());
+  const currentIsoYear = getISOWeekYear(new Date());
+  const [forecastStartWeek, setForecastStartWeek] = useState(currentWeek);
   const [lookbackWeeks, setLookbackWeeks] = useState(8);
-  const [forecastWeeks, setForecastWeeks] = useState(4);
+  const [forecastWeeks, setForecastWeeks] = useState(8);
+  const importJsonInputRef = useRef<HTMLInputElement>(null);
+  const STORAGE_KEY = 'utilization_uploaded_files_v1';
+  const STORAGE_PEOPLE_KEY = 'utilization_planned_people_v1';
+  const STORAGE_CUSTOMERS_KEY = 'utilization_customers_v1';
+
+  // Restore from localStorage on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && (parsed.auslastung || parsed.einsatzplan)) {
+          setUploadedFiles(parsed);
+        }
+      }
+    } catch {}
+  }, []);
+
+  // Autosave to localStorage on change
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(uploadedFiles));
+    } catch {}
+  }, [uploadedFiles]);
+
+  // Planned engagements and customers (persisted independently of uploads)
+  const [plannedByPerson, setPlannedByPerson] = useState<Record<string, PlannedEngagement>>(() => {
+    try { return JSON.parse(localStorage.getItem(STORAGE_PEOPLE_KEY) || '{}'); } catch { return {}; }
+  });
+  const [customers, setCustomers] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem(STORAGE_CUSTOMERS_KEY) || '[]'); } catch { return []; }
+  });
+  const [personStatus, setPersonStatus] = useState<Record<string, string | undefined>>(() => {
+    try { return JSON.parse(localStorage.getItem('utilization_person_status_v1') || '{}'); } catch { return {}; }
+  });
+  const [personTravelReadiness, setPersonTravelReadiness] = useState<Record<string, number | undefined>>(() => {
+    try { return JSON.parse(localStorage.getItem('utilization_person_travel_readiness_v1') || '{}'); } catch { return {}; }
+  });
+  useEffect(() => { try { localStorage.setItem(STORAGE_PEOPLE_KEY, JSON.stringify(plannedByPerson)); } catch {} }, [plannedByPerson]);
+  useEffect(() => { try { localStorage.setItem(STORAGE_CUSTOMERS_KEY, JSON.stringify(customers)); } catch {} }, [customers]);
+  useEffect(() => { try { localStorage.setItem('utilization_person_status_v1', JSON.stringify(personStatus)); } catch {} }, [personStatus]);
+  useEffect(() => { try { localStorage.setItem('utilization_person_travel_readiness_v1', JSON.stringify(personTravelReadiness)); } catch {} }, [personTravelReadiness]);
+
+  // Helper functions to get status icon and color
+  const getStatusIcon = (statusId: string | undefined) => {
+    if (!statusId) return null;
+    
+    const statusIcons: Record<string, React.ReactNode> = {
+      'vacation': <Calendar className="w-4 h-4" />,
+      'parental-leave': <Baby className="w-4 h-4" />,
+      'maternity-leave': <Heart className="w-4 h-4" />,
+      'sick-leave': <Thermometer className="w-4 h-4" />,
+      'termination': <UserX className="w-4 h-4" />,
+      'student': <GraduationCap className="w-4 h-4" />,
+    };
+    
+    return statusIcons[statusId] || null;
+  };
+
+  const getStatusColor = (statusId: string | undefined) => {
+    if (!statusId) return 'text-gray-400';
+    
+    const statusColors: Record<string, string> = {
+      'vacation': 'text-blue-600',
+      'parental-leave': 'text-purple-600',
+      'maternity-leave': 'text-pink-600',
+      'sick-leave': 'text-red-600',
+      'termination': 'text-gray-600',
+      'student': 'text-green-600',
+    };
+    
+    return statusColors[statusId] || 'text-gray-400';
+  };
+
+  // Helper function to check if a week is in a planned project
+  const isWeekInPlannedProject = (person: string, weekNumber: number) => {
+    const engagement = plannedByPerson[person];
+    if (!engagement?.planned || !engagement.startKw || !engagement.endKw) return false;
+    
+    const startKw = parseInt(engagement.startKw.split('KW')[1]);
+    const endKw = parseInt(engagement.endKw.split('KW')[1]);
+    
+    return weekNumber >= startKw && weekNumber <= endKw;
+  };
 
   // Mock data for demonstration
   const mockData: UtilizationData[] = useMemo(() => {
@@ -35,21 +129,118 @@ export function UtilizationReportView() {
     const startWeek = forecastStartWeek - lookbackWeeks;
     const weeks = Array.from({
       length: totalWeeks
-    }, (_, i) => `2025-KW${startWeek + i}`);
+    }, (_, i) => `${currentIsoYear}-KW${startWeek + i}`);
     return persons.flatMap(person => weeks.map((week, weekIndex) => ({
       person,
       week,
       utilization: Math.random() > 0.1 ? Math.round(Math.random() * 40 + 70) : null,
       isHistorical: weekIndex < lookbackWeeks
     })));
-  }, [lookbackWeeks, forecastWeeks, forecastStartWeek]);
+  }, [lookbackWeeks, forecastWeeks, forecastStartWeek, currentIsoYear]);
+  // Build consolidated data from uploaded files (Auslastung = Rückblick, Einsatzplan = Vorblick)
+  const consolidatedData: UtilizationData[] | null = useMemo(() => {
+    const aus = uploadedFiles.auslastung?.isValid ? (uploadedFiles.auslastung?.data as any[]) : null;
+    const ein = uploadedFiles.einsatzplan?.isValid ? (uploadedFiles.einsatzplan?.data as any[]) : null;
+    if (!aus && !ein) return null;
+    // Left side includes current week; right side starts after current week
+    const leftStart = forecastStartWeek - lookbackWeeks + 1;
+    const leftWeeksArr = Array.from({ length: lookbackWeeks }, (_, i) => leftStart + i);
+    const rightWeeksArr = Array.from({ length: forecastWeeks }, (_, i) => forecastStartWeek + 1 + i);
+    const currentYear = currentIsoYear;
+
+    const ausMap = new Map<string, any>();
+    const einMap = new Map<string, any>();
+    aus?.forEach(r => ausMap.set(r.person, r));
+    ein?.forEach(r => einMap.set(r.person, r));
+    const allNames = Array.from(new Set([...(aus ? aus.map(r => r.person) : []), ...(ein ? ein.map(r => r.person) : [])]))
+      .sort((a, b) => a.split(',')[0].localeCompare(b.split(',')[0], 'de'));
+
+    const out: UtilizationData[] = [];
+    for (const person of allNames) {
+      // Left (historical, includes current week)
+      for (let i = 0; i < leftWeeksArr.length; i++) {
+        const weekNum = leftWeeksArr[i];
+        const fileKey = `KW ${weekNum}-${currentYear}`;
+        const uiLabel = `${currentYear}-KW${weekNum}`;
+        const aRow = ausMap.get(person);
+        const eRow = einMap.get(person);
+        let val: number | null = null;
+        if (aRow && aRow.values && Object.prototype.hasOwnProperty.call(aRow.values, fileKey)) {
+          val = Number(aRow.values[fileKey]);
+        } else if (eRow && eRow.values && Object.prototype.hasOwnProperty.call(eRow.values, fileKey)) {
+          const utilFromPlan = Number(eRow.values[fileKey]);
+          if (Number.isFinite(utilFromPlan)) val = utilFromPlan;
+        }
+        out.push({ person, week: uiLabel, utilization: Number.isFinite(val as number) ? Math.round((val as number) * 10) / 10 : null, isHistorical: true });
+      }
+      // Right (forecast, strictly after current week)
+      for (let i = 0; i < rightWeeksArr.length; i++) {
+        const weekNum = rightWeeksArr[i];
+        const fileKey = `KW ${weekNum}-${currentYear}`;
+        const uiLabel = `${currentYear}-KW${weekNum}`;
+        const aRow = ausMap.get(person);
+        const eRow = einMap.get(person);
+        let val: number | null = null;
+        if (aRow && aRow.values && Object.prototype.hasOwnProperty.call(aRow.values, fileKey)) {
+          val = Number(aRow.values[fileKey]);
+        } else if (eRow && eRow.values && Object.prototype.hasOwnProperty.call(eRow.values, fileKey)) {
+          const utilFromPlan = Number(eRow.values[fileKey]);
+          if (Number.isFinite(utilFromPlan)) val = utilFromPlan;
+        }
+        out.push({ person, week: uiLabel, utilization: Number.isFinite(val as number) ? Math.round((val as number) * 10) / 10 : null, isHistorical: false });
+      }
+    }
+    return out;
+  }, [uploadedFiles, forecastStartWeek, lookbackWeeks, forecastWeeks]);
+
+  const dataForUI: UtilizationData[] = consolidatedData ?? mockData;
+
+  // Build person → meta mapping from uploaded data (prefer Auslastung, fallback Einsatzplan)
+  const personMeta = useMemo(() => {
+    const meta = new Map<string, { cc?: string; lbs?: string }>();
+    const aus = uploadedFiles.auslastung?.data as any[] | undefined;
+    const ein = uploadedFiles.einsatzplan?.data as any[] | undefined;
+    const fill = (rows?: any[]) => {
+      rows?.forEach(r => {
+        if (!r?.person) return;
+        meta.set(r.person, {
+          cc: r.cc ?? meta.get(r.person)?.cc,
+          lbs: r.lbs ?? meta.get(r.person)?.lbs
+        });
+      });
+    };
+    fill(aus);
+    fill(ein);
+    return meta;
+  }, [uploadedFiles]);
+
+  // Options for dropdowns
+  const ccOptions = useMemo(() => {
+    const s = new Set<string>();
+    personMeta.forEach(m => { if (m.cc) s.add(String(m.cc)); });
+    return Array.from(s).sort((a, b) => a.localeCompare(b, 'de'));
+  }, [personMeta]);
+  const lbsOptions = useMemo(() => {
+    const s = new Set<string>();
+    personMeta.forEach(m => { if (m.lbs) s.add(String(m.lbs)); });
+    return Array.from(s).sort((a, b) => a.localeCompare(b, 'de'));
+  }, [personMeta]);
+
   const filteredData = useMemo(() => {
-    if (selectedPersons.length === 0) return mockData;
-    return mockData.filter(item => selectedPersons.includes(item.person));
-  }, [mockData, selectedPersons]);
+    let base = dataForUI;
+    if (filterCC.length > 0) base = base.filter(d => filterCC.includes(String(personMeta.get(d.person)?.cc || '')));
+    if (filterLBS.length > 0) base = base.filter(d => filterLBS.includes(String(personMeta.get(d.person)?.lbs || '')));
+    if (selectedPersons.length > 0) {
+      base = base.filter(item => selectedPersons.includes(item.person));
+    }
+    return base;
+  }, [dataForUI, selectedPersons, filterCC, filterLBS, personMeta]);
+  const visiblePersons = useMemo(() => {
+    return Array.from(new Set(filteredData.map(item => item.person)));
+  }, [filteredData]);
   const allPersons = useMemo(() => {
-    return Array.from(new Set(mockData.map(item => item.person)));
-  }, [mockData]);
+    return Array.from(new Set(dataForUI.map(item => item.person)));
+  }, [dataForUI]);
   const kpiData = useMemo(() => {
     const historicalData = filteredData.filter(item => item.isHistorical && item.utilization !== null);
     const forecastData = filteredData.filter(item => !item.isHistorical && item.utilization !== null);
@@ -66,12 +257,70 @@ export function UtilizationReportView() {
       forecastWeeks
     };
   }, [filteredData, lookbackWeeks, forecastWeeks]);
-  const hasData = uploadedFiles.auslastung?.isValid || uploadedFiles.einsatzplan?.isValid || mockData.length > 0;
+  const hasData = uploadedFiles.auslastung?.isValid || uploadedFiles.einsatzplan?.isValid || dataForUI.length > 0;
   const handleExportCSV = () => {
     console.log('Exporting CSV...');
   };
   const handleExportExcel = () => {
     console.log('Exporting Excel...');
+  };
+  const handleSaveLocal = () => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(uploadedFiles));
+    } catch {}
+  };
+  const handleLoadLocal = () => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setUploadedFiles(parsed || {});
+      }
+    } catch {}
+  };
+  const handleResetLocal = () => {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {}
+    setUploadedFiles({});
+  };
+  const handleExportJSON = () => {
+    const payload = JSON.stringify({
+      exportedAt: new Date().toISOString(),
+      version: 1,
+      data: uploadedFiles
+    });
+    const blob = new Blob([payload], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `utilization-data-${currentIsoYear}-KW${forecastStartWeek}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+  const handleImportJSONClick = () => {
+    importJsonInputRef.current?.click();
+  };
+  const handleImportJSON = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const text = String(reader.result || '');
+        const parsed = JSON.parse(text);
+        const files = parsed?.data || parsed; // accept plain structure as well
+        if (files && (files.auslastung || files.einsatzplan)) {
+          setUploadedFiles(files);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(files));
+        }
+      } catch {}
+    };
+    reader.readAsText(f);
+    // reset input value so same file can be chosen again later
+    e.currentTarget.value = '';
   };
   if (!hasData) {
     return <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -95,10 +344,10 @@ export function UtilizationReportView() {
   return <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-4 py-6">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              Auslastung & Vorblick 2025
+              Auslastung & Vorblick {currentIsoYear}
             </h1>
             <p className="text-sm text-gray-600 mt-1">
               Rückblick {lookbackWeeks} W · Vorblick {forecastWeeks} W · ISO-KW
@@ -113,17 +362,35 @@ export function UtilizationReportView() {
               <FileSpreadsheet className="w-4 h-4" />
               Excel
             </button>
+            <button onClick={handleSaveLocal} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              Speichern
+            </button>
+            <button onClick={handleLoadLocal} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              Laden
+            </button>
+            <button onClick={handleResetLocal} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              Zurücksetzen
+            </button>
+            <button onClick={handleExportJSON} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              Export JSON
+            </button>
+            <button onClick={handleImportJSONClick} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              Import JSON
+            </button>
             <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
               <Settings className="w-4 h-4" />
             </button>
+            <input ref={importJsonInputRef} type="file" accept="application/json" className="hidden" onChange={handleImportJSON} />
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto p-4 space-y-6">
-        {/* Upload Panel */}
-        <UploadPanel uploadedFiles={uploadedFiles} onFilesChange={setUploadedFiles} />
+      <main className="w-full p-4 space-y-6">
+        {/* Upload Section (extracted component) */}
+        <DataUploadSection uploadedFiles={uploadedFiles} onFilesChange={setUploadedFiles} />
+
+        {/* Auslastung Preview ausgeblendet (weiterhin über Upload einsehbar) */}
 
         {/* Filter Bar */}
         <PersonFilterBar allPersons={allPersons} selectedPersons={selectedPersons} onSelectionChange={setSelectedPersons} />
@@ -131,8 +398,8 @@ export function UtilizationReportView() {
         {/* KPI Cards */}
         <KpiCardsGrid kpiData={kpiData} />
 
-        {/* Chart Section */}
-        <UtilizationChartSection data={filteredData} forecastStartWeek={forecastStartWeek} lookbackWeeks={lookbackWeeks} forecastWeeks={forecastWeeks} />
+        {/* Chart Section (new standalone component) */}
+        <UtilizationTrendChart data={filteredData as any} forecastStartWeek={forecastStartWeek} lookbackWeeks={lookbackWeeks} forecastWeeks={forecastWeeks} isoYear={currentIsoYear} />
 
         {/* Table Section */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -140,64 +407,227 @@ export function UtilizationReportView() {
             <h3 className="text-lg font-semibold text-gray-900">
               Detailansicht nach Person
             </h3>
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <MultiSelectFilter label="CC" options={ccOptions} selected={filterCC} onChange={setFilterCC} placeholder="Alle CC" />
+              <MultiSelectFilter label="LBS" options={lbsOptions} selected={filterLBS} onChange={setFilterLBS} placeholder="Alle LBS" />
+              <MultiSelectFilter label="Personen" options={allPersons} selected={selectedPersons} onChange={setSelectedPersons} placeholder="Alle Personen" />
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Person
+                  {/* Durchschnitt der ältesten 4 Wochen */}
+                  <th className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-12">
+                    Ø KW{(forecastStartWeek - lookbackWeeks + 1)}-{(forecastStartWeek - lookbackWeeks + 4)}
                   </th>
-                  {Array.from({
-                  length: lookbackWeeks + forecastWeeks
-                }, (_, i) => {
-                  const weekNumber = forecastStartWeek - lookbackWeeks + i;
-                  return <th key={i} className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-20">
-                        2025-KW{weekNumber}
-                      </th>;
-                })}
-                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ø {lookbackWeeks}W Rückblick
+                  {/* 4 Einzelwochen bis zur aktuellen KW */}
+                  {Array.from({ length: 4 }, (_, i) => {
+                    const weekNumber = (forecastStartWeek - lookbackWeeks + 5) + i;
+                    return (
+                      <th key={`left-single-${i}`} className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-12">
+                        {`${currentIsoYear}-KW${weekNumber}`}
+                      </th>
+                    );
+                  })}
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-24">
+                    Mitarbeitende
                   </th>
-                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ø {forecastWeeks}W Vorblick
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">LBS</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">
+                    <div className="flex items-center justify-center">
+                      <Car className="w-4 h-4" />
+                    </div>
                   </th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">Status</th>
+                  {Array.from({ length: forecastWeeks }, (_, i) => {
+                    const weekNumber = (forecastStartWeek + 1) + i; // starts after current week
+                    return (
+                      <th key={`right-${i}`} className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-12">
+                        {`${currentIsoYear}-KW${weekNumber}`}
+                      </th>
+                    );
+                  })}
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">Kunde</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">%</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">Start KW</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">Planung</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">Ticket</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {allPersons.map(person => {
-                const personData = filteredData.filter(item => item.person === person);
-                const historicalAvg = personData.filter(item => item.isHistorical && item.utilization !== null).reduce((sum, item, _, arr) => sum + item.utilization! / arr.length, 0);
-                const forecastAvg = personData.filter(item => !item.isHistorical && item.utilization !== null).reduce((sum, item, _, arr) => sum + item.utilization! / arr.length, 0);
-                return <tr key={person} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {person}
+                {visiblePersons.map(person => {
+                  const personData = filteredData.filter(item => item.person === person);
+                  return (
+                    <tr key={person} className="hover:bg-gray-50">
+                      {/* Durchschnitt der ältesten 4 Wochen */}
+                      <td className="px-1 py-2 text-center text-xs bg-gray-100">
+                        {(() => {
+                          const oldestWeeks = Array.from({ length: 4 }, (_, i) => {
+                            const weekNumber = (forecastStartWeek - lookbackWeeks + 1) + i;
+                            const weekData = personData.find(item => item.week === `${currentIsoYear}-KW${weekNumber}`);
+                            return weekData?.utilization;
+                          }).filter(util => util !== null && util !== undefined);
+                          
+                          if (oldestWeeks.length === 0) return '—';
+                          
+                          const average = Math.round(oldestWeeks.reduce((sum, util) => sum + util!, 0) / oldestWeeks.length);
+                          let bgColor = 'bg-gray-100';
+                          if (average > 90) bgColor = 'bg-green-100';
+                          else if (average > 80) bgColor = 'bg-yellow-100';
+                          else bgColor = 'bg-red-100';
+                          
+                          return (
+                            <span className={`inline-block px-2 py-1 rounded ${bgColor}`}>
+                              <span className="flex items-center justify-center gap-1">
+                                {average}%
+                                {average > 100 && <Star className="w-3 h-3 text-yellow-500" />}
+                              </span>
+                            </span>
+                          );
+                        })()}
                       </td>
-                      {Array.from({
-                    length: lookbackWeeks + forecastWeeks
-                  }, (_, i) => {
-                    const weekNumber = forecastStartWeek - lookbackWeeks + i;
-                    const weekData = personData.find(item => item.week === `2025-KW${weekNumber}`);
-                    const utilization = weekData?.utilization;
-                    let bgColor = 'bg-gray-100';
-                    if (utilization !== null && utilization !== undefined) {
-                      if (utilization > 90) bgColor = 'bg-green-100';else if (utilization > 80) bgColor = 'bg-yellow-100';else bgColor = 'bg-red-100';
-                    }
-                    return <td key={i} className={`px-3 py-4 text-center text-sm ${bgColor}`}>
-                            {utilization !== null && utilization !== undefined ? <span className="flex items-center justify-center gap-1">
+                      {/* 4 Einzelwochen bis zur aktuellen KW */}
+                      {Array.from({ length: 4 }, (_, i) => {
+                        const weekNumber = (forecastStartWeek - lookbackWeeks + 5) + i;
+                        const weekData = personData.find(item => item.week === `${currentIsoYear}-KW${weekNumber}`);
+                        const utilization = weekData?.utilization;
+                        let bgColor = 'bg-gray-100';
+                        if (utilization !== null && utilization !== undefined) {
+                          if (utilization > 90) bgColor = 'bg-green-100';
+                          else if (utilization > 80) bgColor = 'bg-yellow-100';
+                          else bgColor = 'bg-red-100';
+                        }
+                        return (
+                          <td key={`l-single-${i}`} className={`px-1 py-2 text-center text-xs ${bgColor}`}>
+                            {utilization !== null && utilization !== undefined ? (
+                              <span className="flex items-center justify-center gap-1">
                                 {utilization}%
                                 {utilization > 100 && <Star className="w-3 h-3 text-yellow-500" />}
-                              </span> : '—'}
-                          </td>;
-                  })}
-                      <td className="px-3 py-4 text-center text-sm font-medium">
-                        {Math.round(historicalAvg)}%
+                              </span>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">
+                        <div className="flex items-center gap-2">
+                          {personStatus[person] && (
+                            <span className={getStatusColor(personStatus[person])}>
+                              {getStatusIcon(personStatus[person])}
+                            </span>
+                          )}
+                          <span>{person}</span>
+                          {plannedByPerson[person]?.planned ? <span title="Geplanter Einsatz" className="inline-block w-2 h-2 rounded-full bg-amber-500" /> : null}
+                        </div>
                       </td>
-                      <td className="px-3 py-4 text-center text-sm font-medium">
-                        {Math.round(forecastAvg)}%
+                      <td className="px-2 py-2 text-sm bg-gray-50">
+                        {personMeta.get(person)?.lbs ? (
+                          <span className="text-xs text-gray-700">{personMeta.get(person)?.lbs}</span>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
                       </td>
-                    </tr>;
-              })}
+                      <td className="px-2 py-2 text-sm bg-gray-50">
+                        <TravelReadinessSelector
+                          person={person}
+                          value={personTravelReadiness[person]}
+                          onChange={(readiness) => setPersonTravelReadiness(prev => ({ ...prev, [person]: readiness }))}
+                        />
+                      </td>
+                      <td className="px-2 py-2 text-sm bg-gray-50">
+                        <StatusLabelSelector
+                          person={person}
+                          value={personStatus[person]}
+                          onChange={(status) => setPersonStatus(prev => ({ ...prev, [person]: status }))}
+                        />
+                      </td>
+                      {Array.from({ length: forecastWeeks }, (_, i) => {
+                        const weekNumber = (forecastStartWeek + 1) + i;
+                        const weekData = personData.find(item => item.week === `${currentIsoYear}-KW${weekNumber}`);
+                        const utilization = weekData?.utilization;
+                        let bgColor = 'bg-gray-100';
+                        if (utilization !== null && utilization !== undefined) {
+                          if (utilization > 90) bgColor = 'bg-green-100';
+                          else if (utilization > 80) bgColor = 'bg-yellow-100';
+                          else bgColor = 'bg-red-100';
+                        }
+                        return (
+                          <td key={`r-${i}`} className={`px-1 py-2 text-center text-xs ${bgColor}`}>
+                            <div className="flex flex-col items-center gap-1">
+                              {utilization !== null && utilization !== undefined ? (
+                                <span className="flex items-center justify-center gap-1">
+                                  {utilization}%
+                                  {utilization > 100 && <Star className="w-3 h-3 text-yellow-500" />}
+                                </span>
+                              ) : (
+                                '—'
+                              )}
+                              {isWeekInPlannedProject(person, weekNumber) && (
+                                <span 
+                                  title="Geplantes Projekt in dieser Woche" 
+                                  className="text-blue-600 text-lg"
+                                >
+                                  📋
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        );
+                      })}
+                      <td className="px-2 py-2 text-sm bg-gray-50">
+                        {plannedByPerson[person]?.planned && plannedByPerson[person]?.customer ? (
+                          <span className="text-xs text-gray-700">{plannedByPerson[person].customer}</span>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-2 text-sm bg-gray-50">
+                        {plannedByPerson[person]?.planned && plannedByPerson[person]?.probability ? (
+                          <span className="text-xs text-gray-700">{plannedByPerson[person].probability}%</span>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-2 text-sm bg-gray-50">
+                        {plannedByPerson[person]?.planned && plannedByPerson[person]?.startKw ? (
+                          <span className="text-xs text-gray-700">{plannedByPerson[person].startKw}</span>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-2 text-sm bg-gray-50">
+                        <PlannedEngagementEditor
+                          person={person}
+                          value={plannedByPerson[person]}
+                          customers={customers}
+                          availableKws={Array.from({ length: forecastWeeks }, (_, i) => {
+                            const w = forecastStartWeek + 1 + i; // Nur zukünftige Wochen (ab aktueller KW + 1)
+                            return `${currentIsoYear}-KW${w}`;
+                          })}
+                          onChange={(next) => setPlannedByPerson(prev => ({ ...prev, [person]: next }))}
+                          onAddCustomer={(name) => setCustomers(prev => [...new Set([...prev, name.trim()])])}
+                        />
+                      </td>
+                      <td className="px-2 py-2 text-sm bg-gray-50">
+                        {plannedByPerson[person]?.ticketId ? (
+                          <a 
+                            href={plannedByPerson[person].ticketId} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:text-blue-800 underline truncate block"
+                            title={plannedByPerson[person].ticketId}
+                          >
+                            {plannedByPerson[person].ticketId.split('/').pop() || 'Ticket'}
+                          </a>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
