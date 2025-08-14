@@ -8,11 +8,9 @@ interface KpiData {
   missingValues: number;
   lookbackWeeks?: number;
   forecastWeeks?: number;
-  mpid?: string;
 }
 interface KpiCardsGridProps {
   kpiData: KpiData;
-  mpid?: string;
 }
 interface KpiCardProps {
   title: string;
@@ -23,7 +21,6 @@ interface KpiCardProps {
   trend?: 'up' | 'down' | 'neutral';
   subtitle?: string;
   delay?: number;
-  mpid?: string;
 }
 function KpiCard({
   title,
@@ -87,8 +84,8 @@ function KpiCard({
   };
   const colors = getColorClasses(color);
   const getTrendIcon = () => {
-    if (trend === 'up') return <TrendingUp className="w-3 h-3 text-green-500" data-magicpath-id="0" data-magicpath-path="KpiCardsGrid.tsx" />;
-    if (trend === 'down') return <TrendingDown className="w-3 h-3 text-red-500" data-magicpath-id="1" data-magicpath-path="KpiCardsGrid.tsx" />;
+    if (trend === 'up') return <TrendingUp className="w-3 h-3 text-green-500" />;
+    if (trend === 'down') return <TrendingDown className="w-3 h-3 text-red-500" />;
     return null;
   };
   const getStatusText = () => {
@@ -111,9 +108,9 @@ function KpiCard({
     delay,
     duration: 0.3,
     ease: "easeOut"
-  }} className={`relative p-6 rounded-xl border ${colors.bg} ${colors.border} hover:shadow-lg transition-all duration-300 group cursor-default`} onMouseEnter={() => setShowTooltip(true)} onMouseLeave={() => setShowTooltip(false)} data-magicpath-id="2" data-magicpath-path="KpiCardsGrid.tsx">
+  }} className={`relative p-6 rounded-xl border ${colors.bg} ${colors.border} hover:shadow-lg transition-all duration-300 group cursor-default`} onMouseEnter={() => setShowTooltip(true)} onMouseLeave={() => setShowTooltip(false)}>
       {/* Tooltip */}
-      <AnimatePresence data-magicpath-id="3" data-magicpath-path="KpiCardsGrid.tsx">
+      <AnimatePresence>
         {showTooltip && <motion.div initial={{
         opacity: 0,
         y: 10,
@@ -128,38 +125,38 @@ function KpiCard({
         scale: 0.9
       }} transition={{
         duration: 0.2
-      }} className="absolute top-4 right-4 z-10" data-magicpath-id="4" data-magicpath-path="KpiCardsGrid.tsx">
-            <div className="relative" data-magicpath-id="5" data-magicpath-path="KpiCardsGrid.tsx">
-              <HelpCircle className="w-4 h-4 text-gray-400" data-magicpath-id="6" data-magicpath-path="KpiCardsGrid.tsx" />
-              <div className="absolute bottom-full right-0 mb-2 w-72 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-xl" data-magicpath-id="7" data-magicpath-path="KpiCardsGrid.tsx">
-                <p className="leading-relaxed" data-magicpath-id="8" data-magicpath-path="KpiCardsGrid.tsx">{tooltip}</p>
-                <div className="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900" data-magicpath-id="9" data-magicpath-path="KpiCardsGrid.tsx"></div>
+      }} className="absolute top-4 right-4 z-10">
+            <div className="relative">
+              <HelpCircle className="w-4 h-4 text-gray-400" />
+              <div className="absolute bottom-full right-0 mb-2 w-72 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-xl">
+                <p className="leading-relaxed">{tooltip}</p>
+                <div className="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
               </div>
             </div>
           </motion.div>}
       </AnimatePresence>
 
       {/* Header with Icon */}
-      <div className="flex items-start justify-between mb-4" data-magicpath-id="10" data-magicpath-path="KpiCardsGrid.tsx">
+      <div className="flex items-start justify-between mb-4">
         <motion.div whileHover={{
         scale: 1.05
-      }} className={`p-3 rounded-lg ${colors.iconBg} border ${colors.border}`} data-magicpath-id="11" data-magicpath-path="KpiCardsGrid.tsx">
-          <IconComponent className={`w-5 h-5 ${colors.icon}`} data-magicpath-id="12" data-magicpath-path="KpiCardsGrid.tsx" />
+      }} className={`p-3 rounded-lg ${colors.iconBg} border ${colors.border}`}>
+          <IconComponent className={`w-5 h-5 ${colors.icon}`} />
         </motion.div>
         
         {/* Info Icon - Always visible on mobile, hover on desktop */}
-        <div className="block sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" data-magicpath-id="13" data-magicpath-path="KpiCardsGrid.tsx">
-          <Info className="w-4 h-4 text-gray-400" data-magicpath-id="14" data-magicpath-path="KpiCardsGrid.tsx" />
+        <div className="block sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+          <Info className="w-4 h-4 text-gray-400" />
         </div>
       </div>
 
       {/* Content */}
-      <div className="space-y-2" data-magicpath-id="15" data-magicpath-path="KpiCardsGrid.tsx">
-        <h3 className="text-sm font-medium text-gray-600 leading-tight pr-2" data-magicpath-id="16" data-magicpath-path="KpiCardsGrid.tsx">
+      <div className="space-y-2">
+        <h3 className="text-sm font-medium text-gray-600 leading-tight pr-2">
           {title}
         </h3>
         
-        <div className="flex items-baseline gap-2" data-magicpath-id="17" data-magicpath-path="KpiCardsGrid.tsx">
+        <div className="flex items-baseline gap-2">
           <motion.p key={value} initial={{
           scale: 1.1,
           opacity: 0.8
@@ -168,13 +165,13 @@ function KpiCard({
           opacity: 1
         }} transition={{
           duration: 0.2
-        }} className={`text-3xl font-bold ${colors.value}`} data-magicpath-id="18" data-magicpath-path="KpiCardsGrid.tsx">
+        }} className={`text-3xl font-bold ${colors.value}`}>
             {value}
           </motion.p>
           {getTrendIcon()}
         </div>
 
-        {subtitle && <p className="text-xs text-gray-500 mt-1" data-magicpath-id="19" data-magicpath-path="KpiCardsGrid.tsx">
+        {subtitle && <p className="text-xs text-gray-500 mt-1">
             {subtitle}
           </p>}
       </div>
@@ -188,9 +185,9 @@ function KpiCard({
       x: 0
     }} transition={{
       delay: delay + 0.2
-    }} className="mt-4 flex items-center gap-2" data-magicpath-id="20" data-magicpath-path="KpiCardsGrid.tsx">
-          <div className={`w-2 h-2 rounded-full ${colors.indicator}`} data-magicpath-id="21" data-magicpath-path="KpiCardsGrid.tsx"></div>
-          <span className="text-xs font-medium text-gray-600" data-magicpath-id="22" data-magicpath-path="KpiCardsGrid.tsx">
+    }} className="mt-4 flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${colors.indicator}`}></div>
+          <span className="text-xs font-medium text-gray-600">
             {getStatusText()}
           </span>
         </motion.div>}
@@ -206,14 +203,14 @@ function KpiCard({
       delay: delay + 0.3,
       type: "spring",
       stiffness: 200
-    }} className="absolute top-2 left-2" data-magicpath-id="23" data-magicpath-path="KpiCardsGrid.tsx">
-          <div className="w-3 h-3 bg-yellow-400 rounded-full flex items-center justify-center" data-magicpath-id="24" data-magicpath-path="KpiCardsGrid.tsx">
-            <Star className="w-2 h-2 text-yellow-800" data-magicpath-id="25" data-magicpath-path="KpiCardsGrid.tsx" />
+    }} className="absolute top-2 left-2">
+          <div className="w-3 h-3 bg-yellow-400 rounded-full flex items-center justify-center">
+            <Star className="w-2 h-2 text-yellow-800" />
           </div>
         </motion.div>}
 
       {/* Hover effect overlay */}
-      <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" data-magicpath-id="26" data-magicpath-path="KpiCardsGrid.tsx" />
+      <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
     </motion.div>;
 }
 export function KpiCardsGrid({
@@ -238,8 +235,7 @@ export function KpiCardsGrid({
     color: getHistoricalColor(),
     tooltip: `Durchschnittliche Auslastung der letzten ${kpiData.lookbackWeeks || 8} Wochen. Ø über vorhandene Werte, fehlende Daten werden ignoriert.`,
     trend: getHistoricalTrend(),
-    subtitle: 'Historische Daten',
-    mpid: "19150668-036d-4343-ad40-2bea69cd781a"
+    subtitle: 'Historische Daten'
   }, {
     title: `Ø Auslastung Vorblick (${kpiData.forecastWeeks || 4} W)`,
     value: `${kpiData.avgForecast}%`,
@@ -247,26 +243,23 @@ export function KpiCardsGrid({
     color: getForecastColor(),
     tooltip: `Prognostizierte durchschnittliche Auslastung der nächsten ${kpiData.forecastWeeks || 4} Wochen. Ø über vorhandene Werte, fehlende Daten werden ignoriert.`,
     trend: getForecastTrend(),
-    subtitle: 'Prognosedaten',
-    mpid: "a2334a71-4329-4a02-9e08-ed708afea966"
+    subtitle: 'Prognosedaten'
   }, {
     title: '⭐ >100 % (Anzahl Personen/Wochen)',
     value: kpiData.overUtilized.toString(),
     icon: Star,
     color: 'blue' as const,
     tooltip: 'Anzahl der Datenpunkte (Person/Woche-Kombinationen) mit Überauslastung über 100%. Diese werden besonders hervorgehoben.',
-    subtitle: kpiData.overUtilized === 1 ? 'Datenpunkt' : 'Datenpunkte',
-    mpid: "1db6ba3a-8cf4-4ac6-b663-4a9e5bae57a5"
+    subtitle: kpiData.overUtilized === 1 ? 'Datenpunkt' : 'Datenpunkte'
   }, {
     title: 'Anzahl fehlender Werte (ignoriert)',
     value: kpiData.missingValues.toString(),
     icon: AlertTriangle,
     color: 'gray' as const,
     tooltip: 'Anzahl der fehlenden Auslastungswerte in den Daten. Diese Werte werden in allen Berechnungen und Aggregationen ignoriert.',
-    subtitle: 'Werden nicht berücksichtigt',
-    mpid: "94b9f17f-c2fa-4e94-aadd-5890d38471c1"
+    subtitle: 'Werden nicht berücksichtigt'
   }] as any[];
-  return <div className="space-y-4" data-magicpath-id="27" data-magicpath-path="KpiCardsGrid.tsx">
+  return <div className="space-y-4">
       {/* Section Header */}
       <motion.div initial={{
       opacity: 0,
@@ -274,20 +267,20 @@ export function KpiCardsGrid({
     }} animate={{
       opacity: 1,
       y: 0
-    }} className="flex items-center justify-between" data-magicpath-id="28" data-magicpath-path="KpiCardsGrid.tsx">
-        <div data-magicpath-id="29" data-magicpath-path="KpiCardsGrid.tsx">
-          <h2 className="text-lg font-semibold text-gray-900" data-magicpath-id="30" data-magicpath-path="KpiCardsGrid.tsx">
+    }} className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">
             Kennzahlen Übersicht
           </h2>
-          <p className="text-sm text-gray-600 mt-1" data-magicpath-id="31" data-magicpath-path="KpiCardsGrid.tsx">
+          <p className="text-sm text-gray-600 mt-1">
             Wichtige Metriken zur Auslastungsanalyse
           </p>
         </div>
       </motion.div>
 
       {/* Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6" data-magicpath-id="32" data-magicpath-path="KpiCardsGrid.tsx">
-        {cards.map((card, index) => <KpiCard key={card.title} {...card} delay={index * 0.1} data-magicpath-uuid={(card as any)["mpid"] ?? "unsafe"} data-magicpath-id="33" data-magicpath-path="KpiCardsGrid.tsx" />)}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+        {cards.map((card, index) => <KpiCard key={card.title} {...card} delay={index * 0.1} />)}
       </div>
 
       {/* Summary Insights */}
@@ -299,17 +292,17 @@ export function KpiCardsGrid({
       y: 0
     }} transition={{
       delay: 0.5
-    }} className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200" data-magicpath-id="34" data-magicpath-path="KpiCardsGrid.tsx">
-        <div className="flex items-start gap-3" data-magicpath-id="35" data-magicpath-path="KpiCardsGrid.tsx">
-          <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" data-magicpath-id="36" data-magicpath-path="KpiCardsGrid.tsx" />
-          <div className="space-y-2" data-magicpath-id="37" data-magicpath-path="KpiCardsGrid.tsx">
-            <h4 className="text-sm font-medium text-gray-900" data-magicpath-id="38" data-magicpath-path="KpiCardsGrid.tsx">
+    }} className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+        <div className="flex items-start gap-3">
+          <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium text-gray-900">
               Auslastungsanalyse
             </h4>
-            <div className="text-sm text-gray-600 space-y-1" data-magicpath-id="39" data-magicpath-path="KpiCardsGrid.tsx">
-              {kpiData.avgHistorical > kpiData.avgForecast ? <p data-magicpath-id="40" data-magicpath-path="KpiCardsGrid.tsx">• Die prognostizierte Auslastung liegt unter dem historischen Durchschnitt</p> : kpiData.avgHistorical < kpiData.avgForecast ? <p data-magicpath-id="41" data-magicpath-path="KpiCardsGrid.tsx">• Die prognostizierte Auslastung steigt im Vergleich zum historischen Durchschnitt</p> : <p data-magicpath-id="42" data-magicpath-path="KpiCardsGrid.tsx">• Die prognostizierte Auslastung bleibt stabil</p>}
-              {kpiData.overUtilized > 0 && <p data-magicpath-id="43" data-magicpath-path="KpiCardsGrid.tsx">• {kpiData.overUtilized} Datenpunkt{kpiData.overUtilized !== 1 ? 'e' : ''} mit Überauslastung identifiziert</p>}
-              {kpiData.missingValues > 0 && <p data-magicpath-id="44" data-magicpath-path="KpiCardsGrid.tsx">• {kpiData.missingValues} fehlende Werte werden in Berechnungen ignoriert</p>}
+            <div className="text-sm text-gray-600 space-y-1">
+              {kpiData.avgHistorical > kpiData.avgForecast ? <p>• Die prognostizierte Auslastung liegt unter dem historischen Durchschnitt</p> : kpiData.avgHistorical < kpiData.avgForecast ? <p>• Die prognostizierte Auslastung steigt im Vergleich zum historischen Durchschnitt</p> : <p>• Die prognostizierte Auslastung bleibt stabil</p>}
+              {kpiData.overUtilized > 0 && <p>• {kpiData.overUtilized} Datenpunkt{kpiData.overUtilized !== 1 ? 'e' : ''} mit Überauslastung identifiziert</p>}
+              {kpiData.missingValues > 0 && <p>• {kpiData.missingValues} fehlende Werte werden in Berechnungen ignoriert</p>}
             </div>
           </div>
         </div>
