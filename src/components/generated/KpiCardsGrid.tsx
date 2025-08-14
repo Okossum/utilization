@@ -6,6 +6,8 @@ interface KpiData {
   avgForecast: number;
   overUtilized: number;
   missingValues: number;
+  lookbackWeeks?: number;
+  forecastWeeks?: number;
   mpid?: string;
 }
 interface KpiCardsGridProps {
@@ -230,23 +232,23 @@ export function KpiCardsGrid({
     return kpiData.avgForecast > kpiData.avgHistorical ? 'up' : kpiData.avgForecast < kpiData.avgHistorical ? 'down' : 'neutral';
   };
   const cards = [{
-    title: 'Ø Auslastung Rückblick (8 W)',
+    title: `Ø Auslastung Rückblick (${kpiData.lookbackWeeks || 8} W)`,
     value: `${kpiData.avgHistorical}%`,
     icon: TrendingUp,
     color: getHistoricalColor(),
-    tooltip: 'Durchschnittliche Auslastung der letzten 8 Wochen. Ø über vorhandene Werte, fehlende Daten werden ignoriert.',
+    tooltip: `Durchschnittliche Auslastung der letzten ${kpiData.lookbackWeeks || 8} Wochen. Ø über vorhandene Werte, fehlende Daten werden ignoriert.`,
     trend: getHistoricalTrend(),
     subtitle: 'Historische Daten',
-    mpid: "4e3e5bda-c367-472d-9fe7-b359f605b5fc"
+    mpid: "19150668-036d-4343-ad40-2bea69cd781a"
   }, {
-    title: 'Ø Auslastung Vorblick (4 W)',
+    title: `Ø Auslastung Vorblick (${kpiData.forecastWeeks || 4} W)`,
     value: `${kpiData.avgForecast}%`,
     icon: TrendingDown,
     color: getForecastColor(),
-    tooltip: 'Prognostizierte durchschnittliche Auslastung der nächsten 4 Wochen. Ø über vorhandene Werte, fehlende Daten werden ignoriert.',
+    tooltip: `Prognostizierte durchschnittliche Auslastung der nächsten ${kpiData.forecastWeeks || 4} Wochen. Ø über vorhandene Werte, fehlende Daten werden ignoriert.`,
     trend: getForecastTrend(),
     subtitle: 'Prognosedaten',
-    mpid: "703aaf10-7814-4e74-9005-98d8a9bdf602"
+    mpid: "a2334a71-4329-4a02-9e08-ed708afea966"
   }, {
     title: '⭐ >100 % (Anzahl Personen/Wochen)',
     value: kpiData.overUtilized.toString(),
@@ -254,7 +256,7 @@ export function KpiCardsGrid({
     color: 'blue' as const,
     tooltip: 'Anzahl der Datenpunkte (Person/Woche-Kombinationen) mit Überauslastung über 100%. Diese werden besonders hervorgehoben.',
     subtitle: kpiData.overUtilized === 1 ? 'Datenpunkt' : 'Datenpunkte',
-    mpid: "61a2a0f3-b262-4a20-9a7d-f4311bee7baa"
+    mpid: "1db6ba3a-8cf4-4ac6-b663-4a9e5bae57a5"
   }, {
     title: 'Anzahl fehlender Werte (ignoriert)',
     value: kpiData.missingValues.toString(),
@@ -262,7 +264,7 @@ export function KpiCardsGrid({
     color: 'gray' as const,
     tooltip: 'Anzahl der fehlenden Auslastungswerte in den Daten. Diese Werte werden in allen Berechnungen und Aggregationen ignoriert.',
     subtitle: 'Werden nicht berücksichtigt',
-    mpid: "bb2782dc-3d04-4c8c-b951-9e0f5c30c04d"
+    mpid: "94b9f17f-c2fa-4e94-aadd-5890d38471c1"
   }] as any[];
   return <div className="space-y-4" data-magicpath-id="27" data-magicpath-path="KpiCardsGrid.tsx">
       {/* Section Header */}

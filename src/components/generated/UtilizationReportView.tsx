@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info } from 'lucide-react';
+import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus } from 'lucide-react';
 import { UploadPanel } from './UploadPanel';
 import { PersonFilterBar } from './PersonFilterBar';
 import { KpiCardsGrid } from './KpiCardsGrid';
@@ -27,20 +27,24 @@ export function UtilizationReportView() {
   const [selectedPersons, setSelectedPersons] = useState<string[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [forecastStartWeek, setForecastStartWeek] = useState(33);
+  const [lookbackWeeks, setLookbackWeeks] = useState(8);
+  const [forecastWeeks, setForecastWeeks] = useState(4);
 
   // Mock data for demonstration
   const mockData: UtilizationData[] = useMemo(() => {
     const persons = ['Max Mustermann', 'Anna Schmidt', 'Peter Weber', 'Lisa Müller', 'Tom Fischer'];
+    const totalWeeks = lookbackWeeks + forecastWeeks;
+    const startWeek = forecastStartWeek - lookbackWeeks;
     const weeks = Array.from({
-      length: 12
-    }, (_, i) => `2025-KW${29 + i}`);
+      length: totalWeeks
+    }, (_, i) => `2025-KW${startWeek + i}`);
     return persons.flatMap(person => weeks.map((week, weekIndex) => ({
       person,
       week,
       utilization: Math.random() > 0.1 ? Math.round(Math.random() * 40 + 70) : null,
-      isHistorical: weekIndex < 8
+      isHistorical: weekIndex < lookbackWeeks
     })));
-  }, []);
+  }, [lookbackWeeks, forecastWeeks, forecastStartWeek]);
   const filteredData = useMemo(() => {
     if (selectedPersons.length === 0) return mockData;
     return mockData.filter(item => selectedPersons.includes(item.person));
@@ -59,9 +63,11 @@ export function UtilizationReportView() {
       avgHistorical: Math.round(avgHistorical),
       avgForecast: Math.round(avgForecast),
       overUtilized,
-      missingValues
+      missingValues,
+      lookbackWeeks,
+      forecastWeeks
     };
-  }, [filteredData]);
+  }, [filteredData, lookbackWeeks, forecastWeeks]);
   const hasData = uploadedFiles.auslastung?.isValid || uploadedFiles.einsatzplan?.isValid || mockData.length > 0;
   const handleExportCSV = () => {
     console.log('Exporting CSV...');
@@ -84,9 +90,7 @@ export function UtilizationReportView() {
           <h2 className="text-xl font-semibold text-gray-900 mb-2" data-magicpath-id="4" data-magicpath-path="UtilizationReportView.tsx">
             Lade Auslastung & Einsatzplan hoch
           </h2>
-          <p className="text-gray-600" data-magicpath-id="5" data-magicpath-path="UtilizationReportView.tsx">
-            um den Report zu sehen
-          </p>
+          <p className="text-gray-600" data-magicpath-id="5" data-magicpath-path="UtilizationReportView.tsx">um den Report zu sehen</p>
         </motion.div>
       </div>;
   }
@@ -99,7 +103,7 @@ export function UtilizationReportView() {
               Auslastung & Vorblick 2025
             </h1>
             <p className="text-sm text-gray-600 mt-1" data-magicpath-id="11" data-magicpath-path="UtilizationReportView.tsx">
-              Rückblick 8 W · Vorblick 4 W · ISO-KW
+              Rückblick {lookbackWeeks} W · Vorblick {forecastWeeks} W · ISO-KW
             </p>
           </div>
           <div className="flex items-center gap-2" data-magicpath-id="12" data-magicpath-path="UtilizationReportView.tsx">
@@ -130,7 +134,7 @@ export function UtilizationReportView() {
         <KpiCardsGrid kpiData={kpiData} data-magicpath-id="22" data-magicpath-path="UtilizationReportView.tsx" />
 
         {/* Chart Section */}
-        <UtilizationChartSection data={filteredData} forecastStartWeek={forecastStartWeek} data-magicpath-id="23" data-magicpath-path="UtilizationReportView.tsx" />
+        <UtilizationChartSection data={filteredData} forecastStartWeek={forecastStartWeek} lookbackWeeks={lookbackWeeks} forecastWeeks={forecastWeeks} data-magicpath-id="23" data-magicpath-path="UtilizationReportView.tsx" />
 
         {/* Table Section */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden" data-magicpath-id="24" data-magicpath-path="UtilizationReportView.tsx">
@@ -147,15 +151,18 @@ export function UtilizationReportView() {
                     Person
                   </th>
                   {Array.from({
-                  length: 12
-                }, (_, i) => <th key={i} className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-20" data-magicpath-id="32" data-magicpath-path="UtilizationReportView.tsx">
-                      2025-KW{29 + i}
-                    </th>)}
+                  length: lookbackWeeks + forecastWeeks
+                }, (_, i) => {
+                  const weekNumber = forecastStartWeek - lookbackWeeks + i;
+                  return <th key={i} className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-20" data-magicpath-id="32" data-magicpath-path="UtilizationReportView.tsx">
+                        2025-KW{weekNumber}
+                      </th>;
+                })}
                   <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" data-magicpath-id="33" data-magicpath-path="UtilizationReportView.tsx">
-                    Ø 8W Rückblick
+                    Ø {lookbackWeeks}W Rückblick
                   </th>
                   <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" data-magicpath-id="34" data-magicpath-path="UtilizationReportView.tsx">
-                    Ø 4W Vorblick
+                    Ø {forecastWeeks}W Vorblick
                   </th>
                 </tr>
               </thead>
@@ -169,9 +176,10 @@ export function UtilizationReportView() {
                         {person}
                       </td>
                       {Array.from({
-                    length: 12
+                    length: lookbackWeeks + forecastWeeks
                   }, (_, i) => {
-                    const weekData = personData.find(item => item.week === `2025-KW${29 + i}`);
+                    const weekNumber = forecastStartWeek - lookbackWeeks + i;
+                    const weekData = personData.find(item => item.week === `2025-KW${weekNumber}`);
                     const utilization = weekData?.utilization;
                     let bgColor = 'bg-gray-100';
                     if (utilization !== null && utilization !== undefined) {
@@ -217,31 +225,88 @@ export function UtilizationReportView() {
           scale: 0.95,
           opacity: 0
         }} className="bg-white rounded-xl shadow-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()} data-magicpath-id="45" data-magicpath-path="UtilizationReportView.tsx">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4" data-magicpath-id="46" data-magicpath-path="UtilizationReportView.tsx">
-                Einstellungen
+              <h2 className="text-lg font-semibold text-gray-900 mb-6" data-magicpath-id="46" data-magicpath-path="UtilizationReportView.tsx">
+                Zeitraum-Einstellungen
               </h2>
-              <div className="space-y-4" data-magicpath-id="47" data-magicpath-path="UtilizationReportView.tsx">
+              
+              <div className="space-y-6" data-magicpath-id="47" data-magicpath-path="UtilizationReportView.tsx">
+                {/* Lookback Weeks */}
                 <div data-magicpath-id="48" data-magicpath-path="UtilizationReportView.tsx">
-                  <label className="block text-sm font-medium text-gray-700 mb-2" data-magicpath-id="49" data-magicpath-path="UtilizationReportView.tsx">
+                  <label className="block text-sm font-medium text-gray-700 mb-3" data-magicpath-id="49" data-magicpath-path="UtilizationReportView.tsx">
+                    Rückblick-Wochen
+                  </label>
+                  <div className="flex items-center gap-4" data-magicpath-id="50" data-magicpath-path="UtilizationReportView.tsx">
+                    <button onClick={() => setLookbackWeeks(Math.max(1, lookbackWeeks - 1))} disabled={lookbackWeeks <= 1} className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" data-magicpath-id="51" data-magicpath-path="UtilizationReportView.tsx">
+                      <Minus className="w-4 h-4" data-magicpath-id="52" data-magicpath-path="UtilizationReportView.tsx" />
+                    </button>
+                    <div className="flex-1 text-center" data-magicpath-id="53" data-magicpath-path="UtilizationReportView.tsx">
+                      <div className="text-2xl font-bold text-gray-900" data-magicpath-id="54" data-magicpath-path="UtilizationReportView.tsx">{lookbackWeeks}</div>
+                      <div className="text-xs text-gray-500" data-magicpath-id="55" data-magicpath-path="UtilizationReportView.tsx">Wochen</div>
+                    </div>
+                    <button onClick={() => setLookbackWeeks(Math.min(12, lookbackWeeks + 1))} disabled={lookbackWeeks >= 12} className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" data-magicpath-id="56" data-magicpath-path="UtilizationReportView.tsx">
+                      <Plus className="w-4 h-4" data-magicpath-id="57" data-magicpath-path="UtilizationReportView.tsx" />
+                    </button>
+                  </div>
+                  <div className="mt-2 text-xs text-gray-500 text-center" data-magicpath-id="58" data-magicpath-path="UtilizationReportView.tsx">
+                    1 - 12 Wochen (aktuell: {lookbackWeeks})
+                  </div>
+                </div>
+
+                {/* Forecast Weeks */}
+                <div data-magicpath-id="59" data-magicpath-path="UtilizationReportView.tsx">
+                  <label className="block text-sm font-medium text-gray-700 mb-3" data-magicpath-id="60" data-magicpath-path="UtilizationReportView.tsx">
+                    Vorblick-Wochen
+                  </label>
+                  <div className="flex items-center gap-4" data-magicpath-id="61" data-magicpath-path="UtilizationReportView.tsx">
+                    <button onClick={() => setForecastWeeks(Math.max(1, forecastWeeks - 1))} disabled={forecastWeeks <= 1} className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" data-magicpath-id="62" data-magicpath-path="UtilizationReportView.tsx">
+                      <Minus className="w-4 h-4" data-magicpath-id="63" data-magicpath-path="UtilizationReportView.tsx" />
+                    </button>
+                    <div className="flex-1 text-center" data-magicpath-id="64" data-magicpath-path="UtilizationReportView.tsx">
+                      <div className="text-2xl font-bold text-gray-900" data-magicpath-id="65" data-magicpath-path="UtilizationReportView.tsx">{forecastWeeks}</div>
+                      <div className="text-xs text-gray-500" data-magicpath-id="66" data-magicpath-path="UtilizationReportView.tsx">Wochen</div>
+                    </div>
+                    <button onClick={() => setForecastWeeks(Math.min(12, forecastWeeks + 1))} disabled={forecastWeeks >= 12} className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" data-magicpath-id="67" data-magicpath-path="UtilizationReportView.tsx">
+                      <Plus className="w-4 h-4" data-magicpath-id="68" data-magicpath-path="UtilizationReportView.tsx" />
+                    </button>
+                  </div>
+                  <div className="mt-2 text-xs text-gray-500 text-center" data-magicpath-id="69" data-magicpath-path="UtilizationReportView.tsx">
+                    1 - 12 Wochen (aktuell: {forecastWeeks})
+                  </div>
+                </div>
+
+                {/* Forecast Start Week */}
+                <div data-magicpath-id="70" data-magicpath-path="UtilizationReportView.tsx">
+                  <label className="block text-sm font-medium text-gray-700 mb-2" data-magicpath-id="71" data-magicpath-path="UtilizationReportView.tsx">
                     Basiswoche Vorblick
                   </label>
-                  <select value={forecastStartWeek} onChange={e => setForecastStartWeek(Number(e.target.value))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" data-magicpath-id="50" data-magicpath-path="UtilizationReportView.tsx">
+                  <select value={forecastStartWeek} onChange={e => setForecastStartWeek(Number(e.target.value))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" data-magicpath-id="72" data-magicpath-path="UtilizationReportView.tsx">
                     {Array.from({
                   length: 20
-                }, (_, i) => <option key={i} value={30 + i} data-magicpath-id="51" data-magicpath-path="UtilizationReportView.tsx">
+                }, (_, i) => <option key={i} value={30 + i} data-magicpath-id="73" data-magicpath-path="UtilizationReportView.tsx">
                         2025-KW{30 + i}
                       </option>)}
                   </select>
                 </div>
-                <div className="text-xs text-gray-500" data-magicpath-id="52" data-magicpath-path="UtilizationReportView.tsx">
+
+                {/* Summary */}
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200" data-magicpath-id="74" data-magicpath-path="UtilizationReportView.tsx">
+                  <h4 className="text-sm font-medium text-blue-900 mb-2" data-magicpath-id="75" data-magicpath-path="UtilizationReportView.tsx">
+                    Zeitraum-Übersicht
+                  </h4>
+                  <div className="text-sm text-blue-700 space-y-1" data-magicpath-id="76" data-magicpath-path="UtilizationReportView.tsx">
+                    <p data-magicpath-id="77" data-magicpath-path="UtilizationReportView.tsx">• Rückblick: KW{forecastStartWeek - lookbackWeeks} - KW{forecastStartWeek - 1} ({lookbackWeeks} Wochen)</p>
+                    <p data-magicpath-id="78" data-magicpath-path="UtilizationReportView.tsx">• Vorblick: KW{forecastStartWeek} - KW{forecastStartWeek + forecastWeeks - 1} ({forecastWeeks} Wochen)</p>
+                    <p data-magicpath-id="79" data-magicpath-path="UtilizationReportView.tsx">• Gesamt: {lookbackWeeks + forecastWeeks} Wochen</p>
+                  </div>
+                </div>
+
+                <div className="text-xs text-gray-500" data-magicpath-id="80" data-magicpath-path="UtilizationReportView.tsx">
                   Fehlende Werte werden in Aggregationen ignoriert.
                 </div>
               </div>
-              <div className="flex justify-end gap-3 mt-6" data-magicpath-id="53" data-magicpath-path="UtilizationReportView.tsx">
-                <button onClick={() => setIsSettingsOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50" data-magicpath-id="54" data-magicpath-path="UtilizationReportView.tsx">
-                  Abbrechen
-                </button>
-                <button onClick={() => setIsSettingsOpen(false)} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700" data-magicpath-id="55" data-magicpath-path="UtilizationReportView.tsx">
+              
+              <div className="flex justify-end gap-3 mt-6" data-magicpath-id="81" data-magicpath-path="UtilizationReportView.tsx">
+                <button onClick={() => setIsSettingsOpen(false)} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700" data-magicpath-id="82" data-magicpath-path="UtilizationReportView.tsx">
                   Übernehmen
                 </button>
               </div>

@@ -12,6 +12,8 @@ interface UtilizationData {
 interface UtilizationChartSectionProps {
   data: UtilizationData[];
   forecastStartWeek: number;
+  lookbackWeeks?: number;
+  forecastWeeks?: number;
   mpid?: string;
 }
 interface ChartDataPoint {
@@ -26,7 +28,9 @@ interface ChartDataPoint {
 }
 export function UtilizationChartSection({
   data,
-  forecastStartWeek
+  forecastStartWeek,
+  lookbackWeeks = 8,
+  forecastWeeks = 4
 }: UtilizationChartSectionProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [hoveredPoint, setHoveredPoint] = useState<any>(null);
@@ -53,15 +57,17 @@ export function UtilizationChartSection({
     });
 
     // Convert to chart format
+    const totalWeeks = lookbackWeeks + forecastWeeks;
+    const startWeek = forecastStartWeek - lookbackWeeks;
     const weeks = Array.from({
-      length: 12
-    }, (_, i) => `2025-KW${29 + i}`);
+      length: totalWeeks
+    }, (_, i) => `2025-KW${startWeek + i}`);
     return weeks.map((week, index): ChartDataPoint => {
       const weekData = weekMap.get(week) || {
         historical: [],
         forecast: []
       };
-      const weekNumber = 29 + index;
+      const weekNumber = startWeek + index;
       const historicalAvg = weekData.historical.length > 0 ? weekData.historical.reduce((sum, val) => sum + val, 0) / weekData.historical.length : null;
       const forecastAvg = weekData.forecast.length > 0 ? weekData.forecast.reduce((sum, val) => sum + val, 0) / weekData.forecast.length : null;
       return {
@@ -74,7 +80,7 @@ export function UtilizationChartSection({
         weekNumber
       };
     });
-  }, [data]);
+  }, [data, lookbackWeeks, forecastWeeks, forecastStartWeek]);
   const chartStats = useMemo(() => {
     const historicalValues = chartData.filter(d => d.historical !== null).map(d => d.historical!);
     const forecastValues = chartData.filter(d => d.forecast !== null).map(d => d.forecast!);
@@ -271,7 +277,7 @@ export function UtilizationChartSection({
               stroke: '#3b82f6',
               strokeWidth: 2,
               fill: '#ffffff'
-            }} name="Rückblick (8W)" connectNulls={false} animationDuration={1000} animationBegin={200} />
+            }} name={`Rückblick (${lookbackWeeks}W)`} connectNulls={false} animationDuration={1000} animationBegin={200} />
               
               {/* Forecast Line */}
               <Line type="monotone" dataKey="forecast" stroke="#10b981" strokeWidth={3} strokeDasharray="8 4" dot={{
@@ -283,7 +289,7 @@ export function UtilizationChartSection({
               stroke: '#10b981',
               strokeWidth: 2,
               fill: '#ffffff'
-            }} name="Vorblick (4W)" connectNulls={false} animationDuration={1000} animationBegin={400} />
+            }} name={`Vorblick (${forecastWeeks}W)`} connectNulls={false} animationDuration={1000} animationBegin={400} />
             </LineChart>
           </ResponsiveContainer>
         </div>
