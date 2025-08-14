@@ -55,6 +55,32 @@ export function UtilizationReportView() {
     } catch {}
   }, []);
 
+  // Clean up old "student" status from database
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('utilization_person_status_v1');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        let hasChanges = false;
+        const cleaned = { ...parsed };
+        
+        // Entferne alle "student" Status
+        Object.keys(cleaned).forEach(person => {
+          if (cleaned[person] === 'student') {
+            delete cleaned[person];
+            hasChanges = true;
+          }
+        });
+        
+        // Speichere bereinigte Daten
+        if (hasChanges) {
+          localStorage.setItem('utilization_person_status_v1', JSON.stringify(cleaned));
+          setPersonStatus(cleaned);
+        }
+      }
+    } catch {}
+  }, []);
+
   // Autosave to localStorage on change
   useEffect(() => {
     try {
@@ -80,7 +106,43 @@ export function UtilizationReportView() {
   useEffect(() => { try { localStorage.setItem('utilization_person_status_v1', JSON.stringify(personStatus)); } catch {} }, [personStatus]);
   useEffect(() => { try { localStorage.setItem('utilization_person_travel_readiness_v1', JSON.stringify(personTravelReadiness)); } catch {} }, [personTravelReadiness]);
 
+  // Entferne automatische Basiswoche-Ausrichtung – Guardrail: keine Automatik
+  // (vorherige useEffect-Anpassungen bleiben entfernt)
+
   // Helper functions to get status icon and color
+  const getWeekValue = (row: any, weekNum: number, year: number): number | undefined => {
+    const values = row?.values as Record<string, unknown> | undefined;
+    if (!values) return undefined;
+    const asNumber = (raw: unknown): number | undefined => {
+      const num = Number(raw);
+      return Number.isFinite(num) ? (num as number) : undefined;
+    };
+
+    // 1) Exact: "KW n-YYYY"
+    const key1 = `KW ${weekNum}-${year}`;
+    if (key1 in values) return asNumber(values[key1]);
+
+    // 2) Exact without year: "KW n"
+    const key2 = `KW ${weekNum}`;
+    if (key2 in values) return asNumber(values[key2]);
+
+    // 3) Any variant starting with "KW n-" (different year) e.g., "KW n-2024"
+    const altYearKey = Object.keys(values).find(k => k.trim().toLowerCase().startsWith(`kw ${weekNum}-`));
+    if (altYearKey) return asNumber(values[altYearKey]);
+
+    // 4) Variant: "YYYY-KWn" or "YYYY-KW n"
+    const regexYFirst = new RegExp(`^\\d{4}[-\\/]?kw\\s*${weekNum}$`, 'i');
+    const yFirstKey = Object.keys(values).find(k => regexYFirst.test(k.trim()));
+    if (yFirstKey) return asNumber(values[yFirstKey]);
+
+    // 5) Generic fallback: any key that contains "KW" and the week number as a whole token
+    const regexGeneric = new RegExp(`(^|[^\\d])${weekNum}([^\\d]|$)`, '');
+    const genericKey = Object.keys(values).find(k => /kw/i.test(k) && regexGeneric.test(k));
+    if (genericKey) return asNumber(values[genericKey]);
+
+    return undefined;
+  };
+
   const getStatusIcon = (statusId: string | undefined) => {
     if (!statusId) return null;
     
@@ -142,6 +204,7 @@ export function UtilizationReportView() {
     const aus = uploadedFiles.auslastung?.isValid ? (uploadedFiles.auslastung?.data as any[]) : null;
     const ein = uploadedFiles.einsatzplan?.isValid ? (uploadedFiles.einsatzplan?.data as any[]) : null;
     if (!aus && !ein) return null;
+    const normalizePersonKey = (s: string) => s.replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
     // Left side includes current week; right side starts after current week
     const leftStart = forecastStartWeek - lookbackWeeks + 1;
     const leftWeeksArr = Array.from({ length: lookbackWeeks }, (_, i) => leftStart + i);
@@ -150,44 +213,41 @@ export function UtilizationReportView() {
 
     const ausMap = new Map<string, any>();
     const einMap = new Map<string, any>();
-    aus?.forEach(r => ausMap.set(r.person, r));
-    ein?.forEach(r => einMap.set(r.person, r));
-    const allNames = Array.from(new Set([...(aus ? aus.map(r => r.person) : []), ...(ein ? ein.map(r => r.person) : [])]))
+    aus?.forEach(r => ausMap.set(normalizePersonKey(r.person), r));
+    ein?.forEach(r => einMap.set(normalizePersonKey(r.person), r));
+    const allNames = Array.from(new Set([...(aus ? aus.map(r => normalizePersonKey(r.person)) : []), ...(ein ? ein.map(r => normalizePersonKey(r.person)) : [])]))
       .sort((a, b) => a.split(',')[0].localeCompare(b.split(',')[0], 'de'));
 
     const out: UtilizationData[] = [];
-    for (const person of allNames) {
+    for (const personKey of allNames) {
+      const personOriginal = personKey; // already normalized for display we keep original label
       // Left (historical, includes current week)
       for (let i = 0; i < leftWeeksArr.length; i++) {
         const weekNum = leftWeeksArr[i];
         const fileKey = `KW ${weekNum}-${currentYear}`;
         const uiLabel = `${currentYear}-KW${weekNum}`;
-        const aRow = ausMap.get(person);
-        const eRow = einMap.get(person);
+        const aRow = ausMap.get(personKey);
+        const eRow = einMap.get(personKey);
         let val: number | null = null;
-        if (aRow && aRow.values && Object.prototype.hasOwnProperty.call(aRow.values, fileKey)) {
-          val = Number(aRow.values[fileKey]);
-        } else if (eRow && eRow.values && Object.prototype.hasOwnProperty.call(eRow.values, fileKey)) {
-          const utilFromPlan = Number(eRow.values[fileKey]);
-          if (Number.isFinite(utilFromPlan)) val = utilFromPlan;
-        }
-        out.push({ person, week: uiLabel, utilization: Number.isFinite(val as number) ? Math.round((val as number) * 10) / 10 : null, isHistorical: true });
+        const fromAus = getWeekValue(aRow, weekNum, currentYear);
+        const fromEin = getWeekValue(eRow, weekNum, currentYear);
+        if (fromAus !== undefined) val = fromAus;
+        else if (fromEin !== undefined) val = fromEin;
+        out.push({ person: personOriginal, week: uiLabel, utilization: Number.isFinite(val as number) ? Math.round((val as number) * 10) / 10 : null, isHistorical: true });
       }
       // Right (forecast, strictly after current week)
       for (let i = 0; i < rightWeeksArr.length; i++) {
         const weekNum = rightWeeksArr[i];
         const fileKey = `KW ${weekNum}-${currentYear}`;
         const uiLabel = `${currentYear}-KW${weekNum}`;
-        const aRow = ausMap.get(person);
-        const eRow = einMap.get(person);
+        const aRow = ausMap.get(personKey);
+        const eRow = einMap.get(personKey);
         let val: number | null = null;
-        if (aRow && aRow.values && Object.prototype.hasOwnProperty.call(aRow.values, fileKey)) {
-          val = Number(aRow.values[fileKey]);
-        } else if (eRow && eRow.values && Object.prototype.hasOwnProperty.call(eRow.values, fileKey)) {
-          const utilFromPlan = Number(eRow.values[fileKey]);
-          if (Number.isFinite(utilFromPlan)) val = utilFromPlan;
-        }
-        out.push({ person, week: uiLabel, utilization: Number.isFinite(val as number) ? Math.round((val as number) * 10) / 10 : null, isHistorical: false });
+        const fromAus = getWeekValue(aRow, weekNum, currentYear);
+        const fromEin = getWeekValue(eRow, weekNum, currentYear);
+        if (fromAus !== undefined) val = fromAus;
+        else if (fromEin !== undefined) val = fromEin;
+        out.push({ person: personOriginal, week: uiLabel, utilization: Number.isFinite(val as number) ? Math.round((val as number) * 10) / 10 : null, isHistorical: false });
       }
     }
     return out;
@@ -213,6 +273,8 @@ export function UtilizationReportView() {
     fill(ein);
     return meta;
   }, [uploadedFiles]);
+
+
 
   // Options for dropdowns
   const ccOptions = useMemo(() => {
@@ -516,6 +578,12 @@ export function UtilizationReportView() {
                           {personStatus[person] && (
                             <span className={getStatusColor(personStatus[person])}>
                               {getStatusIcon(personStatus[person])}
+                            </span>
+                          )}
+                          {/* Student-Icon basierend auf LBS "Working Student" */}
+                          {personMeta.get(person)?.lbs?.toLowerCase().includes('working student') && (
+                            <span className="text-green-600" title="Working Student">
+                              <GraduationCap className="w-4 h-4" />
                             </span>
                           )}
                           <span>{person}</span>

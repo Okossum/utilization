@@ -14,7 +14,6 @@ const STATUS_OPTIONS: StatusLabel[] = [
   { id: 'maternity-leave', label: 'Mutterschutz', icon: <Heart className="w-4 h-4" />, color: 'text-pink-600' },
   { id: 'sick-leave', label: 'Krankheit', icon: <Thermometer className="w-4 h-4" />, color: 'text-red-600' },
   { id: 'termination', label: 'Kündigung', icon: <UserX className="w-4 h-4" />, color: 'text-gray-600' },
-  { id: 'student', label: 'Student', icon: <GraduationCap className="w-4 h-4" />, color: 'text-green-600' },
 ];
 
 interface StatusLabelSelectorProps {
