@@ -1181,7 +1181,7 @@ export function UtilizationReportView() {
                                       >
                                         <Target className="w-4 h-4" />
                                         {offerCount > 1 && (
-                                          <span className="absolute -top-1 -right-1 text-[10px] leading-none bg-emerald-600 text-white rounded-full px-1.5 py-[2px]">
+                                          <span className="absolute top-0 right-0 translate-x-1/3 -translate-y-1/3 z-10 text-[10px] leading-none bg-emerald-600 text-white rounded-full min-w-[14px] h-[14px] px-[4px] flex items-center justify-center">
                                             {offerCount}
                                           </span>
                                         )}
@@ -1196,7 +1196,7 @@ export function UtilizationReportView() {
                                       >
                                         <Ticket className="w-4 h-4" />
                                         {jiraCount > 1 && (
-                                          <span className="absolute -top-1 -right-1 text-[10px] leading-none bg-sky-600 text-white rounded-full px-1.5 py-[2px]">
+                                          <span className="absolute top-0 right-0 translate-x-1/3 -translate-y-1/3 z-10 text-[10px] leading-none bg-sky-600 text-white rounded-full min-w-[14px] h-[14px] px-[4px] flex items-center justify-center">
                                             {jiraCount}
                                           </span>
                                         )}
