@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { getISOWeek, getISOWeekYear } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, Car, ChefHat, Database } from 'lucide-react';
+import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, Car, ChefHat, Database, Target } from 'lucide-react';
 import { DataUploadSection } from './DataUploadSection';
 import { MultiSelectFilter } from './MultiSelectFilter';
 import { PersonFilterBar } from './PersonFilterBar';
@@ -852,9 +852,9 @@ export function UtilizationReportView() {
                               {isWeekInPlannedProject(person, weekNumber) && (
                                 <span 
                                   title="Geplantes Projekt in dieser Woche" 
-                                  className="text-blue-600 text-lg"
+                                  className="text-blue-600"
                                 >
-                                  📋
+                                  <Target className="w-4 h-4" />
                                 </span>
                               )}
                             </div>
