@@ -4,6 +4,7 @@ import { X, Plus, Edit2, Trash2, User, Briefcase, MessageSquare, Plane } from 'l
 import { ProjectHistoryList } from './ProjectHistoryList';
 import { ProjectOffersList } from './ProjectOffersList';
 import { JiraTicketsList } from './JiraTicketsList';
+import { PlanningModal } from './PlanningModal';
 import DatabaseService from '../../services/database';
 import { EmployeeSkillsEditor } from './EmployeeSkillsEditor';
 export interface ProjectHistoryItem {
@@ -87,6 +88,7 @@ export function EmployeeDossierModal({
 }: EmployeeDossierModalProps) {
   const [formData, setFormData] = useState<Employee>(employee);
   const [isLoading, setIsLoading] = useState(false);
+  const [isPlanningOpen, setPlanningOpen] = useState(false);
 
   // Lade Employee Dossier aus der Datenbank und kombiniere mit Excel-Daten
   useEffect(() => {
@@ -199,29 +201,31 @@ export function EmployeeDossierModal({
     setFormData(employee);
     onClose();
   };
-  return <AnimatePresence>
-      {isOpen && <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <motion.div initial={{
-        opacity: 0
-      }} animate={{
-        opacity: 1
-      }} exit={{
-        opacity: 0
-      }} className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose} />
-          
-          <motion.div initial={{
-        opacity: 0,
-        scale: 0.95,
-        y: 20
-      }} animate={{
-        opacity: 1,
-        scale: 1,
-        y: 0
-      }} exit={{
-        opacity: 0,
-        scale: 0.95,
-        y: 20
-      }} className="relative w-full max-w-7xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+  return (
+    <>
+      <AnimatePresence>
+        {isOpen && <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{
+          opacity: 0
+        }} animate={{
+          opacity: 1
+        }} exit={{
+          opacity: 0
+        }} className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose} />
+            
+            <motion.div initial={{
+          opacity: 0,
+          scale: 0.95,
+          y: 20
+        }} animate={{
+          opacity: 1,
+          scale: 1,
+          y: 0
+        }} exit={{
+          opacity: 0,
+          scale: 0.95,
+          y: 20
+        }} className="relative w-full max-w-7xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
             {/* Header */}
             <header className="flex items-center justify-between p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
               <div className="flex items-center gap-3">
@@ -237,9 +241,14 @@ export function EmployeeDossierModal({
                   )}
                 </div>
               </div>
-              <button onClick={onClose} className="p-2 hover:bg-white/50 rounded-lg transition-colors">
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setPlanningOpen(true)} className="px-3 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
+                  Planung (Angebote & Jira)
+                </button>
+                <button onClick={onClose} className="p-2 hover:bg-white/50 rounded-lg transition-colors">
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
             </header>
 
             {/* Body */}
@@ -355,7 +364,30 @@ export function EmployeeDossierModal({
                 Speichern
               </button>
             </footer>
-          </motion.div>
-        </div>}
-    </AnimatePresence>;
+            </motion.div>
+          </div>}
+      </AnimatePresence>
+      <PlanningModal
+        isOpen={isPlanningOpen}
+        onClose={async () => {
+          setPlanningOpen(false);
+          try {
+            const updated = await DatabaseService.getEmployeeDossier(formData.id);
+            if (updated) {
+              setFormData(prev => ({
+                ...prev,
+                // Übernehme aktualisierte Listen (weitere Felder bleiben unberührt)
+                projectOffers: Array.isArray(updated.projectOffers) ? updated.projectOffers : prev.projectOffers,
+                jiraTickets: Array.isArray(updated.jiraTickets) ? updated.jiraTickets : prev.jiraTickets,
+                skills: Array.isArray(updated.skills) ? updated.skills : prev.skills
+              }));
+            }
+          } catch (e) {
+            console.error('Fehler beim Aktualisieren nach Planung:', e);
+          }
+        }}
+        personId={formData.id}
+      />
+    </>
+  );
 }

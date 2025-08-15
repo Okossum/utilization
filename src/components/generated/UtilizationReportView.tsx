@@ -1130,33 +1130,28 @@ export function UtilizationReportView() {
                               )}
                               {(() => {
                                 const dossier = dossiersByPerson[person] || { projectOffers: [], jiraTickets: [] };
-                                const hasOffer = (dossier.projectOffers || []).some((o: any) => {
+                                // Hilfsfunktion für Wochenüberlappung
+                                const overlapsWeek = (start?: string, end?: string) => {
+                                  if (!start || !end) return false;
+                                  const y = currentIsoYear;
+                                  const ws = new Date(Date.UTC(y, 0, 4));
+                                  const day = (ws.getUTCDay() + 6) % 7;
+                                  ws.setUTCDate(ws.getUTCDate() - day + (weekNumber - 1) * 7);
+                                  const we = new Date(ws); we.setUTCDate(ws.getUTCDate() + 6);
+                                  const s = new Date(start); const e = new Date(end);
+                                  return s <= we && e >= ws;
+                                };
+                                const overlappingOffers = (dossier.projectOffers || []).filter((o: any) => {
                                   if (o.startWeek && o.endWeek) {
                                     const sw = parseInt(String(o.startWeek).split('KW')[1]);
                                     const ew = parseInt(String(o.endWeek).split('KW')[1]);
                                     return weekNumber >= sw && weekNumber <= ew;
                                   }
-                                  if (o.startDate && o.endDate) {
-                                    const y = currentIsoYear;
-                                    const ws = new Date(Date.UTC(y, 0, 4));
-                                    const day = (ws.getUTCDay() + 6) % 7;
-                                    ws.setUTCDate(ws.getUTCDate() - day + (weekNumber - 1) * 7);
-                                    const we = new Date(ws); we.setUTCDate(ws.getUTCDate() + 6);
-                                    const s = new Date(o.startDate); const e = new Date(o.endDate);
-                                    return s <= we && e >= ws;
-                                  }
+                                  if (o.startDate && o.endDate) return overlapsWeek(o.startDate, o.endDate);
                                   return false;
                                 });
-                                const hasJira = (dossier.jiraTickets || []).some((j: any) => {
-                                  if (j.startDate && j.endDate) {
-                                    const y = currentIsoYear;
-                                    const ws = new Date(Date.UTC(y, 0, 4));
-                                    const day = (ws.getUTCDay() + 6) % 7;
-                                    ws.setUTCDate(ws.getUTCDate() - day + (weekNumber - 1) * 7);
-                                    const we = new Date(ws); we.setUTCDate(ws.getUTCDate() + 6);
-                                    const s = new Date(j.startDate); const e = new Date(j.endDate);
-                                    return s <= we && e >= ws;
-                                  }
+                                const overlappingJira = (dossier.jiraTickets || []).filter((j: any) => {
+                                  if (j.startDate && j.endDate) return overlapsWeek(j.startDate, j.endDate);
                                   if (j.startWeek && j.endWeek) {
                                     const sw = parseInt(String(j.startWeek).split('KW')[1]);
                                     const ew = parseInt(String(j.endWeek).split('KW')[1]);
@@ -1164,27 +1159,47 @@ export function UtilizationReportView() {
                                   }
                                   return false;
                                 });
-                                if (!hasOffer && !hasJira) return null;
+                                const offerCount = overlappingOffers.length;
+                                const jiraCount = overlappingJira.length;
+                                if (offerCount === 0 && jiraCount === 0) return null;
+                                const offerTooltip = overlappingOffers
+                                  .map((o: any) => o.title || o.customerName || '')
+                                  .filter((t: string) => !!t && t.trim().length > 0)
+                                  .join('\n') || 'Projektangebote';
+                                const jiraTooltip = overlappingJira
+                                  .map((j: any) => j.title || j.ticketId || '')
+                                  .filter((t: string) => !!t && t.trim().length > 0)
+                                  .join('\n') || 'Jira-Tickets';
                                 return (
                                   <div className="flex items-center gap-1">
-                                    {hasOffer && (
+                                    {offerCount > 0 && (
                                       <button
                                         type="button"
                                         onClick={() => { setPlanningForPerson(person); setPlanningForWeek({ year: currentIsoYear, week: weekNumber }); }}
-                                        className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded p-0.5"
-                                        title="Projektangebote anzeigen"
+                                        className="relative text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded p-0.5"
+                                        title={offerTooltip}
                                       >
                                         <Target className="w-4 h-4" />
+                                        {offerCount > 1 && (
+                                          <span className="absolute -top-1 -right-1 text-[10px] leading-none bg-emerald-600 text-white rounded-full px-1.5 py-[2px]">
+                                            {offerCount}
+                                          </span>
+                                        )}
                                       </button>
                                     )}
-                                    {hasJira && (
+                                    {jiraCount > 0 && (
                                       <button
                                         type="button"
                                         onClick={() => { setPlanningForPerson(person); setPlanningForWeek({ year: currentIsoYear, week: weekNumber }); }}
-                                        className="text-sky-600 hover:text-sky-700 hover:bg-sky-50 rounded p-0.5"
-                                        title="Jira-Tickets anzeigen"
+                                        className="relative text-sky-600 hover:text-sky-700 hover:bg-sky-50 rounded p-0.5"
+                                        title={jiraTooltip}
                                       >
                                         <Ticket className="w-4 h-4" />
+                                        {jiraCount > 1 && (
+                                          <span className="absolute -top-1 -right-1 text-[10px] leading-none bg-sky-600 text-white rounded-full px-1.5 py-[2px]">
+                                            {jiraCount}
+                                          </span>
+                                        )}
                                       </button>
                                     )}
                                   </div>
