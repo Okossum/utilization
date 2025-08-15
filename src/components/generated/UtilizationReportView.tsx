@@ -324,6 +324,60 @@ export function UtilizationReportView() {
 
   const dataForUI: UtilizationData[] = consolidatedData ?? mockData;
 
+  // Automatische ACT-Checkbox Aktivierung basierend auf niedriger Auslastung
+  useEffect(() => {
+    if (!dataForUI || dataForUI.length === 0) return;
+
+    const autoSetActionItems = () => {
+      const newActionItems: Record<string, boolean> = {};
+      
+      // Alle Personen sammeln
+      const allPersons = Array.from(new Set(dataForUI.map(item => item.person)));
+      
+      allPersons.forEach(person => {
+        // Letzte 4 Wochen aus der Auslastung prüfen
+        const last4Weeks = Array.from({ length: 4 }, (_, i) => {
+          const weekNumber = forecastStartWeek - 4 + i;
+          const weekData = dataForUI.find(item => 
+            item.person === person && 
+            item.week === `${currentIsoYear}-KW${weekNumber}` &&
+            item.isHistorical
+          );
+          return weekData?.utilization || 0;
+        });
+
+        // Nächste 8 Wochen aus dem Einsatzplan prüfen
+        const next8Weeks = Array.from({ length: 8 }, (_, i) => {
+          const weekNumber = forecastStartWeek + i;
+          const weekData = dataForUI.find(item => 
+            item.person === person && 
+            item.week === `${currentIsoYear}-KW${weekNumber}` &&
+            !item.isHistorical
+          );
+          return weekData?.utilization || 0;
+        });
+
+        // Durchschnitt der letzten 4 Wochen
+        const avgLast4Weeks = last4Weeks.reduce((sum, val) => sum + val, 0) / last4Weeks.length;
+        
+        // Durchschnitt der nächsten 8 Wochen
+        const avgNext8Weeks = next8Weeks.reduce((sum, val) => sum + val, 0) / next8Weeks.length;
+
+        // Automatisch ACT-Checkbox aktivieren wenn Durchschnitt der nächsten 8 Wochen <= 25%
+        if (avgNext8Weeks <= 25) {
+          newActionItems[person] = true;
+        }
+      });
+
+      // Nur setzen wenn sich etwas geändert hat
+      if (Object.keys(newActionItems).length > 0) {
+        setActionItems(prev => ({ ...prev, ...newActionItems }));
+      }
+    };
+
+    autoSetActionItems();
+  }, [dataForUI, forecastStartWeek, currentIsoYear]);
+
   // Build person → meta mapping from uploaded data or database (prefer Auslastung, fallback Einsatzplan)
   const personMeta = useMemo(() => {
     const meta = new Map<string, { cc?: string; lbs?: string }>();
