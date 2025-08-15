@@ -27,6 +27,7 @@ import {
   PersonTravelReadiness,
   Customer
 } from './types';
+import { FirestoreSkill, SkillDoc } from './types';
 
 // Helper-Funktion für Timestamp-Konvertierung
 const convertTimestamp = (timestamp: any): Date => {
@@ -338,6 +339,43 @@ export const projectService = {
 
   async delete(id: string): Promise<void> {
     const docRef = doc(db, COLLECTIONS.PROJECTS, id);
+    await deleteDoc(docRef);
+  }
+};
+
+// Skills Services
+export const skillService = {
+  async save(skill: { name: string; levels: string[] }): Promise<string> {
+    const docRef = await addDoc(collection(db, COLLECTIONS.SKILLS), {
+      name: skill.name,
+      levels: Array.isArray(skill.levels) ? skill.levels : [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    return docRef.id;
+  },
+
+  async getAll(): Promise<FirestoreSkill[]> {
+    const querySnapshot = await getDocs(collection(db, COLLECTIONS.SKILLS));
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      name: String(doc.data().name || ''),
+      levels: Array.isArray(doc.data().levels) ? doc.data().levels : [],
+      createdAt: convertTimestamp(doc.data().createdAt),
+      updatedAt: convertTimestamp(doc.data().updatedAt)
+    })) as FirestoreSkill[];
+  },
+
+  async update(id: string, updates: Partial<SkillDoc>): Promise<void> {
+    const docRef = doc(db, COLLECTIONS.SKILLS, id);
+    await updateDoc(docRef, {
+      ...updates,
+      updatedAt: new Date(),
+    } as any);
+  },
+
+  async delete(id: string): Promise<void> {
+    const docRef = doc(db, COLLECTIONS.SKILLS, id);
     await deleteDoc(docRef);
   }
 };
