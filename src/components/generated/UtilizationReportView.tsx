@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { getISOWeek, getISOWeekYear } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, Car, ChefHat, Database, Target, User } from 'lucide-react';
+import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, Car, ChefHat, Database, Target, User, Ticket } from 'lucide-react';
 import { DataUploadSection } from './DataUploadSection';
 import { MultiSelectFilter } from './MultiSelectFilter';
 import { PersonFilterBar } from './PersonFilterBar';
@@ -13,6 +13,7 @@ import { PlannedEngagementEditor, PlannedEngagement } from './PlannedEngagementE
 import { StatusLabelSelector } from './StatusLabelSelector';
 import { TravelReadinessSelector } from './TravelReadinessSelector';
 import { EmployeeDossierModal, Employee } from './EmployeeDossierModal';
+import { PlanningModal } from './PlanningModal';
 interface UtilizationData {
   person: string;
   week: string;
@@ -37,6 +38,7 @@ export function UtilizationReportView() {
   }>({});
   const [dataSource, setDataSource] = useState<'upload' | 'database'>('database');
   const [selectedPersons, setSelectedPersons] = useState<string[]>([]);
+  const [planningForPerson, setPlanningForPerson] = useState<string | null>(null);
 
   // Function to switch data source
   const switchToUpload = () => {
@@ -1099,14 +1101,14 @@ export function UtilizationReportView() {
                               ) : (
                                 '—'
                               )}
-                              {isWeekInPlannedProject(person, weekNumber) && (
-                                <span 
-                                  title="Geplantes Projekt in dieser Woche" 
-                                  className="text-blue-600"
-                                >
-                                  <Target className="w-4 h-4" />
-                                </span>
-                              )}
+                              <button 
+                                type="button"
+                                onClick={() => setPlanningForPerson(person)}
+                                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
+                                title="Planung (Projektangebot/Jira)"
+                              >
+                                <Target className="w-4 h-4" />
+                              </button>
                             </div>
                           </td>
                         );
@@ -1320,5 +1322,8 @@ export function UtilizationReportView() {
             </motion.div>
           </motion.div>}
       </AnimatePresence>
+
+      {/* Planning Modal (Projektangebote & Jira) */}
+      <PlanningModal isOpen={!!planningForPerson} onClose={() => setPlanningForPerson(null)} personId={planningForPerson || ''} />
     </div>;
 }
