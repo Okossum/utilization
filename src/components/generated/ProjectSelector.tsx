@@ -23,7 +23,6 @@ export function ProjectSelector({
   const { projects, addProject } = useCustomers();
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [newProjectName, setNewProjectName] = useState('');
 
   // Filtere Projekte nach dem ausgewählten Kunden
   const customerProjects = projects.filter(project => 
@@ -47,19 +46,17 @@ export function ProjectSelector({
   };
 
   const handleCreateProject = () => {
-    if (newProjectName.trim() && selectedCustomer && !projectExists) {
+    if (searchTerm.trim() && selectedCustomer) {
       // Füge das Projekt zum Context hinzu
-      addProject(newProjectName.trim(), selectedCustomer);
+      addProject(searchTerm.trim(), selectedCustomer);
       
       // Rufe den optionalen Callback auf
       if (onProjectCreate) {
-        onProjectCreate(newProjectName.trim());
+        onProjectCreate(searchTerm.trim());
       }
       
       // Wähle das neue Projekt aus
-      onProjectSelect(newProjectName.trim());
-      setSearchTerm(newProjectName.trim());
-      setNewProjectName('');
+      onProjectSelect(searchTerm.trim());
       setIsOpen(false);
     }
   };
@@ -125,7 +122,7 @@ export function ProjectSelector({
             )}
 
             {/* Neues Projekt hinzufügen */}
-            {selectedCustomer && !projectExists && searchTerm.trim() && (
+            {selectedCustomer && searchTerm.trim() && !projectExists && (
               <div className="p-3 border-b border-gray-100 bg-green-50">
                 <div className="flex items-center gap-2">
                   <Plus className="w-3 h-3 text-green-600" />
@@ -142,13 +139,42 @@ export function ProjectSelector({
               </div>
             )}
 
+            {/* Schnell-Projekt erstellen wenn keine Projekte vorhanden */}
+            {selectedCustomer && customerProjects.length === 0 && searchTerm.trim() && (
+              <div className="p-3 border-b border-gray-100 bg-blue-50">
+                <div className="flex items-center gap-2">
+                  <Plus className="w-3 h-3 text-blue-600" />
+                  <span className="text-sm text-blue-700">
+                    Erstes Projekt "{searchTerm}" für {selectedCustomer} erstellen
+                  </span>
+                  <button
+                    onClick={handleCreateProject}
+                    className="ml-auto px-2 py-1 text-xs text-white bg-green-600 rounded hover:bg-green-700"
+                  >
+                    Erstellen
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Projektliste */}
             <div className="max-h-48 overflow-y-auto">
-              {filteredProjects.length === 0 ? (
-                <div className="p-3 text-center text-gray-500 text-sm">
-                  {searchTerm ? 'Keine Projekte gefunden' : 'Keine Projekte für diesen Kunden'}
-                </div>
-              ) : (
+                          {filteredProjects.length === 0 ? (
+              <div className="p-3 text-center text-gray-500 text-sm">
+                {searchTerm ? (
+                  'Keine Projekte gefunden'
+                ) : customerProjects.length === 0 ? (
+                  <div className="space-y-2">
+                    <p>Keine Projekte für {selectedCustomer} vorhanden</p>
+                    <p className="text-xs text-blue-600">
+                      Geben Sie einen Projektnamen ein, um das erste Projekt zu erstellen
+                    </p>
+                  </div>
+                ) : (
+                  'Keine Projekte gefunden'
+                )}
+              </div>
+            ) : (
                 filteredProjects.map((project) => (
                   <div
                     key={project.id}
