@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 // Hochwertige, gefüllte Sterne mit Half-Star-Unterstützung
 
 interface StarRatingProps {
@@ -9,7 +9,8 @@ interface StarRatingProps {
   colorClassName?: string; // e.g. text-yellow-400
   backgroundClassName?: string; // e.g. text-gray-300
   gap?: number; // px gap between stars
-  readOnly?: boolean; // kompatibilität; interaktiv ist nicht vorgesehen
+  readOnly?: boolean; // wenn false und onChange vorhanden → klickbar
+  onChange?: (value: number) => void; // 1..max
 }
 
 export function StarRating({
@@ -20,11 +21,13 @@ export function StarRating({
   colorClassName = 'text-yellow-400',
   backgroundClassName = 'text-gray-300',
   gap = 4,
+  readOnly = true,
+  onChange,
 }: StarRatingProps) {
   const clamped = useMemo(() => Math.max(0, Math.min(max, Number(value || 0))), [value, max]);
   const full = Math.floor(clamped);
-  const frac = clamped - full;
-  const hasHalf = frac >= 0.5 - 1e-6;
+  const [hover, setHover] = useState<number | null>(null);
+  const displayFull = Math.floor(hover ?? full);
 
   const StarFull = (
     <svg width={size} height={size} viewBox="0 0 24 24" className={colorClassName} aria-hidden>
@@ -37,24 +40,31 @@ export function StarRating({
     </svg>
   );
 
-  const StarHalf = (
-    <div style={{ width: size, height: size, position: 'relative' }} aria-hidden>
-      {/* Base empty */}
-      <div className="absolute inset-0">{StarEmpty}</div>
-      {/* Left filled half */}
-      <div className="absolute inset-0 overflow-hidden" style={{ width: size / 2 }}>{StarFull}</div>
-    </div>
-  );
-
   const stars: React.ReactNode[] = [];
   for (let i = 0; i < max; i++) {
-    if (i < full) stars.push(<span key={`s-${i}`} style={{ display: 'inline-block', marginRight: i < max - 1 ? gap : 0 }}>{StarFull}</span>);
-    else if (i === full && hasHalf) stars.push(<span key={`s-${i}`} style={{ display: 'inline-block', marginRight: i < max - 1 ? gap : 0 }}>{StarHalf}</span>);
-    else stars.push(<span key={`s-${i}`} style={{ display: 'inline-block', marginRight: i < max - 1 ? gap : 0 }}>{StarEmpty}</span>);
+    const isActive = i < displayFull;
+    const node = isActive ? StarFull : StarEmpty;
+    const interactive = !readOnly && typeof onChange === 'function';
+    stars.push(
+      <button
+        key={`s-${i}`}
+        type="button"
+        className={`p-0 m-0 bg-transparent border-0 ${interactive ? 'cursor-pointer' : 'cursor-default'}`}
+        style={{ display: 'inline-block', marginRight: i < max - 1 ? gap : 0, lineHeight: 0 }}
+        onMouseEnter={interactive ? () => setHover(i + 1) : undefined}
+        onMouseLeave={interactive ? () => setHover(null) : undefined}
+        onFocus={interactive ? () => setHover(i + 1) : undefined}
+        onBlur={interactive ? () => setHover(null) : undefined}
+        onClick={interactive ? () => onChange!(i + 1) : undefined}
+        aria-label={`${i + 1} Sterne`}
+      >
+        {node}
+      </button>
+    );
   }
 
   return (
-    <div className={`inline-flex items-center ${className}`} aria-label={`${clamped.toFixed(1)} von ${max} Sternen`}>
+    <div className={`inline-flex items-center ${className}`} aria-label={`${Math.floor(clamped)} von ${max} Sternen`}>
       {stars}
     </div>
   );

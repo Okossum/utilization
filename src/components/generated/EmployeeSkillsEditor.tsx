@@ -82,17 +82,7 @@ export function EmployeeSkillsEditor({ value, onChange }: EmployeeSkillsEditorPr
         </select>
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-600">Startlevel:</span>
-          <select
-            value={defaultLevel}
-            onChange={e=>setDefaultLevel(Number(e.target.value))}
-            className="px-3 py-2 border border-gray-200 rounded"
-          >
-            {Array.from({length: 9}).map((_,i)=>{
-              const v = 1 + i*0.5; // 1.0 .. 5.0
-              return <option key={v} value={v}>{v.toFixed(1)}</option>;
-            })}
-          </select>
-          <StarRating value={defaultLevel} readOnly />
+          <StarRating value={defaultLevel} readOnly={false} onChange={setDefaultLevel} />
         </div>
         <button onClick={addSkill} className="inline-flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
           <Plus className="w-4 h-4"/> Hinzufügen
@@ -106,19 +96,7 @@ export function EmployeeSkillsEditor({ value, onChange }: EmployeeSkillsEditorPr
           <div key={s.skillId} className="flex items-center justify-between p-3 border border-gray-200 rounded">
             <div className="flex items-center gap-4 flex-wrap">
               <div className="text-sm font-medium text-gray-900">{s.name}</div>
-              <div className="flex items-center gap-2">
-                <select
-                  value={s.level}
-                  onChange={e=>setLevel(s.skillId, Number(e.target.value))}
-                  className="px-3 py-2 border border-gray-200 rounded"
-                >
-                  {Array.from({length: 9}).map((_,i)=>{
-                    const v = 1 + i*0.5;
-                    return <option key={v} value={v}>{v.toFixed(1)}</option>;
-                  })}
-                </select>
-                <StarRating value={s.level} readOnly />
-              </div>
+              <StarRating value={s.level} readOnly={false} onChange={(lvl)=>setLevel(s.skillId, lvl)} />
             </div>
             <button onClick={()=>removeSkill(s.skillId)} className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded">
               <Trash2 className="w-4 h-4"/>
