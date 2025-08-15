@@ -372,6 +372,7 @@ export function UtilizationReportView() {
       { id: 'parental-leave', label: 'Elternzeit' },
       { id: 'maternity-leave', label: 'Mutterschutz' },
       { id: 'sick-leave', label: 'Krankheit' },
+      { id: 'long-absence', label: 'Lange Abwesent' },
       { id: 'termination', label: 'Kündigung' },
     ];
     
@@ -414,6 +415,7 @@ export function UtilizationReportView() {
           'parental-leave': 'Elternzeit',
           'maternity-leave': 'Mutterschutz',
           'sick-leave': 'Krankheit',
+          'long-absence': 'Lange Abwesent',
           'termination': 'Kündigung'
         };
         

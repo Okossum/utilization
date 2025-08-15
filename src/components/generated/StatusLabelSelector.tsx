@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Calendar, Baby, Heart, Thermometer, X, UserX, GraduationCap } from 'lucide-react';
+import { ChevronDown, Calendar, Baby, Heart, Thermometer, X, UserX, GraduationCap, Clock, Plane } from 'lucide-react';
 
 export interface StatusLabel {
   id: string;
@@ -9,10 +9,11 @@ export interface StatusLabel {
 }
 
 const STATUS_OPTIONS: StatusLabel[] = [
-  { id: 'vacation', label: 'Urlaub', icon: <Calendar className="w-4 h-4" />, color: 'text-blue-600' },
+  { id: 'vacation', label: 'Urlaub', icon: <Plane className="w-4 h-4" />, color: 'text-blue-600' },
   { id: 'parental-leave', label: 'Elternzeit', icon: <Baby className="w-4 h-4" />, color: 'text-purple-600' },
   { id: 'maternity-leave', label: 'Mutterschutz', icon: <Heart className="w-4 h-4" />, color: 'text-pink-600' },
   { id: 'sick-leave', label: 'Krankheit', icon: <Thermometer className="w-4 h-4" />, color: 'text-red-600' },
+  { id: 'long-absence', label: 'Lange Abwesent', icon: <Clock className="w-4 h-4" />, color: 'text-orange-600' },
   { id: 'termination', label: 'Kündigung', icon: <UserX className="w-4 h-4" />, color: 'text-gray-600' },
 ];
 
