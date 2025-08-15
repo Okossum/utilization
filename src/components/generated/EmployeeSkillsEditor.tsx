@@ -69,7 +69,7 @@ export function EmployeeSkillsEditor({ value, onChange }: EmployeeSkillsEditorPr
 
       {error && <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded">{error}</div>}
 
-      <div className="flex flex-col md:flex-row gap-2 md:items-center">
+      <div className="flex flex-col md:flex-row gap-3 md:items-center">
         <select
           value={selectedSkillId}
           onChange={e=>setSelectedSkillId(e.target.value)}
@@ -82,7 +82,17 @@ export function EmployeeSkillsEditor({ value, onChange }: EmployeeSkillsEditorPr
         </select>
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-600">Startlevel:</span>
-          <StarRating value={defaultLevel} onChange={setDefaultLevel} />
+          <select
+            value={defaultLevel}
+            onChange={e=>setDefaultLevel(Number(e.target.value))}
+            className="px-3 py-2 border border-gray-200 rounded"
+          >
+            {Array.from({length: 9}).map((_,i)=>{
+              const v = 1 + i*0.5; // 1.0 .. 5.0
+              return <option key={v} value={v}>{v.toFixed(1)}</option>;
+            })}
+          </select>
+          <StarRating value={defaultLevel} readOnly />
         </div>
         <button onClick={addSkill} className="inline-flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
           <Plus className="w-4 h-4"/> Hinzufügen
@@ -94,9 +104,21 @@ export function EmployeeSkillsEditor({ value, onChange }: EmployeeSkillsEditorPr
           <div className="text-gray-500 text-sm">Noch keine Skills zugeordnet</div>
         ) : value.map(s => (
           <div key={s.skillId} className="flex items-center justify-between p-3 border border-gray-200 rounded">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <div className="text-sm font-medium text-gray-900">{s.name}</div>
-              <StarRating value={s.level} onChange={(lvl)=>setLevel(s.skillId, lvl)} />
+              <div className="flex items-center gap-2">
+                <select
+                  value={s.level}
+                  onChange={e=>setLevel(s.skillId, Number(e.target.value))}
+                  className="px-3 py-2 border border-gray-200 rounded"
+                >
+                  {Array.from({length: 9}).map((_,i)=>{
+                    const v = 1 + i*0.5;
+                    return <option key={v} value={v}>{v.toFixed(1)}</option>;
+                  })}
+                </select>
+                <StarRating value={s.level} readOnly />
+              </div>
             </div>
             <button onClick={()=>removeSkill(s.skillId)} className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded">
               <Trash2 className="w-4 h-4"/>

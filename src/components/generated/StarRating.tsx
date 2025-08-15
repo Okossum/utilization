@@ -1,5 +1,5 @@
 import React, { useMemo, useRef } from 'react';
-import { Star } from 'lucide-react';
+// Custom SVG star for precise fill control
 
 interface StarRatingProps {
   value: number; // 0..5 in 0.5 steps
@@ -72,14 +72,18 @@ export function StarRating({
       {/* Base (empty) */}
       <div className="absolute inset-0 flex">
         {Array.from({ length: max }).map((_, i) => (
-          <Star key={`base-${i}`} width={size} height={size} className="text-gray-300" />
+          <svg key={`base-${i}`} width={size} height={size} viewBox="0 0 24 24" className="text-gray-300">
+            <path fill="currentColor" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+          </svg>
         ))}
       </div>
       {/* Filled overlay */}
       <div className="absolute inset-0 overflow-hidden" style={{ width: `${percentage}%` }}>
-        <div className="flex">
+        <div className="flex text-yellow-400">
           {Array.from({ length: max }).map((_, i) => (
-            <Star key={`fill-${i}`} width={size} height={size} className="text-yellow-400 fill-yellow-400" />
+            <svg key={`fill-${i}`} width={size} height={size} viewBox="0 0 24 24" className="fill-yellow-400">
+              <path fill="currentColor" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+            </svg>
           ))}
         </div>
       </div>
