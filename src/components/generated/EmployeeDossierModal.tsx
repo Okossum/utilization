@@ -221,7 +221,7 @@ export function EmployeeDossierModal({
         opacity: 0,
         scale: 0.95,
         y: 20
-      }} className="relative w-full max-w-4xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden">
+      }} className="relative w-full max-w-7xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden">
             {/* Header */}
             <header className="flex items-center justify-between p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
               <div className="flex items-center gap-3">
