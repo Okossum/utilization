@@ -25,6 +25,8 @@ export interface JiraTicket {
   ticketId: string;
   probability: number;
   contactPerson: string;
+  title?: string;
+  link?: string;
 }
 export interface Employee {
   id: string;

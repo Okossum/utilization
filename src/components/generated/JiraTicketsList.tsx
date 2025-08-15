@@ -14,14 +14,18 @@ export function JiraTicketsList({
   const [editForm, setEditForm] = useState<Omit<JiraTicket, 'id'>>({
     ticketId: '',
     probability: 0,
-    contactPerson: ''
+    contactPerson: '',
+    title: '',
+    link: ''
   });
   const handleAdd = () => {
     const newTicket: JiraTicket = {
       id: Date.now().toString(),
       ticketId: 'STAFF-',
       probability: 50,
-      contactPerson: ''
+      contactPerson: '',
+      title: '',
+      link: ''
     };
     onChange([...tickets, newTicket]);
     setEditingId(newTicket.id);
@@ -36,7 +40,9 @@ export function JiraTicketsList({
     setEditForm({
       ticketId: ticket.ticketId,
       probability: ticket.probability,
-      contactPerson: ticket.contactPerson
+      contactPerson: ticket.contactPerson,
+      title: ticket.title || '',
+      link: ticket.link || ''
     });
   };
   const handleSave = () => {
@@ -74,7 +80,8 @@ export function JiraTicketsList({
   const JIRA_BASE = (import.meta as any)?.env?.VITE_JIRA_BASE_URL as string | undefined;
   const isUrl = (val: string) => /^(https?:)\/\//i.test(val);
   const isTicketKey = (val: string) => /^[A-Z][A-Z0-9]+-\d+$/.test(String(val || '').trim());
-  const buildJiraUrl = (val: string): string | null => {
+  const buildJiraUrl = (val: string, link?: string): string | null => {
+    if (link && isUrl(link)) return link;
     if (!val) return null;
     if (isUrl(val)) return val;
     if (JIRA_BASE && isTicketKey(val)) return `${String(JIRA_BASE).replace(/\/$/, '')}/browse/${val.trim()}`;
@@ -105,7 +112,14 @@ export function JiraTicketsList({
           y: -10
         }} className="p-4 bg-amber-50 rounded-lg border border-amber-200">
               {editingId === ticket.id ? <div className="space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Titel</label>
+                      <input type="text" value={editForm.title} onChange={e => setEditForm(prev => ({
+                  ...prev,
+                  title: e.target.value
+                }))} className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:ring-2 focus:ring-amber-500 focus:border-transparent" placeholder="Kurzer Titel" />
+                    </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Jira Ticket ID</label>
                       <input type="text" value={editForm.ticketId} onChange={e => setEditForm(prev => ({
@@ -114,13 +128,20 @@ export function JiraTicketsList({
                 }))} className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:ring-2 focus:ring-amber-500 focus:border-transparent" placeholder="STAFF-123" />
                     </div>
                     <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Link (optional)</label>
+                      <input type="text" value={editForm.link} onChange={e => setEditForm(prev => ({
+                  ...prev,
+                  link: e.target.value
+                }))} className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:ring-2 focus:ring-amber-500 focus:border-transparent" placeholder="https://jira.adesso.de/browse/STAFF-123" />
+                    </div>
+                    <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Wahrscheinlichkeit (%)</label>
                       <div className="relative">
                         <input type="number" min="0" max="100" value={editForm.probability} onChange={e => handleProbabilityChange(e.target.value)} className="w-full px-2 py-1 pr-6 text-sm border border-gray-200 rounded focus:ring-2 focus:ring-amber-500 focus:border-transparent" />
                         <Percent className="absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400" />
                       </div>
                     </div>
-                    <div>
+                    <div className="md:col-span-4">
                       <label className="block text-xs font-medium text-gray-600 mb-1">Ansprechpartner</label>
                       <input type="text" value={editForm.contactPerson} onChange={e => setEditForm(prev => ({
                   ...prev,
@@ -142,21 +163,26 @@ export function JiraTicketsList({
                   <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       {(() => {
-                        const href = buildJiraUrl(ticket.ticketId);
+                        const key = String(ticket.ticketId || '').trim();
+                        const href = buildJiraUrl(key, ticket.link);
                         return (
                           <div className="flex items-center gap-2">
                             {href ? (
                               <a href={href} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline inline-flex items-center gap-1">
-                                {ticket.ticketId}
+                                {key}
                                 <ExternalLink className="w-3 h-3" />
                               </a>
                             ) : (
-                              <p className="text-sm font-medium text-gray-900">{ticket.ticketId}</p>
+                              <p className="text-sm font-medium text-gray-900">{key}</p>
                             )}
                           </div>
                         );
                       })()}
                       <p className="text-xs text-gray-500">Ticket ID</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-900 truncate" title={ticket.title || ''}>{ticket.title || '—'}</p>
+                      <p className="text-xs text-gray-500">Titel</p>
                     </div>
                     <div>
                       <div className="flex items-center gap-1">
