@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Container, Theme } from './settings/types';
-import { FirebaseApp } from './components/FirebaseApp';
+import { UtilizationReportView } from './components/generated/UtilizationReportView';
 
 let theme: Theme = 'light';
 // only use 'centered' container for standalone components, never for full page apps or websites.
@@ -19,7 +19,7 @@ function App() {
 
   const generatedComponent = useMemo(() => {
     // THIS IS WHERE THE TOP LEVEL GENRATED COMPONENT WILL BE RETURNED!
-    return <FirebaseApp />; // <FirebaseApp />
+    return <UtilizationReportView />; // <UtilizationReportView />
   }, []);
 
   if (container === 'centered') {

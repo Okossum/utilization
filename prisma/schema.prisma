@@ -1,0 +1,129 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// Datenmodell für Auslastung
+model Auslastung {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Datei-Informationen
+  fileName    String
+  uploadDate  DateTime @default(now())
+  
+  // Personendaten
+  person      String
+  lob         String?
+  bereich     String?
+  cc          String?
+  team        String?
+  
+  // Wochenwerte (dynamisch)
+  weekValues  WeekValue[]
+}
+
+// Wochenwerte für Auslastung
+model WeekValue {
+  id           String     @id @default(cuid())
+  auslastungId String
+  auslastung   Auslastung @relation(fields: [auslastungId], references: [id], onDelete: Cascade)
+  
+  week         String     // z.B. "KW 1-2024"
+  value        Float      // Prozentwert
+  
+  @@unique([auslastungId, week])
+}
+
+// Datenmodell für Einsatzplan
+model Einsatzplan {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Datei-Informationen
+  fileName    String
+  uploadDate  DateTime @default(now())
+  
+  // Personendaten
+  person      String
+  lbs         String?
+  
+  // Wochenwerte (dynamisch)
+  weekValues  EinsatzplanWeekValue[]
+}
+
+// Wochenwerte für Einsatzplan
+model EinsatzplanWeekValue {
+  id            String      @id @default(cuid())
+  einsatzplanId String
+  einsatzplan   Einsatzplan @relation(fields: [einsatzplanId], references: [id], onDelete: Cascade)
+  
+  week          String      // z.B. "KW 1-2024"
+  value         Float       // Prozentwert
+  
+  @@unique([einsatzplanId, week])
+}
+
+// Upload-Historie
+model UploadHistory {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  
+  fileName    String
+  fileType    String // "auslastung" oder "einsatzplan"
+  status      String // "success", "error"
+  error       String?
+  rowCount    Int?
+}
+
+// Normalisierte, konsolidierte Auslastungsdaten für die UI
+model UtilizationData {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Personendaten
+  person      String
+  
+  // Metadaten (aus Auslastung oder Einsatzplan)
+  lob         String?
+  bereich     String?
+  cc          String?
+  team        String?
+  lbs         String?
+  
+  // Wochen-Information
+  week        String      // z.B. "2024-KW1"
+  year        Int         // Jahr der Woche
+  weekNumber  Int         // Kalenderwoche
+  
+  // Auslastungswerte
+  auslastungValue Float?  // Wert aus Auslastung
+  einsatzplanValue Float? // Wert aus Einsatzplan
+  finalValue      Float?  // Finaler Wert (Auslastung bevorzugt)
+  
+  // Status
+  isHistorical   Boolean   @default(false) // Historische vs. Forecast-Daten
+  source         String    // "auslastung", "einsatzplan", oder "both"
+  
+  // Referenzen zu den ursprünglichen Daten
+  auslastungId   String?
+  einsatzplanId  String?
+  
+  // Indizes für bessere Performance
+  @@unique([person, week])
+  @@index([person])
+  @@index([week])
+  @@index([year, weekNumber])
+  @@index([isHistorical])
+}

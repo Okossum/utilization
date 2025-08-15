@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, X, Eye } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import DatabaseService from '../../services/database';
 interface UploadedFile {
   name: string;
   data: any[];
@@ -48,8 +49,9 @@ export function UploadPanel({
     }
 
     try {
+      let parsed;
       if (type === 'auslastung') {
-        const parsed = await parseAuslastungWorkbook(file);
+        parsed = await parseAuslastungWorkbook(file);
         const uploaded: UploadedFile = {
           name: file.name,
           data: parsed.rows,
@@ -63,7 +65,7 @@ export function UploadPanel({
           auslastung: uploaded
         });
       } else {
-        const parsed = await parseEinsatzplanWorkbook(file);
+        parsed = await parseEinsatzplanWorkbook(file);
         const uploaded: UploadedFile = {
           name: file.name,
           data: parsed.rows,
@@ -76,6 +78,48 @@ export function UploadPanel({
           ...uploadedFiles,
           einsatzplan: uploaded
         });
+      }
+
+      // Wenn beide Dateien vorhanden sind, konsolidiere die Daten automatisch
+      if (parsed.isValid) {
+        const newFiles = {
+          ...uploadedFiles,
+          [type]: {
+            name: file.name,
+            data: parsed.rows,
+            isValid: parsed.isValid,
+            error: parsed.error,
+            preview: parsed.preview,
+            debug: parsed.debug,
+          }
+        };
+
+        // Prüfe ob beide Dateien gültig sind
+        if (newFiles.auslastung?.isValid && newFiles.einsatzplan?.isValid) {
+          try {
+            // Aktuelle Woche und Konfiguration (kann später aus Props kommen)
+            const currentYear = new Date().getFullYear();
+            const currentWeek = Math.ceil((new Date().getTime() - new Date(currentYear, 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
+            const forecastStartWeek = currentWeek;
+            const lookbackWeeks = 8;  // Historische Daten der letzten 8 Wochen
+            const forecastWeeks = 4;   // Forecast für die nächsten 4 Wochen
+
+            // Konsolidiere und speichere die Daten in der Datenbank
+            const result = await DatabaseService.consolidateAndSaveUtilizationData(
+              newFiles.auslastung.data,
+              newFiles.einsatzplan.data,
+              currentYear,
+              forecastStartWeek,
+              lookbackWeeks,
+              forecastWeeks
+            );
+
+            console.log('✅ Daten erfolgreich konsolidiert und gespeichert:', result);
+          } catch (dbError) {
+            console.error('❌ Fehler beim Konsolidieren der Daten:', dbError);
+            // Fehler nicht an den User weitergeben, da der Upload selbst erfolgreich war
+          }
+        }
       }
     } catch (e: any) {
       onFilesChange({
