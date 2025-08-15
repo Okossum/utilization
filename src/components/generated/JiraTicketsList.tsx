@@ -70,6 +70,16 @@ export function JiraTicketsList({
       probability: numValue
     }));
   };
+
+  const JIRA_BASE = (import.meta as any)?.env?.VITE_JIRA_BASE_URL as string | undefined;
+  const isUrl = (val: string) => /^(https?:)\/\//i.test(val);
+  const isTicketKey = (val: string) => /^[A-Z][A-Z0-9]+-\d+$/.test(String(val || '').trim());
+  const buildJiraUrl = (val: string): string | null => {
+    if (!val) return null;
+    if (isUrl(val)) return val;
+    if (JIRA_BASE && isTicketKey(val)) return `${String(JIRA_BASE).replace(/\/$/, '')}/browse/${val.trim()}`;
+    return null;
+  };
   return <section className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
@@ -131,10 +141,21 @@ export function JiraTicketsList({
                 </div> : <div className="flex items-center justify-between">
                   <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-gray-900">{ticket.ticketId}</p>
-                        <ExternalLink className="w-3 h-3 text-gray-400" />
-                      </div>
+                      {(() => {
+                        const href = buildJiraUrl(ticket.ticketId);
+                        return (
+                          <div className="flex items-center gap-2">
+                            {href ? (
+                              <a href={href} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline inline-flex items-center gap-1">
+                                {ticket.ticketId}
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            ) : (
+                              <p className="text-sm font-medium text-gray-900">{ticket.ticketId}</p>
+                            )}
+                          </div>
+                        );
+                      })()}
                       <p className="text-xs text-gray-500">Ticket ID</p>
                     </div>
                     <div>
