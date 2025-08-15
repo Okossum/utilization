@@ -221,7 +221,7 @@ export function EmployeeDossierModal({
         opacity: 0,
         scale: 0.95,
         y: 20
-      }} className="relative w-full max-w-7xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden">
+      }} className="relative w-full max-w-7xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
             {/* Header */}
             <header className="flex items-center justify-between p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
               <div className="flex items-center gap-3">
@@ -243,7 +243,7 @@ export function EmployeeDossierModal({
             </header>
 
             {/* Body */}
-            <div className="overflow-y-auto max-h-[calc(90vh-140px)] p-6 space-y-8">
+            <div className="flex-1 overflow-y-auto p-6 space-y-8">
               {/* Basic Information */}
               <section className="space-y-4">
                 <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
