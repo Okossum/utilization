@@ -301,3 +301,43 @@ export const customerService = {
     await deleteDoc(docRef);
   }
 };
+
+// Projects Services
+export const projectService = {
+  async save(project: { name: string; customer: string }): Promise<string> {
+    const docRef = await addDoc(collection(db, COLLECTIONS.PROJECTS), {
+      name: project.name,
+      customer: project.customer,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    return docRef.id;
+  },
+
+  async getAll(): Promise<{ id: string; name: string; customer: string; createdAt: Date; updatedAt: Date }[]> {
+    const querySnapshot = await getDocs(collection(db, COLLECTIONS.PROJECTS));
+    return querySnapshot.docs.map(d => ({
+      id: d.id,
+      name: String(d.data().name || ''),
+      customer: String(d.data().customer || ''),
+      createdAt: convertTimestamp(d.data().createdAt),
+      updatedAt: convertTimestamp(d.data().updatedAt),
+    }));
+  },
+
+  async getByCustomer(customer: string) {
+    const q = query(collection(db, COLLECTIONS.PROJECTS), where('customer', '==', customer));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data(), createdAt: convertTimestamp(d.data().createdAt), updatedAt: convertTimestamp(d.data().updatedAt) })) as any[];
+  },
+
+  async update(id: string, updates: Partial<{ name: string; customer: string }>): Promise<void> {
+    const docRef = doc(db, COLLECTIONS.PROJECTS, id);
+    await updateDoc(docRef, { ...updates, updatedAt: new Date() });
+  },
+
+  async delete(id: string): Promise<void> {
+    const docRef = doc(db, COLLECTIONS.PROJECTS, id);
+    await deleteDoc(docRef);
+  }
+};

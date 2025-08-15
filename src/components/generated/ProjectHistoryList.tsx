@@ -51,7 +51,12 @@ export function ProjectHistoryList({
     if (editingId) {
       const updatedProjects = projects.map(project => project.id === editingId ? {
         ...project,
-        ...editForm
+        // Persist explicit fields to avoid losing keys on reload
+        id: project.id,
+        projectName: editForm.projectName,
+        customer: editForm.customer,
+        role: editForm.role,
+        duration: editForm.duration,
       } : project);
       onChange(updatedProjects);
       setEditingId(null);
@@ -102,12 +107,22 @@ export function ProjectHistoryList({
                       <label className="block text-xs font-medium text-gray-600 mb-1">Kunde</label>
                       <CustomerManager
                         customers={customers}
-                        onAddCustomer={addCustomer}
+                        onAddCustomer={() => { /* disabled in dossier */ }}
                         value={editForm.customer}
-                        onChange={(customer) => setEditForm(prev => ({
-                          ...prev,
-                          customer
-                        }))}
+                        onChange={(customer) => {
+                          // Nur aktualisieren, wenn sich der Wert wirklich ändert
+                          setEditForm(prev => {
+                            if (prev.customer === customer) return prev;
+                            const next = { ...prev, customer };
+                            if (editingId) {
+                              const updated = projects.map(p => p.id === editingId ? { ...p, customer } : p);
+                              onChange(updated);
+                            }
+                            return next;
+                          });
+                        }}
+                        showManagement={false}
+                        allowCreate={false}
                         className="text-sm"
                       />
                     </div>
@@ -116,10 +131,18 @@ export function ProjectHistoryList({
                       <ProjectSelector
                         selectedCustomer={editForm.customer}
                         selectedProject={editForm.projectName}
-                        onProjectSelect={(projectName) => setEditForm(prev => ({
-                          ...prev,
-                          projectName
-                        }))}
+                        onProjectSelect={(projectName) => {
+                          // Nur aktualisieren, wenn sich der Wert wirklich ändert
+                          setEditForm(prev => {
+                            if (prev.projectName === projectName) return prev;
+                            const next = { ...prev, projectName };
+                            if (editingId) {
+                              const updated = projects.map(p => p.id === editingId ? { ...p, projectName } : p);
+                              onChange(updated);
+                            }
+                            return next;
+                          });
+                        }}
                         className="text-sm"
                       />
                     </div>
@@ -151,12 +174,12 @@ export function ProjectHistoryList({
                 </div> :                 <div className="flex items-center justify-between">
                   <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{project.projectName}</p>
-                      <p className="text-xs text-gray-500">Projekt</p>
-                    </div>
-                    <div>
                       <p className="text-sm text-gray-700">{project.customer || '—'}</p>
                       <p className="text-xs text-gray-500">Kunde</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{project.projectName}</p>
+                      <p className="text-xs text-gray-500">Projekt</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-700">{project.role}</p>

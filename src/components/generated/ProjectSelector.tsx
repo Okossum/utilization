@@ -77,10 +77,12 @@ export function ProjectSelector({
 
   // Wenn sich der Kunde ändert, setze das Projekt zurück
   useEffect(() => {
-    // Wenn sich der Kunde ändert, setze das Projekt zurück
     onProjectSelect('');
     setSearchTerm('');
-  }, [selectedCustomer, onProjectSelect]);
+    // Wichtig: nicht von Funktions-Identität abhängig machen, sonst Endlos-Loop
+    // (Caller reicht oft Inline-Funktionen weiter)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCustomer]);
 
   return (
     <div className={`relative ${className}`}>

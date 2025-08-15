@@ -1,10 +1,18 @@
 import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
-import { PrismaClient } from '../generated/prisma/index.js';
+import admin from 'firebase-admin';
 
 const app = express();
-const prisma = new PrismaClient();
+
+// Initialize Firebase Admin (Application Default Credentials)
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.applicationDefault(),
+  });
+}
+const db = admin.firestore();
+const FieldValue = admin.firestore.FieldValue;
 const PORT = process.env.PORT || 3001;
 
 // Middleware
@@ -17,7 +25,25 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Auslastung-Daten speichern oder aktualisieren
+// Helper to extract week values from a row into a flat map
+function buildWeekValuesMap(row) {
+  const map = {};
+  for (const [key, value] of Object.entries(row)) {
+    if (
+      key !== 'person' &&
+      key !== 'lob' &&
+      key !== 'bereich' &&
+      key !== 'cc' &&
+      key !== 'team' &&
+      typeof value === 'number' && Number.isFinite(value)
+    ) {
+      map[key] = value;
+    }
+  }
+  return map;
+}
+
+// Auslastung-Daten speichern oder aktualisieren (Firestore)
 app.post('/api/auslastung', async (req, res) => {
   try {
     const { fileName, data } = req.body;
@@ -27,121 +53,51 @@ app.post('/api/auslastung', async (req, res) => {
     }
 
     // Upload-Historie speichern
-    const history = await prisma.uploadHistory.create({
-      data: {
-        fileName,
-        fileType: 'auslastung',
-        status: 'success',
-        rowCount: data.length
-      }
+    const historyRef = await db.collection('uploadHistory').add({
+      fileName,
+      fileType: 'auslastung',
+      status: 'success',
+      rowCount: data.length,
+      createdAt: FieldValue.serverTimestamp(),
     });
 
     // Bestehende Daten als "nicht mehr aktuell" markieren
-    await prisma.auslastung.updateMany({
-      where: { isLatest: true },
-      data: { isLatest: false }
-    });
+    const latestSnap = await db.collection('auslastung').where('isLatest', '==', true).get();
+    if (!latestSnap.empty) {
+      const batch = db.batch();
+      latestSnap.forEach(doc => batch.update(doc.ref, { isLatest: false }));
+      await batch.commit();
+    }
 
     // Neue Versionsnummer ermitteln
-    const maxVersion = await prisma.auslastung.aggregate({
-      _max: { uploadVersion: true }
-    });
-    const newVersion = (maxVersion._max.uploadVersion || 0) + 1;
+    const maxVerSnap = await db.collection('auslastung').orderBy('uploadVersion', 'desc').limit(1).get();
+    const newVersion = maxVerSnap.empty ? 1 : ((maxVerSnap.docs[0].data().uploadVersion || 0) + 1);
 
     const results = [];
 
-    // Alle Auslastung-Daten speichern oder aktualisieren
+    // Alle Auslastung-Daten speichern (neue Versionen als eigene Docs)
     for (const row of data) {
       if (!row.person) continue;
-
-      // Prüfe ob Person bereits existiert
-      const existingPerson = await prisma.auslastung.findFirst({
-        where: { 
-          person: row.person,
-          isLatest: false
-        },
-        orderBy: { uploadVersion: 'desc' }
+      const docRef = await db.collection('auslastung').add({
+        fileName,
+        uploadDate: FieldValue.serverTimestamp(),
+        uploadVersion: newVersion,
+        person: row.person,
+        lob: row.lob ?? null,
+        bereich: row.bereich ?? null,
+        cc: row.cc ?? null,
+        team: row.team ?? null,
+        values: buildWeekValuesMap(row),
+        isLatest: true,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       });
-
-      if (existingPerson) {
-        // Aktualisiere bestehende Person
-        const updated = await prisma.auslastung.update({
-          where: { id: existingPerson.id },
-          data: { 
-            fileName,
-            uploadVersion: newVersion,
-            isLatest: true,
-            lob: row.lob,
-            bereich: row.bereich,
-            cc: row.cc,
-            team: row.team,
-            updatedAt: new Date()
-          }
-        });
-
-        // Aktualisiere Wochenwerte
-        await prisma.weekValue.deleteMany({
-          where: { auslastungId: existingPerson.id }
-        });
-
-        const weekValues = Object.entries(row)
-          .filter(([key, value]) => 
-            key !== 'person' && 
-            key !== 'lob' && 
-            key !== 'bereich' && 
-            key !== 'cc' && 
-            key !== 'team' &&
-            typeof value === 'number'
-          )
-          .map(([week, value]) => ({
-            auslastungId: existingPerson.id,
-            week,
-            value: value
-          }));
-
-        if (weekValues.length > 0) {
-          await prisma.weekValue.createMany({
-            data: weekValues
-          });
-        }
-
-        results.push({ action: 'updated', person: row.person, id: updated.id });
-      } else {
-        // Erstelle neue Person
-        const auslastung = await prisma.auslastung.create({
-          data: {
-            fileName,
-            uploadVersion: newVersion,
-            person: row.person,
-            lob: row.lob,
-            bereich: row.bereich,
-            cc: row.cc,
-            team: row.team,
-            weekValues: {
-              create: Object.entries(row)
-                .filter(([key, value]) => 
-                  key !== 'person' && 
-                  key !== 'lob' && 
-                  key !== 'bereich' && 
-                  key !== 'cc' && 
-                  key !== 'team' &&
-                  typeof value === 'number'
-                )
-                .map(([week, value]) => ({
-                  week,
-                  value: value
-                }))
-            }
-          }
-        });
-
-        results.push({ action: 'created', person: row.person, id: auslastung.id });
-      }
+      results.push({ action: 'created', person: row.person, id: docRef.id });
     }
 
     res.json({ 
       success: true, 
-      historyId: history.id, 
+      historyId: historyRef.id, 
       version: newVersion,
       results,
       message: `${results.length} Personen verarbeitet`
@@ -153,7 +109,7 @@ app.post('/api/auslastung', async (req, res) => {
   }
 });
 
-// Einsatzplan-Daten speichern oder aktualisieren
+// Einsatzplan-Daten speichern oder aktualisieren (Firestore)
 app.post('/api/einsatzplan', async (req, res) => {
   try {
     const { fileName, data } = req.body;
@@ -163,109 +119,54 @@ app.post('/api/einsatzplan', async (req, res) => {
     }
 
     // Upload-Historie speichern
-    const history = await prisma.uploadHistory.create({
-      data: {
-        fileName,
-        fileType: 'einsatzplan',
-        status: 'success',
-        rowCount: data.length
-      }
+    const historyRef = await db.collection('uploadHistory').add({
+      fileName,
+      fileType: 'einsatzplan',
+      status: 'success',
+      rowCount: data.length,
+      createdAt: FieldValue.serverTimestamp(),
     });
 
     // Bestehende Daten als "nicht mehr aktuell" markieren
-    await prisma.einsatzplan.updateMany({
-      where: { isLatest: true },
-      data: { isLatest: false }
-    });
+    const latestSnap = await db.collection('einsatzplan').where('isLatest', '==', true).get();
+    if (!latestSnap.empty) {
+      const batch = db.batch();
+      latestSnap.forEach(doc => batch.update(doc.ref, { isLatest: false }));
+      await batch.commit();
+    }
 
     // Neue Versionsnummer ermitteln
-    const maxVersion = await prisma.einsatzplan.aggregate({
-      _max: { uploadVersion: true }
-    });
-    const newVersion = (maxVersion._max.uploadVersion || 0) + 1;
+    const maxVerSnap = await db.collection('einsatzplan').orderBy('uploadVersion', 'desc').limit(1).get();
+    const newVersion = maxVerSnap.empty ? 1 : ((maxVerSnap.docs[0].data().uploadVersion || 0) + 1);
 
     const results = [];
 
-    // Alle Einsatzplan-Daten speichern oder aktualisieren
+    // Alle Einsatzplan-Daten speichern (neue Versionen als eigene Docs)
     for (const row of data) {
       if (!row.person) continue;
-
-      // Prüfe ob Person bereits existiert
-      const existingPerson = await prisma.einsatzplan.findFirst({
-        where: { 
-          person: row.person,
-          isLatest: false
-        },
-        orderBy: { uploadVersion: 'desc' }
-      });
-
-      if (existingPerson) {
-        // Aktualisiere bestehende Person
-        const updated = await prisma.einsatzplan.update({
-          where: { id: existingPerson.id },
-          data: { 
-            fileName,
-            uploadVersion: newVersion,
-            isLatest: true,
-            lbs: row.lbs,
-            updatedAt: new Date()
-          }
-        });
-
-        // Aktualisiere Wochenwerte
-        await prisma.einsatzplanWeekValue.deleteMany({
-          where: { einsatzplanId: existingPerson.id }
-        });
-
-        const weekValues = Object.entries(row)
-          .filter(([key, value]) => 
-            key !== 'person' && 
-            key !== 'lbs' &&
-            typeof value === 'number'
-          )
-                        .map(([week, value]) => ({
-                einsatzplanId: existingPerson.id,
-                week,
-                value: value
-              }));
-
-        if (weekValues.length > 0) {
-          await prisma.einsatzplanWeekValue.createMany({
-            data: weekValues
-          });
+      const values = {};
+      for (const [key, value] of Object.entries(row)) {
+        if (key !== 'person' && key !== 'lbs' && typeof value === 'number' && Number.isFinite(value)) {
+          values[key] = value;
         }
-
-        results.push({ action: 'updated', person: row.person, id: updated.id });
-      } else {
-        // Erstelle neue Person
-        const einsatzplan = await prisma.einsatzplan.create({
-          data: {
-            fileName,
-            uploadVersion: newVersion,
-            person: row.person,
-            lbs: row.lbs,
-            weekValues: {
-              create: Object.entries(row)
-                .filter(([key, value]) => 
-                  key !== 'person' && 
-                  key !== 'lbs' &&
-                  typeof value === 'number'
-                )
-                .map(([week, value]) => ({
-                  week,
-                  value: value
-                }))
-            }
-          }
-        });
-
-        results.push({ action: 'created', person: row.person, id: einsatzplan.id });
       }
+      const docRef = await db.collection('einsatzplan').add({
+        fileName,
+        uploadDate: FieldValue.serverTimestamp(),
+        uploadVersion: newVersion,
+        person: row.person,
+        lbs: row.lbs ?? null,
+        values,
+        isLatest: true,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      results.push({ action: 'created', person: row.person, id: docRef.id });
     }
 
     res.json({ 
       success: true, 
-      historyId: history.id, 
+      historyId: historyRef.id, 
       version: newVersion,
       results,
       message: `${results.length} Personen verarbeitet`
@@ -280,17 +181,10 @@ app.post('/api/einsatzplan', async (req, res) => {
 // Alle Auslastung-Daten abrufen (nur neueste Version)
 app.get('/api/auslastung', async (req, res) => {
   try {
-    const auslastung = await prisma.auslastung.findMany({
-      where: { isLatest: true },
-      include: {
-        weekValues: true
-      },
-      orderBy: {
-        person: 'asc'
-      }
-    });
-
-    res.json(auslastung);
+    const snap = await db.collection('auslastung').where('isLatest', '==', true).get();
+    const out = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => String(a.person || '').localeCompare(String(b.person || ''), 'de'));
+    res.json(out);
   } catch (error) {
     console.error('Fehler beim Abrufen der Auslastung:', error);
     res.status(500).json({ error: 'Interner Server-Fehler' });
@@ -300,17 +194,10 @@ app.get('/api/auslastung', async (req, res) => {
 // Alle Einsatzplan-Daten abrufen (nur neueste Version)
 app.get('/api/einsatzplan', async (req, res) => {
   try {
-    const einsatzplan = await prisma.einsatzplan.findMany({
-      where: { isLatest: true },
-      include: {
-        weekValues: true
-      },
-      orderBy: {
-        person: 'asc'
-      }
-    });
-
-    res.json(einsatzplan);
+    const snap = await db.collection('einsatzplan').where('isLatest', '==', true).get();
+    const out = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => String(a.person || '').localeCompare(String(b.person || ''), 'de'));
+    res.json(out);
   } catch (error) {
     console.error('Fehler beim Abrufen des Einsatzplans:', error);
     res.status(500).json({ error: 'Interner Server-Fehler' });
@@ -320,13 +207,9 @@ app.get('/api/einsatzplan', async (req, res) => {
 // Upload-Historie abrufen
 app.get('/api/upload-history', async (req, res) => {
   try {
-    const history = await prisma.uploadHistory.findMany({
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
-
-    res.json(history);
+    const snap = await db.collection('uploadHistory').orderBy('createdAt', 'desc').get();
+    const out = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    res.json(out);
   } catch (error) {
     console.error('Fehler beim Abrufen der Upload-Historie:', error);
     res.status(500).json({ error: 'Interner Server-Fehler' });
@@ -420,26 +303,29 @@ app.post('/api/consolidate', async (req, res) => {
     }
 
     // Bestehende Daten als "nicht mehr aktuell" markieren
-    await prisma.utilizationData.updateMany({
-      where: { isLatest: true },
-      data: { isLatest: false }
-    });
+    const latestUtilSnap = await db.collection('utilizationData').where('isLatest', '==', true).get();
+    if (!latestUtilSnap.empty) {
+      const batch = db.batch();
+      latestUtilSnap.forEach(doc => batch.update(doc.ref, { isLatest: false }));
+      await batch.commit();
+    }
 
     // Neue Daten speichern
-    const savedData = [];
-    for (const data of consolidatedData) {
-      const saved = await prisma.utilizationData.upsert({
-        where: { person_week: { person: data.person, week: data.week } },
-        update: { ...data, updatedAt: new Date() },
-        create: data
-      });
-      savedData.push(saved);
+    const savedCount = [];
+    for (const row of consolidatedData) {
+      const docId = `${row.person}__${row.week}`;
+      await db.collection('utilizationData').doc(docId).set({
+        ...row,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      savedCount.push(docId);
     }
 
     res.json({
       success: true,
-      message: `${savedData.length} Datenzeilen konsolidiert und gespeichert`,
-      count: savedData.length
+      message: `${savedCount.length} Datenzeilen konsolidiert und gespeichert`,
+      count: savedCount.length
     });
 
   } catch (error) {
@@ -453,24 +339,23 @@ app.get('/api/utilization-data', async (req, res) => {
   try {
     const { isHistorical, person } = req.query;
     
-    const where = { isLatest: true };
-    if (isHistorical !== undefined) {
-      where.isHistorical = isHistorical === 'true';
+    let queryRef = db.collection('utilizationData').where('isLatest', '==', true);
+    if (typeof isHistorical !== 'undefined') {
+      queryRef = queryRef.where('isHistorical', '==', isHistorical === 'true');
     }
     if (person) {
-      where.person = person;
+      queryRef = queryRef.where('person', '==', String(person));
     }
-
-    const data = await prisma.utilizationData.findMany({
-      where,
-      orderBy: [
-        { person: 'asc' },
-        { year: 'asc' },
-        { weekNumber: 'asc' }
-      ]
-    });
-
-    res.json(data);
+    // Firestore cannot order by multiple fields without composite indexes; keep simple
+    const snap = await queryRef.get();
+    const out = snap.docs
+      .map(d => d.data())
+      .sort((a, b) => {
+        if (a.person !== b.person) return String(a.person).localeCompare(String(b.person));
+        if (a.year !== b.year) return (a.year || 0) - (b.year || 0);
+        return (a.weekNumber || 0) - (b.weekNumber || 0);
+      });
+    res.json(out);
   } catch (error) {
     console.error('Fehler beim Abrufen der normalisierten Daten:', error);
     res.status(500).json({ error: 'Interner Server-Fehler' });
@@ -492,63 +377,27 @@ app.post('/api/employee-dossier', async (req, res) => {
       return res.status(400).json({ error: 'Ungültige Daten' });
     }
 
-    // Prüfe ob Employee Dossier bereits existiert
-    const existingDossier = await prisma.employeeDossier.findUnique({
-      where: { employeeId }
-    });
-
-    if (existingDossier) {
-      // Aktualisiere bestehendes Dossier
-      const updated = await prisma.employeeDossier.update({
-        where: { employeeId },
-        data: {
-          name: dossierData.name,
-          email: dossierData.email || '',
-          phone: dossierData.phone || '',
-          strengths: dossierData.strengths || '',
-          weaknesses: dossierData.weaknesses || '',
-          comments: dossierData.comments || '',
-          travelReadiness: dossierData.travelReadiness || '',
-          projectHistory: dossierData.projectHistory || [],
-          projectOffers: dossierData.projectOffers || [],
-          jiraTickets: dossierData.jiraTickets || [],
-          excelData: dossierData.excelData || {},
-          updatedAt: new Date()
-        }
-      });
-      
-      res.json({
-        success: true,
-        message: 'Employee Dossier aktualisiert',
-        data: updated
-      });
-    } else {
-      // Erstelle neues Dossier
-      const created = await prisma.employeeDossier.create({
-        data: {
-          employeeId,
-          name: dossierData.name,
-          email: dossierData.email || '',
-          phone: dossierData.phone || '',
-          strengths: dossierData.strengths || '',
-          weaknesses: dossierData.weaknesses || '',
-          comments: dossierData.comments || '',
-          travelReadiness: dossierData.travelReadiness || '',
-          projectHistory: dossierData.projectHistory || [],
-          projectOffers: dossierData.projectOffers || [],
-          jiraTickets: dossierData.jiraTickets || [],
-          excelData: dossierData.excelData || {},
-          createdAt: new Date(),
-          updatedAt: new Date()
-        }
-      });
-      
-      res.json({
-        success: true,
-        message: 'Employee Dossier erstellt',
-        data: created
-      });
-    }
+    const docRef = db.collection('employeeDossiers').doc(String(employeeId));
+    const snap = await docRef.get();
+    const payload = {
+      employeeId,
+      name: dossierData.name,
+      email: dossierData.email || '',
+      phone: dossierData.phone || '',
+      strengths: dossierData.strengths || '',
+      weaknesses: dossierData.weaknesses || '',
+      comments: dossierData.comments || '',
+      travelReadiness: dossierData.travelReadiness || '',
+      projectHistory: dossierData.projectHistory || [],
+      projectOffers: dossierData.projectOffers || [],
+      jiraTickets: dossierData.jiraTickets || [],
+      excelData: dossierData.excelData || {},
+      updatedAt: FieldValue.serverTimestamp(),
+      createdAt: snap.exists ? snap.data().createdAt || FieldValue.serverTimestamp() : FieldValue.serverTimestamp(),
+    };
+    await docRef.set(payload, { merge: true });
+    const updated = await docRef.get();
+    res.json({ success: true, message: snap.exists ? 'Employee Dossier aktualisiert' : 'Employee Dossier erstellt', data: { id: updated.id, ...updated.data() } });
   } catch (error) {
     console.error('Fehler beim Speichern des Employee Dossiers:', error);
     res.status(500).json({ error: 'Interner Server-Fehler', details: error.message });
@@ -560,15 +409,12 @@ app.get('/api/employee-dossier/:employeeId', async (req, res) => {
   try {
     const { employeeId } = req.params;
     
-    const dossier = await prisma.employeeDossier.findUnique({
-      where: { employeeId }
-    });
-    
-    if (!dossier) {
+    const snap = await db.collection('employeeDossiers').doc(String(employeeId)).get();
+    if (!snap.exists) {
       return res.status(404).json({ error: 'Employee Dossier nicht gefunden' });
     }
     
-    res.json(dossier);
+    res.json({ id: snap.id, ...snap.data() });
   } catch (error) {
     console.error('Fehler beim Abrufen des Employee Dossiers:', error);
     res.status(500).json({ error: 'Interner Server-Fehler' });
@@ -578,11 +424,11 @@ app.get('/api/employee-dossier/:employeeId', async (req, res) => {
 // Alle Employee Dossiers abrufen
 app.get('/api/employee-dossiers', async (req, res) => {
   try {
-    const dossiers = await prisma.employeeDossier.findMany({
-      orderBy: { name: 'asc' }
-    });
-    
-    res.json(dossiers);
+    const snap = await db.collection('employeeDossiers').get();
+    const out = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'de'));
+    res.json(out);
   } catch (error) {
     console.error('Fehler beim Abrufen aller Employee Dossiers:', error);
     res.status(500).json({ error: 'Interner Server-Fehler' });
@@ -599,12 +445,10 @@ app.listen(PORT, () => {
 // Graceful Shutdown
 process.on('SIGINT', async () => {
   console.log('\n🛑 Server wird heruntergefahren...');
-  await prisma.$disconnect();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
   console.log('\n🛑 Server wird heruntergefahren...');
-  await prisma.$disconnect();
   process.exit(0);
 });

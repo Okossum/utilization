@@ -19,6 +19,7 @@ interface CustomerManagerProps {
   className?: string;
   value?: string;
   onChange?: (value: string) => void;
+  allowCreate?: boolean;
 }
 
 export function CustomerManager({
@@ -30,7 +31,8 @@ export function CustomerManager({
   showManagement = false,
   className = "",
   value,
-  onChange
+  onChange,
+  allowCreate = true
 }: CustomerManagerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState(value || '');
@@ -104,25 +106,27 @@ export function CustomerManager({
             className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-hidden"
           >
             {/* Add New Customer Section */}
-            <div className="p-3 border-b border-gray-100 bg-gray-50">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newCustomerName}
-                  onChange={(e) => setNewCustomerName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddCustomer()}
-                  className="flex-1 px-2 py-1 text-sm border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Neuen Kunden hinzufügen..."
-                />
-                <button
-                  onClick={handleAddCustomer}
-                  disabled={!newCustomerName.trim()}
-                  className="px-2 py-1 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Plus className="w-3 h-3" />
-                </button>
+            {allowCreate && (
+              <div className="p-3 border-b border-gray-100 bg-gray-50">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newCustomerName}
+                    onChange={(e) => setNewCustomerName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddCustomer()}
+                    className="flex-1 px-2 py-1 text-sm border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Neuen Kunden hinzufügen..."
+                  />
+                  <button
+                    onClick={handleAddCustomer}
+                    disabled={!newCustomerName.trim()}
+                    className="px-2 py-1 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Customer List */}
             <div className="max-h-48 overflow-y-auto">

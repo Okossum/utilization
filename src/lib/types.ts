@@ -48,6 +48,13 @@ export interface Customer {
   updatedAt: Date;
 }
 
+export interface ProjectDoc {
+  name: string;
+  customer: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Firestore Collection Names
 export const COLLECTIONS = {
   UPLOADED_FILES: 'uploaded_files',
@@ -55,7 +62,8 @@ export const COLLECTIONS = {
   PLANNED_ENGAGEMENTS: 'planned_engagements',
   PERSON_STATUS: 'person_status',
   PERSON_TRAVEL_READINESS: 'person_travel_readiness',
-  CUSTOMERS: 'customers'
+  CUSTOMERS: 'customers',
+  PROJECTS: 'projects'
 } as const;
 
 // Firestore Document IDs
@@ -83,5 +91,9 @@ export interface FirestorePersonTravelReadiness extends PersonTravelReadiness, F
 }
 
 export interface FirestoreCustomer extends Customer, FirestoreDocument {
+  userId?: string;
+}
+
+export interface FirestoreProject extends ProjectDoc, FirestoreDocument {
   userId?: string;
 }

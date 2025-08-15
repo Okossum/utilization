@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Container, Theme } from './settings/types';
 import { UtilizationReportView } from './components/generated/UtilizationReportView';
+import { CustomerProjectsManagerButton } from './components/generated/CustomerProjectsManagerButton';
 import { CustomerProvider } from './contexts/CustomerContext';
 
 let theme: Theme = 'light';
@@ -23,6 +24,7 @@ function App() {
     return (
       <CustomerProvider>
         <UtilizationReportView />
+        <CustomerProjectsManagerButton />
       </CustomerProvider>
     );
   }, []);

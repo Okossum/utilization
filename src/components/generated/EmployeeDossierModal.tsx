@@ -91,6 +91,17 @@ export function EmployeeDossierModal({
       try {
         // Lade gespeicherte Dossier-Daten aus der DB
         const savedDossier = await DatabaseService.getEmployeeDossier(employee.id);
+
+        // Normalisierung: stelle sicher, dass projectHistory Items immer projectName befüllt haben
+        const normalizedProjectHistory = Array.isArray(savedDossier?.projectHistory)
+          ? savedDossier.projectHistory.map((p: any) => ({
+              id: String(p.id ?? Date.now().toString()),
+              projectName: String(p.projectName ?? p.project ?? ''),
+              customer: String(p.customer ?? ''),
+              role: String(p.role ?? ''),
+              duration: String(p.duration ?? ''),
+            }))
+          : undefined;
         
         // Kombiniere DB-Daten mit Excel-Daten
         const combinedData: Employee = {
@@ -109,7 +120,7 @@ export function EmployeeDossierModal({
           weaknesses: savedDossier?.weaknesses || employee.weaknesses || '',
           comments: savedDossier?.comments || employee.comments || '',
           travelReadiness: savedDossier?.travelReadiness || employee.travelReadiness || '',
-          projectHistory: savedDossier?.projectHistory || employee.projectHistory || [],
+          projectHistory: normalizedProjectHistory || employee.projectHistory || [],
           projectOffers: savedDossier?.projectOffers || employee.projectOffers || [],
           jiraTickets: savedDossier?.jiraTickets || employee.jiraTickets || [],
           // Speichere Excel-Daten für Referenz
