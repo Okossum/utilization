@@ -39,6 +39,8 @@ export function UtilizationReportView() {
   const [dataSource, setDataSource] = useState<'upload' | 'database'>('database');
   const [selectedPersons, setSelectedPersons] = useState<string[]>([]);
   const [planningForPerson, setPlanningForPerson] = useState<string | null>(null);
+  const [planningForWeek, setPlanningForWeek] = useState<{ year: number; week: number } | null>(null);
+  const [dossiersByPerson, setDossiersByPerson] = useState<Record<string, { projectOffers?: any[]; jiraTickets?: any[] }>>({});
 
   // Function to switch data source
   const switchToUpload = () => {
@@ -572,6 +574,31 @@ export function UtilizationReportView() {
   const visiblePersons = useMemo(() => {
     return Array.from(new Set(filteredData.map(item => item.person)));
   }, [filteredData]);
+  
+  // Dossiers für sichtbare Personen lazy laden
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const toFetch = visiblePersons.filter(p => !dossiersByPerson[p]);
+      if (toFetch.length === 0) return;
+      const entries = await Promise.all(toFetch.map(async (p) => {
+        try {
+          const dossier = await DatabaseService.getEmployeeDossier(p);
+          return [p, { projectOffers: dossier?.projectOffers || [], jiraTickets: dossier?.jiraTickets || [] }] as const;
+        } catch {
+          return [p, { projectOffers: [], jiraTickets: [] }] as const;
+        }
+      }));
+      if (!cancelled && entries.length > 0) {
+        setDossiersByPerson(prev => {
+          const next = { ...prev } as Record<string, { projectOffers?: any[]; jiraTickets?: any[] }>;
+          for (const [p, v] of entries) next[p] = v;
+          return next;
+        });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [visiblePersons]);
   const allPersons = useMemo(() => {
     return Array.from(new Set(dataForUI.map(item => item.person)));
   }, [dataForUI]);
@@ -1101,14 +1128,68 @@ export function UtilizationReportView() {
                               ) : (
                                 '—'
                               )}
-                              <button 
-                                type="button"
-                                onClick={() => setPlanningForPerson(person)}
-                                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
-                                title="Planung (Projektangebot/Jira)"
-                              >
-                                <Target className="w-4 h-4" />
-                              </button>
+                              {(() => {
+                                const dossier = dossiersByPerson[person] || { projectOffers: [], jiraTickets: [] };
+                                const hasOffer = (dossier.projectOffers || []).some((o: any) => {
+                                  if (o.startWeek && o.endWeek) {
+                                    const sw = parseInt(String(o.startWeek).split('KW')[1]);
+                                    const ew = parseInt(String(o.endWeek).split('KW')[1]);
+                                    return weekNumber >= sw && weekNumber <= ew;
+                                  }
+                                  if (o.startDate && o.endDate) {
+                                    const y = currentIsoYear;
+                                    const ws = new Date(Date.UTC(y, 0, 4));
+                                    const day = (ws.getUTCDay() + 6) % 7;
+                                    ws.setUTCDate(ws.getUTCDate() - day + (weekNumber - 1) * 7);
+                                    const we = new Date(ws); we.setUTCDate(ws.getUTCDate() + 6);
+                                    const s = new Date(o.startDate); const e = new Date(o.endDate);
+                                    return s <= we && e >= ws;
+                                  }
+                                  return false;
+                                });
+                                const hasJira = (dossier.jiraTickets || []).some((j: any) => {
+                                  if (j.startDate && j.endDate) {
+                                    const y = currentIsoYear;
+                                    const ws = new Date(Date.UTC(y, 0, 4));
+                                    const day = (ws.getUTCDay() + 6) % 7;
+                                    ws.setUTCDate(ws.getUTCDate() - day + (weekNumber - 1) * 7);
+                                    const we = new Date(ws); we.setUTCDate(ws.getUTCDate() + 6);
+                                    const s = new Date(j.startDate); const e = new Date(j.endDate);
+                                    return s <= we && e >= ws;
+                                  }
+                                  if (j.startWeek && j.endWeek) {
+                                    const sw = parseInt(String(j.startWeek).split('KW')[1]);
+                                    const ew = parseInt(String(j.endWeek).split('KW')[1]);
+                                    return weekNumber >= sw && weekNumber <= ew;
+                                  }
+                                  return false;
+                                });
+                                if (!hasOffer && !hasJira) return null;
+                                return (
+                                  <div className="flex items-center gap-1">
+                                    {hasOffer && (
+                                      <button
+                                        type="button"
+                                        onClick={() => { setPlanningForPerson(person); setPlanningForWeek({ year: currentIsoYear, week: weekNumber }); }}
+                                        className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded p-0.5"
+                                        title="Projektangebote anzeigen"
+                                      >
+                                        <Target className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                    {hasJira && (
+                                      <button
+                                        type="button"
+                                        onClick={() => { setPlanningForPerson(person); setPlanningForWeek({ year: currentIsoYear, week: weekNumber }); }}
+                                        className="text-sky-600 hover:text-sky-700 hover:bg-sky-50 rounded p-0.5"
+                                        title="Jira-Tickets anzeigen"
+                                      >
+                                        <Ticket className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </td>
                         );
@@ -1324,6 +1405,6 @@ export function UtilizationReportView() {
       </AnimatePresence>
 
       {/* Planning Modal (Projektangebote & Jira) */}
-      <PlanningModal isOpen={!!planningForPerson} onClose={() => setPlanningForPerson(null)} personId={planningForPerson || ''} />
+      <PlanningModal isOpen={!!planningForPerson} onClose={() => { setPlanningForPerson(null); setPlanningForWeek(null); }} personId={planningForPerson || ''} filterByWeek={planningForWeek || undefined} />
     </div>;
 }

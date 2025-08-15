@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { X, Target, Ticket } from 'lucide-react';
+import { X, Target, Ticket, Plus } from 'lucide-react';
 import DatabaseService from '../../services/database';
 
 type OfferedSkill = { skillId: string; name: string; level: number };
@@ -9,13 +9,16 @@ interface PlanningModalProps {
   isOpen: boolean;
   onClose: () => void;
   personId: string; // verwendet als Dossier-ID
+  filterByWeek?: { year: number; week: number };
+  initialTab?: 'offers' | 'jira' | 'all';
 }
 
-export function PlanningModal({ isOpen, onClose, personId }: PlanningModalProps) {
+export function PlanningModal({ isOpen, onClose, personId, filterByWeek, initialTab = 'all' }: PlanningModalProps) {
   const [loading, setLoading] = useState(false);
   const [skills, setSkills] = useState<OfferedSkill[]>([]);
   const [projectOffers, setProjectOffers] = useState<any[]>([]);
   const [jiraTickets, setJiraTickets] = useState<any[]>([]);
+  const [showForms, setShowForms] = useState(false);
 
   // Forms
   const [offerForm, setOfferForm] = useState({ title: '', contactPerson: '', startDate: '', endDate: '', offeredSkillId: '' });
@@ -39,6 +42,39 @@ export function PlanningModal({ isOpen, onClose, personId }: PlanningModalProps)
     })();
     return () => { cancelled = true; };
   }, [isOpen, personId]);
+
+  // KW-Hilfen
+  function getIsoWeekStartDate(year: number, week: number): Date {
+    const fourthJan = new Date(year, 0, 4);
+    const dayOfWeek = (fourthJan.getDay() + 6) % 7; // Montag=0
+    const mondayOfWeek1 = new Date(fourthJan);
+    mondayOfWeek1.setDate(fourthJan.getDate() - dayOfWeek);
+    const result = new Date(mondayOfWeek1);
+    result.setDate(mondayOfWeek1.getDate() + (week - 1) * 7);
+    result.setHours(0, 0, 0, 0);
+    return result;
+  }
+  function overlapsWeek(start: string | undefined, end: string | undefined, year: number, week: number): boolean {
+    if (!start || !end) return false;
+    const s = new Date(start);
+    const e = new Date(end);
+    if (isNaN(s.getTime()) || isNaN(e.getTime())) return false;
+    const ws = getIsoWeekStartDate(year, week);
+    const we = new Date(ws);
+    we.setDate(ws.getDate() + 6);
+    we.setHours(23, 59, 59, 999);
+    return s <= we && e >= ws;
+  }
+
+  const filteredOffers = useMemo(() => {
+    if (!filterByWeek) return projectOffers;
+    return projectOffers.filter(o => overlapsWeek(o.startDate, o.endDate, filterByWeek.year, filterByWeek.week));
+  }, [projectOffers, filterByWeek]);
+
+  const filteredJira = useMemo(() => {
+    if (!filterByWeek) return jiraTickets;
+    return jiraTickets.filter(j => overlapsWeek(j.startDate, j.endDate, filterByWeek.year, filterByWeek.week));
+  }, [jiraTickets, filterByWeek]);
 
   const addOffer = () => {
     if (!offerForm.title || !offerForm.startDate || !offerForm.endDate) return;
@@ -110,63 +146,98 @@ export function PlanningModal({ isOpen, onClose, personId }: PlanningModalProps)
                 <div className="font-medium text-gray-900">Planung: Projektangebote & Jira-Tickets</div>
                 <button onClick={onClose} className="p-2 rounded hover:bg-gray-100"><X className="w-4 h-4 text-gray-500"/></button>
               </div>
-              <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Projektangebot */}
-                <div className="border border-gray-200 rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-2 text-gray-800"><Target className="w-4 h-4 text-emerald-600"/> Projektangebot</div>
-                  <div className="space-y-2">
-                    <input className="w-full px-2 py-1 border border-gray-200 rounded" placeholder="Titel" value={offerForm.title} onChange={e=>setOfferForm(v=>({...v,title:e.target.value}))}/>
-                    <input className="w-full px-2 py-1 border border-gray-200 rounded" placeholder="Ansprechpartner" value={offerForm.contactPerson} onChange={e=>setOfferForm(v=>({...v,contactPerson:e.target.value}))}/>
-                    <div className="grid grid-cols-2 gap-2">
-                      <input type="date" className="px-2 py-1 border border-gray-200 rounded" value={offerForm.startDate} onChange={e=>setOfferForm(v=>({...v,startDate:e.target.value}))}/>
-                      <input type="date" className="px-2 py-1 border border-gray-200 rounded" value={offerForm.endDate} onChange={e=>setOfferForm(v=>({...v,endDate:e.target.value}))}/>
-                    </div>
-                    <select className="w-full px-2 py-1 border border-gray-200 rounded" value={offerForm.offeredSkillId} onChange={e=>setOfferForm(v=>({...v,offeredSkillId:e.target.value}))}>
-                      <option value="">— angebotener Skill —</option>
-                      {skills.map(s=> (
-                        <option key={s.skillId} value={s.skillId}>{s.name} (Level {s.level})</option>
-                      ))}
-                    </select>
-                    <button onClick={addOffer} className="px-3 py-1 bg-emerald-600 text-white rounded disabled:opacity-60" disabled={loading}>Hinzufügen</button>
+              <div className="p-4">
+                {filterByWeek && (
+                  <div className="mb-3 text-xs text-gray-600">
+                    Gefiltert auf KW {filterByWeek.week}/{filterByWeek.year}
                   </div>
-                  <div className="mt-3 space-y-2">
-                    {projectOffers.map(o=> (
-                      <div key={o.id} className="flex items-center justify-between px-2 py-1 border border-gray-200 rounded">
-                        <div className="text-sm text-gray-800 truncate" title={o.title}>{o.title}</div>
-                        <button onClick={()=>removeOffer(o.id)} className="text-xs text-red-600 hover:underline">Entfernen</button>
-                      </div>
-                    ))}
+                )}
+                {/* Listen-Übersicht */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="border border-gray-200 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2 text-gray-800">
+                      <div className="flex items-center gap-2"><Target className="w-4 h-4 text-emerald-600"/> Projektangebote</div>
+                    </div>
+                    <div className="space-y-2">
+                      {filteredOffers.length === 0 && (
+                        <div className="text-sm text-gray-400">Keine Einträge</div>
+                      )}
+                      {filteredOffers.map(o=> (
+                        <div key={o.id} className="flex items-center justify-between px-2 py-1 border border-gray-200 rounded">
+                          <div className="text-sm text-gray-800 truncate" title={o.title}>{o.title}</div>
+                          <button onClick={()=>removeOffer(o.id)} className="text-xs text-red-600 hover:underline">Entfernen</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="border border-gray-200 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2 text-gray-800">
+                      <div className="flex items-center gap-2"><Ticket className="w-4 h-4 text-sky-600"/> Jira-Tickets</div>
+                    </div>
+                    <div className="space-y-2">
+                      {filteredJira.length === 0 && (
+                        <div className="text-sm text-gray-400">Keine Einträge</div>
+                      )}
+                      {filteredJira.map(j=> (
+                        <div key={j.id} className="flex items-center justify-between px-2 py-1 border border-gray-200 rounded">
+                          <div className="text-sm text-gray-800 truncate" title={j.title}>{j.title}</div>
+                          <button onClick={()=>removeJira(j.id)} className="text-xs text-red-600 hover:underline">Entfernen</button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
-                {/* Jira Ticket */}
-                <div className="border border-gray-200 rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-2 text-gray-800"><Ticket className="w-4 h-4 text-sky-600"/> Jira-Ticket</div>
-                  <div className="space-y-2">
-                    <input className="w-full px-2 py-1 border border-gray-200 rounded" placeholder="Titel" value={jiraForm.title} onChange={e=>setJiraForm(v=>({...v,title:e.target.value}))}/>
-                    <input className="w-full px-2 py-1 border border-gray-200 rounded" placeholder="Ticket-ID (z. B. ABC-123)" value={jiraForm.ticketId} onChange={e=>setJiraForm(v=>({...v,ticketId:e.target.value}))}/>
-                    <input className="w-full px-2 py-1 border border-gray-200 rounded" placeholder="Link (optional)" value={jiraForm.link} onChange={e=>setJiraForm(v=>({...v,link:e.target.value}))}/>
-                    <input className="w-full px-2 py-1 border border-gray-200 rounded" placeholder="Ansprechpartner" value={jiraForm.contactPerson} onChange={e=>setJiraForm(v=>({...v,contactPerson:e.target.value}))}/>
-                    <div className="grid grid-cols-2 gap-2">
-                      <input type="date" className="px-2 py-1 border border-gray-200 rounded" value={jiraForm.startDate} onChange={e=>setJiraForm(v=>({...v,startDate:e.target.value}))}/>
-                      <input type="date" className="px-2 py-1 border border-gray-200 rounded" value={jiraForm.endDate} onChange={e=>setJiraForm(v=>({...v,endDate:e.target.value}))}/>
-                    </div>
-                    <select className="w-full px-2 py-1 border border-gray-200 rounded" value={jiraForm.offeredSkillId} onChange={e=>setJiraForm(v=>({...v,offeredSkillId:e.target.value}))}>
-                      <option value="">— angebotener Skill —</option>
-                      {skills.map(s=> (
-                        <option key={s.skillId} value={s.skillId}>{s.name} (Level {s.level})</option>
-                      ))}
-                    </select>
-                    <button onClick={addJira} className="px-3 py-1 bg-sky-600 text-white rounded disabled:opacity-60" disabled={loading}>Hinzufügen</button>
-                  </div>
-                  <div className="mt-3 space-y-2">
-                    {jiraTickets.map(j=> (
-                      <div key={j.id} className="flex items-center justify-between px-2 py-1 border border-gray-200 rounded">
-                        <div className="text-sm text-gray-800 truncate" title={j.title}>{j.title}</div>
-                        <button onClick={()=>removeJira(j.id)} className="text-xs text-red-600 hover:underline">Entfernen</button>
+                {/* Formulare einklappbar */}
+                <div className="mt-4">
+                  <button onClick={()=>setShowForms(s=>!s)} className="inline-flex items-center gap-2 px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50">
+                    <Plus className="w-4 h-4"/> {showForms ? 'Formulare ausblenden' : 'Neuen Eintrag hinzufügen'}
+                  </button>
+                  {showForms && (
+                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Angebot-Form */}
+                      <div className="border border-gray-200 rounded-lg p-3">
+                        <div className="flex items-center gap-2 mb-2 text-gray-800"><Target className="w-4 h-4 text-emerald-600"/> Projektangebot anlegen</div>
+                        <div className="space-y-2">
+                          <input className="w-full px-2 py-1 border border-gray-200 rounded" placeholder="Titel" value={offerForm.title} onChange={e=>setOfferForm(v=>({...v,title:e.target.value}))}/>
+                          <input className="w-full px-2 py-1 border border-gray-200 rounded" placeholder="Ansprechpartner" value={offerForm.contactPerson} onChange={e=>setOfferForm(v=>({...v,contactPerson:e.target.value}))}/>
+                          <div className="grid grid-cols-2 gap-2">
+                            <input type="date" className="px-2 py-1 border border-gray-200 rounded" value={offerForm.startDate} onChange={e=>setOfferForm(v=>({...v,startDate:e.target.value}))}/>
+                            <input type="date" className="px-2 py-1 border border-gray-200 rounded" value={offerForm.endDate} onChange={e=>setOfferForm(v=>({...v,endDate:e.target.value}))}/>
+                          </div>
+                          <select className="w-full px-2 py-1 border border-gray-200 rounded" value={offerForm.offeredSkillId} onChange={e=>setOfferForm(v=>({...v,offeredSkillId:e.target.value}))}>
+                            <option value="">— angebotener Skill —</option>
+                            {skills.map(s=> (
+                              <option key={s.skillId} value={s.skillId}>{s.name} (Level {s.level})</option>
+                            ))}
+                          </select>
+                          <button onClick={addOffer} className="px-3 py-1 bg-emerald-600 text-white rounded disabled:opacity-60" disabled={loading}>Hinzufügen</button>
+                        </div>
                       </div>
-                    ))}
-                  </div>
+
+                      {/* Jira-Form */}
+                      <div className="border border-gray-200 rounded-lg p-3">
+                        <div className="flex items-center gap-2 mb-2 text-gray-800"><Ticket className="w-4 h-4 text-sky-600"/> Jira-Ticket anlegen</div>
+                        <div className="space-y-2">
+                          <input className="w-full px-2 py-1 border border-gray-200 rounded" placeholder="Titel" value={jiraForm.title} onChange={e=>setJiraForm(v=>({...v,title:e.target.value}))}/>
+                          <input className="w-full px-2 py-1 border border-gray-200 rounded" placeholder="Ticket-ID (z. B. ABC-123)" value={jiraForm.ticketId} onChange={e=>setJiraForm(v=>({...v,ticketId:e.target.value}))}/>
+                          <input className="w-full px-2 py-1 border border-gray-200 rounded" placeholder="Link (optional)" value={jiraForm.link} onChange={e=>setJiraForm(v=>({...v,link:e.target.value}))}/>
+                          <input className="w-full px-2 py-1 border border-gray-200 rounded" placeholder="Ansprechpartner" value={jiraForm.contactPerson} onChange={e=>setJiraForm(v=>({...v,contactPerson:e.target.value}))}/>
+                          <div className="grid grid-cols-2 gap-2">
+                            <input type="date" className="px-2 py-1 border border-gray-200 rounded" value={jiraForm.startDate} onChange={e=>setJiraForm(v=>({...v,startDate:e.target.value}))}/>
+                            <input type="date" className="px-2 py-1 border border-gray-200 rounded" value={jiraForm.endDate} onChange={e=>setJiraForm(v=>({...v,endDate:e.target.value}))}/>
+                          </div>
+                          <select className="w-full px-2 py-1 border border-gray-200 rounded" value={jiraForm.offeredSkillId} onChange={e=>setJiraForm(v=>({...v,offeredSkillId:e.target.value}))}>
+                            <option value="">— angebotener Skill —</option>
+                            {skills.map(s=> (
+                              <option key={s.skillId} value={s.skillId}>{s.name} (Level {s.level})</option>
+                            ))}
+                          </select>
+                          <button onClick={addJira} className="px-3 py-1 bg-sky-600 text-white rounded disabled:opacity-60" disabled={loading}>Hinzufügen</button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
