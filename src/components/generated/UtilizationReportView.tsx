@@ -273,7 +273,17 @@ export function UtilizationReportView() {
     }
 
     if (!aus && !ein) return null;
-    const normalizePersonKey = (s: string) => s.replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
+    const normalizePersonKey = (s: string) => {
+      // Nur Klammern und Leerzeichen entfernen, KEINE Buchstaben ändern
+      // Das verhindert, dass "Leisen, Wei" zu "Leisen, Wie" wird
+      const cleaned = s.replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
+      
+      // Spezielle Behandlung für bekannte Namensabweichungen
+      if (cleaned === 'Leisen, Wie') return 'Leisen, Wei';
+      if (cleaned === 'Leisen, Wei') return 'Leisen, Wei';
+      
+      return cleaned;
+    };
     // Left side includes current week; right side starts after current week
     const leftStart = forecastStartWeek - lookbackWeeks + 1;
     const leftWeeksArr = Array.from({ length: lookbackWeeks }, (_, i) => leftStart + i);
@@ -784,7 +794,9 @@ export function UtilizationReportView() {
                   <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
                     Act
                   </th>
-
+                  <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
+                    VG
+                  </th>
                   <th className="px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">
                     Mitarbeitende
                   </th>
@@ -866,7 +878,7 @@ export function UtilizationReportView() {
                           </td>
                         );
                       })}
-                      {/* Act-Spalte mit Checkbox */}
+                                            {/* Act-Spalte mit Checkbox */}
                       <td className={`px-2 py-1 text-sm ${
                         actionItems[person] 
                           ? (plannedByPerson[person]?.planned ? 'bg-yellow-100' : 'bg-blue-100')
@@ -882,7 +894,51 @@ export function UtilizationReportView() {
                         </div>
                       </td>
                       
-
+                      {/* VG-Avatar-Spalte */}
+                      <td className={`px-2 py-1 text-sm ${
+                        actionItems[person] 
+                          ? (plannedByPerson[person]?.planned ? 'bg-yellow-100' : 'bg-blue-100')
+                          : 'bg-gray-50'
+                      }`}>
+                        <div className="flex items-center justify-center">
+                          {(() => {
+                            // Hole VG-Information aus dem Einsatzplan
+                            let vgName = '';
+                            
+                            if (dataSource === 'database') {
+                              const einsatzplanData = databaseData.einsatzplan?.find(item => item.person === person);
+                              vgName = einsatzplanData?.vg || '';
+                            } else {
+                              const einsatzplanData = uploadedFiles.einsatzplan?.data?.find((item: any) => item.person === person);
+                              vgName = einsatzplanData?.vg || '';
+                            }
+                            
+                            if (vgName && vgName.trim()) {
+                              // Extrahiere Initialen (erste Buchstaben von Vor- und Nachname)
+                              const initials = vgName
+                                .split(' ')
+                                .map(word => word.charAt(0).toUpperCase())
+                                .join('')
+                                .slice(0, 2); // Maximal 2 Initialen
+                              
+                              return (
+                                <div 
+                                  className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-medium flex items-center justify-center cursor-pointer hover:bg-blue-700 transition-colors"
+                                  title={vgName}
+                                >
+                                  {initials}
+                                </div>
+                              );
+                            }
+                            
+                            return (
+                              <div className="w-6 h-6 rounded-full bg-gray-300 text-gray-500 text-xs font-medium flex items-center justify-center">
+                                —
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </td>
                       
                       <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium text-gray-900 ${
                         actionItems[person] 

@@ -212,7 +212,12 @@ export function UploadPanel({
     }
     return null;
   };
-  const normalizePersonKey = (s: string) => s.replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
+  const normalizePersonKey = (s: string) => {
+    // Nur Klammern und Leerzeichen entfernen, KEINE Buchstaben ändern
+    // Das verhindert, dass "Leisen, Wei" zu "Leisen, Wie" wird
+    const cleaned = s.replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
+    return cleaned;
+  };
   const isSummaryRow = (s: string) => {
     const p = s.trim().toLowerCase();
     return p === 'total' || p === 'summe' || /^total\b/.test(p) || /^summe\b/.test(p) || p.includes('total') || p.includes('summe');
@@ -401,6 +406,7 @@ export function UploadPanel({
     const colCC = lowered.indexOf('compentence center (cc)') !== -1 ? lowered.indexOf('compentence center (cc)') : (lowered.indexOf('competence center') !== -1 ? lowered.indexOf('competence center') : lowered.indexOf('cc'));
     const colTeam = lowered.indexOf('team');
     const colLBS = lowered.indexOf('lbs');
+    const colVG = lowered.indexOf('vg');
     const colPerson = lowered.indexOf('name');
     if (colPerson === -1) return { isValid: false, error: 'Spalte "Name" nicht gefunden', rows: [], debug: [...debug, 'Spalte "Name" nicht gefunden'] };
 
@@ -451,13 +457,14 @@ export function UploadPanel({
         const kv = Math.max(0, Math.min(100, Math.round((100 - parsedNkv) * 10) / 10));
         values[w.key] = kv;
       }
-      rowsOut.push({ person: personKey, personDisplay, cc: colCC !== -1 ? row[colCC] : undefined, team: colTeam !== -1 ? row[colTeam] : undefined, bu: colBusinessUnit !== -1 ? row[colBusinessUnit] : undefined, lbs: colLBS !== -1 ? row[colLBS] : undefined, values });
+      rowsOut.push({ person: personKey, personDisplay, cc: colCC !== -1 ? row[colCC] : undefined, team: colTeam !== -1 ? row[colTeam] : undefined, bu: colBusinessUnit !== -1 ? row[colBusinessUnit] : undefined, lbs: colLBS !== -1 ? row[colLBS] : undefined, vg: colVG !== -1 ? row[colVG] : undefined, values });
     }
 
-    const previewHeader = ['Name', 'LBS', ...weeks.map(k => k.key)];
+    const previewHeader = ['Name', 'LBS', 'VG', ...weeks.map(k => k.key)];
     const previewBody: string[][] = rowsOut.slice(0, 5).map(r => [
       r.personDisplay,
       r.lbs || '',
+      r.vg || '',
       ...weeks.map(k => (r.values[k.key] === undefined ? '' : `${r.values[k.key]}%`))
     ]);
     debug.push(`Beispiel Person: ${rowsOut[0]?.personDisplay || '-'} → Keys: ${Object.keys(rowsOut[0]?.values || {}).slice(0, 5).join(', ')}`);
