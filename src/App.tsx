@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Container, Theme } from './settings/types';
 import { UtilizationReportView } from './components/generated/UtilizationReportView';
 import { CustomerProjectsManagerButton } from './components/generated/CustomerProjectsManagerButton';
+import { SkillManagementButton } from './components/generated/SkillManagementButton';
 import { CustomerProvider } from './contexts/CustomerContext';
 
 let theme: Theme = 'light';
@@ -25,6 +26,7 @@ function App() {
       <CustomerProvider>
         <UtilizationReportView />
         <CustomerProjectsManagerButton />
+        <SkillManagementButton className="fixed bottom-4 right-44 z-40" label="Skills" />
       </CustomerProvider>
     );
   }, []);
