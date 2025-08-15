@@ -1012,7 +1012,7 @@ export function UtilizationReportView() {
                           ? (plannedByPerson[person]?.planned ? 'bg-yellow-100' : 'bg-blue-100')
                           : 'bg-gray-50'
                       }`}>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 w-full">
                           {personStatus[person] && (
                             <span className={getStatusColor(personStatus[person])}>
                               {getStatusIcon(personStatus[person])}
@@ -1035,14 +1035,14 @@ export function UtilizationReportView() {
                           <div className="flex items-center gap-2">
                             <span>{person}</span>
                             {plannedByPerson[person]?.planned ? <span title="Geplanter Einsatz" className="inline-block w-2 h-2 rounded-full bg-amber-500" /> : null}
-                            <button
-                              onClick={() => openEmployeeDossier(person)}
-                              className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
-                              title="Mitarbeiter-Dossier öffnen"
-                            >
-                              <User className="w-4 h-4" />
-                            </button>
                           </div>
+                          <button
+                            onClick={() => openEmployeeDossier(person)}
+                            className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors ml-auto"
+                            title="Mitarbeiter-Dossier öffnen"
+                          >
+                            <User className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                       <td className={`px-2 py-2 text-sm ${
