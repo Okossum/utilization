@@ -50,6 +50,8 @@ export function UtilizationReportView() {
   const [filterCC, setFilterCC] = useState<string[]>([]);
   const [filterLBS, setFilterLBS] = useState<string[]>([]);
   const [filterStatus, setFilterStatus] = useState<string[]>([]);
+  const [showActionItems, setShowActionItems] = useState<boolean>(false);
+  const [actionItems, setActionItems] = useState<Record<string, boolean>>({});
   const [personSearchTerm, setPersonSearchTerm] = useState<string>('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showWorkingStudents, setShowWorkingStudents] = useState(() => {
@@ -423,11 +425,17 @@ export function UtilizationReportView() {
                personStatusValue === statusMapping[filterStatusItem];
       });
     });
+    
+    // Action Items Filter
+    if (showActionItems) {
+      base = base.filter(d => actionItems[d.person] === true);
+    }
+    
     if (selectedPersons.length > 0) {
       base = base.filter(item => selectedPersons.includes(item.person));
     }
     return base;
-  }, [dataForUI, selectedPersons, filterCC, filterLBS, filterStatus, personMeta, personStatus, showWorkingStudents, personSearchTerm]);
+  }, [dataForUI, selectedPersons, filterCC, filterLBS, filterStatus, personMeta, personStatus, showWorkingStudents, showActionItems, actionItems, personSearchTerm]);
   const visiblePersons = useMemo(() => {
     return Array.from(new Set(filteredData.map(item => item.person)));
   }, [filteredData]);
@@ -636,8 +644,8 @@ export function UtilizationReportView() {
               Detailansicht nach Person
             </h3>
             
-            {/* Alle Filter in einer Reihe - Personen, CC, LBS und Status */}
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            {/* Alle Filter in einer Reihe - Personen, CC, LBS, Status und Action */}
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
               {/* Personen-Filter mit Suchfunktion */}
               <div className="w-full">
                 <label className="block text-xs font-medium text-gray-600 mb-1">Personen</label>
@@ -672,6 +680,22 @@ export function UtilizationReportView() {
               <MultiSelectFilter label="LBS" options={lbsOptions} selected={filterLBS} onChange={setFilterLBS} placeholder="Alle LBS" />
               <MultiSelectFilter label="Status" options={statusOptions} selected={filterStatus} onChange={setFilterStatus} placeholder="Alle Status" />
               
+              {/* Act Filter - Checkbox für jede Person */}
+              <div className="w-full">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Act</label>
+                <div className="flex items-center justify-center">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showActionItems}
+                      onChange={(e) => setShowActionItems(e.target.checked)}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Act Items</span>
+                  </label>
+                </div>
+              </div>
+              
               {/* Working Students Toggle als separater Filter */}
               <div className="flex items-center justify-center">
                 <label className="flex items-center space-x-2 cursor-pointer">
@@ -703,16 +727,19 @@ export function UtilizationReportView() {
                       </th>
                     );
                   })}
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-24">
+                  <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
+                    Act
+                  </th>
+                  <th className="px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">
                     Mitarbeitende
                   </th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">LBS</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">
+                  <th className="px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">LBS</th>
+                  <th className="px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">
                     <div className="flex items-center justify-center">
                       <Car className="w-4 h-4" />
                     </div>
                   </th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">Status</th>
+                  <th className="px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">Status</th>
                   {Array.from({ length: forecastWeeks }, (_, i) => {
                     const weekNumber = (forecastStartWeek + 1) + i; // starts after current week
                     return (
@@ -784,7 +811,27 @@ export function UtilizationReportView() {
                           </td>
                         );
                       })}
-                      <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 bg-gray-50">
+                      {/* Act-Spalte mit Checkbox */}
+                      <td className={`px-2 py-1 text-sm ${
+                        actionItems[person] 
+                          ? (plannedByPerson[person]?.planned ? 'bg-yellow-100' : 'bg-blue-100')
+                          : 'bg-gray-50'
+                      }`}>
+                        <div className="flex items-center justify-center">
+                          <input
+                            type="checkbox"
+                            checked={actionItems[person] || false}
+                            onChange={(e) => setActionItems(prev => ({ ...prev, [person]: e.target.checked }))}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                        </div>
+                      </td>
+                      
+                      <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium text-gray-900 ${
+                        actionItems[person] 
+                          ? (plannedByPerson[person]?.planned ? 'bg-yellow-100' : 'bg-blue-100')
+                          : 'bg-gray-50'
+                      }`}>
                         <div className="flex items-center gap-2">
                           {personStatus[person] && (
                             <span className={getStatusColor(personStatus[person])}>
@@ -809,21 +856,33 @@ export function UtilizationReportView() {
                           {plannedByPerson[person]?.planned ? <span title="Geplanter Einsatz" className="inline-block w-2 h-2 rounded-full bg-amber-500" /> : null}
                         </div>
                       </td>
-                      <td className="px-2 py-2 text-sm bg-gray-50">
+                      <td className={`px-2 py-2 text-sm ${
+                        actionItems[person] 
+                          ? (plannedByPerson[person]?.planned ? 'bg-yellow-100' : 'bg-blue-100')
+                          : 'bg-gray-50'
+                      }`}>
                         {personMeta.get(person)?.lbs ? (
                           <span className="text-xs text-gray-700">{personMeta.get(person)?.lbs}</span>
                         ) : (
                           <span className="text-xs text-gray-400">—</span>
                         )}
                       </td>
-                      <td className="px-2 py-2 text-sm bg-gray-50">
+                      <td className={`px-2 py-2 text-sm ${
+                        actionItems[person] 
+                          ? (plannedByPerson[person]?.planned ? 'bg-yellow-100' : 'bg-blue-100')
+                          : 'bg-gray-50'
+                      }`}>
                         <TravelReadinessSelector
                           person={person}
                           value={personTravelReadiness[person]}
                           onChange={(readiness) => setPersonTravelReadiness(prev => ({ ...prev, [person]: readiness }))}
                         />
                       </td>
-                      <td className="px-2 py-2 text-sm bg-gray-50">
+                      <td className={`px-2 py-2 text-sm ${
+                        actionItems[person] 
+                          ? (plannedByPerson[person]?.planned ? 'bg-yellow-100' : 'bg-blue-100')
+                          : 'bg-gray-50'
+                      }`}>
                         <StatusLabelSelector
                           person={person}
                           value={personStatus[person]}
