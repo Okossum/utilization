@@ -96,6 +96,37 @@ model UploadHistory {
   rowCount    Int?
 }
 
+// Employee Dossier für zusätzliche Mitarbeiter-Informationen
+model EmployeeDossier {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Eindeutige ID für den Mitarbeiter (aus Excel-Daten)
+  employeeId String  @unique
+  
+  // Basis-Informationen
+  name      String
+  email     String?
+  phone     String?
+  
+  // Bewertungen
+  strengths String?
+  weaknesses String?
+  comments  String?
+  
+  // Reisebereitschaft
+  travelReadiness String?
+  
+  // Projekt-Informationen
+  projectHistory Json? // Array von ProjectHistoryItem
+  projectOffers  Json? // Array von ProjectOffer
+  jiraTickets    Json? // Array von JiraTicket
+  
+  // Excel-Daten als Referenz (werden nie überschrieben)
+  excelData Json? // Objekt mit Excel-Daten
+}
+
 // Normalisierte, konsolidierte Auslastungsdaten für die UI
 model UtilizationData {
   id        String   @id @default(cuid())

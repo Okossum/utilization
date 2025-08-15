@@ -99,6 +99,37 @@ export class DatabaseService {
     }
   }
 
+  // Employee Dossier speichern oder aktualisieren
+  static async saveEmployeeDossier(employeeId: string, dossierData: any) {
+    try {
+      const result = await ApiService.post('/employee-dossier', { employeeId, dossierData });
+      return result;
+    } catch (error) {
+      console.error('Fehler beim Speichern des Employee Dossiers:', error);
+      throw error;
+    }
+  }
+
+  // Employee Dossier abrufen
+  static async getEmployeeDossier(employeeId: string) {
+    try {
+      return await ApiService.get(`/employee-dossier/${employeeId}`);
+    } catch (error) {
+      console.error('Fehler beim Abrufen des Employee Dossiers:', error);
+      return null;
+    }
+  }
+
+  // Alle Employee Dossiers abrufen
+  static async getAllEmployeeDossiers() {
+    try {
+      return await ApiService.get('/employee-dossiers');
+    } catch (error) {
+      console.error('Fehler beim Abrufen aller Employee Dossiers:', error);
+      return [];
+    }
+  }
+
   // Datenbank schließen (nicht mehr benötigt mit API)
   static async disconnect() {
     // API-basierte Implementierung benötigt keine explizite Verbindungsschließung

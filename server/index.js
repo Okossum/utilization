@@ -483,6 +483,112 @@ function extractWeekValue(row, weekNum, year) {
   return row[weekKey] !== undefined ? row[weekKey] : null;
 }
 
+// Employee Dossier speichern oder aktualisieren
+app.post('/api/employee-dossier', async (req, res) => {
+  try {
+    const { employeeId, dossierData } = req.body;
+    
+    if (!employeeId || !dossierData) {
+      return res.status(400).json({ error: 'Ungültige Daten' });
+    }
+
+    // Prüfe ob Employee Dossier bereits existiert
+    const existingDossier = await prisma.employeeDossier.findUnique({
+      where: { employeeId }
+    });
+
+    if (existingDossier) {
+      // Aktualisiere bestehendes Dossier
+      const updated = await prisma.employeeDossier.update({
+        where: { employeeId },
+        data: {
+          name: dossierData.name,
+          email: dossierData.email || '',
+          phone: dossierData.phone || '',
+          strengths: dossierData.strengths || '',
+          weaknesses: dossierData.weaknesses || '',
+          comments: dossierData.comments || '',
+          travelReadiness: dossierData.travelReadiness || '',
+          projectHistory: dossierData.projectHistory || [],
+          projectOffers: dossierData.projectOffers || [],
+          jiraTickets: dossierData.jiraTickets || [],
+          excelData: dossierData.excelData || {},
+          updatedAt: new Date()
+        }
+      });
+      
+      res.json({
+        success: true,
+        message: 'Employee Dossier aktualisiert',
+        data: updated
+      });
+    } else {
+      // Erstelle neues Dossier
+      const created = await prisma.employeeDossier.create({
+        data: {
+          employeeId,
+          name: dossierData.name,
+          email: dossierData.email || '',
+          phone: dossierData.phone || '',
+          strengths: dossierData.strengths || '',
+          weaknesses: dossierData.weaknesses || '',
+          comments: dossierData.comments || '',
+          travelReadiness: dossierData.travelReadiness || '',
+          projectHistory: dossierData.projectHistory || [],
+          projectOffers: dossierData.projectOffers || [],
+          jiraTickets: dossierData.jiraTickets || [],
+          excelData: dossierData.excelData || {},
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      });
+      
+      res.json({
+        success: true,
+        message: 'Employee Dossier erstellt',
+        data: created
+      });
+    }
+  } catch (error) {
+    console.error('Fehler beim Speichern des Employee Dossiers:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler', details: error.message });
+  }
+});
+
+// Employee Dossier abrufen
+app.get('/api/employee-dossier/:employeeId', async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    
+    const dossier = await prisma.employeeDossier.findUnique({
+      where: { employeeId }
+    });
+    
+    if (!dossier) {
+      return res.status(404).json({ error: 'Employee Dossier nicht gefunden' });
+    }
+    
+    res.json(dossier);
+  } catch (error) {
+    console.error('Fehler beim Abrufen des Employee Dossiers:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+// Alle Employee Dossiers abrufen
+app.get('/api/employee-dossiers', async (req, res) => {
+  try {
+    const dossiers = await prisma.employeeDossier.findMany({
+      orderBy: { name: 'asc' }
+    });
+    
+    res.json(dossiers);
+  } catch (error) {
+    console.error('Fehler beim Abrufen aller Employee Dossiers:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
 // Server starten
 app.listen(PORT, () => {
   console.log(`🚀 Backend-Server läuft auf Port ${PORT}`);

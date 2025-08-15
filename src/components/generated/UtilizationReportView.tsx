@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { getISOWeek, getISOWeekYear } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, Car, ChefHat, Database, Target } from 'lucide-react';
+import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, Car, ChefHat, Database, Target, User } from 'lucide-react';
 import { DataUploadSection } from './DataUploadSection';
 import { MultiSelectFilter } from './MultiSelectFilter';
 import { PersonFilterBar } from './PersonFilterBar';
@@ -12,6 +12,7 @@ import { UtilizationTrendChart } from './UtilizationTrendChart';
 import { PlannedEngagementEditor, PlannedEngagement } from './PlannedEngagementEditor';
 import { StatusLabelSelector } from './StatusLabelSelector';
 import { TravelReadinessSelector } from './TravelReadinessSelector';
+import { EmployeeDossierModal, Employee } from './EmployeeDossierModal';
 interface UtilizationData {
   person: string;
   week: string;
@@ -47,6 +48,68 @@ export function UtilizationReportView() {
     setDataSource('database');
     setUploadedFiles({});
   };
+
+  // Employee Dossier Modal öffnen
+  const openEmployeeDossier = (person: string) => {
+    // Hole Excel-Daten für diese Person
+    let excelData: {
+      name: string;
+      manager: string;
+      team: string;
+      competenceCenter: string;
+      lineOfBusiness: string;
+      careerLevel: string;
+    } | undefined = undefined;
+    
+    if (dataSource === 'database') {
+      const einsatzplanData = databaseData.einsatzplan?.find(item => item.person === person);
+      if (einsatzplanData) {
+        excelData = {
+          name: person,
+          manager: String(einsatzplanData.vg || ''),
+          team: String(einsatzplanData.team || ''),
+          competenceCenter: String(einsatzplanData.cc || ''),
+          lineOfBusiness: String(einsatzplanData.bu || ''),
+          careerLevel: String(einsatzplanData.lbs || '')
+        };
+      }
+    } else {
+      const einsatzplanData = uploadedFiles.einsatzplan?.data?.find((item: any) => item.person === person);
+      if (einsatzplanData) {
+        excelData = {
+          name: person,
+          manager: String(einsatzplanData.vg || ''),
+          team: String(einsatzplanData.team || ''),
+          competenceCenter: String(einsatzplanData.cc || ''),
+          lineOfBusiness: String(einsatzplanData.bu || ''),
+          careerLevel: String(einsatzplanData.lbs || '')
+        };
+      }
+    }
+
+    const employee: Employee = {
+      id: person, // Verwende den Personennamen als ID
+      name: person,
+      careerLevel: excelData?.careerLevel || '',
+      manager: excelData?.manager || '',
+      team: excelData?.team || '',
+      competenceCenter: excelData?.competenceCenter || '',
+      lineOfBusiness: excelData?.lineOfBusiness || '',
+      email: '',
+      phone: '',
+      projectHistory: [],
+      strengths: '',
+      weaknesses: '',
+      comments: '',
+      travelReadiness: String(personTravelReadiness[person] || ''),
+      projectOffers: [],
+      jiraTickets: [],
+      excelData: excelData
+    };
+
+    setSelectedEmployee(employee);
+    setIsEmployeeDossierOpen(true);
+  };
   const [filterCC, setFilterCC] = useState<string[]>([]);
   const [filterLBS, setFilterLBS] = useState<string[]>([]);
   const [filterStatus, setFilterStatus] = useState<string[]>([]);
@@ -57,6 +120,10 @@ export function UtilizationReportView() {
   const [showWorkingStudents, setShowWorkingStudents] = useState(() => {
     try { return JSON.parse(localStorage.getItem('utilization_show_working_students') || 'true'); } catch { return true; }
   });
+  
+  // Employee Dossier Modal
+  const [isEmployeeDossierOpen, setIsEmployeeDossierOpen] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const currentWeek = getISOWeek(new Date());
   const currentIsoYear = getISOWeekYear(new Date());
   const [forecastStartWeek, setForecastStartWeek] = useState(currentWeek);
@@ -965,8 +1032,17 @@ export function UtilizationReportView() {
                             </span>
                           )}
 
-                          <span>{person}</span>
-                          {plannedByPerson[person]?.planned ? <span title="Geplanter Einsatz" className="inline-block w-2 h-2 rounded-full bg-amber-500" /> : null}
+                          <div className="flex items-center gap-2">
+                            <span>{person}</span>
+                            {plannedByPerson[person]?.planned ? <span title="Geplanter Einsatz" className="inline-block w-2 h-2 rounded-full bg-amber-500" /> : null}
+                            <button
+                              onClick={() => openEmployeeDossier(person)}
+                              className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                              title="Mitarbeiter-Dossier öffnen"
+                            >
+                              <User className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       </td>
                       <td className={`px-2 py-2 text-sm ${
@@ -1108,6 +1184,31 @@ export function UtilizationReportView() {
           </div>
         </div>
       </main>
+
+      {/* Employee Dossier Modal */}
+      {selectedEmployee && (
+        <EmployeeDossierModal
+          isOpen={isEmployeeDossierOpen}
+          onClose={() => {
+            setIsEmployeeDossierOpen(false);
+            setSelectedEmployee(null);
+          }}
+          employee={selectedEmployee}
+          onSave={(updatedEmployee) => {
+            // Aktualisiere den lokalen State
+            // Konvertiere travelReadiness von String zu Number falls nötig
+            const travelReadinessNumber = typeof updatedEmployee.travelReadiness === 'string' 
+              ? parseInt(updatedEmployee.travelReadiness) || 0 
+              : updatedEmployee.travelReadiness;
+            
+            setPersonTravelReadiness(prev => ({
+              ...prev,
+              [updatedEmployee.name]: travelReadinessNumber
+            }));
+          }}
+          excelData={selectedEmployee.excelData}
+        />
+      )}
 
       {/* Settings Modal */}
       <AnimatePresence>
