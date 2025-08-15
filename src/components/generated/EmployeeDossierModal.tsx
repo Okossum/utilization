@@ -5,6 +5,7 @@ import { ProjectHistoryList } from './ProjectHistoryList';
 import { ProjectOffersList } from './ProjectOffersList';
 import { JiraTicketsList } from './JiraTicketsList';
 import DatabaseService from '../../services/database';
+import { EmployeeSkillsEditor } from './EmployeeSkillsEditor';
 export interface ProjectHistoryItem {
   id: string;
   projectName: string;
@@ -42,6 +43,7 @@ export interface Employee {
   travelReadiness: string;
   projectOffers: ProjectOffer[];
   jiraTickets: JiraTicket[];
+  skills?: { skillId: string; name: string; level: number }[];
   // Excel-Daten (werden nie überschrieben)
   excelData?: {
     name: string;
@@ -172,6 +174,7 @@ export function EmployeeDossierModal({
         projectHistory: formData.projectHistory,
         projectOffers: formData.projectOffers,
         jiraTickets: formData.jiraTickets,
+        skills: formData.skills || [],
         // Excel-Daten als Referenz (werden nie überschrieben)
         excelData: formData.excelData
       };
@@ -319,6 +322,12 @@ export function EmployeeDossierModal({
                 </h2>
                 <input type="text" value={formData.travelReadiness} onChange={e => handleInputChange('travelReadiness', e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="z.B. Ja, bis zu 50% oder Nein" />
               </section>
+
+              {/* Skills */}
+              <EmployeeSkillsEditor
+                value={formData.skills || []}
+                onChange={(skills)=>setFormData(prev=>({ ...prev, skills }))}
+              />
 
               {/* Project Offers */}
               <ProjectOffersList offers={formData.projectOffers} onChange={offers => setFormData(prev => ({

@@ -395,6 +395,7 @@ app.post('/api/employee-dossier', async (req, res) => {
       projectHistory: dossierData.projectHistory || [],
       projectOffers: dossierData.projectOffers || [],
       jiraTickets: dossierData.jiraTickets || [],
+      skills: dossierData.skills || [],
       excelData: dossierData.excelData || {},
       updatedAt: FieldValue.serverTimestamp(),
       createdAt: snap.exists ? snap.data().createdAt || FieldValue.serverTimestamp() : FieldValue.serverTimestamp(),
