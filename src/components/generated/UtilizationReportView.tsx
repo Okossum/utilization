@@ -784,6 +784,7 @@ export function UtilizationReportView() {
                   <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
                     Act
                   </th>
+
                   <th className="px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">
                     Mitarbeitende
                   </th>
@@ -880,6 +881,8 @@ export function UtilizationReportView() {
                           />
                         </div>
                       </td>
+                      
+
                       
                       <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium text-gray-900 ${
                         actionItems[person] 
@@ -1011,18 +1014,34 @@ export function UtilizationReportView() {
                         />
                       </td>
                       <td className="px-2 py-2 text-sm bg-gray-50">
-                        {plannedByPerson[person]?.ticketId ? (
-                          <a 
-                            href={plannedByPerson[person].ticketId} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-xs text-blue-600 hover:text-blue-800 underline truncate block"
-                            title={plannedByPerson[person].ticketId}
-                          >
-                            {plannedByPerson[person].ticketId.split('/').pop() || 'Ticket'}
-                          </a>
-                        ) : (
-                          <span className="text-xs text-gray-400">—</span>
+                        <input
+                          type="text"
+                          placeholder="Jira-Ticket (z.B. PROJ-123)"
+                          value={plannedByPerson[person]?.ticketId || ''}
+                          onChange={(e) => {
+                            const ticketId = e.target.value.trim();
+                            setPlannedByPerson(prev => ({
+                              ...prev,
+                              [person]: {
+                                ...prev[person],
+                                ticketId: ticketId || undefined
+                              }
+                            }));
+                          }}
+                          className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                        {plannedByPerson[person]?.ticketId && (
+                          <div className="mt-1">
+                            <a 
+                              href={`https://jira.company.com/browse/${plannedByPerson[person].ticketId}`}
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-600 hover:text-blue-800 underline truncate block"
+                              title={`Jira-Ticket: ${plannedByPerson[person].ticketId}`}
+                            >
+                              {plannedByPerson[person].ticketId}
+                            </a>
+                          </div>
                         )}
                       </td>
                     </tr>
