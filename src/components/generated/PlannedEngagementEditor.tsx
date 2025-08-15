@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, ChevronDown, X } from 'lucide-react';
+import { Plus, ChevronDown, X, Calendar } from 'lucide-react';
+import { PlanningModal } from './PlanningModal';
 
 export interface PlannedEngagement {
   planned: boolean;
@@ -22,6 +23,7 @@ interface PlannedEngagementEditorProps {
 
 export function PlannedEngagementEditor({ person, value, customers, availableKws, onChange, onAddCustomer }: PlannedEngagementEditorProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isPlanningOpen, setPlanningOpen] = useState(false);
   const [local, setLocal] = useState<PlannedEngagement>(value || { planned: false });
   const [customerOpen, setCustomerOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -95,10 +97,17 @@ export function PlannedEngagementEditor({ person, value, customers, availableKws
 
   return (
     <div className="space-y-2">
-      <button onClick={() => setIsOpen(!isOpen)} className="inline-flex items-center gap-2 px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50">
-        Planung
-        <ChevronDown className={`w-3 h-3 ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
+      <div className="flex items-center gap-2">
+        <button onClick={() => setPlanningOpen(true)} className="inline-flex items-center gap-2 px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50">
+          <Calendar className="w-3 h-3"/>
+          Planung
+        </button>
+        <button onClick={() => setIsOpen(!isOpen)} className="inline-flex items-center gap-2 px-2 py-1 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded hover:bg-gray-50">
+          Details
+          <ChevronDown className={`w-3 h-3 ${isOpen ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
+      <PlanningModal isOpen={isPlanningOpen} onClose={() => setPlanningOpen(false)} personId={person} />
       <AnimatePresence>
         {isOpen && (
           <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-3">
