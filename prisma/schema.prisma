@@ -20,6 +20,7 @@ model Auslastung {
   // Datei-Informationen
   fileName    String
   uploadDate  DateTime @default(now())
+  uploadVersion Int    @default(1)  // Versionsnummer für Updates
   
   // Personendaten
   person      String
@@ -30,6 +31,10 @@ model Auslastung {
   
   // Wochenwerte (dynamisch)
   weekValues  WeekValue[]
+  
+  // Update-Tracking
+  isLatest    Boolean @default(true)  // Ist dies der neueste Stand?
+  replacedBy  String?                 // ID der ersetzenden Version
 }
 
 // Wochenwerte für Auslastung
@@ -53,6 +58,7 @@ model Einsatzplan {
   // Datei-Informationen
   fileName    String
   uploadDate  DateTime @default(now())
+  uploadVersion Int    @default(1)  // Versionsnummer für Updates
   
   // Personendaten
   person      String
@@ -60,6 +66,10 @@ model Einsatzplan {
   
   // Wochenwerte (dynamisch)
   weekValues  EinsatzplanWeekValue[]
+  
+  // Update-Tracking
+  isLatest    Boolean @default(true)  // Ist dies der neueste Stand?
+  replacedBy  String?                 // ID der ersetzenden Version
 }
 
 // Wochenwerte für Einsatzplan
@@ -120,10 +130,16 @@ model UtilizationData {
   auslastungId   String?
   einsatzplanId  String?
   
+  // Update-Tracking
+  lastUpdated    DateTime @updatedAt
+  dataVersion    Int      @default(1)
+  isLatest       Boolean  @default(true)
+  
   // Indizes für bessere Performance
   @@unique([person, week])
   @@index([person])
   @@index([week])
   @@index([year, weekNumber])
   @@index([isHistorical])
+  @@index([isLatest])
 }

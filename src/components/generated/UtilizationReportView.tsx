@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { getISOWeek, getISOWeekYear } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, Car, ChefHat } from 'lucide-react';
+import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, Car, ChefHat, Database } from 'lucide-react';
 import { DataUploadSection } from './DataUploadSection';
 import { MultiSelectFilter } from './MultiSelectFilter';
 import { PersonFilterBar } from './PersonFilterBar';
+import DatabaseService from '../../services/database';
 import { KpiCardsGrid } from './KpiCardsGrid';
 import { UtilizationChartSection } from './UtilizationChartSection';
 import { UtilizationTrendChart } from './UtilizationTrendChart';
@@ -28,10 +29,30 @@ export function UtilizationReportView() {
     auslastung?: UploadedFile;
     einsatzplan?: UploadedFile;
   }>({});
+  const [databaseData, setDatabaseData] = useState<{
+    auslastung?: any[];
+    einsatzplan?: any[];
+    utilizationData?: any[];
+  }>({});
+  const [dataSource, setDataSource] = useState<'upload' | 'database'>('database');
   const [selectedPersons, setSelectedPersons] = useState<string[]>([]);
+
+  // Function to switch data source
+  const switchToUpload = () => {
+    setDataSource('upload');
+    setDatabaseData({});
+  };
+
+  const switchToDatabase = () => {
+    setDataSource('database');
+    setUploadedFiles({});
+  };
   const [filterCC, setFilterCC] = useState<string[]>([]);
   const [filterLBS, setFilterLBS] = useState<string[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [showWorkingStudents, setShowWorkingStudents] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('utilization_show_working_students') || 'true'); } catch { return true; }
+  });
   const currentWeek = getISOWeek(new Date());
   const currentIsoYear = getISOWeekYear(new Date());
   const [forecastStartWeek, setForecastStartWeek] = useState(currentWeek);
@@ -42,7 +63,32 @@ export function UtilizationReportView() {
   const STORAGE_PEOPLE_KEY = 'utilization_planned_people_v1';
   const STORAGE_CUSTOMERS_KEY = 'utilization_customers_v1';
 
-  // Restore from localStorage on mount
+  // Load data from database on mount
+  useEffect(() => {
+    const loadDatabaseData = async () => {
+      try {
+        // Prüfe ob Datenbank-Daten vorhanden sind
+        const auslastung = await DatabaseService.getAuslastung();
+        const einsatzplan = await DatabaseService.getEinsatzplan();
+        const utilizationData = await DatabaseService.getUtilizationData();
+        
+        if (auslastung.length > 0 || einsatzplan.length > 0 || utilizationData.length > 0) {
+          setDatabaseData({
+            auslastung: auslastung.length > 0 ? auslastung : undefined,
+            einsatzplan: einsatzplan.length > 0 ? einsatzplan : undefined,
+            utilizationData: utilizationData.length > 0 ? utilizationData : undefined
+          });
+          setDataSource('database');
+        }
+      } catch (error) {
+        console.log('Keine Datenbank-Daten verfügbar, verwende Upload-Daten');
+      }
+    };
+
+    loadDatabaseData();
+  }, []);
+
+  // Restore from localStorage on mount (fallback)
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -50,6 +96,7 @@ export function UtilizationReportView() {
         const parsed = JSON.parse(raw);
         if (parsed && (parsed.auslastung || parsed.einsatzplan)) {
           setUploadedFiles(parsed);
+          setDataSource('upload');
         }
       }
     } catch {}
@@ -87,6 +134,13 @@ export function UtilizationReportView() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(uploadedFiles));
     } catch {}
   }, [uploadedFiles]);
+
+  // Save working students toggle state
+  useEffect(() => {
+    try {
+      localStorage.setItem('utilization_show_working_students', JSON.stringify(showWorkingStudents));
+    } catch {}
+  }, [showWorkingStudents]);
 
   // Planned engagements and customers (persisted independently of uploads)
   const [plannedByPerson, setPlannedByPerson] = useState<Record<string, PlannedEngagement>>(() => {
@@ -199,10 +253,21 @@ export function UtilizationReportView() {
       isHistorical: weekIndex < lookbackWeeks
     })));
   }, [lookbackWeeks, forecastWeeks, forecastStartWeek, currentIsoYear]);
-  // Build consolidated data from uploaded files (Auslastung = Rückblick, Einsatzplan = Vorblick)
+  // Build consolidated data from uploaded files or database (Auslastung = Rückblick, Einsatzplan = Vorblick)
   const consolidatedData: UtilizationData[] | null = useMemo(() => {
-    const aus = uploadedFiles.auslastung?.isValid ? (uploadedFiles.auslastung?.data as any[]) : null;
-    const ein = uploadedFiles.einsatzplan?.isValid ? (uploadedFiles.einsatzplan?.data as any[]) : null;
+    let aus: any[] | null = null;
+    let ein: any[] | null = null;
+
+    if (dataSource === 'database') {
+      // Verwende Datenbank-Daten
+      aus = databaseData.auslastung || null;
+      ein = databaseData.einsatzplan || null;
+    } else {
+      // Verwende Upload-Daten
+      aus = uploadedFiles.auslastung?.isValid ? (uploadedFiles.auslastung?.data as any[]) : null;
+      ein = uploadedFiles.einsatzplan?.isValid ? (uploadedFiles.einsatzplan?.data as any[]) : null;
+    }
+
     if (!aus && !ein) return null;
     const normalizePersonKey = (s: string) => s.replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
     // Left side includes current week; right side starts after current week
@@ -255,11 +320,21 @@ export function UtilizationReportView() {
 
   const dataForUI: UtilizationData[] = consolidatedData ?? mockData;
 
-  // Build person → meta mapping from uploaded data (prefer Auslastung, fallback Einsatzplan)
+  // Build person → meta mapping from uploaded data or database (prefer Auslastung, fallback Einsatzplan)
   const personMeta = useMemo(() => {
     const meta = new Map<string, { cc?: string; lbs?: string }>();
-    const aus = uploadedFiles.auslastung?.data as any[] | undefined;
-    const ein = uploadedFiles.einsatzplan?.data as any[] | undefined;
+    
+    let aus: any[] | undefined;
+    let ein: any[] | undefined;
+
+    if (dataSource === 'database') {
+      aus = databaseData.auslastung;
+      ein = databaseData.einsatzplan;
+    } else {
+      aus = uploadedFiles.auslastung?.data as any[] | undefined;
+      ein = uploadedFiles.einsatzplan?.data as any[] | undefined;
+    }
+
     const fill = (rows?: any[]) => {
       rows?.forEach(r => {
         if (!r?.person) return;
@@ -272,7 +347,7 @@ export function UtilizationReportView() {
     fill(aus);
     fill(ein);
     return meta;
-  }, [uploadedFiles]);
+  }, [uploadedFiles, databaseData, dataSource]);
 
 
 
@@ -290,13 +365,22 @@ export function UtilizationReportView() {
 
   const filteredData = useMemo(() => {
     let base = dataForUI;
+    
+    // Working Students Filter
+    if (!showWorkingStudents) {
+      base = base.filter(d => {
+        const lbs = personMeta.get(d.person)?.lbs;
+        return lbs !== 'Working Student' && lbs !== 'Working student' && lbs !== 'working student';
+      });
+    }
+    
     if (filterCC.length > 0) base = base.filter(d => filterCC.includes(String(personMeta.get(d.person)?.cc || '')));
     if (filterLBS.length > 0) base = base.filter(d => filterLBS.includes(String(personMeta.get(d.person)?.lbs || '')));
     if (selectedPersons.length > 0) {
       base = base.filter(item => selectedPersons.includes(item.person));
     }
     return base;
-  }, [dataForUI, selectedPersons, filterCC, filterLBS, personMeta]);
+  }, [dataForUI, selectedPersons, filterCC, filterLBS, personMeta, showWorkingStudents]);
   const visiblePersons = useMemo(() => {
     return Array.from(new Set(filteredData.map(item => item.person)));
   }, [filteredData]);
@@ -449,13 +533,57 @@ export function UtilizationReportView() {
 
       {/* Main Content */}
       <main className="w-full p-4 space-y-6">
+        {/* Data Source Status and Controls */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Datenquelle
+              </h3>
+              <p className="text-sm text-gray-600">
+                {dataSource === 'database' 
+                  ? 'Daten aus der lokalen Datenbank geladen' 
+                  : 'Daten aus Excel-Uploads (Updates)'
+                }
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              {dataSource === 'database' ? (
+                <button
+                  onClick={switchToUpload}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  Daten aktualisieren
+                </button>
+              ) : (
+                <button
+                  onClick={switchToDatabase}
+                  disabled={!databaseData.auslastung && !databaseData.einsatzplan}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Database className="w-4 h-4" />
+                  Datenbank-Daten verwenden
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Upload Section (extracted component) */}
         <DataUploadSection uploadedFiles={uploadedFiles} onFilesChange={setUploadedFiles} />
 
         {/* Auslastung Preview ausgeblendet (weiterhin über Upload einsehbar) */}
 
         {/* Filter Bar */}
-        <PersonFilterBar allPersons={allPersons} selectedPersons={selectedPersons} onSelectionChange={setSelectedPersons} />
+        <PersonFilterBar 
+          allPersons={allPersons} 
+          selectedPersons={selectedPersons} 
+          onSelectionChange={setSelectedPersons}
+          showWorkingStudents={showWorkingStudents}
+          onWorkingStudentsToggle={setShowWorkingStudents}
+        />
 
         {/* KPI Cards */}
         <KpiCardsGrid kpiData={kpiData} />

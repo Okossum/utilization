@@ -80,19 +80,35 @@ export function UploadPanel({
         });
       }
 
+      // Aktualisiere den State mit den neuen Dateien
+      const newFiles = {
+        ...uploadedFiles,
+        [type]: {
+          name: file.name,
+          data: parsed.rows,
+          isValid: parsed.isValid,
+          error: parsed.error,
+          preview: parsed.preview,
+          debug: parsed.debug,
+        }
+      };
+
       // Wenn beide Dateien vorhanden sind, konsolidiere die Daten automatisch
       if (parsed.isValid) {
-        const newFiles = {
-          ...uploadedFiles,
-          [type]: {
-            name: file.name,
-            data: parsed.rows,
-            isValid: parsed.isValid,
-            error: parsed.error,
-            preview: parsed.preview,
-            debug: parsed.debug,
+
+        // Speichere die aktuelle Datei in der Datenbank
+        try {
+          if (type === 'auslastung') {
+            await DatabaseService.saveAuslastung(file.name, parsed.rows);
+            console.log('✅ Auslastung-Daten erfolgreich in Datenbank gespeichert');
+          } else {
+            await DatabaseService.saveEinsatzplan(file.name, parsed.rows);
+            console.log('✅ Einsatzplan-Daten erfolgreich in Datenbank gespeichert');
           }
-        };
+        } catch (dbError) {
+          console.error('❌ Fehler beim Speichern in Datenbank:', dbError);
+          // Trotz DB-Fehler die Datei als gültig markieren
+        }
 
         // Prüfe ob beide Dateien gültig sind
         if (newFiles.auslastung?.isValid && newFiles.einsatzplan?.isValid) {

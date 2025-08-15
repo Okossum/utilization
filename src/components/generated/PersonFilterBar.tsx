@@ -5,11 +5,15 @@ interface PersonFilterBarProps {
   allPersons: string[];
   selectedPersons: string[];
   onSelectionChange: (persons: string[]) => void;
+  showWorkingStudents: boolean;
+  onWorkingStudentsToggle: (show: boolean) => void;
 }
 export function PersonFilterBar({
   allPersons,
   selectedPersons,
-  onSelectionChange
+  onSelectionChange,
+  showWorkingStudents,
+  onWorkingStudentsToggle
 }: PersonFilterBarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -92,6 +96,16 @@ export function PersonFilterBar({
             <RotateCcw className="w-3 h-3" />
             Zurücksetzen
           </button>
+          <span className="text-gray-300">|</span>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showWorkingStudents}
+              onChange={(e) => onWorkingStudentsToggle(e.target.checked)}
+              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-700">Working Students</span>
+          </label>
         </div>
       </div>
 

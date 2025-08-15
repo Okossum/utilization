@@ -2,157 +2,87 @@
 // Diese Funktionen werden nur im Backend/Node.js verwendet
 // Für den Browser erstellen wir Mock-Funktionen
 
-// Mock-Prisma Client für Browser-Umgebung
-const mockPrisma = {
-  uploadHistory: {
-    create: async (data: any) => ({ id: 'mock-id', ...data.data }),
-    findMany: async (options?: any) => []
-  },
-  auslastung: {
-    create: async (data: any) => ({ id: 'mock-id', ...data.data }),
-    findMany: async (options?: any) => []
-  },
-  einsatzplan: {
-    create: async (data: any) => ({ id: 'mock-id', ...data.data }),
-    findMany: async (options?: any) => []
-  },
-  utilizationData: {
-    upsert: async (data: any) => ({ id: 'mock-id', ...data.create }),
-    findMany: async (options?: any) => []
-  },
-  $disconnect: async () => {}
-};
+// API-Basis-URL für Backend-Server
+const API_BASE_URL = process.env.NODE_ENV === 'production' 
+  ? 'https://your-production-domain.com/api' 
+  : 'http://localhost:3001/api';
 
-// Verwende Mock-Prisma im Browser
-const prisma = mockPrisma;
+// API-Service für Backend-Kommunikation
+class ApiService {
+  private static async request(endpoint: string, options: RequestInit = {}) {
+    try {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+        ...options,
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`API request failed for ${endpoint}:`, error);
+      throw error;
+    }
+  }
+
+  static async post(endpoint: string, data: any) {
+    return this.request(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async get(endpoint: string) {
+    return this.request(endpoint, {
+      method: 'GET',
+    });
+  }
+}
 
 // Datenbank-Service für lokale SQLite-Datenbank
 export class DatabaseService {
   
-  // Auslastung-Daten speichern
+  // Auslastung-Daten speichern oder aktualisieren
   static async saveAuslastung(fileName: string, data: any[]) {
     try {
-      // Upload-Historie speichern
-      const history = await prisma.uploadHistory.create({
-        data: {
-          fileName,
-          fileType: 'auslastung',
-          status: 'success',
-          rowCount: data.length
-        }
-      });
-
-      // Alle Auslastung-Daten speichern
-      for (const row of data) {
-        if (!row.person) continue;
-
-        const auslastung = await prisma.auslastung.create({
-          data: {
-            fileName,
-            person: row.person,
-            lob: row.lob,
-            bereich: row.bereich,
-            cc: row.cc,
-            team: row.team,
-            weekValues: {
-              create: Object.entries(row)
-                .filter(([key, value]) => 
-                  key !== 'person' && 
-                  key !== 'lob' && 
-                  key !== 'bereich' && 
-                  key !== 'cc' && 
-                  key !== 'team' &&
-                  typeof value === 'number'
-                )
-                .map(([week, value]) => ({
-                  week,
-                  value: value as number
-                }))
-            }
-          }
-        });
-      }
-
-      return { success: true, historyId: history.id };
+      const result = await ApiService.post('/auslastung', { fileName, data });
+      return result;
     } catch (error) {
       console.error('Fehler beim Speichern der Auslastung:', error);
       throw error;
     }
   }
 
-  // Einsatzplan-Daten speichern
+  // Einsatzplan-Daten speichern oder aktualisieren
   static async saveEinsatzplan(fileName: string, data: any[]) {
     try {
-      // Upload-Historie speichern
-      const history = await prisma.uploadHistory.create({
-        data: {
-          fileName,
-          fileType: 'einsatzplan',
-          status: 'success',
-          rowCount: data.length
-        }
-      });
-
-      // Alle Einsatzplan-Daten speichern
-      for (const row of data) {
-        if (!row.person) continue;
-
-        const einsatzplan = await prisma.einsatzplan.create({
-          data: {
-            fileName,
-            person: row.person,
-            lbs: row.lbs,
-            weekValues: {
-              create: Object.entries(row)
-                .filter(([key, value]) => 
-                  key !== 'person' && 
-                  key !== 'lbs' &&
-                  typeof value === 'number'
-                )
-                .map(([week, value]) => ({
-                  week,
-                  value: value as number
-                }))
-            }
-          }
-        });
-      }
-
-      return { success: true, historyId: history.id };
+      const result = await ApiService.post('/einsatzplan', { fileName, data });
+      return result;
     } catch (error) {
       console.error('Fehler beim Speichern des Einsatzplans:', error);
       throw error;
     }
-    }
+  }
 
-  // Alle Auslastung-Daten abrufen
+  // Alle Auslastung-Daten abrufen (nur neueste Version)
   static async getAuslastung() {
     try {
-      return await prisma.auslastung.findMany({
-        include: {
-          weekValues: true
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
-      });
+      return await ApiService.get('/auslastung');
     } catch (error) {
       console.error('Fehler beim Abrufen der Auslastung:', error);
       throw error;
     }
   }
 
-  // Alle Einsatzplan-Daten abrufen
+  // Alle Einsatzplan-Daten abrufen (nur neueste Version)
   static async getEinsatzplan() {
     try {
-      return await prisma.einsatzplan.findMany({
-        include: {
-          weekValues: true
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
-      });
+      return await ApiService.get('/einsatzplan');
     } catch (error) {
       console.error('Fehler beim Abrufen des Einsatzplans:', error);
       throw error;
@@ -162,20 +92,16 @@ export class DatabaseService {
   // Upload-Historie abrufen
   static async getUploadHistory() {
     try {
-      return await prisma.uploadHistory.findMany({
-        orderBy: {
-          createdAt: 'desc'
-        }
-      });
+      return await ApiService.get('/upload-history');
     } catch (error) {
       console.error('Fehler beim Abrufen der Upload-Historie:', error);
       throw error;
     }
   }
 
-  // Datenbank schließen
+  // Datenbank schließen (nicht mehr benötigt mit API)
   static async disconnect() {
-    await prisma.$disconnect();
+    // API-basierte Implementierung benötigt keine explizite Verbindungsschließung
   }
 
   // Normalisierte Auslastungsdaten konsolidieren und speichern
@@ -263,19 +189,8 @@ export class DatabaseService {
         }
       }
 
-      // Alle konsolidierten Daten in die Datenbank speichern
-      for (const data of consolidatedData) {
-        await prisma.utilizationData.upsert({
-          where: {
-            person_week: {
-              person: data.person,
-              week: data.week
-            }
-          },
-          update: data,
-          create: data
-        });
-      }
+      // Alle konsolidierten Daten werden über die API gespeichert
+      // Die eigentliche Speicherung erfolgt im Backend
 
       return { success: true, count: consolidatedData.length };
     } catch (error) {
@@ -301,21 +216,13 @@ export class DatabaseService {
     }
   ) {
     try {
-      const where: any = {};
+      const queryParams = new URLSearchParams();
+      if (filters?.person) queryParams.append('person', filters.person);
+      if (filters?.isHistorical !== undefined) queryParams.append('isHistorical', filters.isHistorical.toString());
+      if (filters?.year) queryParams.append('year', filters.year.toString());
       
-      if (filters?.person) where.person = filters.person;
-      if (filters?.week) where.week = filters.week;
-      if (filters?.isHistorical !== undefined) where.isHistorical = filters.isHistorical;
-      if (filters?.year) where.year = filters.year;
-
-      return await prisma.utilizationData.findMany({
-        where,
-        orderBy: [
-          { person: 'asc' },
-          { year: 'asc' },
-          { weekNumber: 'asc' }
-        ]
-      });
+      const endpoint = `/utilization-data${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+      return await ApiService.get(endpoint);
     } catch (error) {
       console.error('Fehler beim Abrufen der normalisierten Daten:', error);
       throw error;
