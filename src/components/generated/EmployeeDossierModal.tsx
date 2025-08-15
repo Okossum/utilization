@@ -27,6 +27,8 @@ export interface JiraTicket {
   contactPerson: string;
   title?: string;
   link?: string;
+  customer?: string;
+  project?: string;
 }
 export interface Employee {
   id: string;

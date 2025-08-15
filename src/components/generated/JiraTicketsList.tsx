@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Edit2, Trash2, Ticket, Save, X, Percent, ExternalLink } from 'lucide-react';
 import { JiraTicket } from './EmployeeDossierModal';
+import { useCustomers } from '../../contexts/CustomerContext';
 interface JiraTicketsListProps {
   tickets: JiraTicket[];
   onChange: (tickets: JiraTicket[]) => void;
@@ -10,13 +11,16 @@ export function JiraTicketsList({
   tickets,
   onChange
 }: JiraTicketsListProps) {
+  const { customers, getProjectsByCustomer, addCustomer, addProject } = useCustomers();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Omit<JiraTicket, 'id'>>({
     ticketId: '',
     probability: 0,
     contactPerson: '',
     title: '',
-    link: ''
+    link: '',
+    customer: '',
+    project: ''
   });
   const handleAdd = () => {
     const newTicket: JiraTicket = {
@@ -25,7 +29,9 @@ export function JiraTicketsList({
       probability: 50,
       contactPerson: '',
       title: '',
-      link: ''
+      link: '',
+      customer: '',
+      project: ''
     };
     onChange([...tickets, newTicket]);
     setEditingId(newTicket.id);
@@ -42,7 +48,9 @@ export function JiraTicketsList({
       probability: ticket.probability,
       contactPerson: ticket.contactPerson,
       title: ticket.title || '',
-      link: ticket.link || ''
+      link: ticket.link || '',
+      customer: ticket.customer || '',
+      project: ticket.project || ''
     });
   };
   const handleSave = () => {
@@ -112,7 +120,7 @@ export function JiraTicketsList({
           y: -10
         }} className="p-4 bg-amber-50 rounded-lg border border-amber-200">
               {editingId === ticket.id ? <div className="space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Titel</label>
                       <input type="text" value={editForm.title} onChange={e => setEditForm(prev => ({
@@ -135,13 +143,55 @@ export function JiraTicketsList({
                 }))} className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:ring-2 focus:ring-amber-500 focus:border-transparent" placeholder="https://jira.adesso.de/browse/STAFF-123" />
                     </div>
                     <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Kunde</label>
+                      <div className="flex gap-2">
+                        <select
+                          value={editForm.customer}
+                          onChange={e=> setEditForm(prev=>({ ...prev, customer: e.target.value, project: '' }))}
+                          className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                        >
+                          <option value="">— auswählen —</option>
+                          {customers.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                        <button type="button" onClick={()=>{
+                          const name = prompt('Neuen Kunden anlegen:');
+                          if (!name) return;
+                          addCustomer(name);
+                          setEditForm(prev=>({ ...prev, customer: name }));
+                        }} className="px-2 py-1 text-xs bg-gray-100 border border-gray-200 rounded">Neu</button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Projekt</label>
+                      <div className="flex gap-2">
+                        <select
+                          value={editForm.project}
+                          onChange={e=> setEditForm(prev=>({ ...prev, project: e.target.value }))}
+                          className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                          disabled={!editForm.customer}
+                        >
+                          <option value="">— auswählen —</option>
+                          {editForm.customer && getProjectsByCustomer(editForm.customer).map(p => (
+                            <option key={p.id} value={p.name}>{p.name}</option>
+                          ))}
+                        </select>
+                        <button type="button" onClick={()=>{
+                          if (!editForm.customer) { alert('Bitte zuerst Kunden wählen'); return; }
+                          const name = prompt('Neues Projekt anlegen:');
+                          if (!name) return;
+                          addProject(name, editForm.customer);
+                          setEditForm(prev=>({ ...prev, project: name }));
+                        }} className="px-2 py-1 text-xs bg-gray-100 border border-gray-200 rounded" disabled={!editForm.customer}>Neu</button>
+                      </div>
+                    </div>
+                    <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Wahrscheinlichkeit (%)</label>
                       <div className="relative">
                         <input type="number" min="0" max="100" value={editForm.probability} onChange={e => handleProbabilityChange(e.target.value)} className="w-full px-2 py-1 pr-6 text-sm border border-gray-200 rounded focus:ring-2 focus:ring-amber-500 focus:border-transparent" />
                         <Percent className="absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400" />
                       </div>
                     </div>
-                    <div className="md:col-span-4">
+                    <div className="md:col-span-6">
                       <label className="block text-xs font-medium text-gray-600 mb-1">Ansprechpartner</label>
                       <input type="text" value={editForm.contactPerson} onChange={e => setEditForm(prev => ({
                   ...prev,
