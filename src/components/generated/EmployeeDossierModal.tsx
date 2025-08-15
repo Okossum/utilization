@@ -8,6 +8,7 @@ import DatabaseService from '../../services/database';
 export interface ProjectHistoryItem {
   id: string;
   projectName: string;
+  customer: string;
   role: string;
   duration: string;
 }
@@ -65,13 +66,18 @@ interface EmployeeDossierModalProps {
     lineOfBusiness: string;
     careerLevel: string;
   };
+  // Kunden-Funktionalität (optional, da jetzt über Context)
+  customers?: string[];
+  onAddCustomer?: (name: string) => void;
 }
 export function EmployeeDossierModal({
   isOpen,
   onClose,
   employee,
   onSave,
-  excelData
+  excelData,
+  customers,
+  onAddCustomer
 }: EmployeeDossierModalProps) {
   const [formData, setFormData] = useState<Employee>(employee);
   const [isLoading, setIsLoading] = useState(false);
@@ -259,10 +265,13 @@ export function EmployeeDossierModal({
               </section>
 
               {/* Project History */}
-              <ProjectHistoryList projects={formData.projectHistory} onChange={projects => setFormData(prev => ({
-            ...prev,
-            projectHistory: projects
-          }))} />
+              <ProjectHistoryList 
+                projects={formData.projectHistory} 
+                onChange={projects => setFormData(prev => ({
+                  ...prev,
+                  projectHistory: projects
+                }))}
+              />
 
               {/* Strengths & Weaknesses */}
               <section className="space-y-4">

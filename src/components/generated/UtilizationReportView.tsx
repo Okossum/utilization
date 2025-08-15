@@ -1207,6 +1207,9 @@ export function UtilizationReportView() {
             }));
           }}
           excelData={selectedEmployee.excelData}
+          // Kunden-Funktionalität weitergeben
+          customers={customers}
+          onAddCustomer={(name) => setCustomers(prev => [...new Set([...prev, name.trim()])])}
         />
       )}
 

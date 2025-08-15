@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Container, Theme } from './settings/types';
 import { UtilizationReportView } from './components/generated/UtilizationReportView';
+import { CustomerProvider } from './contexts/CustomerContext';
 
 let theme: Theme = 'light';
 // only use 'centered' container for standalone components, never for full page apps or websites.
@@ -19,7 +20,11 @@ function App() {
 
   const generatedComponent = useMemo(() => {
     // THIS IS WHERE THE TOP LEVEL GENRATED COMPONENT WILL BE RETURNED!
-    return <UtilizationReportView />; // <UtilizationReportView />
+    return (
+      <CustomerProvider>
+        <UtilizationReportView />
+      </CustomerProvider>
+    );
   }, []);
 
   if (container === 'centered') {

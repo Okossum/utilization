@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Edit2, Trash2, History, Save, X } from 'lucide-react';
 import { ProjectHistoryItem } from './EmployeeDossierModal';
+import { CustomerManager } from './CustomerManager';
+import { useCustomers } from '../../contexts/CustomerContext';
 interface ProjectHistoryListProps {
   projects: ProjectHistoryItem[];
   onChange: (projects: ProjectHistoryItem[]) => void;
@@ -10,9 +12,11 @@ export function ProjectHistoryList({
   projects,
   onChange
 }: ProjectHistoryListProps) {
+  const { customers, addCustomer } = useCustomers();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Omit<ProjectHistoryItem, 'id'>>({
     projectName: '',
+    customer: '',
     role: '',
     duration: ''
   });
@@ -20,6 +24,7 @@ export function ProjectHistoryList({
     const newProject: ProjectHistoryItem = {
       id: Date.now().toString(),
       projectName: 'Neues Projekt',
+      customer: '',
       role: '',
       duration: ''
     };
@@ -27,6 +32,7 @@ export function ProjectHistoryList({
     setEditingId(newProject.id);
     setEditForm({
       projectName: newProject.projectName,
+      customer: newProject.customer,
       role: newProject.role,
       duration: newProject.duration
     });
@@ -35,6 +41,7 @@ export function ProjectHistoryList({
     setEditingId(project.id);
     setEditForm({
       projectName: project.projectName,
+      customer: project.customer,
       role: project.role,
       duration: project.duration
     });
@@ -53,6 +60,7 @@ export function ProjectHistoryList({
     setEditingId(null);
     setEditForm({
       projectName: '',
+      customer: '',
       role: '',
       duration: ''
     });
@@ -88,13 +96,26 @@ export function ProjectHistoryList({
           y: -10
         }} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
               {editingId === project.id ? <div className="space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Projektname</label>
                       <input type="text" value={editForm.projectName} onChange={e => setEditForm(prev => ({
                   ...prev,
                   projectName: e.target.value
                 }))} className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Kunde</label>
+                      <CustomerManager
+                        customers={customers}
+                        onAddCustomer={addCustomer}
+                        value={editForm.customer}
+                        onChange={(customer) => setEditForm(prev => ({
+                          ...prev,
+                          customer
+                        }))}
+                        className="text-sm"
+                      />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Rolle</label>
@@ -121,11 +142,15 @@ export function ProjectHistoryList({
                       Abbrechen
                     </button>
                   </div>
-                </div> : <div className="flex items-center justify-between">
-                  <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
+                </div> :                 <div className="flex items-center justify-between">
+                  <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
                       <p className="text-sm font-medium text-gray-900">{project.projectName}</p>
                       <p className="text-xs text-gray-500">Projekt</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-700">{project.customer || '—'}</p>
+                      <p className="text-xs text-gray-500">Kunde</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-700">{project.role}</p>
