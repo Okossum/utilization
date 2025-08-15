@@ -345,10 +345,9 @@ export const projectService = {
 
 // Skills Services
 export const skillService = {
-  async save(skill: { name: string; levels: string[] }): Promise<string> {
+  async save(skill: { name: string }): Promise<string> {
     const docRef = await addDoc(collection(db, COLLECTIONS.SKILLS), {
       name: skill.name,
-      levels: Array.isArray(skill.levels) ? skill.levels : [],
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -360,7 +359,6 @@ export const skillService = {
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
       name: String(doc.data().name || ''),
-      levels: Array.isArray(doc.data().levels) ? doc.data().levels : [],
       createdAt: convertTimestamp(doc.data().createdAt),
       updatedAt: convertTimestamp(doc.data().updatedAt)
     })) as FirestoreSkill[];

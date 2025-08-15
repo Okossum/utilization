@@ -57,7 +57,6 @@ export interface ProjectDoc {
 
 export interface SkillDoc {
   name: string;
-  levels: string[]; // z.B. ["Beginner", "Advanced", "Expert"] oder frei definierbar
   createdAt: Date;
   updatedAt: Date;
 }

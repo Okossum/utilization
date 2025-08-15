@@ -5,7 +5,6 @@ import { skillService } from '../../lib/firebase-services';
 interface SkillItem {
   id: string;
   name: string;
-  levels: string[];
 }
 
 export function SkillManagement() {
@@ -15,13 +14,11 @@ export function SkillManagement() {
 
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newName, setNewName] = useState('');
-  const [newLevelInput, setNewLevelInput] = useState('');
-  const [newLevels, setNewLevels] = useState<string[]>([]);
+  
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
-  const [editLevels, setEditLevels] = useState<string[]>([]);
-  const [editLevelInput, setEditLevelInput] = useState('');
+  
 
   useEffect(() => {
     const load = async () => {
@@ -29,7 +26,7 @@ export function SkillManagement() {
       setError(null);
       try {
         const all = await skillService.getAll();
-        setSkills(all.map(s => ({ id: s.id, name: s.name, levels: s.levels || [] })));
+        setSkills(all.map(s => ({ id: s.id, name: s.name })));
       } catch (e: any) {
         setError('Fehler beim Laden der Skills');
       } finally {
@@ -41,31 +38,17 @@ export function SkillManagement() {
 
   const resetAdd = () => {
     setNewName('');
-    setNewLevels([]);
-    setNewLevelInput('');
     setIsAddOpen(false);
   };
 
-  const addLevelToNew = () => {
-    const v = newLevelInput.trim();
-    if (!v) return;
-    setNewLevels(prev => Array.from(new Set([...prev, v])));
-    setNewLevelInput('');
-  };
-
-  const addLevelToEdit = () => {
-    const v = editLevelInput.trim();
-    if (!v) return;
-    setEditLevels(prev => Array.from(new Set([...prev, v])));
-    setEditLevelInput('');
-  };
+  
 
   const handleAdd = async () => {
     if (!newName.trim()) return;
     setLoading(true);
     try {
-      const id = await skillService.save({ name: newName.trim(), levels: newLevels });
-      setSkills(prev => [...prev, { id, name: newName.trim(), levels: newLevels }]);
+      const id = await skillService.save({ name: newName.trim() });
+      setSkills(prev => [...prev, { id, name: newName.trim() }]);
       resetAdd();
     } catch (e) {
       setError('Fehler beim Anlegen des Skills');
@@ -77,23 +60,21 @@ export function SkillManagement() {
   const startEdit = (s: SkillItem) => {
     setEditingId(s.id);
     setEditName(s.name);
-    setEditLevels(s.levels || []);
-    setEditLevelInput('');
+    
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditName('');
-    setEditLevels([]);
-    setEditLevelInput('');
+    
   };
 
   const saveEdit = async () => {
     if (!editingId || !editName.trim()) return;
     setLoading(true);
     try {
-      await skillService.update(editingId, { name: editName.trim(), levels: editLevels });
-      setSkills(prev => prev.map(s => s.id === editingId ? { ...s, name: editName.trim(), levels: editLevels } : s));
+      await skillService.update(editingId, { name: editName.trim() });
+      setSkills(prev => prev.map(s => s.id === editingId ? { ...s, name: editName.trim() } : s));
       cancelEdit();
     } catch (e) {
       setError('Fehler beim Aktualisieren');
@@ -124,7 +105,7 @@ export function SkillManagement() {
           <div className="p-3 bg-indigo-100 rounded-lg"><Settings className="w-6 h-6 text-indigo-600"/></div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Skill-Verwaltung</h1>
-            <p className="text-gray-600">Skills mit Leveln verwalten (CRUD)</p>
+            <p className="text-gray-600">Skills verwalten (CRUD)</p>
           </div>
         </div>
         <button
@@ -149,20 +130,7 @@ export function SkillManagement() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
                   <input value={newName} onChange={e=>setNewName(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded"/>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Levels</label>
-                  <div className="flex gap-2">
-                    <input value={newLevelInput} onChange={e=>setNewLevelInput(e.target.value)} className="flex-1 px-3 py-2 border border-gray-200 rounded" placeholder="z. B. Beginner"/>
-                    <button onClick={addLevelToNew} className="px-3 py-2 bg-gray-100 rounded border border-gray-200">Hinzufügen</button>
-                  </div>
-                  {newLevels.length>0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {newLevels.map(l => (
-                        <span key={l} className="px-2 py-1 text-xs bg-indigo-50 text-indigo-700 rounded border border-indigo-200">{l}</span>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                
               </div>
               <div className="p-4 border-t border-gray-200 flex justify-end gap-2">
                 <button onClick={resetAdd} className="px-4 py-2 bg-gray-100 rounded border border-gray-200">Abbrechen</button>
@@ -187,19 +155,7 @@ export function SkillManagement() {
               {editingId === s.id ? (
                 <div className="space-y-3">
                   <input value={editName} onChange={e=>setEditName(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded"/>
-                  <div>
-                    <div className="flex gap-2">
-                      <input value={editLevelInput} onChange={e=>setEditLevelInput(e.target.value)} className="flex-1 px-3 py-2 border border-gray-200 rounded" placeholder="Level hinzufügen"/>
-                      <button onClick={addLevelToEdit} className="px-3 py-2 bg-gray-100 rounded border border-gray-200">Hinzufügen</button>
-                    </div>
-                    {editLevels.length>0 && (
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {editLevels.map(l => (
-                          <span key={l} className="px-2 py-1 text-xs bg-indigo-50 text-indigo-700 rounded border border-indigo-200">{l}</span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  
                   <div className="flex justify-end gap-2">
                     <button onClick={cancelEdit} className="px-3 py-2 bg-gray-100 rounded border border-gray-200">Abbrechen</button>
                     <button onClick={saveEdit} disabled={!editName.trim() || isBusy} className="px-3 py-2 bg-indigo-600 text-white rounded disabled:opacity-50">Speichern</button>
@@ -209,11 +165,7 @@ export function SkillManagement() {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-sm font-medium text-gray-900">{s.name}</div>
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      {s.levels.map(l => (
-                        <span key={l} className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded border border-gray-200">{l}</span>
-                      ))}
-                    </div>
+                    
                   </div>
                   <div className="flex items-center gap-2">
                     <button onClick={()=>startEdit(s)} className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded">
