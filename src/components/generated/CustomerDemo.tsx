@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { CustomerManager } from './CustomerManager';
+import { ProjectSelector } from './ProjectSelector';
 import { CustomerManagementPage } from './CustomerManagementPage';
 import { useCustomers } from '../../contexts/CustomerContext';
 
 export function CustomerDemo() {
-  const { customers, addCustomer } = useCustomers();
+  const { customers, projects, addCustomer } = useCustomers();
   const [selectedCustomer, setSelectedCustomer] = useState('');
+  const [selectedProject, setSelectedProject] = useState('');
   const [showManagementPage, setShowManagementPage] = useState(false);
 
   if (showManagementPage) {
@@ -34,27 +36,45 @@ export function CustomerDemo() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Einfache Kundenauswahl */}
+        {/* Kunden- und Projektauswahl */}
         <div className="bg-white p-6 rounded-lg border border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            Kundenauswahl
+            Kunden- und Projektauswahl
           </h2>
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Kunde auswählen
+                1. Kunde auswählen
               </label>
               <CustomerManager
                 customers={customers}
                 onAddCustomer={addCustomer}
                 value={selectedCustomer}
                 onChange={setSelectedCustomer}
+                className="w-full"
               />
             </div>
-            {selectedCustomer && (
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  Ausgewählter Kunde: <strong>{selectedCustomer}</strong>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                2. Projekt auswählen
+              </label>
+              <ProjectSelector
+                selectedCustomer={selectedCustomer}
+                selectedProject={selectedProject}
+                onProjectSelect={setSelectedProject}
+                className="w-full"
+              />
+            </div>
+            {selectedCustomer && selectedProject && (
+              <div className="p-3 bg-green-50 rounded-lg">
+                <p className="text-sm text-green-800">
+                  <strong>Auswahl bestätigt:</strong>
+                </p>
+                <p className="text-sm text-green-700 mt-1">
+                  Kunde: <strong>{selectedCustomer}</strong>
+                </p>
+                <p className="text-sm text-green-700">
+                  Projekt: <strong>{selectedProject}</strong>
                 </p>
               </div>
             )}
@@ -102,15 +122,19 @@ export function CustomerDemo() {
       {/* Aktueller Status */}
       <div className="bg-gray-50 p-4 rounded-lg">
         <h3 className="text-lg font-medium text-gray-900 mb-2">Aktueller Status</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
           <div>
             <span className="text-gray-600">Gesamt Kunden:</span>
             <span className="ml-2 font-medium">{customers.length}</span>
           </div>
           <div>
+            <span className="text-gray-600">Gesamt Projekte:</span>
+            <span className="ml-2 font-medium">{projects.length}</span>
+          </div>
+          <div>
             <span className="text-gray-600">Ausgewählt:</span>
             <span className="ml-2 font-medium">
-              {selectedCustomer || 'Keiner'}
+              {selectedCustomer || 'Keiner'} / {selectedProject || 'Keines'}
             </span>
           </div>
           <div>

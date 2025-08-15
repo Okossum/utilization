@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Search, Building2, Edit2, Trash2, Users, Calendar } from 'lucide-react';
+import { Plus, Search, Building2, Edit2, Trash2, Users, Calendar, FolderOpen } from 'lucide-react';
 import { useCustomers } from '../../contexts/CustomerContext';
 
 export function CustomerManagementPage() {
   const {
     customers,
+    projects,
     addCustomer,
     removeCustomer,
     updateCustomer,
@@ -97,10 +98,10 @@ export function CustomerManagementPage() {
         </div>
         <div className="bg-white p-4 rounded-lg border border-gray-200">
           <div className="flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-green-600" />
-            <span className="text-sm text-gray-600">Aktive Projekte</span>
+            <FolderOpen className="w-5 h-5 text-green-600" />
+            <span className="text-sm text-gray-600">Gesamt Projekte</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">-</p>
+          <p className="text-2xl font-bold text-gray-900">{projects.length}</p>
         </div>
       </div>
 
@@ -222,6 +223,48 @@ export function CustomerManagementPage() {
                     </div>
                   </div>
                 )}
+              </motion.div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Projekte Übersicht */}
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+          <h2 className="text-lg font-medium text-gray-900">Alle Projekte</h2>
+        </div>
+        
+        <div className="divide-y divide-gray-200">
+          {projects.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              <FolderOpen className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p className="text-lg font-medium mb-2">Noch keine Projekte vorhanden</p>
+              <p className="text-sm">Projekte werden automatisch erstellt, wenn Sie sie in der Projektverwaltung hinzufügen.</p>
+            </div>
+          ) : (
+            projects.map((project, index) => (
+              <motion.div
+                key={project.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className="p-6 hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-100 rounded-lg">
+                      <FolderOpen className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900">{project.name}</h3>
+                      <p className="text-sm text-gray-500">Kunde: {project.customer}</p>
+                      <p className="text-xs text-gray-400">
+                        Erstellt: {project.createdAt.toLocaleDateString('de-DE')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </motion.div>
             ))
           )}

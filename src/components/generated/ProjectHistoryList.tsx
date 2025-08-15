@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Edit2, Trash2, History, Save, X } from 'lucide-react';
 import { ProjectHistoryItem } from './EmployeeDossierModal';
 import { CustomerManager } from './CustomerManager';
+import { ProjectSelector } from './ProjectSelector';
 import { useCustomers } from '../../contexts/CustomerContext';
 interface ProjectHistoryListProps {
   projects: ProjectHistoryItem[];
@@ -98,13 +99,6 @@ export function ProjectHistoryList({
               {editingId === project.id ? <div className="space-y-3">
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Projektname</label>
-                      <input type="text" value={editForm.projectName} onChange={e => setEditForm(prev => ({
-                  ...prev,
-                  projectName: e.target.value
-                }))} className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-                    </div>
-                    <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Kunde</label>
                       <CustomerManager
                         customers={customers}
@@ -113,6 +107,18 @@ export function ProjectHistoryList({
                         onChange={(customer) => setEditForm(prev => ({
                           ...prev,
                           customer
+                        }))}
+                        className="text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Projektname</label>
+                      <ProjectSelector
+                        selectedCustomer={editForm.customer}
+                        selectedProject={editForm.projectName}
+                        onProjectSelect={(projectName) => setEditForm(prev => ({
+                          ...prev,
+                          projectName
                         }))}
                         className="text-sm"
                       />
