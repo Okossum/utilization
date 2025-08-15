@@ -50,7 +50,7 @@ export function MultiSelectFilter({ label, options, selected, onChange, placehol
       : `${selected.length} ausgewählt`;
 
   return (
-    <div className="w-full" ref={dropdownRef}>
+    <div className="w-full relative" ref={dropdownRef}>
       <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
       <button onClick={() => setIsOpen(!isOpen)} className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
         <span className="text-sm text-gray-700 truncate">{displayText}</span>
@@ -59,7 +59,7 @@ export function MultiSelectFilter({ label, options, selected, onChange, placehol
 
       <AnimatePresence>
         {isOpen && (
-          <motion.div initial={{ opacity: 0, y: -8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8, scale: 0.98 }} transition={{ duration: 0.15 }} className="mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-20 max-h-80 overflow-hidden">
+          <motion.div initial={{ opacity: 0, y: -8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8, scale: 0.98 }} transition={{ duration: 0.15 }} className="absolute mt-2 bg-white border border-gray-200 rounded-lg shadow-xl z-50 max-h-80 overflow-hidden w-full">
             <div className="p-2 border-b border-gray-200">
               <div className="relative">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />

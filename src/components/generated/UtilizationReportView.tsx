@@ -49,6 +49,8 @@ export function UtilizationReportView() {
   };
   const [filterCC, setFilterCC] = useState<string[]>([]);
   const [filterLBS, setFilterLBS] = useState<string[]>([]);
+  const [filterStatus, setFilterStatus] = useState<string[]>([]);
+  const [personSearchTerm, setPersonSearchTerm] = useState<string>('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showWorkingStudents, setShowWorkingStudents] = useState(() => {
     try { return JSON.parse(localStorage.getItem('utilization_show_working_students') || 'true'); } catch { return true; }
@@ -362,6 +364,20 @@ export function UtilizationReportView() {
     personMeta.forEach(m => { if (m.lbs) s.add(String(m.lbs)); });
     return Array.from(s).sort((a, b) => a.localeCompare(b, 'de'));
   }, [personMeta]);
+  
+  const statusOptions = useMemo(() => {
+    // Verwende nur die deutschen Bezeichnungen wie im StatusLabelSelector
+    const STATUS_OPTIONS = [
+      { id: 'vacation', label: 'Urlaub' },
+      { id: 'parental-leave', label: 'Elternzeit' },
+      { id: 'maternity-leave', label: 'Mutterschutz' },
+      { id: 'sick-leave', label: 'Krankheit' },
+      { id: 'termination', label: 'Kündigung' },
+    ];
+    
+    // Verwende nur die deutschen Labels, nicht die IDs
+    return STATUS_OPTIONS.map(status => status.label).sort((a, b) => a.localeCompare(b, 'de'));
+  }, []);
 
   const filteredData = useMemo(() => {
     let base = dataForUI;
@@ -374,13 +390,42 @@ export function UtilizationReportView() {
       });
     }
     
+    // Personensuche Filter (wenn Suchbegriff eingegeben wurde)
+    if (personSearchTerm.trim()) {
+      base = base.filter(d => 
+        d.person.toLowerCase().includes(personSearchTerm.toLowerCase())
+      );
+    }
+    
     if (filterCC.length > 0) base = base.filter(d => filterCC.includes(String(personMeta.get(d.person)?.cc || '')));
     if (filterLBS.length > 0) base = base.filter(d => filterLBS.includes(String(personMeta.get(d.person)?.lbs || '')));
+    if (filterStatus.length > 0) base = base.filter(d => {
+      const personStatusValue = personStatus[d.person];
+      if (!personStatusValue) return false;
+      
+      // Prüfe ob der Status im Filter enthalten ist (sowohl ID als auch Label)
+      return filterStatus.some(filterStatusItem => {
+        // Direkte Übereinstimmung
+        if (filterStatusItem === personStatusValue) return true;
+        
+        // Mapping von ID zu Label
+        const statusMapping: Record<string, string> = {
+          'vacation': 'Urlaub',
+          'parental-leave': 'Elternzeit',
+          'maternity-leave': 'Mutterschutz',
+          'sick-leave': 'Krankheit',
+          'termination': 'Kündigung'
+        };
+        
+        return filterStatusItem === statusMapping[personStatusValue] || 
+               personStatusValue === statusMapping[filterStatusItem];
+      });
+    });
     if (selectedPersons.length > 0) {
       base = base.filter(item => selectedPersons.includes(item.person));
     }
     return base;
-  }, [dataForUI, selectedPersons, filterCC, filterLBS, personMeta, showWorkingStudents]);
+  }, [dataForUI, selectedPersons, filterCC, filterLBS, filterStatus, personMeta, personStatus, showWorkingStudents, personSearchTerm]);
   const visiblePersons = useMemo(() => {
     return Array.from(new Set(filteredData.map(item => item.person)));
   }, [filteredData]);
@@ -576,15 +621,6 @@ export function UtilizationReportView() {
 
         {/* Auslastung Preview ausgeblendet (weiterhin über Upload einsehbar) */}
 
-        {/* Filter Bar */}
-        <PersonFilterBar 
-          allPersons={allPersons} 
-          selectedPersons={selectedPersons} 
-          onSelectionChange={setSelectedPersons}
-          showWorkingStudents={showWorkingStudents}
-          onWorkingStudentsToggle={setShowWorkingStudents}
-        />
-
         {/* KPI Cards */}
         <KpiCardsGrid kpiData={kpiData} />
 
@@ -597,10 +633,55 @@ export function UtilizationReportView() {
             <h3 className="text-lg font-semibold text-gray-900">
               Detailansicht nach Person
             </h3>
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            
+            {/* Alle Filter in einer Reihe - Personen, CC, LBS und Status */}
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              {/* Personen-Filter mit Suchfunktion */}
+              <div className="w-full">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Personen</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Nach Personen suchen..."
+                    value={personSearchTerm}
+                    onChange={(e) => setPersonSearchTerm(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  />
+                  {/* Suchfunktionen */}
+                  <div className="flex items-center gap-2 mt-2 text-xs">
+                    <button 
+                      onClick={() => setPersonSearchTerm('')} 
+                      className="text-blue-600 hover:text-blue-700 hover:underline"
+                    >
+                      Suche löschen
+                    </button>
+                    <span className="text-gray-300">|</span>
+                    <button 
+                      onClick={() => setPersonSearchTerm('')} 
+                      className="text-gray-600 hover:text-gray-700 hover:underline"
+                    >
+                      Alle anzeigen
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
               <MultiSelectFilter label="CC" options={ccOptions} selected={filterCC} onChange={setFilterCC} placeholder="Alle CC" />
               <MultiSelectFilter label="LBS" options={lbsOptions} selected={filterLBS} onChange={setFilterLBS} placeholder="Alle LBS" />
-              <MultiSelectFilter label="Personen" options={allPersons} selected={selectedPersons} onChange={setSelectedPersons} placeholder="Alle Personen" />
+              <MultiSelectFilter label="Status" options={statusOptions} selected={filterStatus} onChange={setFilterStatus} placeholder="Alle Status" />
+              
+              {/* Working Students Toggle als separater Filter */}
+              <div className="flex items-center justify-center">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showWorkingStudents}
+                    onChange={(e) => setShowWorkingStudents(e.target.checked)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Working Students</span>
+                </label>
+              </div>
             </div>
           </div>
           <div className="overflow-x-auto">

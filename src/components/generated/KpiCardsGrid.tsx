@@ -21,6 +21,11 @@ interface KpiCardProps {
   trend?: 'up' | 'down' | 'neutral';
   subtitle?: string;
   delay?: number;
+  showAnalysisTooltip?: boolean;
+  analysisData?: {
+    overUtilized: number;
+    missingValues: number;
+  };
 }
 function KpiCard({
   title,
@@ -30,7 +35,9 @@ function KpiCard({
   tooltip,
   trend,
   subtitle,
-  delay = 0
+  delay = 0,
+  showAnalysisTooltip = false,
+  analysisData
 }: KpiCardProps) {
   const [showTooltip, setShowTooltip] = useState(false);
   const getColorClasses = (color: string) => {
@@ -145,8 +152,23 @@ function KpiCard({
         </motion.div>
         
         {/* Info Icon - Always visible on mobile, hover on desktop */}
-        <div className="block sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-          <Info className="w-4 h-4 text-gray-400" />
+        <div className="relative block sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+          <Info className="w-4 h-4 text-gray-400 cursor-help" />
+          
+          {/* Tooltip mit Auslastungsanalyse */}
+          {showAnalysisTooltip && analysisData && (
+            <div className="absolute right-0 top-6 w-80 bg-gray-900 text-white text-sm rounded-lg p-3 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+              <div className="font-semibold mb-2 text-blue-200">Auslastungsanalyse</div>
+              <ul className="space-y-1 text-gray-200">
+                <li>• Die prognostizierte Auslastung steigt im Vergleich zum historischen Durchschnitt</li>
+                <li>• {analysisData.overUtilized || 0} Datenpunkte mit Überauslastung identifiziert</li>
+                <li>• {analysisData.missingValues || 0} fehlende Werte werden in Berechnungen ignoriert</li>
+              </ul>
+              
+              {/* Tooltip-Pfeil */}
+              <div className="absolute -top-2 right-4 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-gray-900"></div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -235,7 +257,12 @@ export function KpiCardsGrid({
     color: getHistoricalColor(),
     tooltip: `Durchschnittliche Auslastung der letzten ${kpiData.lookbackWeeks || 8} Wochen. Ø über vorhandene Werte, fehlende Daten werden ignoriert.`,
     trend: getHistoricalTrend(),
-    subtitle: 'Historische Daten'
+    subtitle: 'Historische Daten',
+    showAnalysisTooltip: true,
+    analysisData: {
+      overUtilized: kpiData.overUtilized,
+      missingValues: kpiData.missingValues
+    }
   }, {
     title: `Ø Auslastung Vorblick (${kpiData.forecastWeeks || 4} W)`,
     value: `${kpiData.avgForecast}%`,
