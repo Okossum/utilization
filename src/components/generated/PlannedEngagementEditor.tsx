@@ -1,8 +1,16 @@
+/*
+  DEPRECATED: This component is no longer used and is scheduled for removal.
+  Replacement: Use `PlanningModal` for all planning interactions.
+  Safe to delete once legacy references are confirmed absent.
+*/
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, ChevronDown, X, Calendar } from 'lucide-react';
 import { PlanningModal } from './PlanningModal';
 
+/**
+ * @deprecated Use data managed via PlanningModal and employee dossiers instead.
+ */
 export interface PlannedEngagement {
   planned: boolean;
   customer?: string;
@@ -21,6 +29,9 @@ interface PlannedEngagementEditorProps {
   onAddCustomer: (name: string) => void;
 }
 
+/**
+ * @deprecated No longer used in the app. Planning is handled by `PlanningModal`.
+ */
 export function PlannedEngagementEditor({ person, value, customers, availableKws, onChange, onAddCustomer }: PlannedEngagementEditorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isPlanningOpen, setPlanningOpen] = useState(false);

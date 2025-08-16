@@ -1021,6 +1021,7 @@ export function UtilizationReportView() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {visiblePersons.map(person => {
+                  const isTerminated = personStatus[person] === 'termination' || personStatus[person] === 'Kündigung';
                   const personData = filteredData.filter(item => item.person === person);
                   return (
                     <tr key={person} className="hover:bg-gray-50">
@@ -1044,7 +1045,7 @@ export function UtilizationReportView() {
                           
                           return (
                             <span className={`inline-block px-2 py-1 rounded ${bgColor}`}>
-                              <span className="flex items-center justify-center gap-1">
+                              <span className={`flex items-center justify-center gap-1 ${isTerminated ? 'line-through opacity-60' : ''}`}>
                                 {average}%
                                 {average > 100 && <Star className="w-3 h-3 text-yellow-500" />}
                               </span>
@@ -1067,12 +1068,12 @@ export function UtilizationReportView() {
                         return (
                           <td key={`l-single-${i}`} className={`px-1 py-2 text-center text-xs ${bgColor}`}>
                             {utilization !== null && utilization !== undefined ? (
-                              <span className="flex items-center justify-center gap-1">
+                              <span className={`flex items-center justify-center gap-1 ${isTerminated ? 'line-through opacity-60' : ''}`}>
                                 {utilization}%
                                 {utilization > 100 && <Star className="w-3 h-3 text-yellow-500" />}
                               </span>
                             ) : (
-                              '—'
+                              <span className={`${isTerminated ? 'line-through opacity-60' : ''}`}>—</span>
                             )}
                           </td>
                         );
@@ -1148,7 +1149,7 @@ export function UtilizationReportView() {
                           ? 'bg-blue-100'
                           : 'bg-gray-50'
                       }`}>
-                        <div className="flex items-center gap-2 w-full">
+                        <div className={`flex items-center gap-2 w-full ${isTerminated ? 'line-through opacity-60' : ''}`}>
                           {personStatus[person] && (
                             <span className={getStatusColor(personStatus[person])}>
                               {getStatusIcon(personStatus[person])}
@@ -1193,7 +1194,7 @@ export function UtilizationReportView() {
                         actionItems[person] 
                           ? 'bg-blue-100'
                           : 'bg-gray-50'
-                      }`}>
+                      } ${isTerminated ? 'line-through opacity-60' : ''}`}>
                         {personMeta.get(person)?.lbs ? (
                           <span className="text-xs text-gray-700">{personMeta.get(person)?.lbs}</span>
                         ) : (
@@ -1227,14 +1228,14 @@ export function UtilizationReportView() {
                         }
                         return (
                           <td key={`r-${i}`} className={`px-1 py-2 text-center text-xs ${bgColor}`}>
-                            <div className="flex flex-col items-center gap-1">
+                            <div className={`flex flex-col items-center gap-1 ${isTerminated ? 'line-through opacity-60' : ''}`}>
                               {utilization !== null && utilization !== undefined ? (
-                                <span className="flex items-center justify-center gap-1">
+                                <span className={`flex items-center justify-center gap-1 ${isTerminated ? 'line-through opacity-60' : ''}`}>
                                   {utilization}%
                                   {utilization > 100 && <Star className="w-3 h-3 text-yellow-500" />}
                                 </span>
                               ) : (
-                                '—'
+                                <span className={`${isTerminated ? 'line-through opacity-60' : ''}`}>—</span>
                               )}
                               {(() => {
                                 const dossier = dossiersByPerson[person] || { projectOffers: [], jiraTickets: [] };
