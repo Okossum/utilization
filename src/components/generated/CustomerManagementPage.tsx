@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Search, Building2, Edit2, Trash2, Users, FolderOpen, Shield, RefreshCw, Check } from 'lucide-react';
+import { Plus, Search, Building2, Edit2, Trash2, Users, FolderOpen, Shield, RefreshCw, Check, Inbox, Send, Key } from 'lucide-react';
 import { useCustomers } from '../../contexts/CustomerContext';
 import DatabaseService from '../../services/database';
 import { useAuth } from '../../contexts/AuthContext';
@@ -25,6 +25,10 @@ export function CustomerManagementPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const isAdmin = useMemo(() => (profile?.role === 'admin'), [profile?.role]);
+  // Candidates state
+  const [candidates, setCandidates] = useState<any[]>([]);
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
+  const [selectedToImport, setSelectedToImport] = useState<Record<string, boolean>>({});
 
   const filteredCustomers = customers.filter(customer =>
     customer.toLowerCase().includes(searchTerm.toLowerCase())
@@ -80,6 +84,42 @@ export function CustomerManagementPage() {
 
   const updateUser = async (uid: string, data: any) => {
     await DatabaseService.updateUser(uid, data);
+    const list = await DatabaseService.getUsers();
+    setUsers(list || []);
+  };
+
+  const loadCandidates = async () => {
+    setLoadingCandidates(true);
+    try {
+      const list = await DatabaseService.getUserCandidates();
+      setCandidates(Array.isArray(list) ? list : []);
+      setSelectedToImport({});
+    } catch {
+      setCandidates([]);
+    } finally {
+      setLoadingCandidates(false);
+    }
+  };
+
+  const importSelected = async () => {
+    const toImport = candidates
+      .filter(c => selectedToImport[c.name])
+      .map(c => ({
+        name: c.name,
+        email: c.suggestedEmail || '',
+        role: c.role,
+        lob: c.lob || null,
+        bereich: c.bereich || null,
+        competenceCenter: c.competenceCenter || null,
+        team: c.team || null,
+      }));
+    if (toImport.length === 0) return;
+    const missingEmail = toImport.find(u => !u.email);
+    if (missingEmail) {
+      alert(`Bitte E-Mail ergänzen für: ${missingEmail.name}`);
+      return;
+    }
+    await DatabaseService.importUsers({ users: toImport, createAuth: false });
     const list = await DatabaseService.getUsers();
     setUsers(list || []);
   };
@@ -196,10 +236,8 @@ export function CustomerManagementPage() {
                     <div className="text-sm font-medium text-gray-900">{u.email || '—'}</div>
                   </div>
                   <div>
-                    <div className="text-sm text-gray-500">Rolle</div>
-                    <select defaultValue={u.role || 'unknown'} onChange={e => updateUser(u.uid || u.id, { role: e.target.value })} className="w-full px-2 py-1 border rounded">
-                      {['bereichsleiter','cc','teamleiter','sales','admin','unknown'].map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
+                    <div className="text-sm text-gray-500">Rolle (LBS-Text)</div>
+                    <input defaultValue={u.role || ''} onBlur={e => updateUser(u.uid || u.id, { role: e.target.value || null })} className="w-full px-2 py-1 border rounded" placeholder="LBS z. B. Team Lead - Manager"/>
                   </div>
                   <div>
                     <div className="text-sm text-gray-500">Bereich</div>
@@ -213,9 +251,66 @@ export function CustomerManagementPage() {
                     <div className="text-sm text-gray-500">Team</div>
                     <input defaultValue={u.team || ''} onBlur={e => updateUser(u.uid || u.id, { team: e.target.value || null })} className="w-full px-2 py-1 border rounded" placeholder="Team"/>
                     <label className="mt-2 flex items-center gap-2 text-xs text-gray-700">
-                      <input type="checkbox" defaultChecked={Boolean(u.canViewAll)} onChange={e => updateUser(u.uid || u.id, { canViewAll: e.target.checked })} />
+                      <input type="checkbox" defaultChecked={Boolean(u.canViewAll ?? true)} onChange={e => updateUser(u.uid || u.id, { canViewAll: e.target.checked })} />
                       <span>Alle Daten sehen</span>
                     </label>
+                    {u.email && (
+                      <button onClick={async () => { try { const r = await DatabaseService.generatePasswordReset(u.email); alert('Reset-Link generiert: ' + (r?.link || '')); } catch { alert('Fehler beim Generieren des Reset-Links'); } }} className="mt-2 inline-flex items-center gap-2 px-2 py-1 text-xs border rounded">
+                        <Key className="w-3 h-3"/> Passwort-Reset-Link
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {isAdmin && (
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden mt-6">
+          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+            <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2"><Inbox className="w-5 h-5 text-blue-600"/> Kandidaten aus Daten</h2>
+            <div className="flex items-center gap-2">
+              <button onClick={loadCandidates} className="inline-flex items-center gap-2 px-3 py-1.5 text-sm border rounded-lg">
+                <RefreshCw className="w-4 h-4"/> Scannen
+              </button>
+              <button onClick={importSelected} className="inline-flex items-center gap-2 px-3 py-1.5 text-sm border rounded-lg">
+                <Send className="w-4 h-4"/> Ausgewählte übernehmen
+              </button>
+            </div>
+          </div>
+          <div>
+            {loadingCandidates ? (
+              <div className="p-6 text-gray-500">Suche Kandidaten…</div>
+            ) : candidates.length === 0 ? (
+              <div className="p-6 text-gray-500">Keine Kandidaten gefunden.</div>
+            ) : (
+              candidates.map(c => (
+                <div key={c.name} className="p-6 grid grid-cols-1 md:grid-cols-7 gap-3 items-center border-t border-gray-100">
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={Boolean(selectedToImport[c.name])} onChange={e => setSelectedToImport(prev => ({ ...prev, [c.name]: e.target.checked }))}/>
+                    <span className="text-sm font-medium text-gray-900">{c.name}</span>
+                  </label>
+                  <div>
+                    <div className="text-xs text-gray-500">Rolle (LBS)</div>
+                    <div className="text-sm text-gray-900">{c.role}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500">Bereich</div>
+                    <div className="text-sm text-gray-900">{c.bereich || '—'}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500">CC</div>
+                    <div className="text-sm text-gray-900">{c.competenceCenter || '—'}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500">Team</div>
+                    <div className="text-sm text-gray-900">{c.team || '—'}</div>
+                  </div>
+                  <div className="md:col-span-2">
+                    <div className="text-xs text-gray-500">E-Mail</div>
+                    <input value={c.suggestedEmail || ''} onChange={e => setCandidates(prev => prev.map(x => x.name === c.name ? { ...x, suggestedEmail: e.target.value } : x))} className="w-full px-2 py-1 border rounded" placeholder="email@firma.de"/>
                   </div>
                 </div>
               ))

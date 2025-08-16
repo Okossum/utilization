@@ -106,6 +106,14 @@ function applyScopeFilter(rows, profile, adminClaim) {
   });
 }
 
+// Build leadership role from LBS; here we keep LBS as role text
+function mapLbsToRole(lbs) {
+  if (!lbs) return null;
+  const s = String(lbs).trim();
+  // We keep the LBS string as role, as requested
+  return s;
+}
+
 // Current user profile endpoint
 app.get('/api/me', requireAuth, async (req, res) => {
   try {
@@ -385,6 +393,104 @@ app.get('/api/upload-history', requireAuth, async (req, res) => {
     res.json(out);
   } catch (error) {
     console.error('Fehler beim Abrufen der Upload-Historie:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+// User candidates from einsatzplan (leadership LBS)
+app.get('/api/user-candidates', requireAdmin, async (_req, res) => {
+  try {
+    const snap = await db.collection('einsatzplan').where('isLatest', '==', true).get();
+    const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const LEADERSHIP_LBS = new Set([
+      'Team Lead - Manager',
+      'Competence Center Lead - Senior Manager',
+      'Competence Center Lead - Director',
+      'Business Unit Lead - Senior Director',
+      'Business Line Lead - Senior Director',
+    ]);
+    const candidates = rows
+      .filter(r => r.person && LEADERSHIP_LBS.has(String(r.lbs || '').trim()))
+      .map(r => ({
+        name: r.person,
+        role: mapLbsToRole(r.lbs),
+        lob: r.lob || null,
+        bereich: r.bereich || null,
+        competenceCenter: r.cc || null,
+        team: r.team || null,
+        suggestedEmail: '',
+      }))
+      .sort((a, b) => String(a.name).localeCompare(String(b.name), 'de'));
+    res.json(candidates);
+  } catch (error) {
+    console.error('Fehler bei /api/user-candidates:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+// Import users into Firestore (optionally create auth user)
+app.post('/api/users/import', requireAdmin, async (req, res) => {
+  try {
+    const { users: incoming = [], createAuth = false } = req.body || {};
+    if (!Array.isArray(incoming) || incoming.length === 0) {
+      return res.status(400).json({ error: 'Keine Benutzer übergeben' });
+    }
+    const results = [];
+    for (const u of incoming) {
+      const email = String(u.email || '').trim();
+      const displayName = String(u.name || '').trim();
+      const role = mapLbsToRole(u.role) || 'unknown';
+      const profileFields = {
+        email: email || '',
+        displayName,
+        role,
+        canViewAll: true,
+        lob: u.lob ?? null,
+        bereich: u.bereich ?? null,
+        competenceCenter: u.competenceCenter ?? null,
+        team: u.team ?? null,
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+      let uid = null;
+      // Try find existing auth user by email
+      if (email) {
+        try {
+          const authUser = await admin.auth().getUserByEmail(email);
+          uid = authUser.uid;
+        } catch {}
+      }
+      if (!uid && createAuth && email) {
+        const created = await admin.auth().createUser({ email, displayName });
+        uid = created.uid;
+        // Set claims role (admin remains separate)
+        await admin.auth().setCustomUserClaims(uid, { role, admin: role === 'admin' });
+      }
+      if (uid) {
+        await db.collection('users').doc(uid).set({ uid, createdAt: FieldValue.serverTimestamp(), ...profileFields }, { merge: true });
+        results.push({ email, uid, status: 'upserted-with-auth' });
+      } else {
+        // Firestore-only profile (no auth yet)
+        const docRef = db.collection('users').doc();
+        await docRef.set({ id: docRef.id, createdAt: FieldValue.serverTimestamp(), ...profileFields }, { merge: true });
+        results.push({ email, id: docRef.id, status: 'upserted-firestore-only' });
+      }
+    }
+    res.json({ success: true, count: results.length, results });
+  } catch (error) {
+    console.error('Fehler bei /api/users/import:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+// Generate password reset link (admin)
+app.post('/api/users/password-reset', requireAdmin, async (req, res) => {
+  try {
+    const { email } = req.body || {};
+    if (!email) return res.status(400).json({ error: 'E-Mail erforderlich' });
+    const link = await admin.auth().generatePasswordResetLink(String(email));
+    res.json({ success: true, link });
+  } catch (error) {
+    console.error('Fehler bei /api/users/password-reset:', error);
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });

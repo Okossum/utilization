@@ -89,6 +89,21 @@ export class DatabaseService {
   static async updateUser(uid: string, data: any) {
     return ApiService.put(`/users/${uid}`, data);
   }
+
+  // Admin: Kandidaten aus Daten
+  static async getUserCandidates() {
+    return ApiService.get('/user-candidates');
+  }
+
+  // Admin: Import Benutzer
+  static async importUsers(payload: { users: Array<{ name: string; email: string; role: string; lob?: string|null; bereich?: string|null; competenceCenter?: string|null; team?: string|null }>; createAuth?: boolean }) {
+    return ApiService.post('/users/import', payload);
+  }
+
+  // Admin: Passwort-Reset-Link generieren
+  static async generatePasswordReset(email: string) {
+    return ApiService.post('/users/password-reset', { email });
+  }
   
   // Auslastung-Daten speichern oder aktualisieren
   static async saveAuslastung(fileName: string, data: any[]) {
@@ -156,9 +171,19 @@ export class DatabaseService {
   // Employee Dossier abrufen
   static async getEmployeeDossier(employeeId: string) {
     try {
-      return await ApiService.get(`/employee-dossier/${employeeId}`);
-    } catch (error) {
-      console.error('Fehler beim Abrufen des Employee Dossiers:', error);
+      const token = authTokenProvider ? await authTokenProvider() : null;
+      const res = await fetch(`${API_BASE_URL}/employee-dossier/${encodeURIComponent(employeeId)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+      });
+      if (res.status === 404) return null; // kein Dossier vorhanden → still zurückgeben
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      return await res.json();
+    } catch (_error) {
+      // Nicht mehr laut loggen – Frontend behandelt fehlende Dossiers als leer
       return null;
     }
   }
