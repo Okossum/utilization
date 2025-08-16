@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 export interface UtilizationPoint {
   person: string;
@@ -32,6 +33,7 @@ export function UtilizationTrendChart({
   isoYear
 }: UtilizationTrendChartProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const chartData: ChartRow[] = useMemo(() => {
     // Build ordered list of week labels (strings used in data)
@@ -75,38 +77,69 @@ export function UtilizationTrendChart({
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900">Auslastungsverlauf</h3>
-          <p className="text-sm text-gray-600">Ø-Auslastung pro Woche (links Rückblick inkl. Basiswoche, rechts Vorblick)</p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsCollapsed(v => !v)}
+            className="p-1.5 rounded hover:bg-gray-100 text-gray-600"
+            aria-expanded={!isCollapsed}
+            title={isCollapsed ? 'Einblenden' : 'Ausblenden'}
+          >
+            {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Auslastungsverlauf</h3>
+            <p className="text-sm text-gray-600">Ø-Auslastung pro Woche (links Rückblick inkl. Basiswoche, rechts Vorblick)</p>
+          </div>
         </div>
-        <button onClick={() => setIsExpanded(v => !v)} className="px-3 py-1.5 text-xs border rounded-lg text-gray-700 bg-white hover:bg-gray-50">{isExpanded ? 'Kleiner' : 'Größer'}</button>
+        <button onClick={() => setIsExpanded(v => !v)} className="px-3 py-1.5 text-xs border rounded-lg text-gray-700 bg-white hover:bg-gray-50" title={isExpanded ? 'Verkleinern' : 'Vergrößern"'}>{isExpanded ? 'Kleiner' : 'Größer'}</button>
       </div>
 
-      <motion.div animate={{ height: isExpanded ? 460 : 320 }} transition={{ duration: 0.25 }} className="relative">
-        <div className="absolute inset-0 p-6">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 20, right: 24, left: 16, bottom: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-              <XAxis dataKey="shortWeek" tickLine={false} axisLine={false} height={48} angle={-45} textAnchor="end" stroke="#6b7280" fontSize={12} />
-              <YAxis domain={[0, 130]} tickFormatter={v => `${v}%`} tickLine={false} axisLine={false} width={48} stroke="#6b7280" fontSize={12} />
-              <Tooltip formatter={(v: any) => `${v}%`} labelFormatter={(l: any) => `${isoYear}-${l}`} />
-              <Legend wrapperStyle={{ paddingTop: 12 }} />
+      <AnimatePresence initial={false}>
+        {!isCollapsed && (
+          <motion.div
+            key="chart"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: isExpanded ? 460 : 320, opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="relative"
+          >
+            <div className="absolute inset-0 p-6">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} margin={{ top: 20, right: 24, left: 16, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                  <XAxis dataKey="shortWeek" tickLine={false} axisLine={false} height={48} angle={-45} textAnchor="end" stroke="#6b7280" fontSize={12} />
+                  <YAxis domain={[0, 130]} tickFormatter={v => `${v}%`} tickLine={false} axisLine={false} width={48} stroke="#6b7280" fontSize={12} />
+                  <Tooltip formatter={(v: any) => `${v}%`} labelFormatter={(l: any) => `${isoYear}-${l}`} />
+                  <Legend wrapperStyle={{ paddingTop: 12 }} />
 
-              <ReferenceLine y={100} stroke="#ef4444" strokeDasharray="5 5" />
-              {separatorIndex >= 0 && chartData[separatorIndex] && (
-                <ReferenceLine x={chartData[separatorIndex].shortWeek} stroke="#9ca3af" strokeDasharray="3 3" />
-              )}
+                  <ReferenceLine y={100} stroke="#ef4444" strokeDasharray="5 5" />
+                  {separatorIndex >= 0 && chartData[separatorIndex] && (
+                    <ReferenceLine x={chartData[separatorIndex].shortWeek} stroke="#9ca3af" strokeDasharray="3 3" />
+                  )}
 
-              <Line type="monotone" dataKey="historical" name="Rückblick" stroke="#3b82f6" strokeWidth={3} dot={false} connectNulls />
-              <Line type="monotone" dataKey="forecast" name="Vorblick" stroke="#10b981" strokeWidth={3} strokeDasharray="8 4" dot={false} connectNulls />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </motion.div>
+                  <Line type="monotone" dataKey="historical" name="Rückblick" stroke="#3b82f6" strokeWidth={3} dot={false} connectNulls />
+                  <Line type="monotone" dataKey="forecast" name="Vorblick" stroke="#10b981" strokeWidth={3} strokeDasharray="8 4" dot={false} connectNulls />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <div className="p-4 bg-gray-50 border-t border-gray-200 text-xs text-gray-600">
-        Basiswoche: {isoYear}-KW{forecastStartWeek} • Rückblick: {lookbackWeeks}W • Vorblick: {forecastWeeks}W
-      </div>
+      <AnimatePresence initial={false}>
+        {!isCollapsed && (
+          <motion.div
+            key="footer"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="p-4 bg-gray-50 border-t border-gray-200 text-xs text-gray-600"
+          >
+            Basiswoche: {isoYear}-KW{forecastStartWeek} • Rückblick: {lookbackWeeks}W • Vorblick: {forecastWeeks}W
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
