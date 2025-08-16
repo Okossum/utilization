@@ -537,6 +537,59 @@ app.get('/api/utilization-data', requireAuth, async (req, res) => {
   }
 });
 
+// Konsolidierte Daten in Bulk in Firebase speichern
+app.post('/api/utilization-data/bulk', requireAuth, async (req, res) => {
+  try {
+    const { data } = req.body;
+    
+    if (!data || !Array.isArray(data)) {
+      return res.status(400).json({ error: 'Ungültige Daten - Array erwartet' });
+    }
+
+    console.log(`Speichere ${data.length} Datensätze in utilizationData Collection`);
+
+    // Bestehende Daten als "nicht mehr aktuell" markieren
+    const latestUtilSnap = await db.collection('utilizationData').where('isLatest', '==', true).get();
+    if (!latestUtilSnap.empty) {
+      const batch = db.batch();
+      latestUtilSnap.forEach(doc => batch.update(doc.ref, { isLatest: false }));
+      await batch.commit();
+      console.log(`${latestUtilSnap.size} bestehende Datensätze als veraltet markiert`);
+    }
+
+    // Neue Daten speichern (Update oder Insert)
+    const batch = db.batch();
+    const savedCount = [];
+    
+    for (const row of data) {
+      const docId = `${row.person}__${row.week}`;
+      const docRef = db.collection('utilizationData').doc(docId);
+      
+      batch.set(docRef, {
+        ...row,
+        isLatest: true,
+        updatedAt: FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
+      
+      savedCount.push(docId);
+    }
+
+    await batch.commit();
+    console.log(`${savedCount.length} Datensätze erfolgreich gespeichert/aktualisiert`);
+
+    res.json({
+      success: true,
+      message: `${savedCount.length} Datensätze in Firebase gespeichert`,
+      count: savedCount.length
+    });
+
+  } catch (error) {
+    console.error('Fehler beim Bulk-Speichern der Daten:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler', details: error.message });
+  }
+});
+
 // Hilfsfunktion zum Extrahieren von Wochenwerten
 function extractWeekValue(row, weekNum, year) {
   const weekKey = `KW ${weekNum}-${year}`;

@@ -302,6 +302,19 @@ export class DatabaseService {
       throw error;
     }
   }
+
+  // Konsolidierte Daten in Firebase utilizationData Collection speichern
+  static async saveConsolidatedDataToFirebase(consolidatedData: any[]) {
+    try {
+      console.log('Speichere konsolidierte Daten in Firebase:', consolidatedData.length, 'Datensätze');
+      const result = await ApiService.post('/utilization-data/bulk', { data: consolidatedData });
+      console.log('Daten erfolgreich in Firebase gespeichert:', result);
+      return result;
+    } catch (error) {
+      console.error('Fehler beim Speichern der konsolidierten Daten in Firebase:', error);
+      throw error;
+    }
+  }
 }
 
 export default DatabaseService;

@@ -65,67 +65,101 @@ export function UtilizationReportView() {
     setUploadedFiles({});
   };
 
-  // Employee Dossier Modal öffnen
-  const openEmployeeDossier = (person: string) => {
-    // Hole Excel-Daten für diese Person
-    let excelData: {
-      name: string;
-      manager: string;
-      team: string;
-      competenceCenter: string;
-      lineOfBusiness: string;
-      careerLevel: string;
-    } | undefined = undefined;
-    
-    if (dataSource === 'database') {
-      const einsatzplanData = databaseData.einsatzplan?.find(item => item.person === person);
-      if (einsatzplanData) {
-        excelData = {
-          name: person,
-          manager: String(einsatzplanData.vg || ''),
-          team: String(einsatzplanData.team || ''),
-          competenceCenter: String(einsatzplanData.cc || ''),
-          lineOfBusiness: String(einsatzplanData.bereich || ''),
-          careerLevel: String(einsatzplanData.lbs || '')
-        };
+  // Load data from database function
+  const loadDatabaseData = async () => {
+    try {
+      console.log('Lade Datenbank-Daten...');
+      // Prüfe ob Datenbank-Daten vorhanden sind
+      const auslastung = await DatabaseService.getAuslastung();
+      const einsatzplan = await DatabaseService.getEinsatzplan();
+      const utilizationData = await DatabaseService.getUtilizationData();
+      
+      console.log('Geladene Daten:', {
+        auslastung: auslastung?.length || 0,
+        einsatzplan: einsatzplan?.length || 0,
+        utilizationData: utilizationData?.length || 0
+      });
+      
+      if (auslastung.length > 0 || einsatzplan.length > 0 || utilizationData.length > 0) {
+        setDatabaseData({
+          auslastung: auslastung.length > 0 ? auslastung : undefined,
+          einsatzplan: einsatzplan.length > 0 ? einsatzplan : undefined,
+          utilizationData: utilizationData.length > 0 ? utilizationData : undefined
+        });
+        setDataSource('database');
       }
-    } else {
-      const einsatzplanData = uploadedFiles.einsatzplan?.data?.find((item: any) => item.person === person);
-      if (einsatzplanData) {
-        excelData = {
-          name: person,
-          manager: String(einsatzplanData.vg || ''),
-          team: String(einsatzplanData.team || ''),
-          competenceCenter: String(einsatzplanData.cc || ''),
-          lineOfBusiness: String(einsatzplanData.bereich || ''),
-          careerLevel: String(einsatzplanData.lbs || '')
-        };
-      }
+    } catch (error) {
+      console.log('Keine Datenbank-Daten verfügbar, verwende Upload-Daten');
+      setDataSource('upload');
     }
-
-    const employee: Employee = {
-      id: person, // Verwende den Personennamen als ID
-      name: person,
-      careerLevel: excelData?.careerLevel || '',
-      manager: excelData?.manager || '',
-      team: excelData?.team || '',
-      competenceCenter: excelData?.competenceCenter || '',
-      lineOfBusiness: excelData?.lineOfBusiness || '',
-      email: '',
-      phone: '',
-      projectHistory: [],
-      strengths: '',
-      weaknesses: '',
-      comments: '',
-      travelReadiness: String(personTravelReadiness[person] || ''),
-      projectOffers: [],
-      jiraTickets: [],
-      excelData: excelData
-    };
-
-    setSelectedEmployee(employee);
-    setIsEmployeeDossierOpen(true);
   };
+
+  // Load data from database on mount
+  useEffect(() => {
+    loadDatabaseData();
+  }, []);
+
+  // Restore from localStorage on mount (fallback)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && (parsed.auslastung || parsed.einsatzplan)) {
+          setUploadedFiles(parsed);
+          setDataSource('upload');
+        }
+      }
+    } catch {}
+  }, []);
+
+  // Clean up old "student" status from database
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('utilization_person_status_v1');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        let hasChanges = false;
+        const cleaned = { ...parsed };
+        
+        // Entferne alle "student" Status
+        Object.keys(cleaned).forEach(person => {
+          if (cleaned[person] === 'student') {
+            delete cleaned[person];
+            hasChanges = true;
+          }
+        });
+        
+        // Speichere bereinigte Daten
+        if (hasChanges) {
+          localStorage.setItem('utilization_person_status_v1', JSON.stringify(cleaned));
+          setPersonStatus(cleaned);
+        }
+      }
+    } catch {}
+  }, []);
+
+  // Autosave to localStorage on change
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(uploadedFiles));
+    } catch {}
+  }, [uploadedFiles]);
+
+  // Save working students toggle state - wird nach der Definition von showWorkingStudents definiert
+
+  // Removed planned engagements and customers state; planning handled via modal & dossier
+  const [personStatus, setPersonStatus] = useState<Record<string, string | undefined>>(() => {
+    try { return JSON.parse(localStorage.getItem('utilization_person_status_v1') || '{}'); } catch { return {}; }
+  });
+  const [personTravelReadiness, setPersonTravelReadiness] = useState<Record<string, number | undefined>>(() => {
+    try { return JSON.parse(localStorage.getItem('utilization_person_travel_readiness_v1') || '{}'); } catch { return {}; }
+  });
+  // Removed persistence effects for planned engagements and customers
+  useEffect(() => { try { localStorage.setItem('utilization_person_status_v1', JSON.stringify(personStatus)); } catch {} }, [personStatus]);
+  useEffect(() => { try { localStorage.setItem('utilization_person_travel_readiness_v1', JSON.stringify(personTravelReadiness)); } catch {} }, [personTravelReadiness]);
+
+  // Fehlende Variablen hinzufügen
   const [filterCC, setFilterCC] = useState<string[]>([]);
   const [filterLBS, setFilterLBS] = useState<string[]>([]);
   const [filterStatus, setFilterStatus] = useState<string[]>([]);
@@ -136,6 +170,14 @@ export function UtilizationReportView() {
   const [showWorkingStudents, setShowWorkingStudents] = useState(() => {
     try { return JSON.parse(localStorage.getItem('utilization_show_working_students') || 'true'); } catch { return true; }
   });
+
+  // Save working students toggle state
+  useEffect(() => {
+    try {
+      localStorage.setItem('utilization_show_working_students', JSON.stringify(showWorkingStudents));
+    } catch {}
+  }, [showWorkingStudents]);
+
   // Sichtbare Spalten konfigurieren (persistiert)
   const VISIBLE_COLUMNS_KEY = 'utilization_visible_columns_v1';
   type VisibleColumns = {
@@ -205,97 +247,6 @@ export function UtilizationReportView() {
   const importJsonInputRef = useRef<HTMLInputElement>(null);
   const STORAGE_KEY = 'utilization_uploaded_files_v1';
   // Removed planned engagements & customers local storage keys
-
-  // Load data from database on mount
-  useEffect(() => {
-    const loadDatabaseData = async () => {
-      try {
-        // Prüfe ob Datenbank-Daten vorhanden sind
-        const auslastung = await DatabaseService.getAuslastung();
-        const einsatzplan = await DatabaseService.getEinsatzplan();
-        const utilizationData = await DatabaseService.getUtilizationData();
-        
-        if (auslastung.length > 0 || einsatzplan.length > 0 || utilizationData.length > 0) {
-          setDatabaseData({
-            auslastung: auslastung.length > 0 ? auslastung : undefined,
-            einsatzplan: einsatzplan.length > 0 ? einsatzplan : undefined,
-            utilizationData: utilizationData.length > 0 ? utilizationData : undefined
-          });
-          setDataSource('database');
-        }
-      } catch (error) {
-        console.log('Keine Datenbank-Daten verfügbar, verwende Upload-Daten');
-        setDataSource('upload');
-      }
-    };
-
-    loadDatabaseData();
-  }, []);
-
-  // Restore from localStorage on mount (fallback)
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && (parsed.auslastung || parsed.einsatzplan)) {
-          setUploadedFiles(parsed);
-          setDataSource('upload');
-        }
-      }
-    } catch {}
-  }, []);
-
-  // Clean up old "student" status from database
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem('utilization_person_status_v1');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        let hasChanges = false;
-        const cleaned = { ...parsed };
-        
-        // Entferne alle "student" Status
-        Object.keys(cleaned).forEach(person => {
-          if (cleaned[person] === 'student') {
-            delete cleaned[person];
-            hasChanges = true;
-          }
-        });
-        
-        // Speichere bereinigte Daten
-        if (hasChanges) {
-          localStorage.setItem('utilization_person_status_v1', JSON.stringify(cleaned));
-          setPersonStatus(cleaned);
-        }
-      }
-    } catch {}
-  }, []);
-
-  // Autosave to localStorage on change
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(uploadedFiles));
-    } catch {}
-  }, [uploadedFiles]);
-
-  // Save working students toggle state
-  useEffect(() => {
-    try {
-      localStorage.setItem('utilization_show_working_students', JSON.stringify(showWorkingStudents));
-    } catch {}
-  }, [showWorkingStudents]);
-
-  // Removed planned engagements and customers state; planning handled via modal & dossier
-  const [personStatus, setPersonStatus] = useState<Record<string, string | undefined>>(() => {
-    try { return JSON.parse(localStorage.getItem('utilization_person_status_v1') || '{}'); } catch { return {}; }
-  });
-  const [personTravelReadiness, setPersonTravelReadiness] = useState<Record<string, number | undefined>>(() => {
-    try { return JSON.parse(localStorage.getItem('utilization_person_travel_readiness_v1') || '{}'); } catch { return {}; }
-  });
-  // Removed persistence effects for planned engagements and customers
-  useEffect(() => { try { localStorage.setItem('utilization_person_status_v1', JSON.stringify(personStatus)); } catch {} }, [personStatus]);
-  useEffect(() => { try { localStorage.setItem('utilization_person_travel_readiness_v1', JSON.stringify(personTravelReadiness)); } catch {} }, [personTravelReadiness]);
 
   // Entferne automatische Basiswoche-Ausrichtung – Guardrail: keine Automatik
   // (vorherige useEffect-Anpassungen bleiben entfernt)
@@ -367,6 +318,100 @@ export function UtilizationReportView() {
   // Helper function to check if a week is in a planned project
   // Removed isWeekInPlannedProject (inline planning removed)
   const isWeekInPlannedProject = (_person: string, _weekNumber: number) => false;
+
+  // Employee Dossier Modal öffnen
+  const openEmployeeDossier = async (person: string) => {
+    // Hole Excel-Daten für diese Person
+    let excelData: {
+      name: string;
+      manager: string;
+      team: string;
+      competenceCenter: string;
+      lineOfBusiness: string;
+      careerLevel: string;
+    } | undefined = undefined;
+    
+    if (dataSource === 'database') {
+      const einsatzplanData = databaseData.einsatzplan?.find(item => item.person === person);
+      if (einsatzplanData) {
+        excelData = {
+          name: person,
+          manager: String(einsatzplanData.vg || ''),
+          team: String(einsatzplanData.team || ''),
+          competenceCenter: String(einsatzplanData.cc || ''),
+          lineOfBusiness: String(einsatzplanData.bereich || ''),
+          careerLevel: String(einsatzplanData.lbs || '')
+        };
+      }
+    } else {
+      const einsatzplanData = uploadedFiles.einsatzplan?.data?.find((item: any) => item.person === person);
+      if (einsatzplanData) {
+        excelData = {
+          name: person,
+          manager: String(einsatzplanData.vg || ''),
+          team: String(einsatzplanData.team || ''),
+          competenceCenter: String(einsatzplanData.cc || ''),
+          lineOfBusiness: String(einsatzplanData.bereich || ''),
+          careerLevel: String(einsatzplanData.lbs || '')
+        };
+      }
+    }
+
+    // Lade Dossier nur bei Bedarf (wenn noch nicht geladen)
+    if (!dossiersByPerson[person]) {
+      try {
+        const dossier = await DatabaseService.getEmployeeDossier(person);
+        setDossiersByPerson(prev => ({
+          ...prev,
+          [person]: {
+            projectOffers: dossier?.projectOffers || [],
+            jiraTickets: dossier?.jiraTickets || [],
+            utilizationComment: String(dossier?.utilizationComment || ''),
+            planningComment: String(dossier?.planningComment || '')
+          }
+        }));
+      } catch (error) {
+        // Bei 404-Fehlern leeres Dossier erstellen
+        if (error instanceof Error && error.message.includes('404')) {
+          console.log(`Employee Dossier für "${person}" existiert nicht - erstelle leeres Dossier`);
+        } else {
+          console.error(`Fehler beim Laden des Dossiers für "${person}":`, error);
+        }
+        setDossiersByPerson(prev => ({
+          ...prev,
+          [person]: {
+            projectOffers: [],
+            jiraTickets: [],
+            utilizationComment: '',
+            planningComment: ''
+          }
+        }));
+      }
+    }
+
+    const employee: Employee = {
+      id: person, // Verwende den Personennamen als ID
+      name: person,
+      careerLevel: excelData?.careerLevel || '',
+      manager: excelData?.manager || '',
+      team: excelData?.team || '',
+      competenceCenter: excelData?.competenceCenter || '',
+      lineOfBusiness: excelData?.lineOfBusiness || '',
+      email: '',
+      phone: '',
+      projectHistory: [],
+      strengths: '',
+      weaknesses: '',
+      comments: '',
+      travelReadiness: String(personTravelReadiness[person] || ''),
+      projectOffers: dossiersByPerson[person]?.projectOffers || [],
+      jiraTickets: dossiersByPerson[person]?.jiraTickets || [],
+      excelData: excelData
+    };
+
+    setSelectedEmployee(employee);
+    setIsEmployeeDossierOpen(true);
+  };
 
   // Mock data for demonstration
   const mockData: UtilizationData[] = useMemo(() => {
@@ -724,30 +769,8 @@ export function UtilizationReportView() {
     return Array.from(new Set(filteredData.map(item => item.person)));
   }, [filteredData]);
   
-  // Dossiers für sichtbare Personen lazy laden
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const toFetch = visiblePersons.filter(p => !dossiersByPerson[p]);
-      if (toFetch.length === 0) return;
-      const entries = await Promise.all(toFetch.map(async (p) => {
-        try {
-          const dossier = await DatabaseService.getEmployeeDossier(p);
-          return [p, { projectOffers: dossier?.projectOffers || [], jiraTickets: dossier?.jiraTickets || [], utilizationComment: String(dossier?.utilizationComment || ''), planningComment: String(dossier?.planningComment || '') }] as const;
-        } catch {
-          return [p, { projectOffers: [], jiraTickets: [], utilizationComment: '', planningComment: '' }] as const;
-        }
-      }));
-      if (!cancelled && entries.length > 0) {
-        setDossiersByPerson(prev => {
-          const next = { ...prev } as Record<string, { projectOffers?: any[]; jiraTickets?: any[]; utilizationComment?: string; planningComment?: string }>;
-          for (const [p, v] of entries) next[p] = v;
-          return next;
-        });
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [visiblePersons]);
+  // Dossiers werden nur bei Bedarf geladen (beim Öffnen des Modals)
+  // Kein automatisches Laden beim Start mehr
 
   // Helper: Dossier für Person aktualisieren (nach Modal-Speichern)
   const refreshPersonDossier = async (person: string | null) => {
@@ -849,6 +872,56 @@ export function UtilizationReportView() {
     // reset input value so same file can be chosen again later
     e.currentTarget.value = '';
   };
+
+  // Neue Funktion: Upload-Handler mit Firebase-Speicherung
+  const handleFilesChange = async (files: {
+    auslastung?: UploadedFile;
+    einsatzplan?: UploadedFile;
+  }) => {
+    console.log('Neue Dateien hochgeladen:', files);
+    
+    // Bestehende Upload-Logik
+    setUploadedFiles(files);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(files));
+    
+    // Prüfe ob beide Dateien vorhanden sind
+    if (files.auslastung?.isValid && files.einsatzplan?.isValid) {
+      try {
+        console.log('Beide Dateien sind gültig - starte Normalisierung und Firebase-Speicherung');
+        
+        // Warte bis consolidatedData berechnet wurde
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Hole die aktuellen normalisierten Daten
+        if (consolidatedData && consolidatedData.length > 0) {
+          console.log('Speichere normalisierte Daten in Firebase:', consolidatedData.length, 'Datensätze');
+          
+          // Speichere in Firebase
+          await DatabaseService.saveConsolidatedDataToFirebase(consolidatedData);
+          
+          console.log('Daten erfolgreich in Firebase gespeichert - lade App neu');
+          
+          // Lade App aus Firebase neu
+          await loadDatabaseData();
+          
+          // Setze dataSource auf 'database' um Firebase-Daten zu verwenden
+          setDataSource('database');
+          
+          console.log('App erfolgreich aus Firebase neu geladen');
+        } else {
+          console.warn('Keine konsolidierten Daten verfügbar für Firebase-Speicherung');
+        }
+      } catch (error) {
+        console.error('Fehler beim Speichern in Firebase:', error);
+        // Fallback: Verwende weiterhin Upload-Daten
+        setDataSource('upload');
+      }
+    } else {
+      console.log('Nicht beide Dateien sind gültig - verwende Upload-Daten');
+      setDataSource('upload');
+    }
+  };
+
   if (loading) {
     return <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">Lade...</div>;
   }
@@ -1061,7 +1134,7 @@ export function UtilizationReportView() {
         )}
 
         {/* Upload Section (extracted component) */}
-        <DataUploadSection uploadedFiles={uploadedFiles} onFilesChange={setUploadedFiles} />
+        <DataUploadSection uploadedFiles={uploadedFiles} onFilesChange={handleFilesChange} />
 
         {/* Auslastung Preview ausgeblendet (weiterhin über Upload einsehbar) */}
 
