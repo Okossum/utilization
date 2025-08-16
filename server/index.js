@@ -227,12 +227,15 @@ app.post('/api/auslastung', requireAuth, async (req, res) => {
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    // Bestehende Daten als "nicht mehr aktuell" markieren
-    const latestSnap = await db.collection('auslastung').where('isLatest', '==', true).get();
-    if (!latestSnap.empty) {
-      const batch = db.batch();
-      latestSnap.forEach(doc => batch.update(doc.ref, { isLatest: false }));
-      await batch.commit();
+    // Bestehende Latest-Daten nur für betroffene Personen auf false setzen (personenspezifisches Merge)
+    const affectedPersons = Array.from(new Set((data || []).map(r => String(r.person || '').trim()).filter(Boolean)));
+    for (const person of affectedPersons) {
+      const q = await db.collection('auslastung').where('isLatest', '==', true).where('person', '==', person).get();
+      if (!q.empty) {
+        const batch = db.batch();
+        q.forEach(doc => batch.update(doc.ref, { isLatest: false }));
+        await batch.commit();
+      }
     }
 
     // Neue Versionsnummer ermitteln
@@ -293,12 +296,15 @@ app.post('/api/einsatzplan', requireAuth, async (req, res) => {
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    // Bestehende Daten als "nicht mehr aktuell" markieren
-    const latestSnap = await db.collection('einsatzplan').where('isLatest', '==', true).get();
-    if (!latestSnap.empty) {
-      const batch = db.batch();
-      latestSnap.forEach(doc => batch.update(doc.ref, { isLatest: false }));
-      await batch.commit();
+    // Bestehende Latest-Daten nur für betroffene Personen auf false setzen (personenspezifisches Merge)
+    const affectedPersons = Array.from(new Set((data || []).map(r => String(r.person || '').trim()).filter(Boolean)));
+    for (const person of affectedPersons) {
+      const q = await db.collection('einsatzplan').where('isLatest', '==', true).where('person', '==', person).get();
+      if (!q.empty) {
+        const batch = db.batch();
+        q.forEach(doc => batch.update(doc.ref, { isLatest: false }));
+        await batch.commit();
+      }
     }
 
     // Neue Versionsnummer ermitteln

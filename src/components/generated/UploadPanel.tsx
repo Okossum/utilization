@@ -147,6 +147,11 @@ export function UploadPanel({
             // Fehler nicht an den User weitergeben, da der Upload selbst erfolgreich war
           }
         }
+
+        // Nach jedem erfolgreichen Upload automatisch auf DB-Quelle umschalten (global konsolidierte Sicht)
+        try {
+          window.dispatchEvent(new CustomEvent('switch-to-database-source'));
+        } catch {}
       }
     } catch (e: any) {
       onFilesChange({

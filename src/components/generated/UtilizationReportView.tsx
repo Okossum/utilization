@@ -54,6 +54,16 @@ export function UtilizationReportView() {
   const [utilizationCommentForPerson, setUtilizationCommentForPerson] = useState<string | null>(null);
   const [planningCommentForPerson, setPlanningCommentForPerson] = useState<string | null>(null);
 
+  // Zeit-/Speicher- und Modal-States (fehlten zuvor)
+  const STORAGE_KEY = 'utilization_uploaded_files_v1';
+  const importJsonInputRef = useRef<HTMLInputElement>(null);
+  const currentIsoYear = getISOWeekYear(new Date());
+  const [forecastStartWeek, setForecastStartWeek] = useState<number>(getISOWeek(new Date()));
+  const [lookbackWeeks, setLookbackWeeks] = useState<number>(8);
+  const [forecastWeeks, setForecastWeeks] = useState<number>(8);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [isEmployeeDossierOpen, setIsEmployeeDossierOpen] = useState<boolean>(false);
+
   // Function to switch data source
   const switchToUpload = () => {
     setDataSource('upload');
@@ -193,17 +203,17 @@ export function UtilizationReportView() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
-  
-  // Employee Dossier Modal
-  const [isEmployeeDossierOpen, setIsEmployeeDossierOpen] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
-  const currentWeek = getISOWeek(new Date());
-  const currentIsoYear = getISOWeekYear(new Date());
-  const [forecastStartWeek, setForecastStartWeek] = useState(currentWeek);
-  const [lookbackWeeks, setLookbackWeeks] = useState(8);
-  const [forecastWeeks, setForecastWeeks] = useState(8);
-  const importJsonInputRef = useRef<HTMLInputElement>(null);
-  const STORAGE_KEY = 'utilization_uploaded_files_v1';
+  const userInitials = useMemo(() => {
+    const src = (profile?.displayName as string) || (user?.email as string) || '';
+    if (!src) return 'U';
+    const letters = src.includes('@')
+      ? src.split('@')[0].split(/[._\-\s]+/).filter(Boolean)
+      : src.split(/\s+/).filter(Boolean);
+    const first = letters[0]?.[0] || '';
+    const last = letters.length > 1 ? letters[letters.length - 1]?.[0] : (letters[0]?.[1] || '');
+    const initials = `${first}${last}`.toUpperCase();
+    return initials || 'U';
+  }, [profile?.displayName, user?.email]);
   // Removed planned engagements & customers local storage keys
 
   // Load data from database on mount
@@ -230,6 +240,25 @@ export function UtilizationReportView() {
     };
 
     loadDatabaseData();
+  }, []);
+
+  // Reagiere auf Upload-Erfolg: auf Datenbank-Quelle umschalten und neu laden
+  useEffect(() => {
+    const handler = async () => {
+      try {
+        setDataSource('database');
+        const auslastung = await DatabaseService.getAuslastung();
+        const einsatzplan = await DatabaseService.getEinsatzplan();
+        const utilizationData = await DatabaseService.getUtilizationData();
+        setDatabaseData({
+          auslastung: auslastung.length > 0 ? auslastung : undefined,
+          einsatzplan: einsatzplan.length > 0 ? einsatzplan : undefined,
+          utilizationData: utilizationData.length > 0 ? utilizationData : undefined
+        });
+      } catch {}
+    };
+    window.addEventListener('switch-to-database-source', handler as any);
+    return () => window.removeEventListener('switch-to-database-source', handler as any);
   }, []);
 
   // Restore from localStorage on mount (fallback)
@@ -1015,14 +1044,16 @@ export function UtilizationReportView() {
               </div>
             )}
 
-            {/* Avatar Icon ganz rechts */}
+            {/* Avatar (farbige Initialen) ganz rechts */}
             <button
               type="button"
               onClick={() => window.dispatchEvent(new CustomEvent('open-account-modal'))}
-              className="ml-2 inline-flex items-center justify-center w-9 h-9 bg-white border border-gray-300 rounded-full shadow-sm hover:bg-gray-50"
+              className="ml-2 p-0 rounded-full"
               title="Account"
             >
-              <UserIcon className="w-4 h-4 text-gray-700" />
+              <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-xs font-semibold">
+                {userInitials}
+              </span>
             </button>
           </div>
         </div>
