@@ -9,8 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "format": "prettier --write .",
-    "server": "node server/index.js",
-    "server:dev": "nodemon server/index.js",
+    "server": "GOOGLE_APPLICATION_CREDENTIALS=\"/Users/oliver.koss/Projekte/Ressource Utilization/ressourceutilization-firebase-adminsdk-fbsvc-e8129f7d59.json\" node server/index.js",
+    "server:dev": "GOOGLE_APPLICATION_CREDENTIALS=\"/Users/oliver.koss/Projekte/Ressource Utilization/ressourceutilization-firebase-adminsdk-fbsvc-e8129f7d59.json\" nodemon server/index.js",
     "format:check": "prettier --check ."
   },
   "dependencies": {

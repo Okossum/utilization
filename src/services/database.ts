@@ -50,6 +50,13 @@ class ApiService {
       method: 'GET',
     });
   }
+
+  static async put(endpoint: string, data?: any) {
+    return this.request(endpoint, {
+      method: 'PUT',
+      body: data ? JSON.stringify(data) : undefined,
+    });
+  }
 }
 
 // Datenbank-Service für lokale SQLite-Datenbank
@@ -60,6 +67,15 @@ export class DatabaseService {
       return await ApiService.get('/me');
     } catch (error) {
       console.error('Fehler beim Abrufen des User-Profils:', error);
+      throw error;
+    }
+  }
+
+  static async updateMe(data: any) {
+    try {
+      return await ApiService.put('/me', data);
+    } catch (error) {
+      console.error('Fehler beim Aktualisieren des User-Profils:', error);
       throw error;
     }
   }

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { X, Target, Ticket, Plus } from 'lucide-react';
+import { X, Target, Ticket, Plus, Info } from 'lucide-react';
 import DatabaseService from '../../services/database';
 
 type OfferedSkill = { skillId: string; name: string; level: number };
@@ -21,8 +21,8 @@ export function PlanningModal({ isOpen, onClose, personId, filterByWeek, initial
   const [showForms, setShowForms] = useState(false);
 
   // Forms
-  const [offerForm, setOfferForm] = useState({ title: '', contactPerson: '', startDate: '', endDate: '', offeredSkillId: '' });
-  const [jiraForm, setJiraForm] = useState({ title: '', ticketId: '', link: '', contactPerson: '', startDate: '', endDate: '', offeredSkillId: '' });
+  const [offerForm, setOfferForm] = useState({ title: '', contactPerson: '', startDate: '', endDate: '', offeredSkillId: '', probability: 25 });
+  const [jiraForm, setJiraForm] = useState({ title: '', ticketId: '', link: '', contactPerson: '', startDate: '', endDate: '', offeredSkillId: '', probability: 25 });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -88,9 +88,10 @@ export function PlanningModal({ isOpen, onClose, personId, filterByWeek, initial
         startDate: offerForm.startDate,
         endDate: offerForm.endDate,
         offeredSkill: skill ? { ...skill } : undefined,
+        probability: offerForm.probability,
       },
     ]);
-    setOfferForm({ title: '', contactPerson: '', startDate: '', endDate: '', offeredSkillId: '' });
+    setOfferForm({ title: '', contactPerson: '', startDate: '', endDate: '', offeredSkillId: '', probability: 25 });
   };
 
   const addJira = () => {
@@ -107,10 +108,10 @@ export function PlanningModal({ isOpen, onClose, personId, filterByWeek, initial
         startDate: jiraForm.startDate,
         endDate: jiraForm.endDate,
         offeredSkill: skill ? { ...skill } : undefined,
-        probability: 0,
+        probability: jiraForm.probability,
       },
     ]);
-    setJiraForm({ title: '', ticketId: '', link: '', contactPerson: '', startDate: '', endDate: '', offeredSkillId: '' });
+    setJiraForm({ title: '', ticketId: '', link: '', contactPerson: '', startDate: '', endDate: '', offeredSkillId: '', probability: 25 });
   };
 
   const removeOffer = (id: string) => setProjectOffers(prev => prev.filter(o => o.id !== id));
@@ -205,6 +206,34 @@ export function PlanningModal({ isOpen, onClose, personId, filterByWeek, initial
                             <input type="date" className="px-2 py-1 border border-gray-200 rounded" value={offerForm.startDate} onChange={e=>setOfferForm(v=>({...v,startDate:e.target.value}))}/>
                             <input type="date" className="px-2 py-1 border border-gray-200 rounded" value={offerForm.endDate} onChange={e=>setOfferForm(v=>({...v,endDate:e.target.value}))}/>
                           </div>
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Wahrscheinlichkeit</label>
+                              <div className="relative group ml-2">
+                                <Info className="w-3.5 h-3.5 text-gray-400" />
+                                <div className="absolute right-0 top-5 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                                  <div className="font-semibold mb-1 text-blue-200">Erklärung</div>
+                                  <ul className="space-y-1 text-gray-200">
+                                    <li>25% = Profil abgegeben</li>
+                                    <li>50% = Angeboten</li>
+                                    <li>75% = Positives Feedback</li>
+                                    <li>100% = Beauftragt</li>
+                                  </ul>
+                                  <div className="absolute -top-2 right-4 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-gray-900"></div>
+                                </div>
+                              </div>
+                            </div>
+                            <select
+                              className="w-full px-2 py-1 border border-gray-200 rounded"
+                              value={offerForm.probability}
+                              onChange={e=>setOfferForm(v=>({...v, probability: Number(e.target.value)}))}
+                            >
+                              <option value={25}>25%</option>
+                              <option value={50}>50%</option>
+                              <option value={75}>75%</option>
+                              <option value={100}>100%</option>
+                            </select>
+                          </div>
                           <select className="w-full px-2 py-1 border border-gray-200 rounded" value={offerForm.offeredSkillId} onChange={e=>setOfferForm(v=>({...v,offeredSkillId:e.target.value}))}>
                             <option value="">— angebotener Skill —</option>
                             {skills.map(s=> (
@@ -226,6 +255,34 @@ export function PlanningModal({ isOpen, onClose, personId, filterByWeek, initial
                           <div className="grid grid-cols-2 gap-2">
                             <input type="date" className="px-2 py-1 border border-gray-200 rounded" value={jiraForm.startDate} onChange={e=>setJiraForm(v=>({...v,startDate:e.target.value}))}/>
                             <input type="date" className="px-2 py-1 border border-gray-200 rounded" value={jiraForm.endDate} onChange={e=>setJiraForm(v=>({...v,endDate:e.target.value}))}/>
+                          </div>
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Wahrscheinlichkeit</label>
+                              <div className="relative group ml-2">
+                                <Info className="w-3.5 h-3.5 text-gray-400" />
+                                <div className="absolute right-0 top-5 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                                  <div className="font-semibold mb-1 text-blue-200">Erklärung</div>
+                                  <ul className="space-y-1 text-gray-200">
+                                    <li>25% = Profil abgegeben</li>
+                                    <li>50% = Angeboten</li>
+                                    <li>75% = Positives Feedback</li>
+                                    <li>100% = Beauftragt</li>
+                                  </ul>
+                                  <div className="absolute -top-2 right-4 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-gray-900"></div>
+                                </div>
+                              </div>
+                            </div>
+                            <select
+                              className="w-full px-2 py-1 border border-gray-200 rounded"
+                              value={jiraForm.probability}
+                              onChange={e=>setJiraForm(v=>({...v, probability: Number(e.target.value)}))}
+                            >
+                              <option value={25}>25%</option>
+                              <option value={50}>50%</option>
+                              <option value={75}>75%</option>
+                              <option value={100}>100%</option>
+                            </select>
                           </div>
                           <select className="w-full px-2 py-1 border border-gray-200 rounded" value={jiraForm.offeredSkillId} onChange={e=>setJiraForm(v=>({...v,offeredSkillId:e.target.value}))}>
                             <option value="">— angebotener Skill —</option>

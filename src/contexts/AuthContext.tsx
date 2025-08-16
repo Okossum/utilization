@@ -14,6 +14,8 @@ interface AuthContextValue {
   profile: UserProfile | null;
   loginWithEmailPassword: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
+  updateProfile: (data: Partial<UserProfile & { canViewAll: boolean }>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -25,6 +27,8 @@ export interface UserProfile {
   displayName?: string;
   role?: UserRole | string;
   canViewAll?: boolean;
+  lob?: string | null;
+  bereich?: string | null;
   businessUnit?: string | null;
   competenceCenter?: string | null;
   team?: string | null;
@@ -86,6 +90,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
   }, []);
+  const refreshProfile = useCallback(async () => {
+    try {
+      const me = await DatabaseService.getMe();
+      setProfile(me || null);
+    } catch {
+      setProfile(null);
+    }
+  }, []);
+
+  const updateProfile = useCallback(async (data: Partial<UserProfile & { canViewAll: boolean }>) => {
+    await DatabaseService.updateMe(data);
+    await refreshProfile();
+  }, [refreshProfile]);
 
   const loginWithEmailPassword = useCallback(async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
@@ -103,6 +120,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     profile,
     loginWithEmailPassword,
     logout,
+    refreshProfile,
+    updateProfile,
   };
 
   return (

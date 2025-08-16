@@ -2,14 +2,24 @@ import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import admin from 'firebase-admin';
+import fs from 'fs';
+import path from 'path';
 
 const app = express();
 
 // Initialize Firebase Admin (Application Default Credentials)
 if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.applicationDefault(),
-  });
+  // Prefer explicit service account file to avoid ADC issues
+  const defaultPath = path.resolve(process.cwd(), 'ressourceutilization-firebase-adminsdk-fbsvc-e8129f7d59.json');
+  const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS && fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)
+    ? process.env.GOOGLE_APPLICATION_CREDENTIALS
+    : (fs.existsSync(defaultPath) ? defaultPath : '');
+  if (credPath) {
+    const svc = JSON.parse(fs.readFileSync(credPath, 'utf8'));
+    admin.initializeApp({ credential: admin.credential.cert(svc) });
+  } else {
+    admin.initializeApp({ credential: admin.credential.applicationDefault() });
+  }
 }
 const db = admin.firestore();
 const FieldValue = admin.firestore.FieldValue;
@@ -19,6 +29,26 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
+
+// Helpers for field mapping from Excel rows
+function pickField(row, candidates) {
+  for (const key of candidates) {
+    if (row && Object.prototype.hasOwnProperty.call(row, key)) {
+      const v = row[key];
+      if (typeof v === 'string' && v.trim()) return String(v);
+    }
+  }
+  return undefined;
+}
+function parseBuAndBereich(raw) {
+  if (!raw || !String(raw).trim()) return { bu: undefined, bereich: undefined };
+  const s = String(raw).trim();
+  const m = s.match(/^\s*(.+?)\s*\(([^)]+)\)\s*$/);
+  if (m) {
+    return { bu: m[1].trim(), bereich: m[2].trim() };
+  }
+  return { bu: s, bereich: undefined };
+}
 
 // Optional Auth middleware: validates Firebase ID token if provided
 async function authMiddleware(req, _res, next) {
@@ -60,6 +90,8 @@ app.get('/api/me', async (req, res) => {
         displayName: authUser?.displayName || '',
         role: req.user?.role || 'unknown',
         canViewAll: false,
+        lob: null,
+        bereich: null,
         businessUnit: null,
         competenceCenter: null,
         team: null,
@@ -73,6 +105,36 @@ app.get('/api/me', async (req, res) => {
     return res.json({ id: snap.id, ...snap.data() });
   } catch (error) {
     console.error('Fehler bei /api/me:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+// Update current user profile
+app.put('/api/me', async (req, res) => {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) {
+      return res.status(401).json({ error: 'Nicht authentifiziert' });
+    }
+    const { canViewAll, lob, bereich, businessUnit, competenceCenter, team, role } = req.body || {};
+    const users = db.collection('users');
+    const docRef = users.doc(uid);
+    const toUpdate = {
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    if (typeof canViewAll === 'boolean') toUpdate.canViewAll = canViewAll;
+    if (typeof lob !== 'undefined') toUpdate.lob = lob || null;
+    if (typeof bereich !== 'undefined') toUpdate.bereich = bereich || null;
+    if (typeof businessUnit !== 'undefined') toUpdate.businessUnit = businessUnit || null;
+    if (typeof competenceCenter !== 'undefined') toUpdate.competenceCenter = competenceCenter || null;
+    if (typeof team !== 'undefined') toUpdate.team = team || null;
+    // Only allow role change if the token has an admin claim (future extension)
+    if (typeof role !== 'undefined' && req.user?.admin === true) toUpdate.role = role;
+    await docRef.set(toUpdate, { merge: true });
+    const snap = await docRef.get();
+    return res.json({ id: snap.id, ...snap.data() });
+  } catch (error) {
+    console.error('Fehler bei PUT /api/me:', error);
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -207,6 +269,12 @@ app.post('/api/einsatzplan', async (req, res) => {
           values[key] = value;
         }
       }
+      // Map structural fields robustly
+      const lob = pickField(row, ['lob','LoB','LOB']);
+      const cc = pickField(row, ['cc','CC']);
+      const team = pickField(row, ['team','Team']);
+      const bereich = pickField(row, ['bereich','Bereich']) ?? null;
+
       const docRef = await db.collection('einsatzplan').add({
         fileName,
         uploadDate: FieldValue.serverTimestamp(),
@@ -214,9 +282,10 @@ app.post('/api/einsatzplan', async (req, res) => {
         person: row.person,
         lbs: row.lbs ?? null,
         vg: row.vg ?? null,
-        cc: row.cc ?? null,
-        team: row.team ?? null,
-        bu: row.bu ?? null,
+        cc: cc ?? null,
+        team: team ?? null,
+        lob: lob ?? null,
+        bereich,
         values,
         isLatest: true,
         createdAt: FieldValue.serverTimestamp(),

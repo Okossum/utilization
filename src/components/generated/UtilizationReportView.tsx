@@ -16,6 +16,7 @@ import { EmployeeDossierModal, Employee } from './EmployeeDossierModal';
 import { PlanningModal } from './PlanningModal';
 import { PlanningCommentModal } from './PlanningCommentModal';
 import { UtilizationComment } from './UtilizationComment';
+import ScopeFilterDropdown from './ScopeFilterDropdown';
 interface UtilizationData {
   person: string;
   week: string;
@@ -29,7 +30,7 @@ interface UploadedFile {
   error?: string;
 }
 export function UtilizationReportView() {
-  const { user, loading, profile } = useAuth();
+  const { user, loading, profile, updateProfile } = useAuth();
   const [showAllData, setShowAllData] = useState<boolean>(() => {
     try { return JSON.parse(localStorage.getItem('utilization_show_all_data') || 'false'); } catch { return false; }
   });
@@ -45,7 +46,7 @@ export function UtilizationReportView() {
     einsatzplan?: any[];
     utilizationData?: any[];
   }>({});
-  const [dataSource, setDataSource] = useState<'upload' | 'database'>('database');
+  const [dataSource, setDataSource] = useState<'upload' | 'database'>('upload');
   const [selectedPersons, setSelectedPersons] = useState<string[]>([]);
   const [planningForPerson, setPlanningForPerson] = useState<string | null>(null);
   const [planningForWeek, setPlanningForWeek] = useState<{ year: number; week: number } | null>(null);
@@ -84,7 +85,7 @@ export function UtilizationReportView() {
           manager: String(einsatzplanData.vg || ''),
           team: String(einsatzplanData.team || ''),
           competenceCenter: String(einsatzplanData.cc || ''),
-          lineOfBusiness: String(einsatzplanData.bu || ''),
+          lineOfBusiness: String(einsatzplanData.bereich || ''),
           careerLevel: String(einsatzplanData.lbs || '')
         };
       }
@@ -96,7 +97,7 @@ export function UtilizationReportView() {
           manager: String(einsatzplanData.vg || ''),
           team: String(einsatzplanData.team || ''),
           competenceCenter: String(einsatzplanData.cc || ''),
-          lineOfBusiness: String(einsatzplanData.bu || ''),
+          lineOfBusiness: String(einsatzplanData.bereich || ''),
           careerLevel: String(einsatzplanData.lbs || '')
         };
       }
@@ -224,6 +225,7 @@ export function UtilizationReportView() {
         }
       } catch (error) {
         console.log('Keine Datenbank-Daten verfügbar, verwende Upload-Daten');
+        setDataSource('upload');
       }
     };
 
@@ -514,7 +516,7 @@ export function UtilizationReportView() {
 
   // Build person → meta mapping from uploaded data or database (prefer Auslastung, fallback Einsatzplan)
   const personMeta = useMemo(() => {
-    const meta = new Map<string, { cc?: string; lbs?: string; team?: string; bu?: string }>();
+    const meta = new Map<string, { lob?: string; bereich?: string; cc?: string; team?: string; lbs?: string }>();
     
     let aus: any[] | undefined;
     let ein: any[] | undefined;
@@ -527,15 +529,37 @@ export function UtilizationReportView() {
       ein = uploadedFiles.einsatzplan?.data as any[] | undefined;
     }
 
+    const getField = (row: any, candidates: string[]): string | undefined => {
+      for (const key of candidates) {
+        const v = row?.[key];
+        if (typeof v === 'string' && v.trim()) return String(v);
+      }
+      return undefined;
+    };
+    const parseBereich = (raw?: string): { bereich?: string } => {
+      if (!raw || !raw.trim()) return {};
+      // Muster: "BU AT II (BAYERN)" → extrahiere nur den Bereichsteil in Klammern; sonst kompletter String
+      const match = raw.match(/^\s*.+?\s*\(([^)]+)\)\s*$/);
+      if (match) return { bereich: match[1].trim() };
+      return { bereich: raw.trim() };
+    };
     const fill = (rows?: any[]) => {
       rows?.forEach(r => {
         if (!r?.person) return;
+        const current = meta.get(r.person) || {} as any;
+        const lob = getField(r, ['LoB','lob','LOB','lineOfBusiness','LineOfBusiness','Line of Business']);
+        const bereichRaw = getField(r, ['Bereich','bereich']);
+        const bereichValue = parseBereich(bereichRaw || '').bereich || bereichRaw;
+        const cc = getField(r, ['CC','cc','competenceCenter','CompetenceCenter','Competence Center','CC ']);
+        const team = getField(r, ['Team','team','T ']);
+        const lbs = getField(r, ['lbs','LBS']);
         meta.set(r.person, {
-          cc: r.cc ?? meta.get(r.person)?.cc,
-          lbs: r.lbs ?? meta.get(r.person)?.lbs,
-          team: r.team ?? meta.get(r.person)?.team,
-          bu: r.bu ?? meta.get(r.person)?.bu
+          lob: lob ?? current.lob,
+          cc: cc ?? current.cc,
+          lbs: lbs ?? current.lbs,
+          team: team ?? current.team,
         });
+        if (bereichValue) (meta.get(r.person) as any).bereich = bereichValue;
       });
     };
     fill(aus);
@@ -549,6 +573,21 @@ export function UtilizationReportView() {
   const ccOptions = useMemo(() => {
     const s = new Set<string>();
     personMeta.forEach(m => { if (m.cc) s.add(String(m.cc)); });
+    return Array.from(s).sort((a, b) => a.localeCompare(b, 'de'));
+  }, [personMeta]);
+  const lobOptions = useMemo(() => {
+    const s = new Set<string>();
+    personMeta.forEach(m => { if (m.lob) s.add(String(m.lob)); });
+    return Array.from(s).sort((a, b) => a.localeCompare(b, 'de'));
+  }, [personMeta]);
+  const bereichOptions = useMemo(() => {
+    const s = new Set<string>();
+    personMeta.forEach(m => { const b = (m as any).bereich; if (b && String(b).trim()) s.add(String(b)); });
+    return Array.from(s).sort((a, b) => a.localeCompare(b, 'de'));
+  }, [personMeta]);
+  const teamOptions = useMemo(() => {
+    const s = new Set<string>();
+    personMeta.forEach(m => { if (m.team) s.add(String(m.team)); });
     return Array.from(s).sort((a, b) => a.localeCompare(b, 'de'));
   }, [personMeta]);
   const lbsOptions = useMemo(() => {
@@ -571,6 +610,30 @@ export function UtilizationReportView() {
     // Verwende nur die deutschen Labels, nicht die IDs
     return STATUS_OPTIONS.map(status => status.label).sort((a, b) => a.localeCompare(b, 'de'));
   }, []);
+
+  // Auswahlzustände (persistiert)
+  const [selectedLoB, setSelectedLoB] = useState<string>('');
+  const [selectedBereich, setSelectedBereich] = useState<string>('');
+  const [selectedCC, setSelectedCC] = useState<string>('');
+  const [selectedTeam, setSelectedTeam] = useState<string>('');
+  // Initialwerte aus Profil laden
+  useEffect(() => {
+    if (!profile) return;
+    setSelectedLoB(String(profile.lob || ''));
+    setSelectedBereich(String((profile as any).bereich || profile.businessUnit || ''));
+    setSelectedCC(String(profile.competenceCenter || ''));
+    setSelectedTeam(String(profile.team || ''));
+  }, [profile?.lob, (profile as any)?.bereich, profile?.businessUnit, profile?.competenceCenter, profile?.team]);
+  // Defaults: wenn nur eine Option vorhanden und nichts gewählt, automatisch setzen
+  useEffect(() => { if (!selectedLoB && lobOptions.length === 1) setSelectedLoB(lobOptions[0]); }, [lobOptions]);
+  useEffect(() => { if (!selectedBereich && bereichOptions.length === 1) setSelectedBereich(bereichOptions[0]); }, [bereichOptions]);
+  useEffect(() => { if (!selectedCC && ccOptions.length === 1) setSelectedCC(ccOptions[0]); }, [ccOptions]);
+  useEffect(() => { if (!selectedTeam && teamOptions.length === 1) setSelectedTeam(teamOptions[0]); }, [teamOptions]);
+  // Korrigiere Auswahl, falls nicht mehr vorhanden
+  useEffect(() => { if (selectedLoB && !lobOptions.includes(selectedLoB)) setSelectedLoB(''); }, [lobOptions]);
+  useEffect(() => { if (selectedBereich && !bereichOptions.includes(selectedBereich)) setSelectedBereich(''); }, [bereichOptions]);
+  useEffect(() => { if (selectedCC && !ccOptions.includes(selectedCC)) setSelectedCC(''); }, [ccOptions]);
+  useEffect(() => { if (selectedTeam && !teamOptions.includes(selectedTeam)) setSelectedTeam(''); }, [teamOptions]);
 
   const filteredData = useMemo(() => {
     let base = dataForUI;
@@ -625,21 +688,38 @@ export function UtilizationReportView() {
       base = base.filter(item => selectedPersons.includes(item.person));
     }
 
+    // Filter nach LoB/Bereich/CC/Team aus Header-Auswahl
+    // Header-Auswahl-Filter nur anwenden, wenn nicht "Alle Daten" aktiv ist
+    if (!showAllData) {
+      if (selectedLoB) {
+        base = base.filter(d => (personMeta.get(d.person) as any)?.lob === selectedLoB);
+      }
+      if (selectedBereich) {
+        base = base.filter(d => (personMeta.get(d.person) as any)?.bereich === selectedBereich);
+      }
+      if (selectedCC) {
+        base = base.filter(d => (personMeta.get(d.person) as any)?.cc === selectedCC);
+      }
+      if (selectedTeam) {
+        base = base.filter(d => (personMeta.get(d.person) as any)?.team === selectedTeam);
+      }
+    }
+
     // Scope-Filter: wenn nicht "Alle Daten" und Profil vorhanden, nach BU/CC/Team filtern (Team > CC > BU)
     if (!showAllData && profile) {
       const scopeTeam = profile.team || '';
       const scopeCc = profile.competenceCenter || '';
-      const scopeBu = profile.businessUnit || '';
+      const scopeBereich = (profile as any).bereich || '';
       base = base.filter(d => {
         const meta = personMeta.get(d.person) || {} as any;
         if (scopeTeam) return String(meta.team || '') === String(scopeTeam);
         if (scopeCc) return String(meta.cc || '') === String(scopeCc);
-        if (scopeBu) return String(meta.bu || '') === String(scopeBu);
+        if (scopeBereich) return String(meta.bereich || '') === String(scopeBereich);
         return true;
       });
     }
     return base;
-  }, [dataForUI, selectedPersons, filterCC, filterLBS, filterStatus, personMeta, personStatus, showWorkingStudents, showActionItems, actionItems, personSearchTerm, showAllData, profile]);
+  }, [dataForUI, selectedPersons, filterCC, filterLBS, filterStatus, personMeta, personStatus, showWorkingStudents, showActionItems, actionItems, personSearchTerm, showAllData, profile, selectedLoB, selectedBereich, selectedCC, selectedTeam]);
   const visiblePersons = useMemo(() => {
     return Array.from(new Set(filteredData.map(item => item.person)));
   }, [filteredData]);
@@ -812,17 +892,41 @@ export function UtilizationReportView() {
             </p>
           </div>
           <div className="flex items-center gap-2 relative">
-            {/* Scope Toggle */}
-            <label className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              <input
-                type="checkbox"
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                checked={showAllData}
-                onChange={(e) => setShowAllData(e.target.checked)}
-                disabled={!profile}
-              />
-              <span>{showAllData ? 'Alle Daten' : 'Mein Bereich'}</span>
-            </label>
+            {/* LoB als feststehender Chip, wenn nur eine vorhanden ist */}
+            {lobOptions.length === 1 && (
+              <span className="px-4 py-2 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg uppercase tracking-wide">
+                {lobOptions[0]}
+              </span>
+            )}
+
+            {/* Vereinheitlichte Auswahl als ein Dropdown */}
+            <ScopeFilterDropdown
+              lobOptions={lobOptions}
+              bereichOptions={bereichOptions}
+              ccOptions={ccOptions}
+              teamOptions={teamOptions}
+              selectedLoB={selectedLoB}
+              setSelectedLoB={setSelectedLoB}
+              selectedBereich={selectedBereich}
+              setSelectedBereich={setSelectedBereich}
+              selectedCC={selectedCC}
+              setSelectedCC={setSelectedCC}
+              selectedTeam={selectedTeam}
+              setSelectedTeam={setSelectedTeam}
+              showAllData={showAllData}
+              setShowAllData={setShowAllData}
+              onPersist={async (next) => {
+                try {
+                  await DatabaseService.updateMe({
+                    lob: next.lob ?? undefined,
+                    bereich: next.bereich ?? undefined,
+                    competenceCenter: next.competenceCenter ?? undefined,
+                    team: next.team ?? undefined,
+                    canViewAll: Boolean(next.showAll),
+                  });
+                } catch {}
+              }}
+            />
 
             <button onClick={handleExportCSV} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
               <Download className="w-4 h-4" />
@@ -1636,5 +1740,7 @@ export function UtilizationReportView() {
         onClose={async () => { await refreshPersonDossier(planningCommentForPerson); setPlanningCommentForPerson(null); }}
         personId={planningCommentForPerson || ''}
       />
+
+      {/* Scope Settings Modal entfernt: Es gibt nur noch EIN Dropdown für alle Filter */}
     </div>;
 }

@@ -413,7 +413,8 @@ export function UploadPanel({
 
     const headerRow = data[headerIdx] as any[];
     const lowered = headerRow.map(c => String(c || '').trim().toLowerCase());
-    const colBusinessUnit = lowered.indexOf('business unit');
+    const colLoB = lowered.indexOf('lob');
+    const colBereich = lowered.indexOf('bereich');
     const colCC = lowered.indexOf('compentence center (cc)') !== -1 ? lowered.indexOf('compentence center (cc)') : (lowered.indexOf('competence center') !== -1 ? lowered.indexOf('competence center') : lowered.indexOf('cc'));
     const colTeam = lowered.indexOf('team');
     const colLBS = lowered.indexOf('lbs');
@@ -468,7 +469,17 @@ export function UploadPanel({
         const kv = Math.max(0, Math.min(100, Math.round((100 - parsedNkv) * 10) / 10));
         values[w.key] = kv;
       }
-      rowsOut.push({ person: personKey, personDisplay, cc: colCC !== -1 ? row[colCC] : undefined, team: colTeam !== -1 ? row[colTeam] : undefined, bu: colBusinessUnit !== -1 ? row[colBusinessUnit] : undefined, lbs: colLBS !== -1 ? row[colLBS] : undefined, vg: colVG !== -1 ? row[colVG] : undefined, values });
+      rowsOut.push({
+        person: personKey,
+        personDisplay,
+        lob: colLoB !== -1 ? row[colLoB] : undefined,
+        bereich: colBereich !== -1 ? row[colBereich] : undefined,
+        cc: colCC !== -1 ? row[colCC] : undefined,
+        team: colTeam !== -1 ? row[colTeam] : undefined,
+        lbs: colLBS !== -1 ? row[colLBS] : undefined,
+        vg: colVG !== -1 ? row[colVG] : undefined,
+        values
+      });
     }
 
     const previewHeader = ['Name', 'LBS', 'VG', ...weeks.map(k => k.key)];
