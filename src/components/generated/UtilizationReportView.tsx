@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { getISOWeek, getISOWeekYear } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, ChefHat, Database, Target, User, Ticket } from 'lucide-react';
+import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, ChefHat, Database, Target, User, Ticket, Columns } from 'lucide-react';
 import { DataUploadSection } from './DataUploadSection';
 import { MultiSelectFilter } from './MultiSelectFilter';
 import { PersonFilterBar } from './PersonFilterBar';
@@ -9,7 +9,7 @@ import DatabaseService from '../../services/database';
 import { KpiCardsGrid } from './KpiCardsGrid';
 import { UtilizationChartSection } from './UtilizationChartSection';
 import { UtilizationTrendChart } from './UtilizationTrendChart';
-import { PlannedEngagementEditor, PlannedEngagement } from './PlannedEngagementEditor';
+// Removed inline planning editor; Planning via modal remains
 import { StatusLabelSelector } from './StatusLabelSelector';
 import { EmployeeDossierModal, Employee } from './EmployeeDossierModal';
 import { PlanningModal } from './PlanningModal';
@@ -123,6 +123,61 @@ export function UtilizationReportView() {
   const [showWorkingStudents, setShowWorkingStudents] = useState(() => {
     try { return JSON.parse(localStorage.getItem('utilization_show_working_students') || 'true'); } catch { return true; }
   });
+  // Sichtbare Spalten konfigurieren (persistiert)
+  const VISIBLE_COLUMNS_KEY = 'utilization_visible_columns_v1';
+  type VisibleColumns = {
+    avg4: boolean;
+    historyWeeks: boolean;
+    act: boolean;
+    vg: boolean;
+    person: boolean; // Guardrail: bleibt immer true
+    lbs: boolean;
+    status: boolean;
+    forecastWeeks: boolean;
+    customer: boolean;
+    probability: boolean;
+    startKw: boolean;
+    planning: boolean;
+    ticket: boolean;
+  };
+  const defaultVisibleColumns: VisibleColumns = {
+    avg4: true,
+    historyWeeks: true,
+    act: true,
+    vg: true,
+    person: true,
+    lbs: true,
+    status: true,
+    forecastWeeks: true,
+    customer: true,
+    probability: true,
+    startKw: true,
+    planning: true,
+    ticket: true
+  };
+  const [visibleColumns, setVisibleColumns] = useState<VisibleColumns>(() => {
+    try {
+      const raw = localStorage.getItem(VISIBLE_COLUMNS_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return { ...defaultVisibleColumns, ...(parsed || {}) } as VisibleColumns;
+    } catch {
+      return { ...defaultVisibleColumns } as VisibleColumns;
+    }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(VISIBLE_COLUMNS_KEY, JSON.stringify(visibleColumns)); } catch {}
+  }, [visibleColumns]);
+  const [isColumnsMenuOpen, setIsColumnsMenuOpen] = useState(false);
+  const columnsMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (columnsMenuRef.current && !columnsMenuRef.current.contains(e.target as Node)) {
+        setIsColumnsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
   
   // Employee Dossier Modal
   const [isEmployeeDossierOpen, setIsEmployeeDossierOpen] = useState(false);
@@ -134,8 +189,7 @@ export function UtilizationReportView() {
   const [forecastWeeks, setForecastWeeks] = useState(8);
   const importJsonInputRef = useRef<HTMLInputElement>(null);
   const STORAGE_KEY = 'utilization_uploaded_files_v1';
-  const STORAGE_PEOPLE_KEY = 'utilization_planned_people_v1';
-  const STORAGE_CUSTOMERS_KEY = 'utilization_customers_v1';
+  // Removed planned engagements & customers local storage keys
 
   // Load data from database on mount
   useEffect(() => {
@@ -216,21 +270,14 @@ export function UtilizationReportView() {
     } catch {}
   }, [showWorkingStudents]);
 
-  // Planned engagements and customers (persisted independently of uploads)
-  const [plannedByPerson, setPlannedByPerson] = useState<Record<string, PlannedEngagement>>(() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_PEOPLE_KEY) || '{}'); } catch { return {}; }
-  });
-  const [customers, setCustomers] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_CUSTOMERS_KEY) || '[]'); } catch { return []; }
-  });
+  // Removed planned engagements and customers state; planning handled via modal & dossier
   const [personStatus, setPersonStatus] = useState<Record<string, string | undefined>>(() => {
     try { return JSON.parse(localStorage.getItem('utilization_person_status_v1') || '{}'); } catch { return {}; }
   });
   const [personTravelReadiness, setPersonTravelReadiness] = useState<Record<string, number | undefined>>(() => {
     try { return JSON.parse(localStorage.getItem('utilization_person_travel_readiness_v1') || '{}'); } catch { return {}; }
   });
-  useEffect(() => { try { localStorage.setItem(STORAGE_PEOPLE_KEY, JSON.stringify(plannedByPerson)); } catch {} }, [plannedByPerson]);
-  useEffect(() => { try { localStorage.setItem(STORAGE_CUSTOMERS_KEY, JSON.stringify(customers)); } catch {} }, [customers]);
+  // Removed persistence effects for planned engagements and customers
   useEffect(() => { try { localStorage.setItem('utilization_person_status_v1', JSON.stringify(personStatus)); } catch {} }, [personStatus]);
   useEffect(() => { try { localStorage.setItem('utilization_person_travel_readiness_v1', JSON.stringify(personTravelReadiness)); } catch {} }, [personTravelReadiness]);
 
@@ -302,15 +349,8 @@ export function UtilizationReportView() {
   };
 
   // Helper function to check if a week is in a planned project
-  const isWeekInPlannedProject = (person: string, weekNumber: number) => {
-    const engagement = plannedByPerson[person];
-    if (!engagement?.planned || !engagement.startKw || !engagement.endKw) return false;
-    
-    const startKw = parseInt(engagement.startKw.split('KW')[1]);
-    const endKw = parseInt(engagement.endKw.split('KW')[1]);
-    
-    return weekNumber >= startKw && weekNumber <= endKw;
-  };
+  // Removed isWeekInPlannedProject (inline planning removed)
+  const isWeekInPlannedProject = (_person: string, _weekNumber: number) => false;
 
   // Mock data for demonstration
   const mockData: UtilizationData[] = useMemo(() => {
@@ -713,7 +753,7 @@ export function UtilizationReportView() {
               Rückblick {lookbackWeeks} W · Vorblick {forecastWeeks} W · ISO-KW
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 relative">
             <button onClick={handleExportCSV} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
               <Download className="w-4 h-4" />
               CSV
@@ -741,13 +781,72 @@ export function UtilizationReportView() {
               <Settings className="w-4 h-4" />
             </button>
             <input ref={importJsonInputRef} type="file" accept="application/json" className="hidden" onChange={handleImportJSON} />
+            <button onClick={() => setIsColumnsMenuOpen(v => !v)} className="p-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors" title="Spalten">
+              <Columns className="w-4 h-4" />
+            </button>
+            {isColumnsMenuOpen && (
+              <div ref={columnsMenuRef} className="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-40">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-800">Spalten</span>
+                  <button
+                    className="text-xs text-blue-600 hover:underline"
+                    onClick={() => {
+                      setVisibleColumns(prev => ({ ...prev, avg4: true, historyWeeks: true, act: true, vg: true, person: true, lbs: true, status: true, forecastWeeks: true, customer: true, probability: true, startKw: true, planning: true, ticket: true }));
+                    }}
+                  >Alle an</button>
+                </div>
+                <div className="space-y-2">
+                  {[
+                    { key: 'avg4', label: 'Ø 4W' },
+                    { key: 'historyWeeks', label: '4 Wochen Rückblick' },
+                    { key: 'act', label: 'Act' },
+                    { key: 'vg', label: 'VG' },
+                    { key: 'person', label: 'Mitarbeitende (fix)' },
+                    { key: 'lbs', label: 'LBS' },
+                    { key: 'status', label: 'Status' },
+                    { key: 'forecastWeeks', label: 'Vorblick-Wochen' },
+                    { key: 'customer', label: 'Kunde' },
+                    { key: 'probability', label: '%' },
+                    { key: 'startKw', label: 'Start KW' },
+                    { key: 'planning', label: 'Planung' },
+                    { key: 'ticket', label: 'Ticket' },
+                  ].map(({ key, label }) => (
+                    <label key={key} className="flex items-center justify-between text-sm">
+                      <span className="text-gray-700">{label}</span>
+                      <input
+                        type="checkbox"
+                        checked={(visibleColumns as any)[key]}
+                        disabled={key === 'person'}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setVisibleColumns(prev => ({ ...(prev as any), [key]: key === 'person' ? true : checked } as any));
+                        }}
+                      />
+                    </label>
+                  ))}
+                </div>
+                <div className="mt-3 flex items-center justify-between">
+                  <button
+                    className="text-xs text-gray-600 hover:underline"
+                    onClick={() => {
+                      setVisibleColumns(prev => ({ ...prev, avg4: false, historyWeeks: false, act: false, vg: false, person: true, lbs: false, status: false, forecastWeeks: false, customer: false, probability: false, startKw: false, planning: false, ticket: false }));
+                    }}
+                  >Alle aus</button>
+                  <button
+                    className="text-xs text-gray-600 hover:underline"
+                    onClick={() => setVisibleColumns({ ...defaultVisibleColumns })}
+                  >Zurücksetzen</button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="w-full p-4 space-y-6">
-        {/* Data Source Status and Controls */}
+        {/* Data Source Status and Controls (ausgeblendet) */}
+        {false && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
@@ -784,6 +883,7 @@ export function UtilizationReportView() {
             </div>
           </div>
         </div>
+        )}
 
         {/* Upload Section (extracted component) */}
         <DataUploadSection uploadedFiles={uploadedFiles} onFilesChange={setUploadedFiles} />
@@ -873,12 +973,13 @@ export function UtilizationReportView() {
             <table className="w-full">
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
-                  {/* Durchschnitt der ältesten 4 Wochen */}
-                  <th className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-12">
-                    Ø KW{(forecastStartWeek - lookbackWeeks + 1)}-{(forecastStartWeek - lookbackWeeks + 4)}
-                  </th>
+                  {visibleColumns.avg4 && (
+                    <th className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-12">
+                      Ø KW{(forecastStartWeek - lookbackWeeks + 1)}-{(forecastStartWeek - lookbackWeeks + 4)}
+                    </th>
+                  )}
                   {/* 4 Einzelwochen bis zur aktuellen KW */}
-                  {Array.from({ length: 4 }, (_, i) => {
+                  {visibleColumns.historyWeeks && Array.from({ length: 4 }, (_, i) => {
                     const weekNumber = (forecastStartWeek - lookbackWeeks + 5) + i;
                     return (
                       <th key={`left-single-${i}`} className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-12">
@@ -886,18 +987,28 @@ export function UtilizationReportView() {
                       </th>
                     );
                   })}
-                  <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
-                    Act
-                  </th>
-                  <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
-                    VG
-                  </th>
-                  <th className="px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">
-                    Mitarbeitende
-                  </th>
-                  <th className="px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">LBS</th>
-                  <th className="px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">Status</th>
-                  {Array.from({ length: forecastWeeks }, (_, i) => {
+                  {visibleColumns.act && (
+                    <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
+                      Act
+                    </th>
+                  )}
+                  {visibleColumns.vg && (
+                    <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
+                      VG
+                    </th>
+                  )}
+                  {visibleColumns.person && (
+                    <th className="px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">
+                      Mitarbeitende
+                    </th>
+                  )}
+                  {visibleColumns.lbs && (
+                    <th className="px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">LBS</th>
+                  )}
+                  {visibleColumns.status && (
+                    <th className="px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">Status</th>
+                  )}
+                  {visibleColumns.forecastWeeks && Array.from({ length: forecastWeeks }, (_, i) => {
                     const weekNumber = (forecastStartWeek + 1) + i; // starts after current week
                     return (
                       <th key={`right-${i}`} className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-12">
@@ -905,11 +1016,7 @@ export function UtilizationReportView() {
                       </th>
                     );
                   })}
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">Kunde</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">%</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">Start KW</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">Planung</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">Ticket</th>
+                  {/* Removed inline planning columns */}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -918,6 +1025,7 @@ export function UtilizationReportView() {
                   return (
                     <tr key={person} className="hover:bg-gray-50">
                       {/* Durchschnitt der ältesten 4 Wochen */}
+                      {visibleColumns.avg4 && (
                       <td className="px-1 py-2 text-center text-xs bg-gray-100">
                         {(() => {
                           const oldestWeeks = Array.from({ length: 4 }, (_, i) => {
@@ -944,8 +1052,9 @@ export function UtilizationReportView() {
                           );
                         })()}
                       </td>
+                      )}
                       {/* 4 Einzelwochen bis zur aktuellen KW */}
-                      {Array.from({ length: 4 }, (_, i) => {
+                      {visibleColumns.historyWeeks && Array.from({ length: 4 }, (_, i) => {
                         const weekNumber = (forecastStartWeek - lookbackWeeks + 5) + i;
                         const weekData = personData.find(item => item.week === `${currentIsoYear}-KW${weekNumber}`);
                         const utilization = weekData?.utilization;
@@ -969,9 +1078,10 @@ export function UtilizationReportView() {
                         );
                       })}
                                             {/* Act-Spalte mit Checkbox */}
+                      {visibleColumns.act && (
                       <td className={`px-2 py-1 text-sm ${
                         actionItems[person] 
-                          ? (plannedByPerson[person]?.planned ? 'bg-yellow-100' : 'bg-blue-100')
+                          ? 'bg-blue-100'
                           : 'bg-gray-50'
                       }`}>
                         <div className="flex items-center justify-center">
@@ -983,11 +1093,13 @@ export function UtilizationReportView() {
                           />
                         </div>
                       </td>
+                      )}
                       
                       {/* VG-Avatar-Spalte */}
+                      {visibleColumns.vg && (
                       <td className={`px-2 py-1 text-sm ${
                         actionItems[person] 
-                          ? (plannedByPerson[person]?.planned ? 'bg-yellow-100' : 'bg-blue-100')
+                          ? 'bg-blue-100'
                           : 'bg-gray-50'
                       }`}>
                         <div className="flex items-center justify-center">
@@ -1029,10 +1141,11 @@ export function UtilizationReportView() {
                           })()}
                         </div>
                       </td>
+                      )}
                       
                       <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium text-gray-900 ${
                         actionItems[person] 
-                          ? (plannedByPerson[person]?.planned ? 'bg-yellow-100' : 'bg-blue-100')
+                          ? 'bg-blue-100'
                           : 'bg-gray-50'
                       }`}>
                         <div className="flex items-center gap-2 w-full">
@@ -1057,7 +1170,14 @@ export function UtilizationReportView() {
 
                           <div className="flex items-center gap-2">
                             <span>{person}</span>
-                            {plannedByPerson[person]?.planned ? <span title="Geplanter Einsatz" className="inline-block w-2 h-2 rounded-full bg-amber-500" /> : null}
+                            {(() => {
+                              const dossier = dossiersByPerson[person] || { projectOffers: [], jiraTickets: [] };
+                              const hasOffers = Array.isArray(dossier.projectOffers) && dossier.projectOffers.length > 0;
+                              const hasJira = Array.isArray(dossier.jiraTickets) && dossier.jiraTickets.length > 0;
+                              return (hasOffers || hasJira) ? (
+                                <span title="Aktive Angebote oder Jira-Tickets" className="inline-block w-2 h-2 rounded-full bg-amber-500" />
+                              ) : null;
+                            })()}
                           </div>
                           <button
                             onClick={() => openEmployeeDossier(person)}
@@ -1068,9 +1188,10 @@ export function UtilizationReportView() {
                           </button>
                         </div>
                       </td>
+                      {visibleColumns.person && (
                       <td className={`px-2 py-2 text-sm ${
                         actionItems[person] 
-                          ? (plannedByPerson[person]?.planned ? 'bg-yellow-100' : 'bg-blue-100')
+                          ? 'bg-blue-100'
                           : 'bg-gray-50'
                       }`}>
                         {personMeta.get(person)?.lbs ? (
@@ -1079,10 +1200,12 @@ export function UtilizationReportView() {
                           <span className="text-xs text-gray-400">—</span>
                         )}
                       </td>
+                      )}
                       
+                      {visibleColumns.status && (
                       <td className={`px-2 py-2 text-sm ${
                         actionItems[person] 
-                          ? (plannedByPerson[person]?.planned ? 'bg-yellow-100' : 'bg-blue-100')
+                          ? 'bg-blue-100'
                           : 'bg-gray-50'
                       }`}>
                         <StatusLabelSelector
@@ -1091,7 +1214,8 @@ export function UtilizationReportView() {
                           onChange={(status) => setPersonStatus(prev => ({ ...prev, [person]: status }))}
                         />
                       </td>
-                      {Array.from({ length: forecastWeeks }, (_, i) => {
+                      )}
+                      {visibleColumns.forecastWeeks && Array.from({ length: forecastWeeks }, (_, i) => {
                         const weekNumber = (forecastStartWeek + 1) + i;
                         const weekData = personData.find(item => item.week === `${currentIsoYear}-KW${weekNumber}`);
                         const utilization = weekData?.utilization;
@@ -1193,71 +1317,7 @@ export function UtilizationReportView() {
                           </td>
                         );
                       })}
-                      <td className="px-2 py-2 text-sm bg-gray-50">
-                        {plannedByPerson[person]?.planned && plannedByPerson[person]?.customer ? (
-                          <span className="text-xs text-gray-700">{plannedByPerson[person].customer}</span>
-                        ) : (
-                          <span className="text-xs text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-2 text-sm bg-gray-50">
-                        {plannedByPerson[person]?.planned && plannedByPerson[person]?.probability ? (
-                          <span className="text-xs text-gray-700">{plannedByPerson[person].probability}%</span>
-                        ) : (
-                          <span className="text-xs text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-2 text-sm bg-gray-50">
-                        {plannedByPerson[person]?.planned && plannedByPerson[person]?.startKw ? (
-                          <span className="text-xs text-gray-700">{plannedByPerson[person].startKw}</span>
-                        ) : (
-                          <span className="text-xs text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-2 text-sm bg-gray-50">
-                        <PlannedEngagementEditor
-                          person={person}
-                          value={plannedByPerson[person]}
-                          customers={customers}
-                          availableKws={Array.from({ length: forecastWeeks }, (_, i) => {
-                            const w = forecastStartWeek + 1 + i; // Nur zukünftige Wochen (ab aktueller KW + 1)
-                            return `${currentIsoYear}-KW${w}`;
-                          })}
-                          onChange={(next) => setPlannedByPerson(prev => ({ ...prev, [person]: next }))}
-                          onAddCustomer={(name) => setCustomers(prev => [...new Set([...prev, name.trim()])])}
-                        />
-                      </td>
-                      <td className="px-2 py-2 text-sm bg-gray-50">
-                        <input
-                          type="text"
-                          placeholder="Jira-Ticket (z.B. PROJ-123)"
-                          value={plannedByPerson[person]?.ticketId || ''}
-                          onChange={(e) => {
-                            const ticketId = e.target.value.trim();
-                            setPlannedByPerson(prev => ({
-                              ...prev,
-                              [person]: {
-                                ...prev[person],
-                                ticketId: ticketId || undefined
-                              }
-                            }));
-                          }}
-                          className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                        {plannedByPerson[person]?.ticketId && (
-                          <div className="mt-1">
-                            <a 
-                              href={`https://jira.company.com/browse/${plannedByPerson[person].ticketId}`}
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-xs text-blue-600 hover:text-blue-800 underline truncate block"
-                              title={`Jira-Ticket: ${plannedByPerson[person].ticketId}`}
-                            >
-                              {plannedByPerson[person].ticketId}
-                            </a>
-                          </div>
-                        )}
-                      </td>
+                      
                     </tr>
                   );
                 })}
@@ -1289,9 +1349,7 @@ export function UtilizationReportView() {
             }));
           }}
           excelData={selectedEmployee.excelData}
-          // Kunden-Funktionalität weitergeben
-          customers={customers}
-          onAddCustomer={(name) => setCustomers(prev => [...new Set([...prev, name.trim()])])}
+          // Kunden-Funktionalität entfernt
         />
       )}
 

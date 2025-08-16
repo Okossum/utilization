@@ -131,6 +131,7 @@ export function EmployeeDossierModal({
           projectHistory: normalizedProjectHistory || employee.projectHistory || [],
           projectOffers: savedDossier?.projectOffers || employee.projectOffers || [],
           jiraTickets: savedDossier?.jiraTickets || employee.jiraTickets || [],
+          skills: Array.isArray(savedDossier?.skills) ? savedDossier?.skills : (employee.skills || []),
           // Speichere Excel-Daten für Referenz
           excelData: excelData
         };

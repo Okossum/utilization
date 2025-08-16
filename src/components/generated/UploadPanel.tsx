@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, X, Eye } from 'lucide-react';
+import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, X, Eye, Info } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import DatabaseService from '../../services/database';
 interface UploadedFile {
@@ -30,6 +30,17 @@ export function UploadPanel({
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const auslastungRef = useRef<HTMLInputElement>(null);
   const einsatzplanRef = useRef<HTMLInputElement>(null);
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
+  const infoContainerRef = useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (infoContainerRef.current && !infoContainerRef.current.contains(e.target as Node)) {
+        setIsInfoOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
   const handleFileSelect = async (type: 'auslastung' | 'einsatzplan', file: File) => {
     setIsProcessing(type);
 
@@ -610,11 +621,33 @@ export function UploadPanel({
     opacity: 1,
     y: 0
   }} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-      <div className="mb-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-2">
-          Daten hochladen
-        </h2>
-        <p className="text-sm text-gray-600">
+      <div className="mb-6 relative">
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Daten hochladen
+          </h2>
+          <div className="relative" ref={infoContainerRef}>
+            <button
+              type="button"
+              onClick={() => setIsInfoOpen(v => !v)}
+              className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+              title="Dateianforderungen anzeigen"
+            >
+              <Info className="w-4 h-4" />
+            </button>
+            {isInfoOpen && (
+              <div className="absolute left-0 top-full mt-2 w-96 max-w-[90vw] bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-40">
+                <h4 className="text-sm font-medium text-gray-900 mb-2">Dateianforderungen</h4>
+                <ul className="text-sm text-gray-700 space-y-1 list-disc pl-5">
+                  <li>Excel-Dateien (.xlsx oder .xls)</li>
+                  <li>KWs: z. B. "KW 25/01", "KW33(2025)", "KW 33-2025"</li>
+                  <li>Personen: Auslastung → "Mitarbeiter (ID)", Einsatzplan → "Name"</li>
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+        <p className="text-sm text-gray-600 mt-1">
           Lade beide Excel-Dateien hoch, um den vollständigen Report zu generieren.
         </p>
       </div>
@@ -665,16 +698,6 @@ export function UploadPanel({
           </div>
         </motion.div>}
 
-      {/* Requirements Info */}
-      <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-        <h4 className="text-sm font-medium text-blue-900 mb-2">
-          Dateianforderungen
-        </h4>
-        <ul className="text-sm text-blue-700 space-y-1">
-          <li>• Excel-Dateien (.xlsx oder .xls)</li>
-          <li>• KWs: z. B. "KW 25/01", "KW33(2025)", "KW 33-2025"</li>
-          <li>• Personen: Auslastung → "Mitarbeiter (ID)", Einsatzplan → "Name"</li>
-        </ul>
-      </div>
+      {/* Requirements Info ersetzt durch Info-Icon Tooltip am Titel */}
     </motion.div>;
 }
