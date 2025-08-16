@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { getISOWeek, getISOWeekYear } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, ChefHat, Database, Target, User, Ticket, Columns } from 'lucide-react';
+import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, ChefHat, Database, Target, User, Ticket, Columns, ArrowLeft, MessageSquare, X, ArrowRight } from 'lucide-react';
 import { DataUploadSection } from './DataUploadSection';
+import { useAuth } from '../../contexts/AuthContext';
 import { MultiSelectFilter } from './MultiSelectFilter';
 import { PersonFilterBar } from './PersonFilterBar';
 import DatabaseService from '../../services/database';
@@ -13,6 +14,8 @@ import { UtilizationTrendChart } from './UtilizationTrendChart';
 import { StatusLabelSelector } from './StatusLabelSelector';
 import { EmployeeDossierModal, Employee } from './EmployeeDossierModal';
 import { PlanningModal } from './PlanningModal';
+import { PlanningCommentModal } from './PlanningCommentModal';
+import { UtilizationComment } from './UtilizationComment';
 interface UtilizationData {
   person: string;
   week: string;
@@ -26,6 +29,13 @@ interface UploadedFile {
   error?: string;
 }
 export function UtilizationReportView() {
+  const { user, loading, profile } = useAuth();
+  const [showAllData, setShowAllData] = useState<boolean>(() => {
+    try { return JSON.parse(localStorage.getItem('utilization_show_all_data') || 'false'); } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('utilization_show_all_data', JSON.stringify(showAllData)); } catch {}
+  }, [showAllData]);
   const [uploadedFiles, setUploadedFiles] = useState<{
     auslastung?: UploadedFile;
     einsatzplan?: UploadedFile;
@@ -39,7 +49,9 @@ export function UtilizationReportView() {
   const [selectedPersons, setSelectedPersons] = useState<string[]>([]);
   const [planningForPerson, setPlanningForPerson] = useState<string | null>(null);
   const [planningForWeek, setPlanningForWeek] = useState<{ year: number; week: number } | null>(null);
-  const [dossiersByPerson, setDossiersByPerson] = useState<Record<string, { projectOffers?: any[]; jiraTickets?: any[] }>>({});
+  const [dossiersByPerson, setDossiersByPerson] = useState<Record<string, { projectOffers?: any[]; jiraTickets?: any[]; utilizationComment?: string; planningComment?: string }>>({});
+  const [utilizationCommentForPerson, setUtilizationCommentForPerson] = useState<string | null>(null);
+  const [planningCommentForPerson, setPlanningCommentForPerson] = useState<string | null>(null);
 
   // Function to switch data source
   const switchToUpload = () => {
@@ -133,6 +145,7 @@ export function UtilizationReportView() {
     person: boolean; // Guardrail: bleibt immer true
     lbs: boolean;
     status: boolean;
+    planningComment: boolean;
     forecastWeeks: boolean;
     customer: boolean;
     probability: boolean;
@@ -148,6 +161,7 @@ export function UtilizationReportView() {
     person: true,
     lbs: true,
     status: true,
+    planningComment: true,
     forecastWeeks: true,
     customer: true,
     probability: true,
@@ -500,7 +514,7 @@ export function UtilizationReportView() {
 
   // Build person → meta mapping from uploaded data or database (prefer Auslastung, fallback Einsatzplan)
   const personMeta = useMemo(() => {
-    const meta = new Map<string, { cc?: string; lbs?: string }>();
+    const meta = new Map<string, { cc?: string; lbs?: string; team?: string; bu?: string }>();
     
     let aus: any[] | undefined;
     let ein: any[] | undefined;
@@ -518,7 +532,9 @@ export function UtilizationReportView() {
         if (!r?.person) return;
         meta.set(r.person, {
           cc: r.cc ?? meta.get(r.person)?.cc,
-          lbs: r.lbs ?? meta.get(r.person)?.lbs
+          lbs: r.lbs ?? meta.get(r.person)?.lbs,
+          team: r.team ?? meta.get(r.person)?.team,
+          bu: r.bu ?? meta.get(r.person)?.bu
         });
       });
     };
@@ -608,8 +624,22 @@ export function UtilizationReportView() {
     if (selectedPersons.length > 0) {
       base = base.filter(item => selectedPersons.includes(item.person));
     }
+
+    // Scope-Filter: wenn nicht "Alle Daten" und Profil vorhanden, nach BU/CC/Team filtern (Team > CC > BU)
+    if (!showAllData && profile) {
+      const scopeTeam = profile.team || '';
+      const scopeCc = profile.competenceCenter || '';
+      const scopeBu = profile.businessUnit || '';
+      base = base.filter(d => {
+        const meta = personMeta.get(d.person) || {} as any;
+        if (scopeTeam) return String(meta.team || '') === String(scopeTeam);
+        if (scopeCc) return String(meta.cc || '') === String(scopeCc);
+        if (scopeBu) return String(meta.bu || '') === String(scopeBu);
+        return true;
+      });
+    }
     return base;
-  }, [dataForUI, selectedPersons, filterCC, filterLBS, filterStatus, personMeta, personStatus, showWorkingStudents, showActionItems, actionItems, personSearchTerm]);
+  }, [dataForUI, selectedPersons, filterCC, filterLBS, filterStatus, personMeta, personStatus, showWorkingStudents, showActionItems, actionItems, personSearchTerm, showAllData, profile]);
   const visiblePersons = useMemo(() => {
     return Array.from(new Set(filteredData.map(item => item.person)));
   }, [filteredData]);
@@ -623,14 +653,14 @@ export function UtilizationReportView() {
       const entries = await Promise.all(toFetch.map(async (p) => {
         try {
           const dossier = await DatabaseService.getEmployeeDossier(p);
-          return [p, { projectOffers: dossier?.projectOffers || [], jiraTickets: dossier?.jiraTickets || [] }] as const;
+          return [p, { projectOffers: dossier?.projectOffers || [], jiraTickets: dossier?.jiraTickets || [], utilizationComment: String(dossier?.utilizationComment || ''), planningComment: String(dossier?.planningComment || '') }] as const;
         } catch {
-          return [p, { projectOffers: [], jiraTickets: [] }] as const;
+          return [p, { projectOffers: [], jiraTickets: [], utilizationComment: '', planningComment: '' }] as const;
         }
       }));
       if (!cancelled && entries.length > 0) {
         setDossiersByPerson(prev => {
-          const next = { ...prev } as Record<string, { projectOffers?: any[]; jiraTickets?: any[] }>;
+          const next = { ...prev } as Record<string, { projectOffers?: any[]; jiraTickets?: any[]; utilizationComment?: string; planningComment?: string }>;
           for (const [p, v] of entries) next[p] = v;
           return next;
         });
@@ -638,6 +668,23 @@ export function UtilizationReportView() {
     })();
     return () => { cancelled = true; };
   }, [visiblePersons]);
+
+  // Helper: Dossier für Person aktualisieren (nach Modal-Speichern)
+  const refreshPersonDossier = async (person: string | null) => {
+    if (!person) return;
+    try {
+      const dossier = await DatabaseService.getEmployeeDossier(person);
+      setDossiersByPerson(prev => ({
+        ...prev,
+        [person]: {
+          projectOffers: dossier?.projectOffers || prev[person]?.projectOffers || [],
+          jiraTickets: dossier?.jiraTickets || prev[person]?.jiraTickets || [],
+          utilizationComment: String(dossier?.utilizationComment || ''),
+          planningComment: String(dossier?.planningComment || ''),
+        }
+      }));
+    } catch {}
+  };
   const allPersons = useMemo(() => {
     return Array.from(new Set(dataForUI.map(item => item.person)));
   }, [dataForUI]);
@@ -722,6 +769,17 @@ export function UtilizationReportView() {
     // reset input value so same file can be chosen again later
     e.currentTarget.value = '';
   };
+  if (loading) {
+    return <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">Lade...</div>;
+  }
+  if (!user) {
+    return <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="text-center max-w-md">
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">Bitte anmelden</h2>
+        <p className="text-gray-600">Zugriff nur für angemeldete Benutzer.</p>
+      </div>
+    </div>;
+  }
   if (!hasData) {
     return <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <motion.div initial={{
@@ -754,6 +812,18 @@ export function UtilizationReportView() {
             </p>
           </div>
           <div className="flex items-center gap-2 relative">
+            {/* Scope Toggle */}
+            <label className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              <input
+                type="checkbox"
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                checked={showAllData}
+                onChange={(e) => setShowAllData(e.target.checked)}
+                disabled={!profile}
+              />
+              <span>{showAllData ? 'Alle Daten' : 'Mein Bereich'}</span>
+            </label>
+
             <button onClick={handleExportCSV} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
               <Download className="w-4 h-4" />
               CSV
@@ -791,7 +861,7 @@ export function UtilizationReportView() {
                   <button
                     className="text-xs text-blue-600 hover:underline"
                     onClick={() => {
-                      setVisibleColumns(prev => ({ ...prev, avg4: true, historyWeeks: true, act: true, vg: true, person: true, lbs: true, status: true, forecastWeeks: true, customer: true, probability: true, startKw: true, planning: true, ticket: true }));
+                      setVisibleColumns(prev => ({ ...prev, avg4: true, historyWeeks: true, act: true, vg: true, person: true, lbs: true, status: true, planningComment: true, forecastWeeks: true, customer: true, probability: true, startKw: true, planning: true, ticket: true }));
                     }}
                   >Alle an</button>
                 </div>
@@ -804,6 +874,7 @@ export function UtilizationReportView() {
                     { key: 'person', label: 'Mitarbeitende (fix)' },
                     { key: 'lbs', label: 'LBS' },
                     { key: 'status', label: 'Status' },
+                    { key: 'planningComment', label: 'Planung-Comm' },
                     { key: 'forecastWeeks', label: 'Vorblick-Wochen' },
                     { key: 'customer', label: 'Kunde' },
                     { key: 'probability', label: '%' },
@@ -829,7 +900,7 @@ export function UtilizationReportView() {
                   <button
                     className="text-xs text-gray-600 hover:underline"
                     onClick={() => {
-                      setVisibleColumns(prev => ({ ...prev, avg4: false, historyWeeks: false, act: false, vg: false, person: true, lbs: false, status: false, forecastWeeks: false, customer: false, probability: false, startKw: false, planning: false, ticket: false }));
+                      setVisibleColumns(prev => ({ ...prev, avg4: false, historyWeeks: false, act: false, vg: false, person: true, lbs: false, status: false, planningComment: false, forecastWeeks: false, customer: false, probability: false, startKw: false, planning: false, ticket: false }));
                     }}
                   >Alle aus</button>
                   <button
@@ -988,9 +1059,18 @@ export function UtilizationReportView() {
                     );
                   })}
                   {visibleColumns.act && (
-                    <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
-                      Act
-                    </th>
+                    <>
+                      {/* Neue Kommentar-Spalte links von Act */}
+                      <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
+                        <div className="flex items-center justify-center gap-1">
+                          <ArrowLeft className="w-4 h-4" />
+                          <MessageSquare className="w-4 h-4" />
+                        </div>
+                      </th>
+                      <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
+                        Act
+                      </th>
+                    </>
                   )}
                   {visibleColumns.vg && (
                     <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
@@ -1007,6 +1087,14 @@ export function UtilizationReportView() {
                   )}
                   {visibleColumns.status && (
                     <th className="px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">Status</th>
+                  )}
+                  {visibleColumns.planningComment && (
+                    <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
+                      <div className="flex items-center justify-center gap-1">
+                        <MessageSquare className="w-4 h-4" />
+                        <ArrowRight className="w-4 h-4" />
+                      </div>
+                    </th>
                   )}
                   {visibleColumns.forecastWeeks && Array.from({ length: forecastWeeks }, (_, i) => {
                     const weekNumber = (forecastStartWeek + 1) + i; // starts after current week
@@ -1080,20 +1168,42 @@ export function UtilizationReportView() {
                       })}
                                             {/* Act-Spalte mit Checkbox */}
                       {visibleColumns.act && (
-                      <td className={`px-2 py-1 text-sm ${
-                        actionItems[person] 
-                          ? 'bg-blue-100'
-                          : 'bg-gray-50'
-                      }`}>
-                        <div className="flex items-center justify-center">
-                          <input
-                            type="checkbox"
-                            checked={actionItems[person] || false}
-                            onChange={(e) => setActionItems(prev => ({ ...prev, [person]: e.target.checked }))}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          />
-                        </div>
-                      </td>
+                      <>
+                        {/* Kommentar-Spalte links von Act */}
+                        <td className={`px-2 py-1 text-sm ${actionItems[person] ? 'bg-blue-100' : 'bg-gray-50'}`}>
+                          <div className="flex items-center justify-center">
+                            {actionItems[person] && (
+                              <button
+                                type="button"
+                                onClick={() => setUtilizationCommentForPerson(person)}
+                                className="relative inline-flex items-center gap-1 text-gray-700 hover:text-blue-700 hover:bg-blue-50 rounded px-1 py-0.5"
+                                title="Auslastungs-Kommentar öffnen"
+                              >
+                                <ArrowLeft className="w-4 h-4" />
+                                <MessageSquare className="w-4 h-4" />
+                                {(dossiersByPerson[person]?.utilizationComment || '').trim() && (
+                                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-600 rounded-full" />
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        {/* Act-Checkbox */}
+                        <td className={`px-2 py-1 text-sm ${
+                          actionItems[person] 
+                            ? 'bg-blue-100'
+                            : 'bg-gray-50'
+                        }`}>
+                          <div className="flex items-center justify-center">
+                            <input
+                              type="checkbox"
+                              checked={actionItems[person] || false}
+                              onChange={(e) => setActionItems(prev => ({ ...prev, [person]: e.target.checked }))}
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                          </div>
+                        </td>
+                      </>
                       )}
                       
                       {/* VG-Avatar-Spalte */}
@@ -1214,6 +1324,24 @@ export function UtilizationReportView() {
                           value={personStatus[person]}
                           onChange={(status) => setPersonStatus(prev => ({ ...prev, [person]: status }))}
                         />
+                      </td>
+                      )}
+                      {visibleColumns.planningComment && (
+                      <td className={`px-2 py-1 text-sm ${actionItems[person] ? 'bg-blue-100' : 'bg-gray-50'}`}>
+                        <div className="flex items-center justify-center">
+                          <button
+                            type="button"
+                            onClick={() => setPlanningCommentForPerson(person)}
+                            className="relative inline-flex items-center gap-1 text-gray-700 hover:text-blue-700 hover:bg-blue-50 rounded px-1 py-0.5"
+                            title="Einsatzplan-Kommentar öffnen"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                            <ArrowRight className="w-4 h-4" />
+                            {(dossiersByPerson[person]?.planningComment || '').trim() && (
+                              <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-600 rounded-full" />
+                            )}
+                          </button>
+                        </div>
                       </td>
                       )}
                       {visibleColumns.forecastWeeks && Array.from({ length: forecastWeeks }, (_, i) => {
@@ -1463,6 +1591,50 @@ export function UtilizationReportView() {
       </AnimatePresence>
 
       {/* Planning Modal (Projektangebote & Jira) */}
-      <PlanningModal isOpen={!!planningForPerson} onClose={() => { setPlanningForPerson(null); setPlanningForWeek(null); }} personId={planningForPerson || ''} filterByWeek={planningForWeek || undefined} />
+      <PlanningModal isOpen={!!planningForPerson} onClose={async () => { setPlanningForPerson(null); setPlanningForWeek(null); await refreshPersonDossier(planningForPerson); }} personId={planningForPerson || ''} filterByWeek={planningForWeek || undefined} />
+
+      {/* Utilization Comment Modal (match EmployeeDossierModal look & feel) */}
+      <AnimatePresence>
+        {utilizationCommentForPerson && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/20 backdrop-blur-sm"
+              onClick={() => setUtilizationCommentForPerson(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-2xl max-h [90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <header className="flex items-center justify-between p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <MessageSquare className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <h1 className="text-xl font-semibold text-gray-900">Auslastungskommentar</h1>
+                </div>
+                <button onClick={() => setUtilizationCommentForPerson(null)} className="p-2 hover:bg-white/50 rounded-lg transition-colors" aria-label="Schließen">
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </header>
+              <div className="p-6 overflow-y-auto">
+                <UtilizationComment personId={utilizationCommentForPerson} />
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Planning Comment Modal */}
+      <PlanningCommentModal
+        isOpen={!!planningCommentForPerson}
+        onClose={async () => { await refreshPersonDossier(planningCommentForPerson); setPlanningCommentForPerson(null); }}
+        personId={planningCommentForPerson || ''}
+      />
     </div>;
 }

@@ -20,6 +20,63 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 
+// Optional Auth middleware: validates Firebase ID token if provided
+async function authMiddleware(req, _res, next) {
+  const authHeader = req.headers['authorization'] || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.substring('Bearer '.length) : null;
+  if (!token) {
+    req.user = null;
+    return next();
+  }
+  try {
+    const decoded = await admin.auth().verifyIdToken(token);
+    req.user = decoded;
+  } catch {
+    req.user = null;
+  }
+  next();
+}
+
+app.use(authMiddleware);
+
+// Current user profile endpoint
+app.get('/api/me', async (req, res) => {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) {
+      return res.status(401).json({ error: 'Nicht authentifiziert' });
+    }
+    const users = db.collection('users');
+    const docRef = users.doc(uid);
+    const snap = await docRef.get();
+    if (!snap.exists) {
+      let authUser = null;
+      try {
+        authUser = await admin.auth().getUser(uid);
+      } catch {}
+      const payload = {
+        uid,
+        email: authUser?.email || '',
+        displayName: authUser?.displayName || '',
+        role: req.user?.role || 'unknown',
+        canViewAll: false,
+        businessUnit: null,
+        competenceCenter: null,
+        team: null,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+      await docRef.set(payload, { merge: true });
+      const created = await docRef.get();
+      return res.json({ id: created.id, ...created.data() });
+    }
+    return res.json({ id: snap.id, ...snap.data() });
+  } catch (error) {
+    console.error('Fehler bei /api/me:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
@@ -391,6 +448,8 @@ app.post('/api/employee-dossier', async (req, res) => {
       strengths: dossierData.strengths || '',
       weaknesses: dossierData.weaknesses || '',
       comments: dossierData.comments || '',
+      utilizationComment: dossierData.utilizationComment || '',
+      planningComment: dossierData.planningComment || '',
       travelReadiness: dossierData.travelReadiness || '',
       projectHistory: dossierData.projectHistory || [],
       projectOffers: dossierData.projectOffers || [],

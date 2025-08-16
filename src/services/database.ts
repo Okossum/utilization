@@ -8,12 +8,20 @@ const API_BASE_URL = process.env.NODE_ENV === 'production'
   : 'http://localhost:3001/api';
 
 // API-Service für Backend-Kommunikation
+let authTokenProvider: (() => Promise<string | null>) | null = null;
+
+export function setAuthTokenProvider(provider: () => Promise<string | null>) {
+  authTokenProvider = provider;
+}
+
 class ApiService {
   private static async request(endpoint: string, options: RequestInit = {}) {
     try {
+      const token = authTokenProvider ? await authTokenProvider() : null;
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         headers: {
           'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
           ...options.headers,
         },
         ...options,
@@ -46,6 +54,15 @@ class ApiService {
 
 // Datenbank-Service für lokale SQLite-Datenbank
 export class DatabaseService {
+  // Aktuelles User-Profil abrufen
+  static async getMe() {
+    try {
+      return await ApiService.get('/me');
+    } catch (error) {
+      console.error('Fehler beim Abrufen des User-Profils:', error);
+      throw error;
+    }
+  }
   
   // Auslastung-Daten speichern oder aktualisieren
   static async saveAuslastung(fileName: string, data: any[]) {
