@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, Edit2, Trash2, User, Briefcase, MessageSquare, Plane } from 'lucide-react';
+import { X, Plus, Edit2, Trash2, User, Briefcase, MessageSquare, Plane, ArrowRight } from 'lucide-react';
 import { ProjectHistoryList } from './ProjectHistoryList';
 import { ProjectOffersList } from './ProjectOffersList';
 import { JiraTicketsList } from './JiraTicketsList';
 import { PlanningModal } from './PlanningModal';
 import DatabaseService from '../../services/database';
 import { EmployeeSkillsEditor } from './EmployeeSkillsEditor';
+import { UtilizationComment } from './UtilizationComment';
+import { PlanningCommentModal } from './PlanningCommentModal';
 export interface ProjectHistoryItem {
   id: string;
   projectName: string;
@@ -45,6 +47,7 @@ export interface Employee {
   strengths: string;
   weaknesses: string;
   comments: string;
+  utilizationComment?: string;
   travelReadiness: string;
   projectOffers: ProjectOffer[];
   jiraTickets: JiraTicket[];
@@ -89,6 +92,8 @@ export function EmployeeDossierModal({
   const [formData, setFormData] = useState<Employee>(employee);
   const [isLoading, setIsLoading] = useState(false);
   const [isPlanningOpen, setPlanningOpen] = useState(false);
+  const [isPlanningCommentOpen, setPlanningCommentOpen] = useState(false);
+  const [planningComment, setPlanningComment] = useState<string>('');
 
   // Lade Employee Dossier aus der Datenbank und kombiniere mit Excel-Daten
   useEffect(() => {
@@ -127,6 +132,7 @@ export function EmployeeDossierModal({
           strengths: savedDossier?.strengths || employee.strengths || '',
           weaknesses: savedDossier?.weaknesses || employee.weaknesses || '',
           comments: savedDossier?.comments || employee.comments || '',
+          utilizationComment: savedDossier?.utilizationComment || employee.utilizationComment || '',
           travelReadiness: savedDossier?.travelReadiness || employee.travelReadiness || '',
           projectHistory: normalizedProjectHistory || employee.projectHistory || [],
           projectOffers: savedDossier?.projectOffers || employee.projectOffers || [],
@@ -137,6 +143,7 @@ export function EmployeeDossierModal({
         };
         
         setFormData(combinedData);
+        setPlanningComment(String(savedDossier?.planningComment || ''));
       } catch (error) {
         console.error('Fehler beim Laden der Employee-Daten:', error);
         // Fallback: Verwende nur Excel-Daten
@@ -151,6 +158,7 @@ export function EmployeeDossierModal({
             careerLevel: excelData.careerLevel || prev.careerLevel,
             excelData: excelData
           }));
+          setPlanningComment('');
         }
       } finally {
         setIsLoading(false);
@@ -177,6 +185,7 @@ export function EmployeeDossierModal({
         strengths: formData.strengths,
         weaknesses: formData.weaknesses,
         comments: formData.comments,
+        utilizationComment: formData.utilizationComment,
         travelReadiness: formData.travelReadiness,
         projectHistory: formData.projectHistory,
         projectOffers: formData.projectOffers,
@@ -245,6 +254,9 @@ export function EmployeeDossierModal({
               <div className="flex items-center gap-2">
                 <button onClick={() => setPlanningOpen(true)} className="px-3 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
                   Planung (Angebote & Jira)
+                </button>
+                <button onClick={() => setPlanningCommentOpen(true)} className="px-3 py-2 text-sm text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+                  Einsatzplan-Kommentar
                 </button>
                 <button onClick={onClose} className="p-2 hover:bg-white/50 rounded-lg transition-colors">
                   <X className="w-5 h-5 text-gray-500" />
@@ -328,6 +340,41 @@ export function EmployeeDossierModal({
                 <textarea value={formData.comments} onChange={e => handleInputChange('comments', e.target.value)} rows={3} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none" placeholder="Allgemeine Kommentare zum Mitarbeiter..." />
               </section>
 
+              {/* Utilization & Planning Comments side-by-side */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Utilization Comment Component */}
+                <UtilizationComment
+                  personId={formData.id}
+                  initialValue={formData.utilizationComment}
+                  onLocalChange={(v)=> setFormData(prev => ({ ...prev, utilizationComment: v }))}
+                  className="h-full"
+                />
+
+                {/* Planning Comment (inline card with edit via modal) */}
+                <section className="space-y-3">
+                  <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
+                    <MessageSquare className="w-5 h-5 text-blue-600" />
+                    <ArrowRight className="w-5 h-5 text-blue-600" />
+                    Einsatzplan
+                    <button
+                      type="button"
+                      className="ml-2 inline-flex items-center gap-1 text-sm text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded px-2 py-1"
+                      onClick={() => setPlanningCommentOpen(true)}
+                      title="Bearbeiten"
+                    >
+                      Bearbeiten
+                    </button>
+                  </h2>
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded min-h-24">
+                    {planningComment?.trim() ? (
+                      <p className="text-sm text-gray-800 whitespace-pre-wrap">{planningComment}</p>
+                    ) : (
+                      <p className="text-sm text-gray-500">Kein Einsatzplan-Kommentar vorhanden.</p>
+                    )}
+                  </div>
+                </section>
+              </div>
+
               {/* Travel Readiness */}
               <section className="space-y-4">
                 <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
@@ -386,6 +433,17 @@ export function EmployeeDossierModal({
           } catch (e) {
             console.error('Fehler beim Aktualisieren nach Planung:', e);
           }
+        }}
+        personId={formData.id}
+      />
+      <PlanningCommentModal
+        isOpen={isPlanningCommentOpen}
+        onClose={async () => {
+          setPlanningCommentOpen(false);
+          try {
+            const updated = await DatabaseService.getEmployeeDossier(formData.id);
+            setPlanningComment(String(updated?.planningComment || ''));
+          } catch {}
         }}
         personId={formData.id}
       />
