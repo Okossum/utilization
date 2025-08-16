@@ -79,6 +79,16 @@ export class DatabaseService {
       throw error;
     }
   }
+
+  // Admin: Nutzerliste
+  static async getUsers() {
+    return ApiService.get('/users');
+  }
+
+  // Admin: Nutzer aktualisieren
+  static async updateUser(uid: string, data: any) {
+    return ApiService.put(`/users/${uid}`, data);
+  }
   
   // Auslastung-Daten speichern oder aktualisieren
   static async saveAuslastung(fileName: string, data: any[]) {

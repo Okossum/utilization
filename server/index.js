@@ -61,8 +61,53 @@ async function authMiddleware(req, _res, next) {
 
 app.use(authMiddleware);
 
+// Require authenticated user
+function requireAuth(req, res, next) {
+  if (!req.user?.uid) {
+    return res.status(401).json({ error: 'Nicht authentifiziert' });
+  }
+  return next();
+}
+
+// Load user profile (Firestore)
+async function loadUserProfile(uid) {
+  const snap = await db.collection('users').doc(uid).get();
+  return snap.exists ? { id: snap.id, ...snap.data() } : null;
+}
+
+// Require admin
+async function requireAdmin(req, res, next) {
+  try {
+    if (!req.user?.uid) return res.status(401).json({ error: 'Nicht authentifiziert' });
+    const profile = await loadUserProfile(req.user.uid);
+    const isAdmin = Boolean(req.user?.admin === true || profile?.role === 'admin');
+    if (!isAdmin) return res.status(403).json({ error: 'Nicht autorisiert' });
+    req.profile = profile;
+    return next();
+  } catch (e) {
+    return res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+}
+
+// Apply scope filter (Team > CC > Bereich) unless user canViewAll or admin
+function applyScopeFilter(rows, profile, adminClaim) {
+  if (!profile) return [];
+  const canViewAll = Boolean(profile.canViewAll) || Boolean(adminClaim === true) || profile.role === 'admin';
+  if (canViewAll) return rows;
+  const scopeTeam = profile.team || '';
+  const scopeCc = profile.competenceCenter || '';
+  const scopeBereich = profile.bereich || '';
+  return rows.filter(r => {
+    const meta = r;
+    if (scopeTeam) return String(meta.team || '') === String(scopeTeam);
+    if (scopeCc) return String(meta.cc || '') === String(scopeCc);
+    if (scopeBereich) return String(meta.bereich || '') === String(scopeBereich);
+    return true;
+  });
+}
+
 // Current user profile endpoint
-app.get('/api/me', async (req, res) => {
+app.get('/api/me', requireAuth, async (req, res) => {
   try {
     const uid = req.user?.uid;
     if (!uid) {
@@ -101,7 +146,7 @@ app.get('/api/me', async (req, res) => {
 });
 
 // Update current user profile
-app.put('/api/me', async (req, res) => {
+app.put('/api/me', requireAuth, async (req, res) => {
   try {
     const uid = req.user?.uid;
     if (!uid) {
@@ -157,7 +202,7 @@ function buildWeekValuesMap(row) {
 }
 
 // Auslastung-Daten speichern oder aktualisieren (Firestore)
-app.post('/api/auslastung', async (req, res) => {
+app.post('/api/auslastung', requireAuth, async (req, res) => {
   try {
     const { fileName, data } = req.body;
     
@@ -223,7 +268,7 @@ app.post('/api/auslastung', async (req, res) => {
 });
 
 // Einsatzplan-Daten speichern oder aktualisieren (Firestore)
-app.post('/api/einsatzplan', async (req, res) => {
+app.post('/api/einsatzplan', requireAuth, async (req, res) => {
   try {
     const { fileName, data } = req.body;
     
@@ -303,11 +348,13 @@ app.post('/api/einsatzplan', async (req, res) => {
 });
 
 // Alle Auslastung-Daten abrufen (nur neueste Version)
-app.get('/api/auslastung', async (req, res) => {
+app.get('/api/auslastung', requireAuth, async (req, res) => {
   try {
     const snap = await db.collection('auslastung').where('isLatest', '==', true).get();
-    const out = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    let out = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       .sort((a, b) => String(a.person || '').localeCompare(String(b.person || ''), 'de'));
+    const profile = await loadUserProfile(req.user.uid);
+    out = applyScopeFilter(out, profile, req.user?.admin);
     res.json(out);
   } catch (error) {
     console.error('Fehler beim Abrufen der Auslastung:', error);
@@ -316,11 +363,13 @@ app.get('/api/auslastung', async (req, res) => {
 });
 
 // Alle Einsatzplan-Daten abrufen (nur neueste Version)
-app.get('/api/einsatzplan', async (req, res) => {
+app.get('/api/einsatzplan', requireAuth, async (req, res) => {
   try {
     const snap = await db.collection('einsatzplan').where('isLatest', '==', true).get();
-    const out = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    let out = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       .sort((a, b) => String(a.person || '').localeCompare(String(b.person || ''), 'de'));
+    const profile = await loadUserProfile(req.user.uid);
+    out = applyScopeFilter(out, profile, req.user?.admin);
     res.json(out);
   } catch (error) {
     console.error('Fehler beim Abrufen des Einsatzplans:', error);
@@ -329,7 +378,7 @@ app.get('/api/einsatzplan', async (req, res) => {
 });
 
 // Upload-Historie abrufen
-app.get('/api/upload-history', async (req, res) => {
+app.get('/api/upload-history', requireAuth, async (req, res) => {
   try {
     const snap = await db.collection('uploadHistory').orderBy('createdAt', 'desc').get();
     const out = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -341,7 +390,7 @@ app.get('/api/upload-history', async (req, res) => {
 });
 
 // Normalisierte Auslastungsdaten konsolidieren und speichern
-app.post('/api/consolidate', async (req, res) => {
+app.post('/api/consolidate', requireAuth, async (req, res) => {
   try {
     const { auslastungData, einsatzplanData, currentYear, forecastStartWeek, lookbackWeeks, forecastWeeks } = req.body;
     
@@ -459,7 +508,7 @@ app.post('/api/consolidate', async (req, res) => {
 });
 
 // Normalisierte Daten abrufen
-app.get('/api/utilization-data', async (req, res) => {
+app.get('/api/utilization-data', requireAuth, async (req, res) => {
   try {
     const { isHistorical, person } = req.query;
     
@@ -472,13 +521,15 @@ app.get('/api/utilization-data', async (req, res) => {
     }
     // Firestore cannot order by multiple fields without composite indexes; keep simple
     const snap = await queryRef.get();
-    const out = snap.docs
+    let out = snap.docs
       .map(d => d.data())
       .sort((a, b) => {
         if (a.person !== b.person) return String(a.person).localeCompare(String(b.person));
         if (a.year !== b.year) return (a.year || 0) - (b.year || 0);
         return (a.weekNumber || 0) - (b.weekNumber || 0);
       });
+    const profile = await loadUserProfile(req.user.uid);
+    out = applyScopeFilter(out, profile, req.user?.admin);
     res.json(out);
   } catch (error) {
     console.error('Fehler beim Abrufen der normalisierten Daten:', error);
@@ -493,7 +544,7 @@ function extractWeekValue(row, weekNum, year) {
 }
 
 // Employee Dossier speichern oder aktualisieren
-app.post('/api/employee-dossier', async (req, res) => {
+app.post('/api/employee-dossier', requireAuth, async (req, res) => {
   try {
     const { employeeId, dossierData } = req.body;
     
@@ -532,7 +583,7 @@ app.post('/api/employee-dossier', async (req, res) => {
 });
 
 // Employee Dossier abrufen
-app.get('/api/employee-dossier/:employeeId', async (req, res) => {
+app.get('/api/employee-dossier/:employeeId', requireAuth, async (req, res) => {
   try {
     const { employeeId } = req.params;
     
@@ -549,7 +600,7 @@ app.get('/api/employee-dossier/:employeeId', async (req, res) => {
 });
 
 // Alle Employee Dossiers abrufen
-app.get('/api/employee-dossiers', async (req, res) => {
+app.get('/api/employee-dossiers', requireAuth, async (req, res) => {
   try {
     const snap = await db.collection('employeeDossiers').get();
     const out = snap.docs
@@ -558,6 +609,44 @@ app.get('/api/employee-dossiers', async (req, res) => {
     res.json(out);
   } catch (error) {
     console.error('Fehler beim Abrufen aller Employee Dossiers:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+// Admin: Alle User-Profile abrufen
+app.get('/api/users', requireAdmin, async (_req, res) => {
+  try {
+    const snap = await db.collection('users').get();
+    const out = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    res.json(out);
+  } catch (error) {
+    console.error('Fehler beim Abrufen der Nutzer:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+// Admin: User-Profil aktualisieren (inkl. Rolle/Scope/CanViewAll)
+app.put('/api/users/:uid', requireAdmin, async (req, res) => {
+  try {
+    const { uid } = req.params;
+    const { role, canViewAll, lob, bereich, competenceCenter, team } = req.body || {};
+    const docRef = db.collection('users').doc(uid);
+    const toUpdate = { updatedAt: FieldValue.serverTimestamp() };
+    if (typeof role !== 'undefined') toUpdate.role = role || null;
+    if (typeof canViewAll !== 'undefined') toUpdate.canViewAll = Boolean(canViewAll);
+    if (typeof lob !== 'undefined') toUpdate.lob = lob || null;
+    if (typeof bereich !== 'undefined') toUpdate.bereich = bereich || null;
+    if (typeof competenceCenter !== 'undefined') toUpdate.competenceCenter = competenceCenter || null;
+    if (typeof team !== 'undefined') toUpdate.team = team || null;
+    await docRef.set(toUpdate, { merge: true });
+    // Optional: Claims setzen
+    if (typeof role !== 'undefined') {
+      await admin.auth().setCustomUserClaims(uid, { role, admin: role === 'admin' });
+    }
+    const snap = await docRef.get();
+    res.json({ id: snap.id, ...snap.data() });
+  } catch (error) {
+    console.error('Fehler beim Aktualisieren des Nutzers:', error);
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });

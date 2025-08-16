@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Search, Building2, Edit2, Trash2, Users, Calendar, FolderOpen } from 'lucide-react';
+import { Plus, Search, Building2, Edit2, Trash2, Users, FolderOpen, Shield, RefreshCw, Check } from 'lucide-react';
 import { useCustomers } from '../../contexts/CustomerContext';
+import DatabaseService from '../../services/database';
+import { useAuth } from '../../contexts/AuthContext';
 
 export function CustomerManagementPage() {
+  const { profile } = useAuth();
   const {
     customers,
     projects,
@@ -18,6 +21,10 @@ export function CustomerManagementPage() {
   const [newCustomerName, setNewCustomerName] = useState('');
   const [editingCustomer, setEditingCustomer] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  // Admin User Management
+  const [users, setUsers] = useState<any[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const isAdmin = useMemo(() => (profile?.role === 'admin'), [profile?.role]);
 
   const filteredCustomers = customers.filter(customer =>
     customer.toLowerCase().includes(searchTerm.toLowerCase())
@@ -53,6 +60,28 @@ export function CustomerManagementPage() {
   const cancelEditing = () => {
     setEditingCustomer(null);
     setEditName('');
+  };
+
+  // Load users if admin
+  useEffect(() => {
+    if (!isAdmin) return;
+    (async () => {
+      setLoadingUsers(true);
+      try {
+        const list = await DatabaseService.getUsers();
+        setUsers(list || []);
+      } catch {
+        setUsers([]);
+      } finally {
+        setLoadingUsers(false);
+      }
+    })();
+  }, [isAdmin]);
+
+  const updateUser = async (uid: string, data: any) => {
+    await DatabaseService.updateUser(uid, data);
+    const list = await DatabaseService.getUsers();
+    setUsers(list || []);
   };
 
   return (
@@ -144,6 +173,56 @@ export function CustomerManagementPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Admin: Userverwaltung */}
+      {isAdmin && (
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+            <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2"><Shield className="w-5 h-5 text-purple-600"/> Benutzerverwaltung</h2>
+            <button onClick={async () => { setLoadingUsers(true); try { const list = await DatabaseService.getUsers(); setUsers(list || []); } finally { setLoadingUsers(false); } }} className="inline-flex items-center gap-2 px-3 py-1.5 text-sm border rounded-lg">
+              <RefreshCw className="w-4 h-4"/> Aktualisieren
+            </button>
+          </div>
+          <div className="divide-y divide-gray-200">
+            {loadingUsers ? (
+              <div className="p-6 text-gray-500">Lade Benutzer…</div>
+            ) : users.length === 0 ? (
+              <div className="p-6 text-gray-500">Keine Benutzer gefunden.</div>
+            ) : (
+              users.map(u => (
+                <div key={u.id} className="p-6 grid grid-cols-1 md:grid-cols-6 gap-3 items-center">
+                  <div className="md:col-span-2">
+                    <div className="text-sm text-gray-500">E-Mail</div>
+                    <div className="text-sm font-medium text-gray-900">{u.email || '—'}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-500">Rolle</div>
+                    <select defaultValue={u.role || 'unknown'} onChange={e => updateUser(u.uid || u.id, { role: e.target.value })} className="w-full px-2 py-1 border rounded">
+                      {['bereichsleiter','cc','teamleiter','sales','admin','unknown'].map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-500">Bereich</div>
+                    <input defaultValue={u.bereich || ''} onBlur={e => updateUser(u.uid || u.id, { bereich: e.target.value || null })} className="w-full px-2 py-1 border rounded" placeholder="Bereich"/>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-500">CC</div>
+                    <input defaultValue={u.competenceCenter || ''} onBlur={e => updateUser(u.uid || u.id, { competenceCenter: e.target.value || null })} className="w-full px-2 py-1 border rounded" placeholder="Competence Center"/>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-500">Team</div>
+                    <input defaultValue={u.team || ''} onBlur={e => updateUser(u.uid || u.id, { team: e.target.value || null })} className="w-full px-2 py-1 border rounded" placeholder="Team"/>
+                    <label className="mt-2 flex items-center gap-2 text-xs text-gray-700">
+                      <input type="checkbox" defaultChecked={Boolean(u.canViewAll)} onChange={e => updateUser(u.uid || u.id, { canViewAll: e.target.checked })} />
+                      <span>Alle Daten sehen</span>
+                    </label>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Customers List */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
