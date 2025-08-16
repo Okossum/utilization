@@ -46,7 +46,7 @@ export function UtilizationReportView() {
     einsatzplan?: any[];
     utilizationData?: any[];
   }>({});
-  const [dataSource, setDataSource] = useState<'upload' | 'database'>('upload');
+  const [dataSource, setDataSource] = useState<'upload' | 'database'>('database');
   const [selectedPersons, setSelectedPersons] = useState<string[]>([]);
   const [planningForPerson, setPlanningForPerson] = useState<string | null>(null);
   const [planningForWeek, setPlanningForWeek] = useState<{ year: number; week: number } | null>(null);
@@ -234,8 +234,8 @@ export function UtilizationReportView() {
           setDataSource('database');
         }
       } catch (error) {
-        console.log('Keine Datenbank-Daten verfügbar, verwende Upload-Daten');
-        setDataSource('upload');
+        console.log('Keine Datenbank-Daten verfügbar');
+        setDataSource('database');
       }
     };
 
@@ -261,19 +261,7 @@ export function UtilizationReportView() {
     return () => window.removeEventListener('switch-to-database-source', handler as any);
   }, []);
 
-  // Restore from localStorage on mount (fallback)
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && (parsed.auslastung || parsed.einsatzplan)) {
-          setUploadedFiles(parsed);
-          setDataSource('upload');
-        }
-      }
-    } catch {}
-  }, []);
+  // Keine lokale Fallback-Nutzung mehr – App arbeitet immer mit Datenbankdaten
 
   // Clean up old "student" status from database
   useEffect(() => {
@@ -301,12 +289,7 @@ export function UtilizationReportView() {
     } catch {}
   }, []);
 
-  // Autosave to localStorage on change
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(uploadedFiles));
-    } catch {}
-  }, [uploadedFiles]);
+  // Kein Autosave mehr notwendig
 
   // Save working students toggle state
   useEffect(() => {
