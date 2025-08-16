@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { getISOWeek, getISOWeekYear } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, Car, ChefHat, Database, Target, User, Ticket } from 'lucide-react';
+import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, ChefHat, Database, Target, User, Ticket } from 'lucide-react';
 import { DataUploadSection } from './DataUploadSection';
 import { MultiSelectFilter } from './MultiSelectFilter';
 import { PersonFilterBar } from './PersonFilterBar';
@@ -11,7 +11,6 @@ import { UtilizationChartSection } from './UtilizationChartSection';
 import { UtilizationTrendChart } from './UtilizationTrendChart';
 import { PlannedEngagementEditor, PlannedEngagement } from './PlannedEngagementEditor';
 import { StatusLabelSelector } from './StatusLabelSelector';
-import { TravelReadinessSelector } from './TravelReadinessSelector';
 import { EmployeeDossierModal, Employee } from './EmployeeDossierModal';
 import { PlanningModal } from './PlanningModal';
 interface UtilizationData {
@@ -897,11 +896,6 @@ export function UtilizationReportView() {
                     Mitarbeitende
                   </th>
                   <th className="px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">LBS</th>
-                  <th className="px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">
-                    <div className="flex items-center justify-center">
-                      <Car className="w-4 h-4" />
-                    </div>
-                  </th>
                   <th className="px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">Status</th>
                   {Array.from({ length: forecastWeeks }, (_, i) => {
                     const weekNumber = (forecastStartWeek + 1) + i; // starts after current week
@@ -1085,17 +1079,7 @@ export function UtilizationReportView() {
                           <span className="text-xs text-gray-400">—</span>
                         )}
                       </td>
-                      <td className={`px-2 py-2 text-sm ${
-                        actionItems[person] 
-                          ? (plannedByPerson[person]?.planned ? 'bg-yellow-100' : 'bg-blue-100')
-                          : 'bg-gray-50'
-                      }`}>
-                        <TravelReadinessSelector
-                          person={person}
-                          value={personTravelReadiness[person]}
-                          onChange={(readiness) => setPersonTravelReadiness(prev => ({ ...prev, [person]: readiness }))}
-                        />
-                      </td>
+                      
                       <td className={`px-2 py-2 text-sm ${
                         actionItems[person] 
                           ? (plannedByPerson[person]?.planned ? 'bg-yellow-100' : 'bg-blue-100')
