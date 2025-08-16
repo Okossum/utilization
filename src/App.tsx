@@ -35,7 +35,12 @@ function App() {
       useEffect(() => {
         const openHandler = () => setAdminModalOpen(true);
         window.addEventListener('open-admin-modal', openHandler as any);
-        return () => window.removeEventListener('open-admin-modal', openHandler as any);
+        const openAccountHandler = () => setAccountModalOpen(true);
+        window.addEventListener('open-account-modal', openAccountHandler as any);
+        return () => {
+          window.removeEventListener('open-admin-modal', openHandler as any);
+          window.removeEventListener('open-account-modal', openAccountHandler as any);
+        };
       }, []);
       if (loading) {
         return (
@@ -48,16 +53,6 @@ function App() {
       return (
         <CustomerProvider>
           {/* Global Header Actions */}
-          <div className="fixed top-4 right-4 z-50">
-            <button
-              onClick={() => setAccountModalOpen(true)}
-              className="inline-flex items-center justify-center w-9 h-9 bg-white border border-gray-300 rounded-full shadow-sm hover:bg-gray-50"
-              title="Account"
-            >
-              <UserIcon className="w-4 h-4 text-gray-700" />
-            </button>
-          </div>
-
           <UtilizationReportView />
           <AccountInfoModal isOpen={isAccountModalOpen} onClose={() => setAccountModalOpen(false)} />
           <AdminUserManagementModal isOpen={isAdminModalOpen} onClose={() => setAdminModalOpen(false)} />

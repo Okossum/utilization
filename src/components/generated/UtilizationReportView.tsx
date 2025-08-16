@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { getISOWeek, getISOWeekYear } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, ChefHat, Database, Target, User, Ticket, Columns, ArrowLeft, MessageSquare, X, ArrowRight } from 'lucide-react';
+import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, ChefHat, Database, Target, User, Ticket, Columns, ArrowLeft, MessageSquare, X, ArrowRight, User as UserIcon } from 'lucide-react';
 import { DataUploadSection } from './DataUploadSection';
 import { useAuth } from '../../contexts/AuthContext';
 import { MultiSelectFilter } from './MultiSelectFilter';
@@ -891,7 +891,7 @@ export function UtilizationReportView() {
               Rückblick {lookbackWeeks} W · Vorblick {forecastWeeks} W · ISO-KW
             </p>
           </div>
-          <div className="flex items-center gap-2 relative">
+          <div className="flex items-center gap-2 relative ml-auto">
             {/* LoB als feststehender Chip, wenn nur eine vorhanden ist */}
             {lobOptions.length === 1 && (
               <span className="px-4 py-2 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg uppercase tracking-wide">
@@ -1014,6 +1014,16 @@ export function UtilizationReportView() {
                 </div>
               </div>
             )}
+
+            {/* Avatar Icon ganz rechts */}
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('open-account-modal'))}
+              className="ml-2 inline-flex items-center justify-center w-9 h-9 bg-white border border-gray-300 rounded-full shadow-sm hover:bg-gray-50"
+              title="Account"
+            >
+              <UserIcon className="w-4 h-4 text-gray-700" />
+            </button>
           </div>
         </div>
       </header>
@@ -1399,7 +1409,7 @@ export function UtilizationReportView() {
                             className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors ml-auto"
                             title="Mitarbeiter-Dossier öffnen"
                           >
-                            <User className="w-4 h-4" />
+                            <UserIcon className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
