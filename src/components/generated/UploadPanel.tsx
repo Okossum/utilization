@@ -152,6 +152,13 @@ export function UploadPanel({
         try {
           window.dispatchEvent(new CustomEvent('switch-to-database-source'));
         } catch {}
+
+        // Vollständiger Seiten-Refresh, damit die Daten sicher angezeigt werden
+        try {
+          setTimeout(() => {
+            window.location.reload();
+          }, 250);
+        } catch {}
       }
     } catch (e: any) {
       onFilesChange({
