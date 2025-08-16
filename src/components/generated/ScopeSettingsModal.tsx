@@ -8,14 +8,14 @@ interface ScopeSettingsModalProps {
   onClose: () => void;
   profile: UserProfile | null;
   lobOptions?: string[];
-  buOptions: string[];
+  bereichOptions: string[];
   ccOptions: string[];
   teamOptions: string[];
-  onSave: (data: { businessUnit?: string | null; competenceCenter?: string | null; team?: string | null; canViewAll?: boolean }) => Promise<void>;
+  onSave: (data: { bereich?: string | null; competenceCenter?: string | null; team?: string | null; canViewAll?: boolean }) => Promise<void>;
 }
 
-export function ScopeSettingsModal({ isOpen, onClose, profile, lobOptions = [], buOptions, ccOptions, teamOptions, onSave }: ScopeSettingsModalProps) {
-  const [businessUnit, setBusinessUnit] = useState<string | ''>('');
+export function ScopeSettingsModal({ isOpen, onClose, profile, lobOptions = [], bereichOptions, ccOptions, teamOptions, onSave }: ScopeSettingsModalProps) {
+  const [bereich, setBereich] = useState<string | ''>('');
   const [lob, setLob] = useState<string | ''>('');
   const [competenceCenter, setCompetenceCenter] = useState<string | ''>('');
   const [team, setTeam] = useState<string | ''>('');
@@ -25,7 +25,7 @@ export function ScopeSettingsModal({ isOpen, onClose, profile, lobOptions = [], 
   useEffect(() => {
     if (!isOpen) return;
     setLob((profile?.lob as any as string) || '');
-    setBusinessUnit((profile?.businessUnit as string) || '');
+    setBereich((profile?.bereich as string) || '');
     setCompetenceCenter((profile?.competenceCenter as string) || '');
     setTeam((profile?.team as string) || '');
     setCanViewAll(Boolean(profile?.canViewAll));
@@ -39,7 +39,7 @@ export function ScopeSettingsModal({ isOpen, onClose, profile, lobOptions = [], 
     try {
       await onSave({
         // lob wird aktuell serverseitig nicht persistiert; kann später ergänzt werden
-        businessUnit: businessUnit || null,
+        bereich: bereich || null,
         competenceCenter: competenceCenter || null,
         team: team || null,
         canViewAll,
@@ -86,11 +86,11 @@ export function ScopeSettingsModal({ isOpen, onClose, profile, lobOptions = [], 
                   </div>
                 )}
                 <div>
-                  <label className="block text-sm text-gray-700 mb-1">Business Unit</label>
-                  <select value={businessUnit} onChange={e => setBusinessUnit(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                  <label className="block text-sm text-gray-700 mb-1">Bereich</label>
+                  <select value={bereich} onChange={e => setBereich(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     <option value="">— Nicht gesetzt —</option>
-                    {buOptions.map(bu => (
-                      <option key={bu} value={bu}>{bu}</option>
+                    {bereichOptions.map(b => (
+                      <option key={b} value={b}>{b}</option>
                     ))}
                   </select>
                 </div>

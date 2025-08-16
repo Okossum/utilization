@@ -29,7 +29,6 @@ export interface UserProfile {
   canViewAll?: boolean;
   lob?: string | null;
   bereich?: string | null;
-  businessUnit?: string | null;
   competenceCenter?: string | null;
   team?: string | null;
 }

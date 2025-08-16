@@ -620,10 +620,10 @@ export function UtilizationReportView() {
   useEffect(() => {
     if (!profile) return;
     setSelectedLoB(String(profile.lob || ''));
-    setSelectedBereich(String((profile as any).bereich || profile.businessUnit || ''));
+    setSelectedBereich(String((profile as any).bereich || ''));
     setSelectedCC(String(profile.competenceCenter || ''));
     setSelectedTeam(String(profile.team || ''));
-  }, [profile?.lob, (profile as any)?.bereich, profile?.businessUnit, profile?.competenceCenter, profile?.team]);
+  }, [profile?.lob, (profile as any)?.bereich, profile?.competenceCenter, profile?.team]);
   // Defaults: wenn nur eine Option vorhanden und nichts gewählt, automatisch setzen
   useEffect(() => { if (!selectedLoB && lobOptions.length === 1) setSelectedLoB(lobOptions[0]); }, [lobOptions]);
   useEffect(() => { if (!selectedBereich && bereichOptions.length === 1) setSelectedBereich(bereichOptions[0]); }, [bereichOptions]);

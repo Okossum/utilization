@@ -7,19 +7,11 @@ import path from 'path';
 
 const app = express();
 
-// Initialize Firebase Admin (Application Default Credentials)
+// Initialize Firebase Admin using explicit service account credentials to avoid ADC issues
 if (!admin.apps.length) {
-  // Prefer explicit service account file to avoid ADC issues
-  const defaultPath = path.resolve(process.cwd(), 'ressourceutilization-firebase-adminsdk-fbsvc-e8129f7d59.json');
-  const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS && fs.existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)
-    ? process.env.GOOGLE_APPLICATION_CREDENTIALS
-    : (fs.existsSync(defaultPath) ? defaultPath : '');
-  if (credPath) {
-    const svc = JSON.parse(fs.readFileSync(credPath, 'utf8'));
-    admin.initializeApp({ credential: admin.credential.cert(svc) });
-  } else {
-    admin.initializeApp({ credential: admin.credential.applicationDefault() });
-  }
+  const absoluteServiceAccountPath = '/Users/oliver.koss/Projekte/Ressource Utilization/ressourceutilization-firebase-adminsdk-fbsvc-e8129f7d59.json';
+  const svc = JSON.parse(fs.readFileSync(absoluteServiceAccountPath, 'utf8'));
+  admin.initializeApp({ credential: admin.credential.cert(svc) });
 }
 const db = admin.firestore();
 const FieldValue = admin.firestore.FieldValue;
@@ -92,7 +84,6 @@ app.get('/api/me', async (req, res) => {
         canViewAll: false,
         lob: null,
         bereich: null,
-        businessUnit: null,
         competenceCenter: null,
         team: null,
         createdAt: FieldValue.serverTimestamp(),
@@ -116,7 +107,7 @@ app.put('/api/me', async (req, res) => {
     if (!uid) {
       return res.status(401).json({ error: 'Nicht authentifiziert' });
     }
-    const { canViewAll, lob, bereich, businessUnit, competenceCenter, team, role } = req.body || {};
+    const { canViewAll, lob, bereich, competenceCenter, team, role } = req.body || {};
     const users = db.collection('users');
     const docRef = users.doc(uid);
     const toUpdate = {
@@ -125,7 +116,10 @@ app.put('/api/me', async (req, res) => {
     if (typeof canViewAll === 'boolean') toUpdate.canViewAll = canViewAll;
     if (typeof lob !== 'undefined') toUpdate.lob = lob || null;
     if (typeof bereich !== 'undefined') toUpdate.bereich = bereich || null;
-    if (typeof businessUnit !== 'undefined') toUpdate.businessUnit = businessUnit || null;
+    // Backward compatibility: if legacy "businessUnit" is provided and no explicit "bereich", map it to bereich
+    if (typeof req.body?.businessUnit !== 'undefined' && typeof bereich === 'undefined') {
+      toUpdate.bereich = req.body.businessUnit || null;
+    }
     if (typeof competenceCenter !== 'undefined') toUpdate.competenceCenter = competenceCenter || null;
     if (typeof team !== 'undefined') toUpdate.team = team || null;
     // Only allow role change if the token has an admin claim (future extension)
