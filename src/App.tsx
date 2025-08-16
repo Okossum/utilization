@@ -7,8 +7,9 @@ import { CustomerProvider } from './contexts/CustomerContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './contexts/AuthContext';
 import LoginForm from './components/LoginForm';
-import { User as UserIcon, ChevronDown, LogOut } from 'lucide-react';
+import { User as UserIcon } from 'lucide-react';
 import AdminUserManagementModal from './components/generated/AdminUserManagementModal';
+import AccountInfoModal from './components/generated/AccountInfoModal';
 
 let theme: Theme = 'light';
 // only use 'centered' container for standalone components, never for full page apps or websites.
@@ -28,18 +29,13 @@ function App() {
   const generatedComponent = useMemo(() => {
     // THIS IS WHERE THE TOP LEVEL GENRATED COMPONENT WILL BE RETURNED!
     function RootRouter() {
-      const { user, loading, profile, logout } = useAuth();
+      const { user, loading, profile } = useAuth();
       const [isAdminModalOpen, setAdminModalOpen] = useState(false);
-      const [isMenuOpen, setMenuOpen] = useState(false);
-      const menuRef = useRef<HTMLDivElement>(null);
+      const [isAccountModalOpen, setAccountModalOpen] = useState(false);
       useEffect(() => {
-        const handler = (e: MouseEvent) => {
-          if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-            setMenuOpen(false);
-          }
-        };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
+        const openHandler = () => setAdminModalOpen(true);
+        window.addEventListener('open-admin-modal', openHandler as any);
+        return () => window.removeEventListener('open-admin-modal', openHandler as any);
       }, []);
       if (loading) {
         return (
@@ -52,41 +48,18 @@ function App() {
       return (
         <CustomerProvider>
           {/* Global Header Actions */}
-          <div className="fixed top-4 right-4 z-50" ref={menuRef}>
+          <div className="fixed top-4 right-4 z-50">
             <button
-              onClick={() => setMenuOpen(v => !v)}
-              className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50"
+              onClick={() => setAccountModalOpen(true)}
+              className="inline-flex items-center justify-center w-9 h-9 bg-white border border-gray-300 rounded-full shadow-sm hover:bg-gray-50"
               title="Account"
             >
               <UserIcon className="w-4 h-4 text-gray-700" />
-              <ChevronDown className="w-4 h-4 text-gray-500" />
             </button>
-            {isMenuOpen && (
-              <div className="mt-2 w-72 bg-white border border-gray-200 rounded-lg shadow-lg p-3">
-                <div className="mb-3">
-                  <div className="text-xs text-gray-500">Angemeldet als</div>
-                  <div className="text-sm font-medium text-gray-900 truncate">{profile?.displayName || user.email || '—'}</div>
-                  <div className="text-xs text-gray-600">Rolle: {String(profile?.role || 'unknown')}</div>
-                </div>
-                {profile?.role === 'admin' && (
-                  <button
-                    onClick={() => { setAdminModalOpen(true); setMenuOpen(false); }}
-                    className="w-full px-3 py-2 text-sm text-white bg-purple-600 rounded-lg hover:bg-purple-700 mb-2"
-                  >
-                    Benutzerverwaltung
-                  </button>
-                )}
-                <button
-                  onClick={async () => { setMenuOpen(false); await logout(); }}
-                  className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  <LogOut className="w-4 h-4" /> Abmelden
-                </button>
-              </div>
-            )}
           </div>
 
           <UtilizationReportView />
+          <AccountInfoModal isOpen={isAccountModalOpen} onClose={() => setAccountModalOpen(false)} />
           <AdminUserManagementModal isOpen={isAdminModalOpen} onClose={() => setAdminModalOpen(false)} />
           <CustomerProjectsManagerButton />
           <SkillManagementButton className="fixed bottom-4 right-44 z-40" label="Skills" />
