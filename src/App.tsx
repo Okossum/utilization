@@ -6,7 +6,7 @@ import { SkillManagementButton } from './components/generated/SkillManagementBut
 import { CustomerProvider } from './contexts/CustomerContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './contexts/AuthContext';
-import LoginForm from './components/LoginForm';
+import { LoginForm } from './components/LoginForm';
 import { User as UserIcon, ChevronDown, LogOut } from 'lucide-react';
 import AdminUserManagementModal from './components/generated/AdminUserManagementModal';
 
