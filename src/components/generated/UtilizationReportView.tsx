@@ -68,28 +68,30 @@ export function UtilizationReportView() {
   // Load data from database function
   const loadDatabaseData = async () => {
     try {
-      console.log('Lade Datenbank-Daten...');
-      // Prüfe ob Datenbank-Daten vorhanden sind
-      const auslastung = await DatabaseService.getAuslastung();
-      const einsatzplan = await DatabaseService.getEinsatzplan();
+      console.log('🔍 loadDatabaseData() wird aufgerufen...');
+
+      // ✅ SCHRITT 6: Nur utilizationData Collection verwenden (konsolidierte, aktuelle Daten)
+      // Keine veralteten auslastung/einsatzplan Collections mehr laden
       const utilizationData = await DatabaseService.getUtilizationData();
       
-      console.log('Geladene Daten:', {
-        auslastung: auslastung?.length || 0,
-        einsatzplan: einsatzplan?.length || 0,
-        utilizationData: utilizationData?.length || 0
+      console.log('🔍 Daten geladen:', {
+        utilizationData: utilizationData.length
       });
       
-      if (auslastung.length > 0 || einsatzplan.length > 0 || utilizationData.length > 0) {
-        setDatabaseData({
-          auslastung: auslastung.length > 0 ? auslastung : undefined,
-          einsatzplan: einsatzplan.length > 0 ? einsatzplan : undefined,
-          utilizationData: utilizationData.length > 0 ? utilizationData : undefined
-        });
-        setDataSource('database');
-      }
+      // Immer Datenbank-Modus setzen, wenn API-Aufrufe erfolgreich sind
+      // Auch leere Arrays sind OK - das bedeutet einfach, dass noch keine Daten vorhanden sind
+      setDatabaseData({
+        auslastung: undefined, // Veraltete Collection nicht mehr verwenden
+        einsatzplan: undefined, // Veraltete Collection nicht mehr verwenden
+        utilizationData: utilizationData.length > 0 ? utilizationData : undefined
+      });
+      
+      console.log('✅ dataSource wird auf "database" gesetzt');
+      setDataSource('database');
+      
     } catch (error) {
-      console.log('Keine Datenbank-Daten verfügbar, verwende Upload-Daten');
+      console.error('❌ Fehler in loadDatabaseData:', error);
+      // Nur bei echten API-Fehlern auf Upload-Modus wechseln
       setDataSource('upload');
     }
   };
@@ -99,19 +101,8 @@ export function UtilizationReportView() {
     loadDatabaseData();
   }, []);
 
-  // Restore from localStorage on mount (fallback)
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && (parsed.auslastung || parsed.einsatzplan)) {
-          setUploadedFiles(parsed);
-          setDataSource('upload');
-        }
-      }
-    } catch {}
-  }, []);
+  // ✅ SCHRITT 5: localStorage-Fallback entfernt - Datenbank-Daten werden erfolgreich geladen
+  // Kein localStorage-Fallback mehr nötig, da die Datenbank-Daten funktionieren
 
   // Clean up old "student" status from database
   useEffect(() => {
@@ -373,9 +364,9 @@ export function UtilizationReportView() {
       } catch (error) {
         // Bei 404-Fehlern leeres Dossier erstellen
         if (error instanceof Error && error.message.includes('404')) {
-          console.log(`Employee Dossier für "${person}" existiert nicht - erstelle leeres Dossier`);
+  
         } else {
-          console.error(`Fehler beim Laden des Dossiers für "${person}":`, error);
+          
         }
         setDossiersByPerson(prev => ({
           ...prev,
@@ -434,16 +425,34 @@ export function UtilizationReportView() {
     let ein: any[] | null = null;
 
     if (dataSource === 'database') {
-      // Verwende Datenbank-Daten
-      aus = databaseData.auslastung || null;
-      ein = databaseData.einsatzplan || null;
+      // ✅ SCHRITT 6: Nur noch utilizationData verwenden (konsolidierte, aktuelle Daten)
+      // Keine veralteten auslastung/einsatzplan Collections mehr
+      if (databaseData.utilizationData && databaseData.utilizationData.length > 0) {
+        console.log('🔍 Daten aus der Datenbank werden transformiert:', {
+          count: databaseData.utilizationData.length,
+          sample: databaseData.utilizationData[0]
+        });
+        // Daten aus der Datenbank in das erwartete UtilizationData Format transformieren
+        const transformed = databaseData.utilizationData.map((item: any) => ({
+          person: item.person,
+          week: item.week,
+          utilization: item.finalValue !== undefined ? item.finalValue : item.utilization,
+          isHistorical: item.isHistorical
+        }));
+        console.log('✅ Transformierte Daten:', {
+          count: transformed.length,
+          sample: transformed[0]
+        });
+        return transformed;
+      }
+      return null;
     } else {
-      // Verwende Upload-Daten
+      // Verwende Upload-Daten (Fallback für lokale Tests)
       aus = uploadedFiles.auslastung?.isValid ? (uploadedFiles.auslastung?.data as any[]) : null;
       ein = uploadedFiles.einsatzplan?.isValid ? (uploadedFiles.einsatzplan?.data as any[]) : null;
+      
+      if (!aus && !ein) return null;
     }
-
-    if (!aus && !ein) return null;
     const normalizePersonKey = (s: string) => {
       // Nur Klammern und Leerzeichen entfernen, KEINE Buchstaben ändern
       // Das verhindert, dass "Leisen, Wei" zu "Leisen, Wie" wird
@@ -501,9 +510,20 @@ export function UtilizationReportView() {
       }
     }
     return out;
-  }, [uploadedFiles, forecastStartWeek, lookbackWeeks, forecastWeeks]);
+  }, [uploadedFiles, databaseData, dataSource, forecastStartWeek, lookbackWeeks, forecastWeeks]);
 
   const dataForUI: UtilizationData[] = consolidatedData ?? mockData;
+  
+  // Debug-Log für dataForUI
+  useEffect(() => {
+    console.log('🔍 dataForUI aktualisiert:', {
+      dataSource,
+      consolidatedDataCount: consolidatedData?.length || 0,
+      mockDataCount: mockData.length,
+      finalCount: dataForUI.length,
+      sample: dataForUI[0]
+    });
+  }, [dataForUI, dataSource, consolidatedData]);
 
   // Automatische ACT-Checkbox Aktivierung basierend auf niedriger Auslastung
   useEffect(() => {
@@ -567,8 +587,22 @@ export function UtilizationReportView() {
     let ein: any[] | undefined;
 
     if (dataSource === 'database') {
-      aus = databaseData.auslastung;
-      ein = databaseData.einsatzplan;
+      // ✅ SCHRITT 6: Nur noch utilizationData verwenden für Metadaten
+      // utilizationData enthält bereits alle Metadaten (lob, bereich, cc, team, lbs)
+      if (databaseData.utilizationData && databaseData.utilizationData.length > 0) {
+        // Direkt aus utilizationData extrahieren - das sind bereits konsolidierte Daten
+        return new Map(databaseData.utilizationData.map(item => [
+          item.person,
+          {
+            lob: item.lob,
+            bereich: item.bereich,
+            cc: item.cc,
+            team: item.team,
+            lbs: item.lbs
+          }
+        ]));
+      }
+      return new Map();
     } else {
       aus = uploadedFiles.auslastung?.data as any[] | undefined;
       ein = uploadedFiles.einsatzplan?.data as any[] | undefined;
@@ -809,10 +843,10 @@ export function UtilizationReportView() {
   }, [filteredData, lookbackWeeks, forecastWeeks]);
   const hasData = uploadedFiles.auslastung?.isValid || uploadedFiles.einsatzplan?.isValid || dataForUI.length > 0;
   const handleExportCSV = () => {
-    console.log('Exporting CSV...');
+    
   };
   const handleExportExcel = () => {
-    console.log('Exporting Excel...');
+    
   };
   const handleSaveLocal = () => {
     try {
@@ -878,7 +912,7 @@ export function UtilizationReportView() {
     auslastung?: UploadedFile;
     einsatzplan?: UploadedFile;
   }) => {
-    console.log('Neue Dateien hochgeladen:', files);
+    
     
     // Bestehende Upload-Logik
     setUploadedFiles(files);
@@ -887,19 +921,19 @@ export function UtilizationReportView() {
     // Prüfe ob beide Dateien vorhanden sind
     if (files.auslastung?.isValid && files.einsatzplan?.isValid) {
       try {
-        console.log('Beide Dateien sind gültig - starte Normalisierung und Firebase-Speicherung');
+
         
         // Warte bis consolidatedData berechnet wurde
         await new Promise(resolve => setTimeout(resolve, 100));
         
         // Hole die aktuellen normalisierten Daten
         if (consolidatedData && consolidatedData.length > 0) {
-          console.log('Speichere normalisierte Daten in Firebase:', consolidatedData.length, 'Datensätze');
+
           
           // Speichere in Firebase
           await DatabaseService.saveConsolidatedDataToFirebase(consolidatedData);
           
-          console.log('Daten erfolgreich in Firebase gespeichert - lade App neu');
+          
           
           // Lade App aus Firebase neu
           await loadDatabaseData();
@@ -907,17 +941,17 @@ export function UtilizationReportView() {
           // Setze dataSource auf 'database' um Firebase-Daten zu verwenden
           setDataSource('database');
           
-          console.log('App erfolgreich aus Firebase neu geladen');
+          
         } else {
-          console.warn('Keine konsolidierten Daten verfügbar für Firebase-Speicherung');
+          
         }
       } catch (error) {
-        console.error('Fehler beim Speichern in Firebase:', error);
+        
         // Fallback: Verwende weiterhin Upload-Daten
         setDataSource('upload');
       }
     } else {
-      console.log('Nicht beide Dateien sind gültig - verwende Upload-Daten');
+      
       setDataSource('upload');
     }
   };
@@ -1121,7 +1155,7 @@ export function UtilizationReportView() {
               ) : (
                 <button
                   onClick={switchToDatabase}
-                  disabled={!databaseData.auslastung && !databaseData.einsatzplan}
+                  disabled={!databaseData.utilizationData}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
                 >
                   <Database className="w-4 h-4" />
