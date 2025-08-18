@@ -1,13 +1,14 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { Container, Theme } from './settings/types';
 import { UtilizationReportView } from './components/generated/UtilizationReportView';
+import { EmployeeListView } from './components/generated/EmployeeListView';
 import { CustomerProjectsManagerButton } from './components/generated/CustomerProjectsManagerButton';
 import { SkillManagementButton } from './components/generated/SkillManagementButton';
 import { CustomerProvider } from './contexts/CustomerContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './contexts/AuthContext';
 import { LoginForm } from './components/LoginForm';
-import { User as UserIcon, ChevronDown, LogOut } from 'lucide-react';
+import { User as UserIcon, ChevronDown, LogOut, Users, BarChart3 } from 'lucide-react';
 import AdminUserManagementModal from './components/generated/AdminUserManagementModal';
 
 let theme: Theme = 'light';
@@ -39,6 +40,7 @@ function App() {
     const { user, loading, profile, logout } = useAuth();
     const [isAdminModalOpen, setAdminModalOpen] = useState(false);
     const [isMenuOpen, setMenuOpen] = useState(false);
+    const [currentView, setCurrentView] = useState<'utilization' | 'employees'>('utilization');
     const menuRef = useRef<HTMLDivElement>(null);
     
     useEffect(() => {
@@ -63,16 +65,46 @@ function App() {
     
     return (
       <CustomerProvider>
-        {/* Global Header Actions */}
-        <div className="fixed top-4 right-4 z-50" ref={menuRef}>
-          <button
-            onClick={() => setMenuOpen(v => !v)}
-            className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50"
-            title="Account"
-          >
-            <UserIcon className="w-4 h-4 text-gray-700" />
-            <ChevronDown className="w-4 h-4 text-gray-500" />
-          </button>
+        {/* Navigation & Account */}
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+          {/* Navigation Buttons */}
+          <div className="flex items-center gap-1 bg-white border border-gray-300 rounded-lg shadow-sm p-1">
+            <button
+              onClick={() => setCurrentView('utilization')}
+              className={`inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                currentView === 'utilization' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+              title="Auslastung Report"
+            >
+              <BarChart3 className="w-4 h-4" />
+              Auslastung
+            </button>
+            <button
+              onClick={() => setCurrentView('employees')}
+              className={`inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                currentView === 'employees' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+              title="Mitarbeiter Liste"
+            >
+              <Users className="w-4 h-4" />
+              Mitarbeiter
+            </button>
+          </div>
+          
+          {/* Account Menu */}
+          <div ref={menuRef}>
+            <button
+              onClick={() => setMenuOpen(v => !v)}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50"
+              title="Account"
+            >
+              <UserIcon className="w-4 h-4 text-gray-700" />
+              <ChevronDown className="w-4 h-4 text-gray-500" />
+            </button>
           {isMenuOpen && (
             <div className="mt-2 w-72 bg-white border border-gray-200 rounded-lg shadow-lg p-3">
               <div className="mb-3">
@@ -96,12 +128,23 @@ function App() {
               </button>
             </div>
           )}
+          </div>
         </div>
 
-        <UtilizationReportView />
+        {/* Main Content */}
+        {currentView === 'utilization' && (
+          <>
+            <UtilizationReportView />
+            <CustomerProjectsManagerButton />
+            <SkillManagementButton className="fixed bottom-4 right-44 z-40" label="Skills" />
+          </>
+        )}
+        
+        {currentView === 'employees' && (
+          <EmployeeListView />
+        )}
+        
         <AdminUserManagementModal isOpen={isAdminModalOpen} onClose={() => setAdminModalOpen(false)} />
-        <CustomerProjectsManagerButton />
-        <SkillManagementButton className="fixed bottom-4 right-44 z-40" label="Skills" />
       </CustomerProvider>
     );
   }

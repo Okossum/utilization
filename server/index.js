@@ -888,6 +888,87 @@ app.put('/api/users/:uid', requireAdmin, async (req, res) => {
   }
 });
 
+// ✅ Employee Stammdaten Endpunkte
+app.post('/api/employees/bulk', authMiddleware, async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Nicht autorisiert' });
+  }
+  
+  try {
+    const { employees } = req.body;
+    
+    if (!Array.isArray(employees) || employees.length === 0) {
+      return res.status(400).json({ error: 'Keine Employee-Daten erhalten' });
+    }
+    
+    console.log(`💾 Speichere ${employees.length} Employee-Stammdaten...`);
+    
+    const batch = db.batch();
+    let count = 0;
+    
+    for (const employee of employees) {
+      // Validierung
+      if (!employee.person || !employee.lob || !employee.cc || !employee.team) {
+        console.warn('Überspringe Employee ohne Pflichtfelder:', employee);
+        continue;
+      }
+      
+      // Composite Key als Dokument-ID verwenden
+      const docId = employee.compositeKey || `${employee.person}__${employee.team}__${employee.cc}`;
+      const docRef = db.collection('employeeStammdaten').doc(docId);
+      
+      const employeeDoc = {
+        ...employee,
+        updatedAt: FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp() // Wird nur bei neuen Docs gesetzt
+      };
+      
+      batch.set(docRef, employeeDoc, { merge: false }); // Komplett überschreiben
+      count++;
+    }
+    
+    await batch.commit();
+    
+    console.log(`✅ ${count} Employee-Stammdaten erfolgreich gespeichert`);
+    res.json({ 
+      success: true, 
+      message: `${count} Mitarbeiter erfolgreich gespeichert`,
+      count 
+    });
+    
+  } catch (error) {
+    console.error('❌ Fehler beim Speichern der Employee-Stammdaten:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+app.get('/api/employees', authMiddleware, async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Nicht autorisiert' });
+  }
+  
+  try {
+    console.log('🔍 Lade Employee-Stammdaten...');
+    
+    const snapshot = await db.collection('employeeStammdaten').get();
+    const employees = [];
+    
+    snapshot.forEach(doc => {
+      employees.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+    
+    console.log(`✅ ${employees.length} Employee-Stammdaten geladen`);
+    res.json(employees);
+    
+  } catch (error) {
+    console.error('❌ Fehler beim Laden der Employee-Stammdaten:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
 // Server starten
 app.listen(PORT, () => {
   console.log(`🚀 Backend-Server läuft auf Port ${PORT}`);

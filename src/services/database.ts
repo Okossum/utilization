@@ -617,6 +617,40 @@ export class DatabaseService {
     const endpoint: ApiEndpoint = '/employee-skills';
     return await makeApiCall<any[]>(endpoint, { method: 'GET' });
   }
+
+  /**
+   * Employee Stammdaten speichern
+   */
+  static async saveEmployeeStammdaten(employeeData: any[]): Promise<{ success: boolean; message: string; count: number }> {
+    console.log('💾 DatabaseService.saveEmployeeStammdaten() mit', employeeData.length, 'Personen');
+    
+    try {
+      await this.waitForTokenProvider();
+      const response = await ApiService.post('/employees/bulk', { employees: employeeData });
+      console.log('✅ saveEmployeeStammdaten() erfolgreich:', response);
+      return response;
+    } catch (error) {
+      console.error('❌ saveEmployeeStammdaten() Fehler:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Employee Stammdaten laden
+   */
+  static async getEmployeeStammdaten(): Promise<any[]> {
+    console.log('🔍 DatabaseService.getEmployeeStammdaten()');
+    
+    try {
+      await this.waitForTokenProvider();
+      const response = await ApiService.get('/employees');
+      console.log('✅ getEmployeeStammdaten() erfolgreich:', response.length, 'Personen');
+      return response;
+    } catch (error) {
+      console.error('❌ getEmployeeStammdaten() Fehler:', error);
+      throw error;
+    }
+  }
 }
 
 export default DatabaseService;
