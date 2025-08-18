@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X, Target, Ticket, Plus, Info } from 'lucide-react';
 import DatabaseService from '../../services/database';
+import { employeeSkillService } from '../../lib/firebase-services';
+import { SkillDropdownWithAdd } from './SkillDropdownWithAdd';
 
 type OfferedSkill = { skillId: string; name: string; level: number };
 
@@ -30,10 +32,20 @@ export function PlanningModal({ isOpen, onClose, personId, filterByWeek, initial
     (async () => {
       setLoading(true);
       try {
+        // Lade Employee Skills aus Firebase
+        const firebaseSkills = await employeeSkillService.getByEmployee(personId);
+        const skillsData = firebaseSkills.map(fs => ({
+          skillId: fs.skillId,
+          name: fs.skillName,
+          level: fs.level
+        }));
+
         const dossier = await DatabaseService.getEmployeeDossier(personId);
         if (cancelled) return;
         const ds = dossier || {};
-        setSkills(Array.isArray(ds.skills) ? ds.skills : []);
+        
+        // Skills aus Firebase haben Vorrang
+        setSkills(skillsData.length > 0 ? skillsData : (Array.isArray(ds.skills) ? ds.skills : []));
         setProjectOffers(Array.isArray(ds.projectOffers) ? ds.projectOffers : []);
         setJiraTickets(Array.isArray(ds.jiraTickets) ? ds.jiraTickets : []);
       } finally {
@@ -42,6 +54,21 @@ export function PlanningModal({ isOpen, onClose, personId, filterByWeek, initial
     })();
     return () => { cancelled = true; };
   }, [isOpen, personId]);
+
+  // Funktion zum Aktualisieren der Skills nach dem Hinzufügen neuer Skills
+  const refreshSkills = async () => {
+    try {
+      const firebaseSkills = await employeeSkillService.getByEmployee(personId);
+      const skillsData = firebaseSkills.map(fs => ({
+        skillId: fs.skillId,
+        name: fs.skillName,
+        level: fs.level
+      }));
+      setSkills(skillsData);
+    } catch (error) {
+      console.error('Fehler beim Aktualisieren der Skills:', error);
+    }
+  };
 
   // KW-Hilfen
   function getIsoWeekStartDate(year: number, week: number): Date {
@@ -234,12 +261,15 @@ export function PlanningModal({ isOpen, onClose, personId, filterByWeek, initial
                               <option value={100}>100%</option>
                             </select>
                           </div>
-                          <select className="w-full px-2 py-1 border border-gray-200 rounded" value={offerForm.offeredSkillId} onChange={e=>setOfferForm(v=>({...v,offeredSkillId:e.target.value}))}>
-                            <option value="">— angebotener Skill —</option>
-                            {skills.map(s=> (
-                              <option key={s.skillId} value={s.skillId}>{s.name} (Level {s.level})</option>
-                            ))}
-                          </select>
+                          <SkillDropdownWithAdd
+                            value={offerForm.offeredSkillId}
+                            onChange={(skillId) => setOfferForm(v => ({ ...v, offeredSkillId: skillId }))}
+                            availableSkills={skills}
+                            onSkillsUpdated={refreshSkills}
+                            placeholder="— angebotener Skill —"
+                            employeeId={personId}
+                            className="w-full"
+                          />
                           <button onClick={addOffer} className="px-3 py-1 bg-emerald-600 text-white rounded disabled:opacity-60" disabled={loading}>Hinzufügen</button>
                         </div>
                       </div>
@@ -284,12 +314,15 @@ export function PlanningModal({ isOpen, onClose, personId, filterByWeek, initial
                               <option value={100}>100%</option>
                             </select>
                           </div>
-                          <select className="w-full px-2 py-1 border border-gray-200 rounded" value={jiraForm.offeredSkillId} onChange={e=>setJiraForm(v=>({...v,offeredSkillId:e.target.value}))}>
-                            <option value="">— angebotener Skill —</option>
-                            {skills.map(s=> (
-                              <option key={s.skillId} value={s.skillId}>{s.name} (Level {s.level})</option>
-                            ))}
-                          </select>
+                          <SkillDropdownWithAdd
+                            value={jiraForm.offeredSkillId}
+                            onChange={(skillId) => setJiraForm(v => ({ ...v, offeredSkillId: skillId }))}
+                            availableSkills={skills}
+                            onSkillsUpdated={refreshSkills}
+                            placeholder="— angebotener Skill —"
+                            employeeId={personId}
+                            className="w-full"
+                          />
                           <button onClick={addJira} className="px-3 py-1 bg-sky-600 text-white rounded disabled:opacity-60" disabled={loading}>Hinzufügen</button>
                         </div>
                       </div>

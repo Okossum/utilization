@@ -509,7 +509,7 @@ app.get('/api/upload-history', requireAuth, async (req, res) => {
 // Normalisierte Auslastungsdaten konsolidieren und speichern
 app.post('/api/consolidate', requireAuth, async (req, res) => {
   try {
-    const { auslastungData, einsatzplanData, currentYear, forecastStartWeek, lookbackWeeks, forecastWeeks } = req.body;
+    const { auslastungData, einsatzplanData } = req.body;
     
     if (!auslastungData || !einsatzplanData) {
       return res.status(400).json({ error: 'Auslastung und Einsatzplan Daten erforderlich' });
@@ -517,13 +517,13 @@ app.post('/api/consolidate', requireAuth, async (req, res) => {
 
     const consolidatedData = [];
     
-    // Alle Personen sammeln (mit Composite Key Unterstützung)
+    // Alle Personen sammeln
     const allPersons = new Set([
       ...auslastungData.map(row => row.person).filter(Boolean),
       ...einsatzplanData.map(row => row.person).filter(Boolean)
     ]);
 
-    // Gruppiere Auslastungsdaten nach Person (um mehrere Team/CC Kombinationen zu handhaben)
+    // Gruppiere Daten nach Person
     const auslastungByPerson = new Map();
     auslastungData.forEach(row => {
       if (!row.person) return;
@@ -533,7 +533,6 @@ app.post('/api/consolidate', requireAuth, async (req, res) => {
       auslastungByPerson.get(row.person).push(row);
     });
 
-    // Gruppiere Einsatzplandaten nach Person
     const einsatzplanByPerson = new Map();
     einsatzplanData.forEach(row => {
       if (!row.person) return;
@@ -543,14 +542,42 @@ app.post('/api/consolidate', requireAuth, async (req, res) => {
       einsatzplanByPerson.get(row.person).push(row);
     });
 
+            // Sammle alle verfügbaren Wochen-Keys aus beiden Datensets
+        const allWeekKeys = new Set();
+        [...auslastungData, ...einsatzplanData].forEach(row => {
+          // DEBUGGING: Zeige die Struktur der Row-Daten
+          console.log('🔍 Row-Struktur:', {
+            person: row.person,
+            keys: Object.keys(row),
+            hasValues: !!row.values,
+            valuesKeys: row.values ? Object.keys(row.values) : 'keine values'
+          });
+          
+          // Prüfe sowohl direkte Keys als auch values-Objekt
+          const keysToCheck = [
+            ...Object.keys(row),
+            ...(row.values ? Object.keys(row.values) : [])
+          ];
+          
+          keysToCheck.forEach(key => {
+            // Prüfe auf Wochen-Format: XX/XX (z.B. "25/01", "25/33")
+            if (/^\d{2}\/\d{2}$/.test(key)) {
+              allWeekKeys.add(key);
+              console.log(`📅 Gefundener Wochen-Key: ${key} in ${row.person || 'unbekannt'}`);
+            }
+          });
+        });
+        
+        console.log(`📊 Insgesamt gefundene Wochen-Keys: ${Array.from(allWeekKeys).join(', ')}`);
+
+    // Konsolidiere für jede Person und jede Woche
     for (const person of allPersons) {
       const ausRows = auslastungByPerson.get(person) || [];
       const einRows = einsatzplanByPerson.get(person) || [];
 
-      // Erstelle Kombinationen für alle Team/CC Variationen einer Person
+      // Sammle Team/CC Kombinationen für diese Person
       const personCombinations = new Set();
       
-      // Sammle alle einzigartigen Team/CC Kombinationen
       ausRows.forEach(row => {
         const combo = `${row.team || 'unknown'}__${row.cc || 'unknown'}`;
         personCombinations.add(combo);
@@ -560,12 +587,11 @@ app.post('/api/consolidate', requireAuth, async (req, res) => {
         personCombinations.add(combo);
       });
 
-      // Falls keine spezifischen Kombinationen gefunden wurden, erstelle Standard-Eintrag
       if (personCombinations.size === 0) {
         personCombinations.add('unknown__unknown');
       }
 
-      // Verarbeite jede Team/CC Kombination separat
+      // Verarbeite jede Team/CC Kombination
       for (const combo of personCombinations) {
         const [team, cc] = combo.split('__');
         
@@ -576,72 +602,57 @@ app.post('/api/consolidate', requireAuth, async (req, res) => {
           (row.team || 'unknown') === team && (row.cc || 'unknown') === cc
         );
 
-        // Historische Wochen (links von aktueller Woche)
-        for (let i = 0; i < lookbackWeeks; i++) {
-        const weekNum = forecastStartWeek - lookbackWeeks + i;
-        const yy = String(currentYear).slice(-2);
-        const ww = String(weekNum).padStart(2, '0');
-        const weekKey = `${yy}/${ww}`;
-        const uiLabel = `${yy}/${ww}`;
-        
-        const ausValue = ausRow ? extractWeekValue(ausRow, weekNum, currentYear) : null;
-        const einValue = einRow ? extractWeekValue(einRow, weekNum, currentYear) : null;
-        
-        const finalValue = ausValue !== undefined ? ausValue : einValue;
-        
-        if (finalValue !== undefined) {
-          consolidatedData.push({
-            person,
-            lob: ausRow?.lob,
-            bereich: ausRow?.bereich,
-            cc: cc !== 'unknown' ? cc : ausRow?.cc,
-            team: team !== 'unknown' ? team : ausRow?.team,
-            lbs: einRow?.lbs,
-            week: uiLabel,
-            year: currentYear,
-            weekNumber: weekNum,
-            auslastungValue: ausValue,
-            einsatzplanValue: einValue,
-            finalValue,
-            isHistorical: true,
-            source: ausValue !== undefined && einValue !== undefined ? 'both' : (ausValue !== undefined ? 'auslastung' : 'einsatzplan'),
-            isLatest: true,
-            compositeKey: `${person}__${team !== 'unknown' ? team : (ausRow?.team || 'unknown')}__${cc !== 'unknown' ? cc : (ausRow?.cc || 'unknown')}`
-          });
-        }
-        }
-
-        // Forecast-Wochen (rechts von aktueller Woche)
-        for (let i = 0; i < forecastWeeks; i++) {
-          const weekNum = forecastStartWeek + i;
-          const yy = String(currentYear).slice(-2);
-          const ww = String(weekNum).padStart(2, '0');
-          const weekKey = `${yy}/${ww}`;
-          const uiLabel = `${yy}/${ww}`;
+        // Verarbeite jede verfügbare Woche
+        for (const weekKey of allWeekKeys) {
+          // ✅ KORRIGIERT: Korrekte Extraktion der Werte aus den Row-Objekten
+          let ausValue = null;
+          let einValue = null;
           
-          const ausValue = ausRow ? extractWeekValue(ausRow, weekNum, currentYear) : null;
-          const einValue = einRow ? extractWeekValue(einRow, weekNum, currentYear) : null;
+          // Prüfe Auslastungswert aus dem "values" Objekt
+          if (ausRow && ausRow.values && ausRow.values[weekKey] !== undefined) {
+            ausValue = ausRow.values[weekKey];
+          } else if (ausRow && ausRow[weekKey] !== undefined) {
+            ausValue = ausRow[weekKey];
+          }
           
-          const finalValue = ausValue !== undefined ? ausValue : einValue;
+          // Prüfe Einsatzplanwert aus dem "values" Objekt
+          if (einRow && einRow.values && einRow.values[weekKey] !== undefined) {
+            einValue = einRow.values[weekKey];
+          } else if (einRow && einRow[weekKey] !== undefined) {
+            einValue = einRow[weekKey];
+          }
           
-          if (finalValue !== undefined) {
+          // Debugging: Log die gefundenen Werte
+          if (ausValue !== null || einValue !== null) {
+            console.log(`📊 Woche ${weekKey} für ${person}: aus=${ausValue}, ein=${einValue}`);
+          }
+          
+          // Nur hinzufügen wenn mindestens ein Wert vorhanden ist
+          if (ausValue !== null || einValue !== null) {
+            const finalValue = ausValue !== null ? ausValue : einValue;
+            
+            // Parse Jahr und Woche aus weekKey (z.B. "25/33")
+            const [yearPart, weekPart] = weekKey.split('/');
+            const year = 2000 + parseInt(yearPart, 10);
+            const weekNumber = parseInt(weekPart, 10);
+            
             consolidatedData.push({
               person,
-              lob: ausRow?.lob,
-              bereich: ausRow?.bereich,
-              cc: cc !== 'unknown' ? cc : ausRow?.cc,
-              team: team !== 'unknown' ? team : ausRow?.team,
+              lob: ausRow?.lob || einRow?.lob,
+              bereich: ausRow?.bereich || einRow?.bereich,
+              cc: cc !== 'unknown' ? cc : (ausRow?.cc || einRow?.cc),
+              team: team !== 'unknown' ? team : (ausRow?.team || einRow?.team),
               lbs: einRow?.lbs,
-              week: uiLabel,
-              year: currentYear,
-              weekNumber: weekNum,
+              week: weekKey,
+              year: year,
+              weekNumber: weekNumber,
               auslastungValue: ausValue,
               einsatzplanValue: einValue,
               finalValue,
-              isHistorical: false,
-              source: ausValue !== undefined && einValue !== undefined ? 'both' : (ausValue !== undefined ? 'auslastung' : 'einsatzplan'),
+              source: (ausValue !== null && einValue !== null) ? 'both' : 
+                     (ausValue !== null ? 'auslastung' : 'einsatzplan'),
               isLatest: true,
-              compositeKey: `${person}__${team !== 'unknown' ? team : (ausRow?.team || 'unknown')}__${cc !== 'unknown' ? cc : (ausRow?.cc || 'unknown')}`
+              compositeKey: `${person}__${team !== 'unknown' ? team : (ausRow?.team || einRow?.team || 'unknown')}__${cc !== 'unknown' ? cc : (ausRow?.cc || einRow?.cc || 'unknown')}`
             });
           }
         }
@@ -686,29 +697,23 @@ app.post('/api/consolidate', requireAuth, async (req, res) => {
 // Normalisierte Daten abrufen
 app.get('/api/utilization-data', requireAuth, async (req, res) => {
   try {
-    const { isHistorical, person } = req.query;
-    
-    let queryRef = db.collection('utilizationData').where('isLatest', '==', true);
-    if (typeof isHistorical !== 'undefined') {
-      queryRef = queryRef.where('isHistorical', '==', isHistorical === 'true');
-    }
-    if (person) {
-      queryRef = queryRef.where('person', '==', String(person));
-    }
-    // Firestore cannot order by multiple fields without composite indexes; keep simple
-    const snap = await queryRef.get();
-    let out = snap.docs
-      .map(d => d.data())
+    // Einfach: Lade alle aktuellen utilizationData
+    const snap = await db.collection('utilizationData').where('isLatest', '==', true).get();
+    const data = snap.docs
+      .map(doc => doc.data())
       .sort((a, b) => {
         if (a.person !== b.person) return String(a.person).localeCompare(String(b.person));
         if (a.year !== b.year) return (a.year || 0) - (b.year || 0);
         return (a.weekNumber || 0) - (b.weekNumber || 0);
       });
-    const profile = await loadUserProfile(req.user.uid);
-    out = applyScopeFilter(out, profile, req.user?.admin);
-    res.json(out);
-  } catch (error) {
     
+    // Scope-Filter anwenden
+    const profile = await loadUserProfile(req.user.uid);
+    const filteredData = applyScopeFilter(data, profile, req.user?.admin);
+    
+    res.json(filteredData);
+  } catch (error) {
+    console.error('Fehler beim Laden der Nutzungsdaten:', error);
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -772,12 +777,8 @@ app.post('/api/utilization-data/bulk', requireAuth, async (req, res) => {
 });
 
 // Hilfsfunktion zum Extrahieren von Wochenwerten im YY/WW Format
-function extractWeekValue(row, weekNum, year) {
-  const yy = String(year).slice(-2);
-  const ww = String(weekNum).padStart(2, '0');
-  const weekKey = `${yy}/${ww}`;
-  return row[weekKey] !== undefined ? row[weekKey] : null;
-}
+// Hilfsfunktion extractWeekValue entfernt - wird nicht mehr benötigt
+// Daten werden jetzt direkt über die Wochen-Keys aus Firebase gelesen
 
 // Employee Dossier speichern oder aktualisieren
 app.post('/api/employee-dossier', requireAuth, async (req, res) => {
@@ -892,6 +893,50 @@ app.listen(PORT, () => {
   console.log(`🚀 Backend-Server läuft auf Port ${PORT}`);
   console.log(`📊 API verfügbar unter http://localhost:${PORT}/api`);
   console.log(`🏥 Health Check: http://localhost:${PORT}/health`);
+});
+
+// Debug-Endpoint: Collection-Inhalte prüfen
+app.get('/api/debug/collections', requireAuth, async (req, res) => {
+  try {
+    // Auslastung Collection
+    const auslastungSnap = await db.collection('auslastung').limit(3).get();
+    const auslastungSample = auslastungSnap.docs.map(doc => ({
+      id: doc.id,
+      data: doc.data()
+    }));
+
+    // Einsatzplan Collection  
+    const einsatzplanSnap = await db.collection('einsatzplan').limit(3).get();
+    const einsatzplanSample = einsatzplanSnap.docs.map(doc => ({
+      id: doc.id,
+      data: doc.data()
+    }));
+
+    // UtilizationData Collection
+    const utilizationSnap = await db.collection('utilizationData').limit(3).get();
+    const utilizationSample = utilizationSnap.docs.map(doc => ({
+      id: doc.id,
+      data: doc.data()
+    }));
+
+    res.json({
+      auslastung: {
+        count: auslastungSnap.size,
+        sample: auslastungSample
+      },
+      einsatzplan: {
+        count: einsatzplanSnap.size,
+        sample: einsatzplanSample
+      },
+      utilizationData: {
+        count: utilizationSnap.size,
+        sample: utilizationSample
+      }
+    });
+  } catch (error) {
+    console.error('Debug-Fehler:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Graceful Shutdown

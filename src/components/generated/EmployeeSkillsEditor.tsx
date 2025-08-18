@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, Trash2, Wrench } from 'lucide-react';
+import { Plus, Trash2, Wrench, Save } from 'lucide-react';
 import { skillService } from '../../lib/firebase-services';
 import { StarRating } from './StarRating';
+import DatabaseService from '../../services/database';
 
 export interface EmployeeSkillLink {
   skillId: string;
@@ -10,16 +11,19 @@ export interface EmployeeSkillLink {
 }
 
 interface EmployeeSkillsEditorProps {
+  employeeName: string; // NEW: Benötigt für Persistierung
   value: EmployeeSkillLink[];
   onChange: (next: EmployeeSkillLink[]) => void;
 }
 
-export function EmployeeSkillsEditor({ value, onChange }: EmployeeSkillsEditorProps) {
+export function EmployeeSkillsEditor({ employeeName, value, onChange }: EmployeeSkillsEditorProps) {
   const [catalog, setCatalog] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedSkillId, setSelectedSkillId] = useState('');
   const [defaultLevel, setDefaultLevel] = useState(3);
+  const [saving, setSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -37,6 +41,62 @@ export function EmployeeSkillsEditor({ value, onChange }: EmployeeSkillsEditorPr
     load();
   }, []);
 
+  // Skills laden beim Mount und Employee-Name Änderung
+  useEffect(() => {
+    if (employeeName) {
+      loadEmployeeSkills();
+    }
+  }, [employeeName]);
+
+  const loadEmployeeSkills = async () => {
+    if (!employeeName) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const skills = await DatabaseService.getEmployeeSkills(employeeName);
+      const employeeSkills: EmployeeSkillLink[] = skills.map(skill => ({
+        skillId: skill.skillId,
+        name: skill.skillName,
+        level: skill.level
+      }));
+      
+      onChange(employeeSkills);
+      setHasUnsavedChanges(false);
+      console.log(`✅ ${skills.length} Skills geladen für ${employeeName}`);
+    } catch (error) {
+      console.error('❌ Fehler beim Laden der Employee Skills:', error);
+      setError('Fehler beim Laden der Skills aus der Datenbank');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveSkills = async () => {
+    if (!employeeName || !hasUnsavedChanges) return;
+    
+    try {
+      setSaving(true);
+      setError(null);
+      
+      const skillsToSave = value.map(skill => ({
+        skillId: skill.skillId,
+        skillName: skill.name,
+        level: skill.level
+      }));
+      
+      await DatabaseService.saveEmployeeSkills(employeeName, skillsToSave);
+      setHasUnsavedChanges(false);
+      console.log(`✅ ${skillsToSave.length} Skills gespeichert für ${employeeName}`);
+    } catch (error) {
+      console.error('❌ Fehler beim Speichern der Skills:', error);
+      setError('Fehler beim Speichern der Skills in der Datenbank');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const addSkill = () => {
     const id = selectedSkillId.trim();
     if (!id) return;
@@ -50,22 +110,39 @@ export function EmployeeSkillsEditor({ value, onChange }: EmployeeSkillsEditorPr
     ]);
     setSelectedSkillId('');
     setDefaultLevel(3);
+    setHasUnsavedChanges(true); // Mark as changed
   };
 
   const removeSkill = (skillId: string) => {
     onChange(value.filter(v => v.skillId !== skillId));
+    setHasUnsavedChanges(true); // Mark as changed
   };
 
   const setLevel = (skillId: string, level: number) => {
     onChange(value.map(v => v.skillId === skillId ? { ...v, level } : v));
+    setHasUnsavedChanges(true); // Mark as changed
   };
 
   return (
     <section className="space-y-4">
-      <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
-        <Wrench className="w-5 h-5 text-amber-600"/>
-        Skills
-      </h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
+          <Wrench className="w-5 h-5 text-amber-600"/>
+          Skills
+        </h2>
+        
+        {/* Save Button */}
+        {hasUnsavedChanges && (
+          <button
+            onClick={saveSkills}
+            disabled={saving || !employeeName}
+            className="inline-flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Save className="w-4 h-4"/>
+            {saving ? 'Speichert...' : 'Skills speichern'}
+          </button>
+        )}
+      </div>
 
       {error && <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded">{error}</div>}
 

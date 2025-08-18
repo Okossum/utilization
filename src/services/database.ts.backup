@@ -406,26 +406,6 @@ export class DatabaseService {
         auslastung: auslastungData?.length || 0,
         einsatzplan: einsatzplanData?.length || 0
       });
-      
-      // 🔍 DEBUG: Zeige Struktur der ersten Datensätze
-      if (auslastungData?.length > 0) {
-        console.log('🔍 AUSLASTUNG Sample:', {
-          person: auslastungData[0].person,
-          keys: Object.keys(auslastungData[0]),
-          hasValues: !!auslastungData[0].values,
-          valuesKeys: auslastungData[0].values ? Object.keys(auslastungData[0].values).slice(0, 5) : 'NO VALUES',
-          firstValues: auslastungData[0].values ? Object.entries(auslastungData[0].values).slice(0, 3) : 'NO VALUES'
-        });
-      }
-      if (einsatzplanData?.length > 0) {
-        console.log('🔍 EINSATZPLAN Sample:', {
-          person: einsatzplanData[0].person,
-          keys: Object.keys(einsatzplanData[0]),
-          hasValues: !!einsatzplanData[0].values,
-          valuesKeys: einsatzplanData[0].values ? Object.keys(einsatzplanData[0].values).slice(0, 5) : 'NO VALUES',
-          firstValues: einsatzplanData[0].values ? Object.entries(einsatzplanData[0].values).slice(0, 3) : 'NO VALUES'
-        });
-      }
 
       // Prüfe Datenverfügbarkeit
       const hasAuslastung = auslastungData && auslastungData.length > 0;

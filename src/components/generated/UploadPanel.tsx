@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, X, Eye, Info } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import DatabaseService from '../../services/database';
+import { useAuth } from '../../contexts/AuthContext';
 interface UploadedFile {
   name: string;
   data: any[];
@@ -27,6 +28,31 @@ export function UploadPanel({
   onFilesChange,
   onDatabaseRefresh
 }: UploadPanelProps) {
+  // ✅ FIX: Race-Condition verhindern - Upload nur wenn User vollständig authentifiziert
+  const { user, loading } = useAuth();
+  
+  // Zeige Loading-Zustand an wenn Authentifizierung noch läuft
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <span className="ml-3 text-gray-600">Authentifizierung läuft...</span>
+        </div>
+      </div>
+    );
+  }
+  
+  // Upload nur für angemeldete User
+  if (!user) {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="text-center py-8">
+          <p className="text-gray-600">Bitte melde dich an um Dateien hochzuladen.</p>
+        </div>
+      </div>
+    );
+  }
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);

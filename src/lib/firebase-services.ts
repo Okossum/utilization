@@ -27,7 +27,7 @@ import {
   PersonTravelReadiness,
   Customer
 } from './types';
-import { FirestoreSkill, SkillDoc } from './types';
+import { FirestoreSkill, SkillDoc, FirestoreEmployeeSkill, EmployeeSkillDoc } from './types';
 
 // Helper-Funktion für Timestamp-Konvertierung
 const convertTimestamp = (timestamp: any): Date => {
@@ -375,5 +375,119 @@ export const skillService = {
   async delete(id: string): Promise<void> {
     const docRef = doc(db, COLLECTIONS.SKILLS, id);
     await deleteDoc(docRef);
+  }
+};
+
+// Employee Skills Services
+export const employeeSkillService = {
+  async save(employeeSkill: { employeeName: string; skillId: string; skillName: string; level: number }): Promise<string> {
+    const docRef = await addDoc(collection(db, COLLECTIONS.EMPLOYEE_SKILLS), {
+      employeeName: employeeSkill.employeeName,
+      skillId: employeeSkill.skillId,
+      skillName: employeeSkill.skillName,
+      level: employeeSkill.level,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    return docRef.id;
+  },
+
+  async getByEmployee(employeeName: string): Promise<FirestoreEmployeeSkill[]> {
+    const q = query(
+      collection(db, COLLECTIONS.EMPLOYEE_SKILLS),
+      where('employeeName', '==', employeeName),
+      orderBy('skillName')
+    );
+    
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      employeeName: String(doc.data().employeeName || ''),
+      skillId: String(doc.data().skillId || ''),
+      skillName: String(doc.data().skillName || ''),
+      level: Number(doc.data().level || 0),
+      createdAt: convertTimestamp(doc.data().createdAt),
+      updatedAt: convertTimestamp(doc.data().updatedAt)
+    })) as FirestoreEmployeeSkill[];
+  },
+
+  async getAll(): Promise<FirestoreEmployeeSkill[]> {
+    const querySnapshot = await getDocs(collection(db, COLLECTIONS.EMPLOYEE_SKILLS));
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      employeeName: String(doc.data().employeeName || ''),
+      skillId: String(doc.data().skillId || ''),
+      skillName: String(doc.data().skillName || ''),
+      level: Number(doc.data().level || 0),
+      createdAt: convertTimestamp(doc.data().createdAt),
+      updatedAt: convertTimestamp(doc.data().updatedAt)
+    })) as FirestoreEmployeeSkill[];
+  },
+
+  async update(id: string, updates: Partial<EmployeeSkillDoc>): Promise<void> {
+    const docRef = doc(db, COLLECTIONS.EMPLOYEE_SKILLS, id);
+    await updateDoc(docRef, {
+      ...updates,
+      updatedAt: new Date(),
+    });
+  },
+
+  async updateLevel(employeeName: string, skillId: string, level: number): Promise<void> {
+    const q = query(
+      collection(db, COLLECTIONS.EMPLOYEE_SKILLS),
+      where('employeeName', '==', employeeName),
+      where('skillId', '==', skillId)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+      const docRef = doc(db, COLLECTIONS.EMPLOYEE_SKILLS, querySnapshot.docs[0].id);
+      await updateDoc(docRef, {
+        level,
+        updatedAt: new Date()
+      });
+    }
+  },
+
+  async delete(id: string): Promise<void> {
+    const docRef = doc(db, COLLECTIONS.EMPLOYEE_SKILLS, id);
+    await deleteDoc(docRef);
+  },
+
+  async deleteByEmployeeAndSkill(employeeName: string, skillId: string): Promise<void> {
+    const q = query(
+      collection(db, COLLECTIONS.EMPLOYEE_SKILLS),
+      where('employeeName', '==', employeeName),
+      where('skillId', '==', skillId)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    querySnapshot.docs.forEach(async (docSnapshot) => {
+      await deleteDoc(docSnapshot.ref);
+    });
+  },
+
+  async saveOrUpdate(employeeName: string, skillId: string, skillName: string, level: number): Promise<string> {
+    // Prüfe ob bereits vorhanden
+    const q = query(
+      collection(db, COLLECTIONS.EMPLOYEE_SKILLS),
+      where('employeeName', '==', employeeName),
+      where('skillId', '==', skillId)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+      // Update existing
+      const docRef = querySnapshot.docs[0].ref;
+      await updateDoc(docRef, {
+        level,
+        skillName, // Update name in case it changed
+        updatedAt: new Date()
+      });
+      return querySnapshot.docs[0].id;
+    } else {
+      // Create new
+      return await this.save({ employeeName, skillId, skillName, level });
+    }
   }
 };

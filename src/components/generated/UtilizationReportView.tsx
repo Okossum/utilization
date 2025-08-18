@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { getISOWeek, getISOWeekYear } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, ChefHat, Database, Target, User, Ticket, Columns, ArrowLeft, MessageSquare, X, ArrowRight } from 'lucide-react';
-import { DataUploadSection } from './DataUploadSection';
+import { AdminDataUploadModal } from './AdminDataUploadModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { MultiSelectFilter } from './MultiSelectFilter';
 import { PersonFilterBar } from './PersonFilterBar';
@@ -41,8 +41,10 @@ export function UtilizationReportView() {
     auslastung?: UploadedFile;
     einsatzplan?: UploadedFile;
   }>({});
+  // ✅ VEREINFACHT: Direkte Collections statt Konsolidierung
   const [databaseData, setDatabaseData] = useState<{
-    utilizationData?: any[];
+    auslastung?: any[];
+    einsatzplan?: any[];
   }>({});
   const [dataSource, setDataSource] = useState<'upload' | 'database'>('upload');
   const [selectedPersons, setSelectedPersons] = useState<string[]>([]);
@@ -51,56 +53,36 @@ export function UtilizationReportView() {
   const [dossiersByPerson, setDossiersByPerson] = useState<Record<string, { projectOffers?: any[]; jiraTickets?: any[]; utilizationComment?: string; planningComment?: string }>>({});
   const [utilizationCommentForPerson, setUtilizationCommentForPerson] = useState<string | null>(null);
   const [planningCommentForPerson, setPlanningCommentForPerson] = useState<string | null>(null);
+  const [isAdminUploadModalOpen, setIsAdminUploadModalOpen] = useState(false);
 
-  // Function to switch data source
-  const switchToUpload = () => {
-    setDataSource('upload');
-    setDatabaseData({});
-  };
-
-  const switchToDatabase = () => {
-    setDataSource('database');
-    setUploadedFiles({});
-  };
+  // ✅ VEREINFACHT: Nur noch eine Datenquelle - Database (Firebase)
+  // Upload-Funktionalität ist jetzt nur noch über Admin-Modal verfügbar
 
   // Load data from database function
+  // ✅ VEREINFACHT: Lade direkt Auslastung und Einsatzplan Collections
   const loadDatabaseData = async () => {
     try {
-      console.log('🔍 loadDatabaseData() wird aufgerufen...');
+      console.log('🔍 loadDatabaseData() - Lade Auslastung und Einsatzplan...');
 
-      // ✅ VEREINFACHT: Nur noch UtilizationData laden
-      const utilizationData = await DatabaseService.getUtilizationData();
+      // Paralleles Laden beider Collections
+      const [auslastungData, einsatzplanData] = await Promise.all([
+        DatabaseService.getAuslastung(),
+        DatabaseService.getEinsatzplan()
+      ]);
       
-      console.log('🔍 UtilizationData geladen:', {
-        count: utilizationData?.length || 0,
-        sample: utilizationData?.[0]
+      console.log('🔍 Collections geladen:', {
+        auslastung: auslastungData?.length || 0,
+        einsatzplan: einsatzplanData?.length || 0
       });
 
-      // Prüfe ob gültige Daten vorhanden sind
-      if (utilizationData && utilizationData.length > 0) {
-        const hasValidValues = utilizationData.some(item => 
-          item.finalValue !== null && item.finalValue !== undefined ||
-          item.utilization !== null && item.utilization !== undefined ||
-          item.auslastungValue !== null && item.auslastungValue !== undefined ||
-          item.einsatzplanValue !== null && item.einsatzplanValue !== undefined
-        );
-        
-        if (hasValidValues) {
-          console.log('✅ Gültige UtilizationData verfügbar - wechsle zu Datenbank-Modus');
-          setDatabaseData({ utilizationData });
-          setDataSource('database');
-          
-          // ✅ KRITISCHER FIX: Lösche Upload-Dateien nach erfolgreichem DB-Switch
-          setUploadedFiles({});
-          console.log('✅ Upload-Dateien geleert - App ist jetzt im Database-Modus');
-          return;
-        }
-      }
-
-      // Keine gültigen Daten - bleibe im Upload-Modus
-      console.log('⚠️ Keine gültigen UtilizationData verfügbar - bleibe im Upload-Modus');
-      setDatabaseData({});
-      setDataSource('upload');
+      // Setze beide Collections direkt
+      setDatabaseData({ 
+        auslastung: auslastungData || [],
+        einsatzplan: einsatzplanData || []
+      });
+      setDataSource('database');
+      
+      console.log('✅ Database-Daten erfolgreich geladen');
       
     } catch (error) {
       console.error('❌ Fehler in loadDatabaseData:', error);
@@ -109,10 +91,16 @@ export function UtilizationReportView() {
     }
   };
 
-  // Load data from database on mount
+  // Load data from database after user is authenticated
   useEffect(() => {
-    loadDatabaseData();
-  }, []);
+    // Nur laden wenn User eingeloggt ist und nicht mehr im Loading-Status
+    if (!loading && user) {
+      console.log('🚀 User authentifiziert - lade Daten aus Firebase utilization-Data Collection');
+      loadDatabaseData();
+    } else if (!loading && !user) {
+      console.log('⚠️ User nicht eingeloggt - keine Daten geladen');
+    }
+  }, [loading, user]);
 
   // ✅ SCHRITT 5: localStorage-Fallback entfernt - Datenbank-Daten werden erfolgreich geladen
   // Kein localStorage-Fallback mehr nötig, da die Datenbank-Daten funktionieren
@@ -350,9 +338,9 @@ export function UtilizationReportView() {
       careerLevel: string;
     } | undefined = undefined;
     
-    if (dataSource === 'database' && databaseData.utilizationData) {
-      // Extrahiere Metadaten aus UtilizationData
-      const personData = databaseData.utilizationData.find(item => item.person === person);
+    if (dataSource === 'database' && databaseData.auslastung) {
+      // Extrahiere Metadaten aus Auslastung Collection
+      const personData = databaseData.auslastung.find(item => item.person === person);
       if (personData) {
         excelData = {
           name: person,
@@ -450,14 +438,14 @@ export function UtilizationReportView() {
   }, [lookbackWeeks, forecastWeeks, forecastStartWeek, currentIsoYear]);
   // ✅ VEREINFACHT: Nur noch UtilizationData verarbeiten
   const consolidatedData: UtilizationData[] | null = useMemo(() => {
-    if (dataSource === 'database' && databaseData.utilizationData) {
+    if (dataSource === 'database' && databaseData.auslastung) {
       console.log('🔍 UtilizationData für UI transformieren:', {
-        count: databaseData.utilizationData.length,
-        sample: databaseData.utilizationData[0]
+        count: databaseData.auslastung.length,
+        sample: databaseData.auslastung[0]
       });
 
       // ✅ Konvertiere Backend YY/WW Format zu Frontend YYYY-KWnn Format
-      const transformed = databaseData.utilizationData.map((item: any) => {
+      const transformed = databaseData.auslastung.map((item: any) => {
         // Backend: "25/33" → Frontend: "2025-KW33"
         let uiWeek = item.week;
         if (item.week && item.week.match(/^\d{2}\/\d{2}$/)) {
@@ -478,7 +466,7 @@ export function UtilizationReportView() {
       }).filter((item: any) => item.utilization !== null && item.utilization !== undefined);
 
       console.log('✅ UtilizationData transformiert:', {
-        inputCount: databaseData.utilizationData.length,
+        inputCount: databaseData.auslastung.length,
         outputCount: transformed.length,
         sample: transformed[0]
       });
@@ -564,21 +552,69 @@ export function UtilizationReportView() {
     return [];
   }, [uploadedFiles, databaseData, dataSource, forecastStartWeek, lookbackWeeks, forecastWeeks, currentIsoYear]);
 
-  const dataForUI: UtilizationData[] = (() => {
-    if (consolidatedData && consolidatedData.length > 0) {
-      console.log('✅ Verwende echte Daten:', { count: consolidatedData.length, sample: consolidatedData[0] });
-      return consolidatedData;
-    } else {
-      console.log('⚠️ Verwende Mock-Daten, Grund:', {
-        consolidatedDataExists: !!consolidatedData,
-        consolidatedDataLength: consolidatedData?.length || 0,
-        dataSource,
-        databaseDataExists: !!databaseData.utilizationData,
-        databaseDataLength: databaseData.utilizationData?.length || 0
+  // ✅ VEREINFACHT: Erstelle View-Daten direkt aus Auslastung und Einsatzplan
+  const dataForUI: UtilizationData[] = useMemo(() => {
+    if (dataSource === 'database' && databaseData.auslastung && databaseData.einsatzplan) {
+      console.log('🔍 Erstelle UI-Daten aus Auslastung + Einsatzplan Collections');
+      
+      const combinedData: UtilizationData[] = [];
+      
+      // ✅ VEREINFACHT: Verwende YY/WW Format direkt (wie Charts erwarten)
+      // Verarbeite Auslastung-Daten (historisch)
+      databaseData.auslastung.forEach(row => {
+        if (row.values) {
+          Object.entries(row.values).forEach(([weekKey, value]) => {
+            if (typeof value === 'number' && weekKey.match(/^\d{2}\/\d{2}$/)) {
+              combinedData.push({
+                person: row.person || 'Unknown',
+                week: weekKey, // ✅ Direkt YY/WW Format verwenden  
+                utilization: value,
+                isHistorical: true
+              });
+            }
+          });
+        }
       });
-      return mockData;
+      
+      // Verarbeite Einsatzplan-Daten (forecast)
+      databaseData.einsatzplan.forEach(row => {
+        if (row.values) {
+          Object.entries(row.values).forEach(([weekKey, value]) => {
+            if (typeof value === 'number' && weekKey.match(/^\d{2}\/\d{2}$/)) {
+              combinedData.push({
+                person: row.person || 'Unknown',
+                week: weekKey, // ✅ Direkt YY/WW Format verwenden
+                utilization: value,
+                isHistorical: false
+              });
+            }
+          });
+        }
+      });
+      
+      // ✅ Ermittle verfügbare Wochen aus echten Daten
+      const allWeeks = [...new Set(combinedData.map(item => item.week))].sort();
+      
+      console.log('✅ UI-Daten erstellt:', {
+        auslastungRows: databaseData.auslastung.length,
+        einsatzplanRows: databaseData.einsatzplan.length,
+        totalDataPoints: combinedData.length,
+        availableWeeks: allWeeks,
+        sampleData: combinedData.slice(0, 3)
+      });
+      
+      return combinedData;
     }
-  })();
+    
+    // Fallback auf Upload-Daten
+    if (dataSource === 'upload' && consolidatedData && consolidatedData.length > 0) {
+      return consolidatedData;
+    }
+    
+    // Letzter Fallback: Mock-Daten
+    console.log('⚠️ Verwende Mock-Daten als Fallback');
+    return mockData;
+  }, [dataSource, databaseData, consolidatedData]);
   
   // Debug-Log für dataForUI
   useEffect(() => {
@@ -602,23 +638,27 @@ export function UtilizationReportView() {
       const allPersons = Array.from(new Set(dataForUI.map(item => item.person)));
       
       allPersons.forEach(person => {
-        // Letzte 4 Wochen aus der Auslastung prüfen
+        // Letzte 4 Wochen aus der Auslastung prüfen (YY/WW Format)
         const last4Weeks = Array.from({ length: 4 }, (_, i) => {
           const weekNumber = forecastStartWeek - 4 + i;
+          const yy = String(currentIsoYear).slice(-2);
+          const weekKey = `${yy}/${String(weekNumber).padStart(2, '0')}`; // "25/33"
           const weekData = dataForUI.find(item => 
             item.person === person && 
-            item.week === `${currentIsoYear}-KW${weekNumber}` &&
+            item.week === weekKey &&
             item.isHistorical
           );
           return weekData?.utilization || 0;
         });
 
-        // Nächste 8 Wochen aus dem Einsatzplan prüfen
+        // Nächste 8 Wochen aus dem Einsatzplan prüfen (YY/WW Format)
         const next8Weeks = Array.from({ length: 8 }, (_, i) => {
           const weekNumber = forecastStartWeek + i;
+          const yy = String(currentIsoYear).slice(-2);
+          const weekKey = `${yy}/${String(weekNumber).padStart(2, '0')}`; // "25/33"
           const weekData = dataForUI.find(item => 
             item.person === person && 
-            item.week === `${currentIsoYear}-KW${weekNumber}` &&
+            item.week === weekKey &&
             !item.isHistorical
           );
           return weekData?.utilization || 0;
@@ -649,22 +689,37 @@ export function UtilizationReportView() {
   const personMeta = useMemo(() => {
     const meta = new Map<string, { lob?: string; bereich?: string; cc?: string; team?: string; lbs?: string }>();
     
-    if (dataSource === 'database' && databaseData.utilizationData) {
-      // UtilizationData enthält bereits alle konsolidierten Metadaten
+    // ✅ VEREINFACHT: Extrahiere Metadaten direkt aus Auslastung Collection  
+    if (dataSource === 'database' && databaseData.auslastung) {
       const personMetaMap = new Map<string, any>();
       
-      // Sammle alle einzigartigen Personen und ihre Metadaten (nehme ersten Eintrag pro Person)
-      databaseData.utilizationData.forEach((item: any) => {
-        if (!personMetaMap.has(item.person)) {
-          personMetaMap.set(item.person, {
-            lob: item.lob,
-            bereich: item.bereich,
-            cc: item.cc,
-            team: item.team,
-            lbs: item.lbs
+      // Sammle Metadaten aus Auslastung Collection (nehme ersten Eintrag pro Person)
+      databaseData.auslastung.forEach((row: any) => {
+        if (row.person && !personMetaMap.has(row.person)) {
+          personMetaMap.set(row.person, {
+            lob: row.lob,
+            bereich: row.bereich,
+            cc: row.cc,
+            team: row.team,
+            lbs: row.lbs
           });
         }
       });
+      
+      // Ergänze fehlende Personen aus Einsatzplan Collection
+      if (databaseData.einsatzplan) {
+        databaseData.einsatzplan.forEach((row: any) => {
+          if (row.person && !personMetaMap.has(row.person)) {
+            personMetaMap.set(row.person, {
+              lob: row.lob,
+              bereich: row.bereich,
+              cc: row.cc,
+              team: row.team,
+              lbs: row.lbs
+            });
+          }
+        });
+      }
       
       return personMetaMap;
     }
@@ -869,6 +924,14 @@ export function UtilizationReportView() {
     }
     return base;
   }, [dataForUI, selectedPersons, filterCC, filterLBS, filterStatus, personMeta, personStatus, showWorkingStudents, showActionItems, actionItems, personSearchTerm, showAllData, profile, selectedLoB, selectedBereich, selectedCC, selectedTeam]);
+  
+  // ✅ Ermittle verfügbare Wochen für Header aus gefilterten Daten
+  const availableWeeksFromData = useMemo(() => {
+    const weeks = [...new Set(filteredData.map(item => item.week))].sort();
+    console.log('🔍 Wochen für Header-Generierung:', weeks.slice(0, 15));
+    return weeks;
+  }, [filteredData]);
+  
   const visiblePersons = useMemo(() => {
     return Array.from(new Set(filteredData.map(item => item.person)));
   }, [filteredData]);
@@ -911,7 +974,8 @@ export function UtilizationReportView() {
       forecastWeeks
     };
   }, [filteredData, lookbackWeeks, forecastWeeks]);
-  const hasData = uploadedFiles.auslastung?.isValid || uploadedFiles.einsatzplan?.isValid || dataForUI.length > 0;
+  // ✅ VEREINFACHT: hasData hängt nur noch von verfügbaren Daten ab, nicht von Upload-Status
+  const hasData = dataForUI.length > 0;
   const handleExportCSV = () => {
     
   };
@@ -977,38 +1041,8 @@ export function UtilizationReportView() {
     e.currentTarget.value = '';
   };
 
-  // Neue Funktion: Upload-Handler mit Firebase-Speicherung
-  const handleFilesChange = async (files: {
-    auslastung?: UploadedFile;
-    einsatzplan?: UploadedFile;
-  }) => {
-    
-    
-    // Bestehende Upload-Logik
-    setUploadedFiles(files);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(files));
-    
-    // Prüfe ob beide Dateien vorhanden sind
-    if (files.auslastung?.isValid && files.einsatzplan?.isValid) {
-      try {
-
-        
-        // ✅ VEREINFACHT: Direkt Datenbank-Modus setzen ohne Frontend-Konsolidierung
-        await loadDatabaseData();
-        
-        if (true) {
-          
-        }
-      } catch (error) {
-        
-        // Fallback: Verwende weiterhin Upload-Daten
-        setDataSource('upload');
-      }
-    } else {
-      
-      setDataSource('upload');
-    }
-  };
+  // ✅ ENTFERNT: handleFilesChange ist nicht mehr nötig
+  // Upload-Funktionalität läuft jetzt über AdminDataUploadModal
 
   if (loading) {
     return <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">Lade...</div>;
@@ -1096,6 +1130,14 @@ export function UtilizationReportView() {
             <button onClick={handleExportExcel} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
               <FileSpreadsheet className="w-4 h-4" />
               Excel
+            </button>
+            <button 
+              onClick={() => setIsAdminUploadModalOpen(true)} 
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
+              title="Neue Daten hochladen (Admin)"
+            >
+              <Database className="w-4 h-4" />
+              Admin Upload
             </button>
             <button onClick={handleSaveLocal} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
               Speichern
@@ -1191,7 +1233,7 @@ export function UtilizationReportView() {
               </h3>
               <p className="text-sm text-gray-600">
                 {dataSource === 'database' 
-                  ? databaseData.utilizationData 
+                  ? databaseData.auslastung 
                     ? 'Konsolidierte Daten aus der Datenbank geladen' 
                     : 'Keine Daten in der Datenbank verfügbar'
                   : 'Daten aus Excel-Uploads'
@@ -1202,10 +1244,10 @@ export function UtilizationReportView() {
             <div className="flex items-center gap-3">
               {dataSource === 'database' ? (
                 <button
-                  onClick={switchToUpload}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  onClick={() => setIsAdminUploadModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                 >
-                  <FileSpreadsheet className="w-4 h-4" />
+                  <Database className="w-4 h-4" />
                   Daten aktualisieren
                 </button>
               ) : (
@@ -1241,8 +1283,26 @@ export function UtilizationReportView() {
         </div>
         )}
 
-        {/* Upload Section (extracted component) */}
-        <DataUploadSection uploadedFiles={uploadedFiles} onFilesChange={handleFilesChange} onDatabaseRefresh={loadDatabaseData} />
+        {/* ✅ ADMIN: Upload-Funktionalität in separates Modal verschoben */}
+        {!hasData && (
+          <div className="mb-8 bg-blue-50 border border-blue-200 rounded-xl p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-medium text-blue-900">Keine Daten verfügbar</h3>
+                <p className="text-sm text-blue-700 mt-1">
+                  Lade Excel-Dateien hoch, um Auslastungsdaten zu analysieren.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsAdminUploadModalOpen(true)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
+              >
+                <Database className="w-4 h-4" />
+                Daten hochladen
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* 🔍 TEMPORÄRER DEBUG-BEREICH - GUT SICHTBAR */}
         <div className="mb-8 p-6 bg-yellow-50 border-2 border-yellow-300 rounded-xl">
@@ -1264,9 +1324,9 @@ export function UtilizationReportView() {
                   });
                   
                   alert(`✅ DB Status (mit Auth):\n📊 UtilizationData: ${utilData?.length || 0} Einträge\n📈 Auslastung: ${ausData?.length || 0} Einträge\n📋 Einsatzplan: ${einData?.length || 0} Einträge\n\n👀 Schau in die Console (F12) für Details!`);
-                } catch (error) {
+                } catch (error: any) {
                   console.error('❌ Auth-API-Fehler:', error);
-                  alert(`❌ Auth-Fehler: ${error.message}\n\n🔐 Bist du eingeloggt? Login erforderlich!`);
+                  alert(`❌ Auth-Fehler: ${error?.message || error}\n\n🔐 Bist du eingeloggt? Login erforderlich!`);
                 }
               }}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
@@ -1282,9 +1342,9 @@ export function UtilizationReportView() {
                   console.log('✅ Konsolidierung Ergebnis:', result);
                   await loadDatabaseData();
                   alert(`✅ Konsolidierung erfolgreich!\n📊 ${result.result?.count || 0} Datensätze verarbeitet`);
-                } catch (error) {
+                } catch (error: any) {
                   console.error('❌ Konsolidierung-Fehler:', error);
-                  alert(`❌ Konsolidierung-Fehler: ${error.message}`);
+                  alert(`❌ Konsolidierung-Fehler: ${error?.message || error}`);
                 }
               }}
               className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
@@ -1303,7 +1363,7 @@ export function UtilizationReportView() {
                 
                 console.log('🔍 Nach Reload Status:', {
                   dataSource: 'database',
-                  databaseDataCount: databaseData.utilizationData?.length || 0,
+                  databaseDataCount: databaseData.auslastung?.length || 0,
                   consolidatedDataCount: consolidatedData?.length || 0,
                   dataForUICount: dataForUI.length
                 });
@@ -1313,6 +1373,41 @@ export function UtilizationReportView() {
               className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold"
             >
               🔄 DB neu laden
+            </button>
+            
+            {/* Mock-Daten Button entfernt - nicht mehr benötigt */}
+            
+            <button
+              onClick={async () => {
+                console.log('🔍 Prüfe Collections...');
+                try {
+                  const response = await fetch('http://localhost:3001/api/debug/collections', {
+                    headers: {
+                      'Authorization': `Bearer ${await user?.getIdToken()}`,
+                      'Content-Type': 'application/json'
+                    }
+                  });
+                  const data = await response.json();
+                  
+                  console.log('📊 Collection-Status:', data);
+                  
+                  const report = [
+                    `📈 Auslastung: ${data.auslastung.count} Einträge`,
+                    `📋 Einsatzplan: ${data.einsatzplan.count} Einträge`, 
+                    `🎯 UtilizationData: ${data.utilizationData.count} Einträge`,
+                    ``,
+                    `💡 Details in der Console (F12)`
+                  ].join('\n');
+                  
+                  alert(report);
+                } catch (error: any) {
+                  console.error('❌ Fehler beim Prüfen:', error);
+                  alert(`❌ Fehler: ${error?.message || error}`);
+                }
+              }}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+            >
+              🔍 Collections prüfen
             </button>
           </div>
           <div className="mt-4 text-sm text-gray-600">
@@ -1407,15 +1502,14 @@ export function UtilizationReportView() {
                 <tr>
                   {visibleColumns.avg4 && (
                     <th className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-12">
-                      Ø {String(new Date().getFullYear()).slice(-2)}/{String(forecastStartWeek - lookbackWeeks + 1).padStart(2, '0')}-{String(forecastStartWeek - lookbackWeeks + 4).padStart(2, '0')}
+                      Ø {availableWeeksFromData.slice(-8, -4).length > 0 ? `${availableWeeksFromData.slice(-8, -4)[0]}-${availableWeeksFromData.slice(-8, -4)[3] || availableWeeksFromData.slice(-8, -4).slice(-1)[0]}` : 'Ø'}
                     </th>
                   )}
                   {/* 4 Einzelwochen bis zur aktuellen KW */}
-                  {visibleColumns.historyWeeks && Array.from({ length: 4 }, (_, i) => {
-                    const weekNumber = (forecastStartWeek - lookbackWeeks + 5) + i;
+                  {visibleColumns.historyWeeks && availableWeeksFromData.slice(-8, -4).map((week, i) => {
                     return (
                       <th key={`left-single-${i}`} className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-12">
-                        {`${String(currentIsoYear).slice(-2)}/${String(weekNumber).padStart(2, '0')}`}
+                        {week}
                       </th>
                     );
                   })}
@@ -1457,11 +1551,15 @@ export function UtilizationReportView() {
                       </div>
                     </th>
                   )}
-                  {visibleColumns.forecastWeeks && Array.from({ length: forecastWeeks }, (_, i) => {
-                    const weekNumber = (forecastStartWeek + 1) + i; // starts after current week
+                  {visibleColumns.forecastWeeks && availableWeeksFromData.slice(0, forecastWeeks).map((week, i) => {
+                    // ✅ DEBUG: Zeige erste 3 Header-Wochen
+                    if (i < 3) {
+                      console.log(`🔍 DEBUG Header-Woche ${i}:`, week);
+                    }
+                    
                     return (
                       <th key={`right-${i}`} className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-12">
-                        {`${String(currentIsoYear).slice(-2)}/${String(weekNumber).padStart(2, '0')}`}
+                        {week}
                       </th>
                     );
                   })}
@@ -1472,6 +1570,13 @@ export function UtilizationReportView() {
                 {visiblePersons.map(person => {
                   const isTerminated = personStatus[person] === 'termination' || personStatus[person] === 'Kündigung';
                   const personData = filteredData.filter(item => item.person === person);
+                  
+                  // ✅ DEBUG: Zeige verfügbare Wochen für erste Person
+                  if (person === visiblePersons[0]) {
+                    const availableWeeks = personData.map(item => item.week).slice(0, 10);
+                    console.log(`🔍 DEBUG Person "${person}" - Verfügbare Wochen:`, availableWeeks);
+                    console.log(`🔍 DEBUG Header wird diese Wochen zeigen:`, availableWeeksFromData.slice(0, 10));
+                  }
                   return (
                     <tr key={person} className="hover:bg-gray-50">
                       {/* Durchschnitt der ältesten 4 Wochen */}
@@ -1480,7 +1585,9 @@ export function UtilizationReportView() {
                         {(() => {
                           const oldestWeeks = Array.from({ length: 4 }, (_, i) => {
                             const weekNumber = (forecastStartWeek - lookbackWeeks + 1) + i;
-                            const weekData = personData.find(item => item.week === `${currentIsoYear}-KW${weekNumber}`);
+                            const yy = String(currentIsoYear).slice(-2);
+                            const weekKey = `${yy}/${String(weekNumber).padStart(2, '0')}`;
+                            const weekData = personData.find(item => item.week === weekKey);
                             return weekData?.utilization;
                           }).filter(util => util !== null && util !== undefined);
                           
@@ -1504,9 +1611,8 @@ export function UtilizationReportView() {
                       </td>
                       )}
                       {/* 4 Einzelwochen bis zur aktuellen KW */}
-                      {visibleColumns.historyWeeks && Array.from({ length: 4 }, (_, i) => {
-                        const weekNumber = (forecastStartWeek - lookbackWeeks + 5) + i;
-                        const weekData = personData.find(item => item.week === `${currentIsoYear}-KW${weekNumber}`);
+                      {visibleColumns.historyWeeks && availableWeeksFromData.slice(-8, -4).map((week, i) => {
+                        const weekData = personData.find(item => item.week === week);
                         const utilization = weekData?.utilization;
                         let bgColor = 'bg-gray-100';
                         if (utilization !== null && utilization !== undefined) {
@@ -1579,7 +1685,7 @@ export function UtilizationReportView() {
                             // Hole VG-Information aus dem Einsatzplan
                             let vgName = '';
                             
-                            if (dataSource === 'database' && databaseData.utilizationData) {
+                            if (dataSource === 'database' && databaseData.auslastung) {
                               // VG nicht in UtilizationData verfügbar
                               vgName = '';
                             } else {
@@ -1705,9 +1811,8 @@ export function UtilizationReportView() {
                         </div>
                       </td>
                       )}
-                      {visibleColumns.forecastWeeks && Array.from({ length: forecastWeeks }, (_, i) => {
-                        const weekNumber = (forecastStartWeek + 1) + i;
-                        const weekData = personData.find(item => item.week === `${currentIsoYear}-KW${weekNumber}`);
+                      {visibleColumns.forecastWeeks && availableWeeksFromData.slice(0, forecastWeeks).map((week, i) => {
+                        const weekData = personData.find(item => item.week === week);
                         const utilization = weekData?.utilization;
                         let bgColor = 'bg-gray-100';
                         if (utilization !== null && utilization !== undefined) {
@@ -2002,6 +2107,13 @@ export function UtilizationReportView() {
         isOpen={!!planningCommentForPerson}
         onClose={async () => { await refreshPersonDossier(planningCommentForPerson); setPlanningCommentForPerson(null); }}
         personId={planningCommentForPerson || ''}
+      />
+
+      {/* Admin Data Upload Modal */}
+      <AdminDataUploadModal
+        isOpen={isAdminUploadModalOpen}
+        onClose={() => setIsAdminUploadModalOpen(false)}
+        onDatabaseRefresh={loadDatabaseData}
       />
 
       {/* Scope Settings Modal entfernt: Es gibt nur noch EIN Dropdown für alle Filter */}

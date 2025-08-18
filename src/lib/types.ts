@@ -61,6 +61,17 @@ export interface SkillDoc {
   updatedAt: Date;
 }
 
+export interface EmployeeSkillDoc {
+  employeeName: string;
+  skillId: string;
+  skillName: string;
+  level: number; // 0-5, step 0.5
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+
+
 // Firestore Collection Names
 export const COLLECTIONS = {
   UPLOADED_FILES: 'uploaded_files',
@@ -70,7 +81,8 @@ export const COLLECTIONS = {
   PERSON_TRAVEL_READINESS: 'person_travel_readiness',
   CUSTOMERS: 'customers',
   PROJECTS: 'projects',
-  SKILLS: 'skills'
+  SKILLS: 'skills',
+  EMPLOYEE_SKILLS: 'employee_skills'
 } as const;
 
 // Firestore Document IDs
@@ -108,3 +120,9 @@ export interface FirestoreProject extends ProjectDoc, FirestoreDocument {
 export interface FirestoreSkill extends SkillDoc, FirestoreDocument {
   userId?: string;
 }
+
+export interface FirestoreEmployeeSkill extends EmployeeSkillDoc, FirestoreDocument {
+  userId?: string;
+}
+
+

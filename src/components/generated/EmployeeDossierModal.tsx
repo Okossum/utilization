@@ -9,6 +9,7 @@ import DatabaseService from '../../services/database';
 import { EmployeeSkillsEditor } from './EmployeeSkillsEditor';
 import { UtilizationComment } from './UtilizationComment';
 import { PlanningCommentModal } from './PlanningCommentModal';
+import { employeeSkillService } from '../../lib/firebase-services';
 export interface ProjectHistoryItem {
   id: string;
   projectName: string;
@@ -104,6 +105,9 @@ export function EmployeeDossierModal({
       try {
         // Lade gespeicherte Dossier-Daten aus der DB
         const savedDossier = await DatabaseService.getEmployeeDossier(employee.id);
+        
+        // Lade Skills aus Firebase
+        const firebaseSkills = await employeeSkillService.getByEmployee(employee.id);
 
         // Normalisierung: stelle sicher, dass projectHistory Items immer projectName befüllt haben
         const normalizedProjectHistory = Array.isArray(savedDossier?.projectHistory)
@@ -137,7 +141,10 @@ export function EmployeeDossierModal({
           projectHistory: normalizedProjectHistory || employee.projectHistory || [],
           projectOffers: savedDossier?.projectOffers || employee.projectOffers || [],
           jiraTickets: savedDossier?.jiraTickets || employee.jiraTickets || [],
-          skills: Array.isArray(savedDossier?.skills) ? savedDossier?.skills : (employee.skills || []),
+          // Skills aus Firebase haben Vorrang, dann lokale DB, dann employee
+          skills: firebaseSkills.length > 0 
+            ? firebaseSkills.map(fs => ({ skillId: fs.skillId, name: fs.skillName, level: fs.level }))
+            : Array.isArray(savedDossier?.skills) ? savedDossier?.skills : (employee.skills || []),
           // Speichere Excel-Daten für Referenz
           excelData: excelData
         };
@@ -175,12 +182,34 @@ export function EmployeeDossierModal({
   };
   const handleSave = async () => {
     try {
+      // Speichere Skills persistent in Firebase
+      if (formData.skills && formData.skills.length > 0) {
+        await employeeSkillService.replaceAllForEmployee(
+          formData.id,
+          formData.skills.map(skill => ({
+            skillId: skill.skillId,
+            skillName: skill.name,
+            level: skill.level
+          }))
+        );
+      } else {
+        // Lösche alle Skills wenn keine vorhanden
+        const existingSkills = await employeeSkillService.getByEmployee(formData.id);
+        for (const skill of existingSkills) {
+          await employeeSkillService.delete(formData.id, skill.skillId);
+        }
+      }
+
       // Speichere nur die manuellen Eingaben in der DB (nicht die Excel-Daten)
+      // Konvertiere zu kompatiblem Format für DatabaseService
       const dossierData = {
-        id: formData.id,
-        name: formData.name,
-        // Manuelle Eingaben
-        email: formData.email,
+        uid: formData.id,
+        displayName: formData.name,
+        email: formData.email || '',
+        // Legacy-Felder für API-Kompatibilität
+        skills: formData.skills?.map(s => s.name) || [],
+        experience: 0,
+        // Alle anderen Daten als dynamische Felder
         phone: formData.phone,
         strengths: formData.strengths,
         weaknesses: formData.weaknesses,
@@ -190,7 +219,6 @@ export function EmployeeDossierModal({
         projectHistory: formData.projectHistory,
         projectOffers: formData.projectOffers,
         jiraTickets: formData.jiraTickets,
-        skills: formData.skills || [],
         // Excel-Daten als Referenz (werden nie überschrieben)
         excelData: formData.excelData
       };
@@ -202,7 +230,7 @@ export function EmployeeDossierModal({
       onSave(formData);
       onClose();
     } catch (error) {
-      
+      console.error('Fehler beim Speichern der Employee Skills:', error);
       // Hier könnte man einen Toast/Alert anzeigen
       alert('Fehler beim Speichern. Bitte versuchen Sie es erneut.');
     }
@@ -386,6 +414,7 @@ export function EmployeeDossierModal({
 
               {/* Skills */}
               <EmployeeSkillsEditor
+                employeeName={formData.name} // NEW: Employee Name für Persistierung
                 value={formData.skills || []}
                 onChange={(skills)=>setFormData(prev=>({ ...prev, skills }))}
               />

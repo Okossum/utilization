@@ -4,6 +4,7 @@ import { Plus, Edit2, Trash2, History, Save, X } from 'lucide-react';
 import { ProjectHistoryItem } from './EmployeeDossierModal';
 import { CustomerManager } from './CustomerManager';
 import { ProjectSelector } from './ProjectSelector';
+import { SkillSelector } from './SkillSelector';
 import { useCustomers } from '../../contexts/CustomerContext';
 interface ProjectHistoryListProps {
   projects: ProjectHistoryItem[];
@@ -148,10 +149,13 @@ export function ProjectHistoryList({
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Rolle</label>
-                      <input type="text" value={editForm.role} onChange={e => setEditForm(prev => ({
-                  ...prev,
-                  role: e.target.value
-                }))} className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                      <SkillSelector
+                        value={editForm.role}
+                        onChange={(role) => setEditForm(prev => ({ ...prev, role }))}
+                        placeholder="Rolle auswählen oder erstellen..."
+                        className="w-full"
+                        allowInlineCreation={true}
+                      />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Dauer</label>
