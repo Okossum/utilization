@@ -48,7 +48,7 @@ export function CustomerProvider({ children, initialCustomers = [] }: CustomerPr
         setCustomers(fsCustomers.map(c => c.name));
         setProjects(fsProjects.map(p => ({ id: p.id, name: p.name, customer: p.customer, createdAt: p.createdAt })));
       } catch (e) {
-        console.error('Fehler beim Laden aus Firestore:', e);
+  
       } finally {
         if (!isCancelled) setIsHydrated(true);
       }

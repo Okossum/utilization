@@ -2,6 +2,20 @@
 // Diese Funktionen werden nur im Backend/Node.js verwendet
 // Für den Browser erstellen wir Mock-Funktionen
 
+import {
+  UserProfileData,
+  UserUpdateData,
+  AuslastungSaveRequest,
+  EinsatzplanSaveRequest,
+  EmployeeDossierData,
+  EmployeeDossierSaveRequest,
+  ConsolidatedDataSaveRequest,
+  GenericDataArray,
+  GenericDataObject,
+  ApiEndpoint,
+  RequestOptions
+} from '../types/database';
+
 // API-Basis-URL für Backend-Server
 const API_BASE_URL = process.env.NODE_ENV === 'production' 
   ? 'https://your-production-domain.com/api' 
@@ -17,28 +31,47 @@ export function setAuthTokenProvider(provider: () => Promise<string | null>) {
 class ApiService {
   private static async request(endpoint: string, options: RequestInit = {}) {
     try {
-      const token = authTokenProvider ? await authTokenProvider() : null;
+      // ✅ SCHRITT 2: Token-Validierung vor API-Aufruf
+      if (!authTokenProvider) {
+        throw new Error('Token Provider nicht verfügbar - bitte warten Sie auf die Anmeldung');
+      }
+      
+      const token = await authTokenProvider();
+      if (!token) {
+        throw new Error('Kein gültiger Token verfügbar - bitte melden Sie sich erneut an');
+      }
+      
+      console.log(`🔍 API-Aufruf ${endpoint}: Token verfügbar, Länge: ${token.length}`);
+      
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          'Authorization': `Bearer ${token}`,
           ...options.headers,
         },
         ...options,
       });
 
+      console.log(`🔍 API-Response ${endpoint}: Status ${response.status}`);
+
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Authentifizierung fehlgeschlagen - bitte melden Sie sich erneut an');
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      return await response.json();
+      const result = await response.json();
+      console.log(`✅ API-Aufruf ${endpoint} erfolgreich:`, result);
+      return result;
     } catch (error) {
-      console.error(`API request failed for ${endpoint}:`, error);
+      // ✅ Bessere Error-Behandlung
+      console.error(`❌ API-Fehler bei ${endpoint}:`, error);
       throw error;
     }
   }
 
-  static async post(endpoint: string, data: any) {
+  static async post(endpoint: string, data: GenericDataObject) {
     return this.request(endpoint, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -51,7 +84,7 @@ class ApiService {
     });
   }
 
-  static async put(endpoint: string, data?: any) {
+  static async put(endpoint: string, data?: GenericDataObject) {
     return this.request(endpoint, {
       method: 'PUT',
       body: data ? JSON.stringify(data) : undefined,
@@ -61,21 +94,38 @@ class ApiService {
 
 // Datenbank-Service für lokale SQLite-Datenbank
 export class DatabaseService {
+  // ✅ SCHRITT 2: Warten auf Token Provider
+  private static async waitForTokenProvider(maxWaitMs: number = 5000): Promise<void> {
+    const startTime = Date.now();
+    while (!authTokenProvider && (Date.now() - startTime) < maxWaitMs) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    if (!authTokenProvider) {
+      throw new Error('Token Provider nicht verfügbar nach 5 Sekunden Wartezeit');
+    }
+    console.log('✅ Token Provider verfügbar');
+  }
+
   // Aktuelles User-Profil abrufen
   static async getMe() {
     try {
-      return await ApiService.get('/me');
+      console.log('🔍 getMe() aufgerufen');
+      await this.waitForTokenProvider();
+      console.log('🔍 API-Aufruf /me wird gemacht...');
+      const result = await ApiService.get('/me');
+      console.log('✅ getMe() erfolgreich:', result);
+      return result;
     } catch (error) {
-      console.error('Fehler beim Abrufen des User-Profils:', error);
+      console.error('❌ Fehler beim Abrufen des User-Profils:', error);
       throw error;
     }
   }
 
-  static async updateMe(data: any) {
+  static async updateMe(data: UserUpdateData) {
     try {
       return await ApiService.put('/me', data);
     } catch (error) {
-      console.error('Fehler beim Aktualisieren des User-Profils:', error);
+
       throw error;
     }
   }
@@ -86,28 +136,28 @@ export class DatabaseService {
   }
 
   // Admin: Nutzer aktualisieren
-  static async updateUser(uid: string, data: any) {
+  static async updateUser(uid: string, data: UserUpdateData) {
     return ApiService.put(`/users/${uid}`, data);
   }
   
   // Auslastung-Daten speichern oder aktualisieren
-  static async saveAuslastung(fileName: string, data: any[]) {
+  static async saveAuslastung(fileName: string, data: GenericDataArray) {
     try {
       const result = await ApiService.post('/auslastung', { fileName, data });
       return result;
     } catch (error) {
-      console.error('Fehler beim Speichern der Auslastung:', error);
+
       throw error;
     }
   }
 
   // Einsatzplan-Daten speichern oder aktualisieren
-  static async saveEinsatzplan(fileName: string, data: any[]) {
+  static async saveEinsatzplan(fileName: string, data: GenericDataArray) {
     try {
       const result = await ApiService.post('/einsatzplan', { fileName, data });
       return result;
     } catch (error) {
-      console.error('Fehler beim Speichern des Einsatzplans:', error);
+
       throw error;
     }
   }
@@ -115,9 +165,14 @@ export class DatabaseService {
   // Alle Auslastung-Daten abrufen (nur neueste Version)
   static async getAuslastung() {
     try {
-      return await ApiService.get('/auslastung');
+      console.log('🔍 getAuslastung() aufgerufen');
+      await this.waitForTokenProvider();
+      console.log('🔍 API-Aufruf /auslastung wird gemacht...');
+      const result = await ApiService.get('/auslastung');
+      console.log('✅ getAuslastung() erfolgreich:', result);
+      return result;
     } catch (error) {
-      console.error('Fehler beim Abrufen der Auslastung:', error);
+      console.error('❌ Fehler beim Abrufen der Auslastung:', error);
       throw error;
     }
   }
@@ -125,9 +180,14 @@ export class DatabaseService {
   // Alle Einsatzplan-Daten abrufen (nur neueste Version)
   static async getEinsatzplan() {
     try {
-      return await ApiService.get('/einsatzplan');
+      console.log('🔍 getEinsatzplan() aufgerufen');
+      await this.waitForTokenProvider();
+      console.log('🔍 API-Aufruf /einsatzplan wird gemacht...');
+      const result = await ApiService.get('/einsatzplan');
+      console.log('✅ getEinsatzplan() erfolgreich:', result);
+      return result;
     } catch (error) {
-      console.error('Fehler beim Abrufen des Einsatzplans:', error);
+      console.error('❌ Fehler beim Abrufen des Einsatzplans:', error);
       throw error;
     }
   }
@@ -137,18 +197,18 @@ export class DatabaseService {
     try {
       return await ApiService.get('/upload-history');
     } catch (error) {
-      console.error('Fehler beim Abrufen der Upload-Historie:', error);
+
       throw error;
     }
   }
 
   // Employee Dossier speichern oder aktualisieren
-  static async saveEmployeeDossier(employeeId: string, dossierData: any) {
+  static async saveEmployeeDossier(employeeId: string, dossierData: EmployeeDossierData) {
     try {
       const result = await ApiService.post('/employee-dossier', { employeeId, dossierData });
       return result;
     } catch (error) {
-      console.error('Fehler beim Speichern des Employee Dossiers:', error);
+
       throw error;
     }
   }
@@ -158,7 +218,7 @@ export class DatabaseService {
     try {
       return await ApiService.get(`/employee-dossier/${employeeId}`);
     } catch (error) {
-      console.error('Fehler beim Abrufen des Employee Dossiers:', error);
+
       return null;
     }
   }
@@ -168,7 +228,7 @@ export class DatabaseService {
     try {
       return await ApiService.get('/employee-dossiers');
     } catch (error) {
-      console.error('Fehler beim Abrufen aller Employee Dossiers:', error);
+
       return [];
     }
   }
@@ -180,15 +240,15 @@ export class DatabaseService {
 
   // Normalisierte Auslastungsdaten konsolidieren und speichern
   static async consolidateAndSaveUtilizationData(
-    auslastungData: any[],
-    einsatzplanData: any[],
+    auslastungData: GenericDataArray,
+    einsatzplanData: GenericDataArray,
     currentYear: number,
     forecastStartWeek: number,
     lookbackWeeks: number,
     forecastWeeks: number
   ) {
     try {
-      const consolidatedData: any[] = [];
+      const consolidatedData: GenericDataArray = [];
       
       // Alle Personen sammeln
       const allPersons = new Set([
@@ -198,13 +258,15 @@ export class DatabaseService {
 
       for (const person of allPersons) {
         const ausRow = auslastungData.find(row => row.person === person);
-        const einRow = einsatzplanData.find(row => row.person === row.person);
+        const einRow = einsatzplanData.find(row => row.person === person);
 
         // Historische Wochen (links von aktueller Woche)
         for (let i = 0; i < lookbackWeeks; i++) {
           const weekNum = forecastStartWeek - lookbackWeeks + i;
-          const weekKey = `KW ${weekNum}-${currentYear}`;
-          const uiLabel = `${currentYear}-KW${weekNum}`;
+          const yy = String(currentYear).slice(-2);
+          const ww = String(weekNum).padStart(2, '0');
+          const weekKey = `${yy}/${ww}`;
+          const uiLabel = `${yy}/${ww}`;
           
           const ausValue = ausRow ? this.extractWeekValue(ausRow, weekNum, currentYear) : null;
           const einValue = einRow ? this.extractWeekValue(einRow, weekNum, currentYear) : null;
@@ -226,7 +288,8 @@ export class DatabaseService {
               bereich: ausRow?.bereich,
               cc: ausRow?.cc,
               team: ausRow?.team,
-              lbs: einRow?.lbs
+              lbs: einRow?.lbs,
+              compositeKey: `${person}__${ausRow?.team || einRow?.team || 'unknown'}__${ausRow?.cc || einRow?.cc || 'unknown'}`
             });
           }
         }
@@ -234,8 +297,10 @@ export class DatabaseService {
         // Forecast-Wochen (rechts von aktueller Woche)
         for (let i = 0; i < forecastWeeks; i++) {
           const weekNum = forecastStartWeek + i;
-          const weekKey = `KW ${weekNum}-${currentYear}`;
-          const uiLabel = `${currentYear}-KW${weekNum}`;
+          const yy = String(currentYear).slice(-2);
+          const ww = String(weekNum).padStart(2, '0');
+          const weekKey = `${yy}/${ww}`;
+          const uiLabel = `${yy}/${ww}`;
           
           const ausValue = ausRow ? this.extractWeekValue(ausRow, weekNum, currentYear) : null;
           const einValue = einRow ? this.extractWeekValue(einRow, weekNum, currentYear) : null;
@@ -257,7 +322,8 @@ export class DatabaseService {
               bereich: ausRow?.bereich,
               cc: ausRow?.cc,
               team: ausRow?.team,
-              lbs: einRow?.lbs
+              lbs: einRow?.lbs,
+              compositeKey: `${person}__${ausRow?.team || einRow?.team || 'unknown'}__${ausRow?.cc || einRow?.cc || 'unknown'}`
             });
           }
         }
@@ -265,17 +331,22 @@ export class DatabaseService {
 
       // Alle konsolidierten Daten werden über die API gespeichert
       // Die eigentliche Speicherung erfolgt im Backend
+      if (consolidatedData.length > 0) {
+        await this.saveConsolidatedDataToFirebase(consolidatedData);
+      }
 
       return { success: true, count: consolidatedData.length };
     } catch (error) {
-      console.error('Fehler beim Konsolidieren der Daten:', error);
+
       throw error;
     }
   }
 
-  // Hilfsfunktion: Wochenwert aus Excel-Daten extrahieren
-  private static extractWeekValue(row: any, weekNum: number, year: number): number | null {
-    const weekKey = `KW ${weekNum}-${year}`;
+  // Hilfsfunktion: Wochenwert aus Excel-Daten extrahieren im YY/WW Format
+  private static extractWeekValue(row: GenericDataObject, weekNum: number, year: number): number | null {
+    const yy = String(year).slice(-2);
+    const ww = String(weekNum).padStart(2, '0');
+    const weekKey = `${yy}/${ww}`;
     const value = row[weekKey];
     return typeof value === 'number' && Number.isFinite(value) ? value : null;
   }
@@ -290,30 +361,180 @@ export class DatabaseService {
     }
   ) {
     try {
+      console.log('🔍 getUtilizationData() aufgerufen');
+      await this.waitForTokenProvider();
       const queryParams = new URLSearchParams();
       if (filters?.person) queryParams.append('person', filters.person);
       if (filters?.isHistorical !== undefined) queryParams.append('isHistorical', filters.isHistorical.toString());
       if (filters?.year) queryParams.append('year', filters.year.toString());
       
       const endpoint = `/utilization-data${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-      return await ApiService.get(endpoint);
+      console.log('🔍 API-Aufruf', endpoint, 'wird gemacht...');
+      const result = await ApiService.get(endpoint);
+      console.log('✅ getUtilizationData() erfolgreich:', result);
+      return result;
     } catch (error) {
-      console.error('Fehler beim Abrufen der normalisierten Daten:', error);
+      console.error('❌ Fehler beim Abrufen der Utilization-Daten:', error);
       throw error;
     }
   }
 
   // Konsolidierte Daten in Firebase utilizationData Collection speichern
-  static async saveConsolidatedDataToFirebase(consolidatedData: any[]) {
+  static async saveConsolidatedDataToFirebase(consolidatedData: GenericDataArray) {
     try {
-      console.log('Speichere konsolidierte Daten in Firebase:', consolidatedData.length, 'Datensätze');
+
       const result = await ApiService.post('/utilization-data/bulk', { data: consolidatedData });
-      console.log('Daten erfolgreich in Firebase gespeichert:', result);
+      
       return result;
     } catch (error) {
-      console.error('Fehler beim Speichern der konsolidierten Daten in Firebase:', error);
+      
       throw error;
     }
+  }
+
+  // Neue Funktion: Konsolidierung mit Daten aus der Datenbank
+  static async consolidateFromDatabase() {
+    try {
+      console.log('🔍 Starte Konsolidierung mit Daten aus der Datenbank...');
+      
+      // Lade beide Datentypen aus der Datenbank
+      const auslastungData = await this.getAuslastung();
+      const einsatzplanData = await this.getEinsatzplan();
+      
+      console.log('🔍 Daten aus der Datenbank geladen:', {
+        auslastung: auslastungData?.length || 0,
+        einsatzplan: einsatzplanData?.length || 0
+      });
+
+      // Prüfe Datenverfügbarkeit
+      const hasAuslastung = auslastungData && auslastungData.length > 0;
+      const hasEinsatzplan = einsatzplanData && einsatzplanData.length > 0;
+
+      if (!hasAuslastung && !hasEinsatzplan) {
+        throw new Error('Keine Daten in der Datenbank verfügbar');
+      }
+
+      // Erstelle Status-Informationen für den Benutzer
+      const statusInfo = {
+        hasAuslastung,
+        hasEinsatzplan,
+        message: '',
+        canConsolidate: hasAuslastung && hasEinsatzplan
+      };
+
+      if (hasAuslastung && !hasEinsatzplan) {
+        statusInfo.message = '⚠️ Nur Auslastungsdaten verfügbar - Planungsdaten fehlen';
+      } else if (!hasAuslastung && hasEinsatzplan) {
+        statusInfo.message = '⚠️ Nur Planungsdaten verfügbar - Auslastungsdaten fehlen';
+      } else {
+        statusInfo.message = '✅ Vollständige Daten verfügbar - Konsolidierung läuft';
+      }
+
+      console.log('📊 Status:', statusInfo.message);
+
+      // Wenn beide Datentypen vorhanden sind, führe vollständige Konsolidierung durch
+      if (statusInfo.canConsolidate) {
+        const currentYear = new Date().getFullYear();
+        const currentWeek = Math.ceil((new Date().getTime() - new Date(currentYear, 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
+        const forecastStartWeek = currentWeek;
+        const lookbackWeeks = 8;
+        const forecastWeeks = 4;
+
+        const result = await this.consolidateAndSaveUtilizationData(
+          auslastungData,
+          einsatzplanData,
+          currentYear,
+          forecastStartWeek,
+          lookbackWeeks,
+          forecastWeeks
+        );
+
+        return { ...statusInfo, result, success: true };
+      } else {
+        // Teilweise Konsolidierung mit verfügbaren Daten
+        const availableData = hasAuslastung ? auslastungData : einsatzplanData;
+        const dataType = hasAuslastung ? 'auslastung' : 'einsatzplan';
+        
+        console.log(`🔍 Führe teilweise Konsolidierung mit ${dataType}-Daten durch...`);
+        
+        // Erstelle Platzhalter-Struktur für fehlende Daten
+        const partialConsolidated = this.createPartialConsolidation(availableData, dataType);
+        
+        // Speichere teilweise konsolidierte Daten
+        await this.saveConsolidatedDataToFirebase(partialConsolidated);
+        
+        return { ...statusInfo, result: { count: partialConsolidated.length }, success: true };
+      }
+
+    } catch (error) {
+      console.error('❌ Fehler bei der Datenbank-Konsolidierung:', error);
+      throw error;
+    }
+  }
+
+  // Hilfsfunktion: Teilweise Konsolidierung mit verfügbaren Daten
+  private static createPartialConsolidation(data: GenericDataArray, dataType: 'auslastung' | 'einsatzplan') {
+    const consolidated: GenericDataArray = [];
+    
+    data.forEach(row => {
+      // Erstelle Basis-Struktur mit verfügbaren Metadaten
+      const baseEntry = {
+        person: row.person,
+        lob: row.lob,
+        bereich: row.bereich,
+        cc: row.cc,
+        team: row.team,
+        lbs: row.lbs,
+        source: dataType,
+        isPartial: true, // Markierung für teilweise Daten
+        missingDataType: dataType === 'auslastung' ? 'einsatzplan' : 'auslastung'
+      };
+
+      // Füge Wochen-Daten hinzu (falls vorhanden) - im YY/WW Format oder values-Objekt
+      if (row.values && typeof row.values === 'object') {
+        // Neue values-Struktur
+        Object.keys(row.values).forEach(key => {
+          if (key.match(/^\d{2}\/\d{2}$/)) {
+            const value = row.values[key];
+            if (typeof value === 'number' && Number.isFinite(value)) {
+              consolidated.push({
+                ...baseEntry,
+                week: key,
+                year: new Date().getFullYear(),
+                weekNumber: parseInt(key.split('/')[1]),
+                auslastungValue: dataType === 'auslastung' ? value : null,
+                einsatzplanValue: dataType === 'einsatzplan' ? value : null,
+                finalValue: value,
+                isHistorical: true,
+                compositeKey: `${row.person}__${row.team || 'unknown'}__${row.cc || 'unknown'}`
+              });
+            }
+          }
+        });
+      } else {
+        // Flache Struktur (direkte Eigenschaften)
+        Object.keys(row).forEach(key => {
+          if (key.match(/^\d{2}\/\d{2}$/)) {
+            const value = row[key];
+            if (typeof value === 'number' && Number.isFinite(value)) {
+              consolidated.push({
+                ...baseEntry,
+                week: key,
+                year: new Date().getFullYear(),
+                weekNumber: parseInt(key.split('/')[1]),
+                auslastungValue: dataType === 'auslastung' ? value : null,
+                einsatzplanValue: dataType === 'einsatzplan' ? value : null,
+                finalValue: value,
+                isHistorical: true,
+                compositeKey: `${row.person}__${row.team || 'unknown'}__${row.cc || 'unknown'}`
+              });
+            }
+          }
+        });
+      }
+    });
+
+    return consolidated;
   }
 }
 

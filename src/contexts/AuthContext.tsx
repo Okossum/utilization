@@ -54,6 +54,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } else {
             setRole('unknown');
           }
+          
+          // ✅ SCHRITT 1: Token Provider SOFORT nach Login setzen
+          setAuthTokenProvider(async () => {
+            try {
+              const current = getAuth(app).currentUser;
+              if (!current) return null;
+              const t = await current.getIdToken();
+              return t || null;
+            } catch {
+              return null;
+            }
+          });
+          
           // Load server-side user profile
           try {
             const me = await DatabaseService.getMe();
@@ -75,20 +88,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     return () => unsubscribe();
   }, [auth]);
-
-  // Provide token to API layer without using localStorage
-  useEffect(() => {
-    setAuthTokenProvider(async () => {
-      try {
-        const current = getAuth(app).currentUser;
-        if (!current) return null;
-        const t = await current.getIdToken();
-        return t || null;
-      } catch {
-        return null;
-      }
-    });
-  }, []);
   const refreshProfile = useCallback(async () => {
     try {
       const me = await DatabaseService.getMe();

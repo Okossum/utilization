@@ -18,25 +18,43 @@ export function AuslastungPreviewExplorer({ rows, maxWeeks = 8 }: AuslastungPrev
   const { weeks, previewRows } = useMemo(() => {
     const weekSet = new Set<string>();
     for (const r of rows) {
-      Object.keys(r.values || {}).forEach(w => weekSet.add(w));
+      // Support both structures: values object and flat properties
+      if (r.values && typeof r.values === 'object') {
+        Object.keys(r.values).forEach(w => weekSet.add(w));
+      } else {
+        // Look for YY/WW format keys directly in row properties
+        Object.keys(r).forEach(key => {
+          if (key.match(/^\d{2}\/\d{2}$/)) {
+            weekSet.add(key);
+          }
+        });
+      }
     }
     const sortedWeeks = Array.from(weekSet).sort((a, b) => {
-      // a = "KW 33-2025"
-      const pa = a.match(/^KW\s*(\d{1,2})-(\d{4})$/);
-      const pb = b.match(/^KW\s*(\d{1,2})-(\d{4})$/);
+      // a = "25/33" (YY/WW format)
+      const pa = a.match(/^(\d{2})\/(\d{2})$/);
+      const pb = b.match(/^(\d{2})\/(\d{2})$/);
       if (!pa || !pb) return a.localeCompare(b);
-      const wa = parseInt(pa[1], 10);
-      const ya = parseInt(pa[2], 10);
-      const wb = parseInt(pb[1], 10);
-      const yb = parseInt(pb[2], 10);
+      const ya = parseInt(`20${pa[1]}`, 10); // Convert YY to YYYY
+      const wa = parseInt(pa[2], 10);
+      const yb = parseInt(`20${pb[1]}`, 10); // Convert YY to YYYY
+      const wb = parseInt(pb[2], 10);
       if (ya !== yb) return ya - yb;
       return wa - wb;
     });
     const weeks = sortedWeeks.slice(0, maxWeeks);
     const previewRows = rows.slice(0, 200).map(r => ({
       ...r,
-      // ensure number formatting with 1 decimal
-      formatted: weeks.map(w => (r.values[w] === undefined ? '' : `${Math.round(r.values[w] * 10) / 10}%`))
+      // ensure number formatting with 1 decimal - support both structures
+      formatted: weeks.map(w => {
+        let value;
+        if (r.values && typeof r.values === 'object') {
+          value = r.values[w];
+        } else {
+          value = r[w];
+        }
+        return value === undefined ? '' : `${Math.round(value * 10) / 10}%`;
+      })
     }));
     return { weeks, previewRows };
   }, [rows, maxWeeks]);

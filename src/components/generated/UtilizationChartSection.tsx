@@ -53,12 +53,14 @@ export function UtilizationChartSection({
       }
     });
 
-    // Convert to chart format
+    // Convert to chart format - using YY/WW format
     const totalWeeks = lookbackWeeks + forecastWeeks;
     const startWeek = forecastStartWeek - lookbackWeeks;
+    const currentYear = new Date().getFullYear();
+    const yy = String(currentYear).slice(-2);
     const weeks = Array.from({
       length: totalWeeks
-    }, (_, i) => `2025-KW${startWeek + i}`);
+    }, (_, i) => `${yy}/${String(startWeek + i).padStart(2, '0')}`);
     return weeks.map((week, index): ChartDataPoint => {
       const weekData = weekMap.get(week) || {
         historical: [],
@@ -69,7 +71,7 @@ export function UtilizationChartSection({
       const forecastAvg = weekData.forecast.length > 0 ? weekData.forecast.reduce((sum, val) => sum + val, 0) / weekData.forecast.length : null;
       return {
         week,
-        shortWeek: `KW${weekNumber}`,
+        shortWeek: week, // Use YY/WW format directly
         historical: historicalAvg ? Math.round(historicalAvg) : null,
         forecast: forecastAvg ? Math.round(forecastAvg) : null,
         isOverUtilizedHistorical: historicalAvg !== null && historicalAvg > 100,

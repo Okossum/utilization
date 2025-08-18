@@ -28,10 +28,10 @@ export function FirebaseTest() {
       };
       
       const id = await saveUploadedFile('auslastung', testFile);
-      console.log('Test file saved with ID:', id);
+      
       alert(`Test file saved successfully with ID: ${id}`);
     } catch (err) {
-      console.error('Error saving test file:', err);
+      
       alert(`Error: ${err}`);
     }
   };
@@ -41,7 +41,7 @@ export function FirebaseTest() {
       await saveCustomer('Test Customer GmbH');
       alert('Test customer saved successfully');
     } catch (err) {
-      console.error('Error saving test customer:', err);
+      
       alert(`Error: ${err}`);
     }
   };

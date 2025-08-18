@@ -11,6 +11,8 @@
     "format": "prettier --write .",
     "server": "GOOGLE_APPLICATION_CREDENTIALS=\"/Users/oliver.koss/Projekte/Ressource Utilization/ressourceutilization-firebase-adminsdk-fbsvc-e8129f7d59.json\" node server/index.js",
     "server:dev": "GOOGLE_APPLICATION_CREDENTIALS=\"/Users/oliver.koss/Projekte/Ressource Utilization/ressourceutilization-firebase-adminsdk-fbsvc-e8129f7d59.json\" nodemon server/index.js",
+    "start": "concurrently \"npm run server\" \"npm run dev\"",
+    "start:dev": "concurrently \"npm run server:dev\" \"npm run dev\"",
     "format:check": "prettier --check ."
   },
   "dependencies": {
@@ -62,6 +64,7 @@
     "@types/react-dom": "^19.0.4",
     "@types/sqlite3": "^3.1.11",
     "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.2.0",
     "eslint": "^9.21.0",
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-react-refresh": "^0.4.19",

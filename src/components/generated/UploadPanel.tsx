@@ -20,10 +20,12 @@ interface UploadPanelProps {
     auslastung?: UploadedFile;
     einsatzplan?: UploadedFile;
   }) => void;
+  onDatabaseRefresh?: () => void;
 }
 export function UploadPanel({
   uploadedFiles,
-  onFilesChange
+  onFilesChange,
+  onDatabaseRefresh
 }: UploadPanelProps) {
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState<string | null>(null);
@@ -32,6 +34,13 @@ export function UploadPanel({
   const einsatzplanRef = useRef<HTMLInputElement>(null);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const infoContainerRef = useRef<HTMLDivElement>(null);
+  
+  // State für Konsolidierungs-Status
+  const [consolidationStatus, setConsolidationStatus] = useState<{
+    type: 'success' | 'warning' | 'error';
+    message: string;
+    details: string;
+  } | null>(null);
   React.useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (infoContainerRef.current && !infoContainerRef.current.contains(e.target as Node)) {
@@ -104,48 +113,80 @@ export function UploadPanel({
         }
       };
 
-      // Wenn beide Dateien vorhanden sind, konsolidiere die Daten automatisch
+      // Wenn die Datei gültig ist, speichere sie in der Datenbank
       if (parsed.isValid) {
-
-        // Speichere die aktuelle Datei in der Datenbank
         try {
+          // Speichere die aktuelle Datei in der Datenbank
           if (type === 'auslastung') {
             await DatabaseService.saveAuslastung(file.name, parsed.rows);
-            console.log('✅ Auslastung-Daten erfolgreich in Datenbank gespeichert');
           } else {
             await DatabaseService.saveEinsatzplan(file.name, parsed.rows);
-            console.log('✅ Einsatzplan-Daten erfolgreich in Datenbank gespeichert');
           }
-        } catch (dbError) {
-          console.error('❌ Fehler beim Speichern in Datenbank:', dbError);
-          // Trotz DB-Fehler die Datei als gültig markieren
-        }
-
-        // Prüfe ob beide Dateien gültig sind
-        if (newFiles.auslastung?.isValid && newFiles.einsatzplan?.isValid) {
+          
+          // Prüfe nach dem Speichern, ob beide Dateien in der Datenbank vorhanden sind
+          // und starte dann die Konsolidierung
+          const updatedFiles = {
+            ...uploadedFiles,
+            [type]: {
+              name: file.name,
+              data: parsed.rows,
+              isValid: parsed.isValid,
+              error: parsed.error,
+              preview: parsed.preview,
+              debug: parsed.debug,
+            }
+          };
+          
+          // Starte Konsolidierung mit Daten aus der Datenbank (robuste Lösung)
           try {
-            // Aktuelle Woche und Konfiguration (kann später aus Props kommen)
-            const currentYear = new Date().getFullYear();
-            const currentWeek = Math.ceil((new Date().getTime() - new Date(currentYear, 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
-            const forecastStartWeek = currentWeek;
-            const lookbackWeeks = 8;  // Historische Daten der letzten 8 Wochen
-            const forecastWeeks = 4;   // Forecast für die nächsten 4 Wochen
+            console.log('🔍 Starte Konsolidierung mit Daten aus der Datenbank...');
+            
+            const consolidationResult = await DatabaseService.consolidateFromDatabase();
+            
+            console.log('✅ Konsolidierung abgeschlossen:', consolidationResult);
+            
+            // Zeige Status-Nachricht an den Benutzer
+            if (consolidationResult.message) {
+              console.log('📊 Status:', consolidationResult.message);
+              
+              // Benutzerbenachrichtigung anzeigen
+              if (consolidationResult.canConsolidate) {
+                // Erfolgreiche Konsolidierung
+                setConsolidationStatus({
+                  type: 'success',
+                  message: consolidationResult.message,
+                  details: `Konsolidierung erfolgreich: ${consolidationResult.result?.count || 0} Datensätze verarbeitet`
+                });
+              } else {
+                // Teilweise Konsolidierung
+                setConsolidationStatus({
+                  type: 'warning',
+                  message: consolidationResult.message,
+                  details: 'Laden Sie die fehlende Datei hoch, um vollständige Daten zu erhalten'
+                });
+              }
+            }
 
-            // Konsolidiere und speichere die Daten in der Datenbank
-            const result = await DatabaseService.consolidateAndSaveUtilizationData(
-              newFiles.auslastung.data,
-              newFiles.einsatzplan.data,
-              currentYear,
-              forecastStartWeek,
-              lookbackWeeks,
-              forecastWeeks
-            );
+            // ✅ KRITISCHER FIX: Aktualisiere Datenbank-Ansicht NACH erfolgreicher Konsolidierung
+            console.log('🔄 Lade Datenbank neu nach Konsolidierung...');
+            if (onDatabaseRefresh) {
+              await onDatabaseRefresh();
+              console.log('✅ Datenbank-Refresh abgeschlossen');
+            }
 
-            console.log('✅ Daten erfolgreich konsolidiert und gespeichert:', result);
           } catch (dbError) {
-            console.error('❌ Fehler beim Konsolidieren der Daten:', dbError);
-            // Fehler nicht an den User weitergeben, da der Upload selbst erfolgreich war
+            console.error('❌ Fehler bei der Konsolidierung:', dbError);
+            
+            // Auch bei Fehlern versuchen, die Datenbank zu aktualisieren
+            if (onDatabaseRefresh) {
+              console.log('🔄 Lade Datenbank trotz Konsolidierungs-Fehler...');
+              await onDatabaseRefresh();
+            }
           }
+          
+        } catch (dbError) {
+          console.error('❌ Fehler beim Speichern in der Datenbank:', dbError);
+          // Trotz DB-Fehler die Datei als gültig markieren
         }
       }
     } catch (e: any) {
@@ -194,8 +235,8 @@ export function UploadPanel({
   // ---- Excel Parsing Helpers ----
   const toKwKey = (week: number, year4?: number): string => {
     const yy = year4 ? String(year4).slice(-2) : String(new Date().getFullYear()).slice(-2);
-    const nn = String(week);
-    return `KW ${nn}/${yy}`;
+    const nn = String(week).padStart(2, '0');
+    return `${yy}/${nn}`;
   };
   const extractWeekYear = (cell: string): { week: number; year: number } | null => {
     const text = String(cell || '').trim();
@@ -213,11 +254,11 @@ export function UploadPanel({
       const year = parseInt(m[2], 10);
       if (Number.isFinite(week) && week >= 1 && week <= 53) return { week, year };
     }
-    // Variant: "KW 33/25" (two-digit year)
+    // Variant: "KW YY/WW" (year/week format)
     m = text.match(/KW\s*(\d{1,2})\s*\/\s*(\d{2})/i);
     if (m) {
-      const week = parseInt(m[1], 10);
-      const yy = parseInt(m[2], 10);
+      const yy = parseInt(m[1], 10);    // ✅ KORRIGIERT: Erste Zahl ist Jahr
+      const week = parseInt(m[2], 10);  // ✅ KORRIGIERT: Zweite Zahl ist Woche
       const year = 2000 + yy;
       if (Number.isFinite(week) && week >= 1 && week <= 53) return { week, year };
     }
@@ -278,12 +319,20 @@ export function UploadPanel({
     const subHeaderIdx = kwHeaderRowIdx + 1;
     const subRow = data[subHeaderIdx] as any[];
 
-    // FESTE POSITION: Header-Zeile ist Zeile 4 (Index 3), Personen-Spalte ist Spalte E (Index 4)
-    const headerIdx = 3; // Zeile 4 (0-basiert)
+    // FESTE POSITION: Header-Zeile ist Zeile 4 (Index 3), Daten starten ab Zeile 9 (Index 8)
+    const headerIdx = 3; // Zeile 4 (0-basiert) - Header-Definitionen
+    const dataStartIdx = 8; // Zeile 9 (0-basiert) - Erste Datenzeile
+    
     if (headerIdx >= data.length) return { isValid: false, error: 'Header-Zeile 4 nicht verfügbar', rows: [], debug: [...debug, 'Header-Zeile 4 nicht verfügbar'] };
     
     const headerRow = data[headerIdx] as any[];
-    const nameCol = 4; // Spalte E (0-basiert)
+    
+    // Spalten-Mapping basierend auf festen Positionen
+    const colLoB = 0;        // Spalte A: Hierarchie Slicer-LoB
+    const colBereich = 1;    // Spalte B: Hierarchie Slicer-Bereich  
+    const colCC = 2;         // Spalte C: Hierarchie Slicer-CC
+    const colTeam = 3;       // Spalte D: Hierarchie Slicer-Team
+    const nameCol = 4;       // Spalte E: Mitarbeiter (ID)
     
     // Überprüfen ob Spalte E den erwarteten Header hat
     const expectedHeader = String(headerRow[nameCol] || '').trim().toLowerCase();
@@ -291,10 +340,11 @@ export function UploadPanel({
       debug.push(`⚠️ Warnung: Spalte E (Index 4) enthält "${headerRow[nameCol]}" statt erwartetem "Mitarbeiter (ID)"`);
     }
     
-    debug.push(`Feste Position: Header-Zeile ${headerIdx + 1}, Personen-Spalte ${nameCol + 1} (${String.fromCharCode(65 + nameCol)})`);
+    debug.push(`Struktur: Header-Zeile ${headerIdx + 1}, Daten ab Zeile ${dataStartIdx + 1}`);
+    debug.push(`Spalten: A=LoB, B=Bereich, C=CC, D=Team, E=Person`);
     debug.push(`Header-Inhalt Spalte E: "${headerRow[nameCol]}"`);
 
-    // KW → NKV-Spalte ermitteln und Ziel-Key in "KW NN/YY" normieren
+    // KW → Auslastungs-Spalte ermitteln und Ziel-Key in YY/WW normieren
     const weeks: { key: string; nkvCol: number }[] = [];
     for (let j = 0; j < kwRow.length; j++) {
       const wy = extractWeekYear(String(kwRow[j] || ''));
@@ -302,20 +352,20 @@ export function UploadPanel({
       const w = wy.week; const y = wy.year;
       let nkvCol = -1;
       
-      // Erweiterte Suche nach NKV-Spalten
+      // Erweiterte Suche nach Auslastungs-Spalten
       for (let off = 0; off <= 3; off++) {
         const lbl = String(subRow[j + off] || '').toLowerCase();
-        debug.push(`KW ${w}/${y}: Subheader[${j + off}] = "${lbl}"`);
-        if (/nkv|auslastung|kapazität|utilization/.test(lbl)) { 
+        debug.push(`${toKwKey(w, y)}: Subheader[${j + off}] = "${lbl}"`);
+        if (/nkv|auslastung|ausl\.|kapazität|utilization|operativ/.test(lbl)) { 
           nkvCol = j + off; 
-          debug.push(`✓ NKV-Spalte gefunden: ${j + off} mit Label "${lbl}"`);
+          debug.push(`✓ Auslastungs-Spalte gefunden: ${j + off} mit Label "${lbl}"`);
           break; 
         }
       }
       
-      // Fallback: Wenn keine NKV-Spalte, nehmen wir die KW trotzdem
+      // Fallback: Wenn keine NKV-Spalte, nehmen wir die Woche trotzdem
       if (nkvCol === -1) {
-        debug.push(`⚠️ Keine NKV-Spalte für KW ${w}/${y} gefunden, verwende Spalte ${j}`);
+        debug.push(`⚠️ Keine NKV-Spalte für ${toKwKey(w, y)} gefunden, verwende Spalte ${j}`);
         nkvCol = j;
       }
       
@@ -325,12 +375,20 @@ export function UploadPanel({
     debug.push(`Subheader-Inhalt: ${subRow.slice(0, 20).map(c => String(c || '').trim()).join(' | ')}`);
     if (weeks.length === 0) return { isValid: false, error: 'Keine passenden KW/Spalten gefunden', rows: [], debug };
 
-    // Datenzeilen
+    // Datenzeilen (ab Zeile 9)
     const rowsOut: any[] = [];
-    debug.push(`Starte Datenverarbeitung ab Zeile ${headerIdx + 2} (${data.length - headerIdx - 1} Zeilen verfügbar)`);
+    debug.push(`Starte Datenverarbeitung ab Zeile ${dataStartIdx + 1} (${data.length - dataStartIdx} Zeilen verfügbar)`);
     
-    for (let r = headerIdx + 1; r < data.length; r++) {
+    for (let r = dataStartIdx; r < data.length; r++) {
       const row = data[r]; if (!Array.isArray(row)) continue;
+      
+      // Prüfe Team-Spalte (D) auf "Total" - diese Zeilen ignorieren
+      const teamCell = row[colTeam];
+      if (teamCell && String(teamCell).trim().toLowerCase() === 'total') {
+        debug.push(`Zeile ${r + 1}: Überspringe Total-Zeile (Team="${teamCell}")`);
+        continue;
+      }
+      
       const nameCell = row[nameCol]; if (!nameCell) continue;
       const personRaw = String(nameCell).trim();
       if (isSummaryRow(personRaw)) {
@@ -346,36 +404,60 @@ export function UploadPanel({
       for (const w of weeks) {
         const rawValue = row[w.nkvCol];
         const parsed = parsePercent(rawValue);
-        debug.push(`  KW ${w.key}: Spalte ${w.nkvCol} = "${rawValue}" → geparst: ${parsed}`);
+        debug.push(`  ${w.key}: Spalte ${w.nkvCol} = "${rawValue}" → geparst: ${parsed}`);
         
         if (parsed === null) continue;
-        // Falls Subheader Auslastung ist, parsed ist bereits KV; falls NKV, bereits Warnung eingetragen → 100-parsed
+        // Prüfe ob es sich um NKV oder bereits um KV/Auslastung handelt
         const headerLbl = String(subRow[w.nkvCol] || '').toLowerCase();
         const isNkv = /nkv/.test(headerLbl);
-        const kv = isNkv ? Math.max(0, Math.min(100, Math.round((100 - parsed) * 10) / 10)) : parsed;
+        const isAuslastung = /auslastung|ausl\.|operativ|utilization/.test(headerLbl);
+        
+        let kv = parsed;
+        if (isNkv) {
+          // NKV → KV Umrechnung (100 - NKV = KV)
+          kv = Math.max(0, Math.min(100, Math.round((100 - parsed) * 10) / 10));
+        } else if (isAuslastung) {
+          // Bereits Auslastung/KV - direkt verwenden
+          kv = Math.max(0, Math.min(100, Math.round(parsed * 10) / 10));
+        }
+        
         values[w.key] = kv;
-        debug.push(`    → Finaler Wert: ${kv}% (${isNkv ? 'NKV' : 'KV'})`);
+        debug.push(`    → Finaler Wert: ${kv}% (${isNkv ? 'NKV→KV' : isAuslastung ? 'Auslastung' : 'Unbekannt'})`);
       }
       
       if (Object.keys(values).length > 0) {
-        rowsOut.push({ person: personKey, personDisplay: person, values });
-        debug.push(`  ✓ Zeile verarbeitet mit ${Object.keys(values).length} KW-Werten`);
+        // Flache Struktur für Backend-Kompatibilität: Wochen-Werte direkt als Eigenschaften
+        const flatRow = { 
+          person: personKey, 
+          personDisplay: person,
+          lob: row[colLoB] ? String(row[colLoB]).trim() : undefined,
+          bereich: row[colBereich] ? String(row[colBereich]).trim() : undefined,
+          cc: row[colCC] ? String(row[colCC]).trim() : undefined,
+          team: row[colTeam] ? String(row[colTeam]).trim() : undefined,
+          ...values  // Wochen-Werte direkt als Eigenschaften
+        };
+        rowsOut.push(flatRow);
+        debug.push(`  ✓ Zeile verarbeitet: LoB="${flatRow.lob}", Bereich="${flatRow.bereich}", CC="${flatRow.cc}", Team="${flatRow.team}", ${Object.keys(values).length} Wochen-Werte`);
       } else {
         debug.push(`  ⚠️ Zeile übersprungen - keine gültigen Werte`);
       }
     }
 
-    const previewHeader = ['Person', ...weeks.map(w => w.key)];
+    const previewHeader = ['Person', 'LoB', 'Bereich', 'CC', 'Team', ...weeks.map(w => w.key).slice(0, 5)];
     const previewBody: string[][] = rowsOut.slice(0, 5).map(r => [
-      r.person, // Verwende den normalisierten Key statt personDisplay
-      ...weeks.map(w => (r.values[w.key] === undefined ? '' : `${r.values[w.key]}%`))
+      r.person,
+      r.lob || '',
+      r.bereich || '',
+      r.cc || '',
+      r.team || '',
+      ...weeks.slice(0, 5).map(w => (r[w.key] === undefined ? '' : `${r[w.key]}%`))
     ]);
-    debug.push(`Beispiel Person: ${rowsOut[0]?.personDisplay || '-'} → Keys: ${Object.keys(rowsOut[0]?.values || {}).slice(0, 5).join(', ')}`);
+    debug.push(`Beispiel Person: ${rowsOut[0]?.personDisplay || '-'} → LoB: "${rowsOut[0]?.lob}", Bereich: "${rowsOut[0]?.bereich}", CC: "${rowsOut[0]?.cc}", Team: "${rowsOut[0]?.team}"`);
 
     return { isValid: rowsOut.length > 0, error: rowsOut.length === 0 ? 'Keine Personenzeilen erkannt' : undefined, preview: [previewHeader, ...previewBody], rows: rowsOut, debug };
   }
 
-  // Parser Einsatzplan: Personen-Spalte = "Name", KW-Blöcke mit Kopf "KWxx(YYYY)" und Subheader "NKV (%)"
+  // Parser Einsatzplan: Feste Struktur - Zeile 2: KW-Triplets, Zeile 3: Proj|NKV(%)|Ort, Zeile 4+: Daten
   async function parseEinsatzplanWorkbook(file: File): Promise<{ isValid: boolean; error?: string; preview?: string[][]; rows: any[]; debug?: string[]; }> {
     const arrayBuffer = await file.arrayBuffer();
     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
@@ -383,115 +465,140 @@ export function UploadPanel({
     if (!sheetName) return { isValid: false, error: 'Keine Sheets gefunden', rows: [], debug: ['Keine Sheets gefunden'] };
     const sheet = workbook.Sheets[sheetName];
     const data = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1, raw: true });
-    if (!data || data.length === 0) return { isValid: false, error: 'Leeres Sheet', rows: [], debug: ['Leeres Sheet'] };
+    if (!data || data.length < 4) return { isValid: false, error: 'Zu wenige Zeilen (mindestens 4 benötigt)', rows: [], debug: ['Zu wenige Zeilen'] };
     const debug: string[] = [];
 
-    // KW-Header-Zeile suchen (erste 10 Zeilen), akzeptiere alle Formate aus extractWeekYear
-    let kwHeaderRowIdx = -1;
-    for (let i = 0; i < Math.min(10, data.length); i++) {
-      const row = data[i]; if (!Array.isArray(row)) continue;
-      const kwCount = row.reduce((acc, c) => acc + (extractWeekYear(String(c || '')) ? 1 : 0), 0);
-      debug.push(`Zeile ${i + 1}: gefundene KW-Header = ${kwCount}`);
-      if (kwCount >= 3) { kwHeaderRowIdx = i; break; }
+    // Feste Zeilen-Struktur entsprechend der Spezifikation
+    const kwHeaderRowIdx = 1;      // Zeile 2 (0-basiert): KW-Triplets
+    const subHeaderIdx = 2;        // Zeile 3 (0-basiert): Proj|NKV(%)|Ort Header
+    const dataStartIdx = 3;        // Zeile 4 (0-basiert): Daten-Start
+
+    debug.push(`Feste Struktur: KW-Header=Zeile ${kwHeaderRowIdx + 1}, Subheader=Zeile ${subHeaderIdx + 1}, Daten ab Zeile ${dataStartIdx + 1}`);
+
+    if (data.length <= dataStartIdx) {
+      return { isValid: false, error: 'Keine Datenzeilen gefunden', rows: [], debug: [...debug, 'Keine Datenzeilen gefunden'] };
     }
-    if (kwHeaderRowIdx === -1 || kwHeaderRowIdx + 1 >= data.length) return { isValid: false, error: 'KW-Header nicht gefunden', rows: [], debug: [...debug, 'KW-Header nicht gefunden'] };
-    debug.push(`KW-Header-Zeile: ${kwHeaderRowIdx + 1}, Subheader: ${kwHeaderRowIdx + 2}, Personen-Header: ${kwHeaderRowIdx + 3}`);
 
     const kwRow = data[kwHeaderRowIdx] as any[];
-    const subHeaderIdx = kwHeaderRowIdx + 1;
     const subRow = data[subHeaderIdx] as any[];
+    const headerRow = data[subHeaderIdx] as any[]; // Zeile 3 enthält auch die Personen-Metadaten
 
-    // Header-Zeile mit Personen-Spalte "Name" finden (innerhalb der ersten 10 Zeilen um den Subheader)
-    let headerIdx = -1;
-    for (let i = 0; i < Math.min(10, data.length); i++) {
-      const row = data[i]; if (!Array.isArray(row)) continue;
-      const lowered = row.map(c => String(c || '').trim().toLowerCase());
-      if (lowered.includes('name')) { headerIdx = i; break; }
-    }
-    if (headerIdx === -1) return { isValid: false, error: 'Header mit "Name" nicht gefunden', rows: [], debug: [...debug, 'Header mit "Name" nicht gefunden'] };
-    debug.push(`KW-Header-Zeile: ${kwHeaderRowIdx + 1}, Subheader: ${subHeaderIdx + 1}, Personen-Header: ${headerIdx + 1}`);
-
-    const headerRow = data[headerIdx] as any[];
+    // Personen-Metadaten Spalten finden
     const lowered = headerRow.map(c => String(c || '').trim().toLowerCase());
     const colLoB = lowered.indexOf('lob');
     const colBereich = lowered.indexOf('bereich');
-    const colCC = lowered.indexOf('compentence center (cc)') !== -1 ? lowered.indexOf('compentence center (cc)') : (lowered.indexOf('competence center') !== -1 ? lowered.indexOf('competence center') : lowered.indexOf('cc'));
+    const colCC = lowered.indexOf('compentence center (cc)') !== -1 ? lowered.indexOf('compentence center (cc)') : 
+                  (lowered.indexOf('competence center') !== -1 ? lowered.indexOf('competence center') : lowered.indexOf('cc'));
     const colTeam = lowered.indexOf('team');
     const colLBS = lowered.indexOf('lbs');
     const colVG = lowered.indexOf('vg');
     const colPerson = lowered.indexOf('name');
+    
     if (colPerson === -1) return { isValid: false, error: 'Spalte "Name" nicht gefunden', rows: [], debug: [...debug, 'Spalte "Name" nicht gefunden'] };
+    debug.push(`Personen-Spalten: Name=${colPerson}, LoB=${colLoB}, Team=${colTeam}, CC=${colCC}, LBS=${colLBS}, VG=${colVG}`);
 
-    // KWs anhand KW-Header + Subheader NKV ermitteln
+    // KW-Triplets verarbeiten: Jede KW spannt 3 Spalten (Proj|NKV(%)|Ort)
     const weeks: { key: string; nkvCol: number }[] = [];
     for (let j = 0; j < kwRow.length; j++) {
-      const wy = extractWeekYear(String(kwRow[j] || ''));
+      const kwCell = String(kwRow[j] || '').trim();
+      const wy = extractWeekYear(kwCell);
       if (!wy) continue;
-      let nkvCol = -1;
-      
-      // Erweiterte Suche nach NKV-Spalten
-      for (let off = 0; off <= 3; off++) {
-        const lbl = String(subRow[j + off] || '').toLowerCase();
-        debug.push(`KW ${wy.week}/${wy.year}: Subheader[${j + off}] = "${lbl}"`);
-        if (/nkv|auslastung|kapazität|utilization/.test(lbl)) { 
-          nkvCol = j + off; 
-          debug.push(`✓ NKV-Spalte gefunden: ${j + off} mit Label "${lbl}"`);
-          break; 
-        }
-      }
-      
-      // Fallback: Wenn keine NKV-Spalte, nehmen wir die KW trotzdem
-      if (nkvCol === -1) {
-        debug.push(`⚠️ Keine NKV-Spalte für KW ${wy.week}/${wy.year} gefunden, verwende Spalte ${j}`);
-        nkvCol = j;
-      }
-      
-      weeks.push({ key: toKwKey(wy.week, wy.year), nkvCol });
-    }
-    debug.push(`Erkannte KWs (Plan): ${weeks.map(w => w.key).slice(0, 8).join(', ')}${weeks.length > 8 ? '…' : ''}`);
-    debug.push(`Subheader-Inhalt: ${subRow.slice(0, 20).map(c => String(c || '').trim()).join(' | ')}`);
-    if (weeks.length === 0) return { isValid: false, error: 'Keine NKV-Spalten für KWs gefunden', rows: [], debug };
 
+      // Prüfe Triplet-Struktur: KW in Spalte j, NKV(%) in Spalte j+1, Ort in Spalte j+2
+      const projCol = j;           // Spalte 0 des Triplets
+      const nkvCol = j + 1;        // Spalte 1 des Triplets (sollte NKV% enthalten)
+      const ortCol = j + 2;        // Spalte 2 des Triplets
+
+      // Validiere NKV-Spalte
+      const nkvLabel = String(subRow[nkvCol] || '').toLowerCase();
+      debug.push(`KW ${kwCell}: Triplet [${projCol}|${nkvCol}|${ortCol}] = ["${subRow[projCol] || ''}" | "${subRow[nkvCol] || ''}" | "${subRow[ortCol] || ''}"]`);
+      
+      if (/nkv.*%|nkv/.test(nkvLabel)) {
+        weeks.push({ key: toKwKey(wy.week, wy.year), nkvCol });
+        debug.push(`✓ KW${wy.week}(${wy.year}) → NKV-Spalte ${nkvCol} ("${nkvLabel}")`);
+        j += 2; // Springe über das komplette Triplet (3 Spalten)
+      } else {
+        debug.push(`⚠️ KW ${kwCell}: Keine gültige NKV-Spalte in Position ${nkvCol} ("${nkvLabel}")`);
+      }
+    }
+
+    if (weeks.length === 0) {
+      return { isValid: false, error: 'Keine gültigen KW-Triplets gefunden', rows: [], debug: [...debug, 'Keine KW-Triplets mit NKV-Spalten gefunden'] };
+    }
+
+    debug.push(`Erkannte Wochen: ${weeks.map(w => w.key).join(', ')}`);
+
+    // Daten verarbeiten (ab Zeile 4)
     const rowsOut: any[] = [];
-    const startRow = Math.max(headerIdx, subHeaderIdx) + 1;
-    for (let r = startRow; r < data.length; r++) {
-      const row = data[r]; if (!Array.isArray(row)) continue;
-      const personCell = row[colPerson]; if (!personCell) continue;
+    for (let r = dataStartIdx; r < data.length; r++) {
+      const row = data[r]; 
+      if (!Array.isArray(row)) continue;
+      
+      const personCell = row[colPerson]; 
+      if (!personCell) continue;
+      
       const personRaw = String(personCell).trim();
       if (isSummaryRow(personRaw)) continue;
+      
       const personDisplay = personRaw;
       const personKey = normalizePersonKey(personDisplay);
 
+      // NKV-Werte aus den entsprechenden Spalten lesen und zu Auslastung umrechnen
       const values: Record<string, number> = {};
       for (const w of weeks) {
-        const parsedNkv = parsePercent(row[w.nkvCol]);
+        const nkvRaw = row[w.nkvCol];
+        if (nkvRaw === undefined || nkvRaw === null || nkvRaw === '') continue;
+        
+        const parsedNkv = parsePercent(nkvRaw);
         if (parsedNkv === null) continue;
-        const kv = Math.max(0, Math.min(100, Math.round((100 - parsedNkv) * 10) / 10));
-        values[w.key] = kv;
+        
+        // NKV → Auslastung: Auslastung = 100 - NKV
+        const auslastung = Math.max(0, Math.min(100, Math.round((100 - parsedNkv) * 10) / 10));
+        values[w.key] = auslastung;
+        
+        debug.push(`Person "${personDisplay}" KW ${w.key}: NKV=${parsedNkv}% → Auslastung=${auslastung}%`);
       }
-      rowsOut.push({
+
+      // Nur Personen mit mindestens einem gültigen Wert hinzufügen
+      if (Object.keys(values).length === 0) continue;
+
+      // Flache Struktur für Backend-Kompatibilität
+      const flatRow = {
         person: personKey,
         personDisplay,
-        lob: colLoB !== -1 ? row[colLoB] : undefined,
-        bereich: colBereich !== -1 ? row[colBereich] : undefined,
-        cc: colCC !== -1 ? row[colCC] : undefined,
-        team: colTeam !== -1 ? row[colTeam] : undefined,
-        lbs: colLBS !== -1 ? row[colLBS] : undefined,
-        vg: colVG !== -1 ? row[colVG] : undefined,
-        values
-      });
+        lob: colLoB !== -1 && row[colLoB] ? String(row[colLoB]).trim() : undefined,
+        bereich: colBereich !== -1 && row[colBereich] ? String(row[colBereich]).trim() : undefined,
+        cc: colCC !== -1 && row[colCC] ? String(row[colCC]).trim() : undefined,
+        team: colTeam !== -1 && row[colTeam] ? String(row[colTeam]).trim() : undefined,
+        lbs: colLBS !== -1 && row[colLBS] ? String(row[colLBS]).trim() : undefined,
+        vg: colVG !== -1 && row[colVG] ? String(row[colVG]).trim() : undefined,
+        ...values  // Wochen-Werte direkt als Eigenschaften im YY/WW Format
+      };
+      rowsOut.push(flatRow);
     }
 
-    const previewHeader = ['Name', 'LBS', 'VG', ...weeks.map(k => k.key)];
+    // Preview erstellen
+    const previewHeader = ['Name', 'LBS', 'VG', 'LoB', 'Team', 'CC', ...weeks.map(w => w.key).slice(0, 5)];
     const previewBody: string[][] = rowsOut.slice(0, 5).map(r => [
-      r.personDisplay,
+      r.personDisplay || '',
       r.lbs || '',
       r.vg || '',
-      ...weeks.map(k => (r.values[k.key] === undefined ? '' : `${r.values[k.key]}%`))
+      r.lob || '',
+      r.team || '',
+      r.cc || '',
+      ...weeks.slice(0, 5).map(w => (r[w.key] === undefined ? '' : `${r[w.key]}%`))
     ]);
-    debug.push(`Beispiel Person: ${rowsOut[0]?.personDisplay || '-'} → Keys: ${Object.keys(rowsOut[0]?.values || {}).slice(0, 5).join(', ')}`);
 
-    return { isValid: rowsOut.length > 0, error: rowsOut.length === 0 ? 'Keine Personenzeilen erkannt' : undefined, preview: [previewHeader, ...previewBody], rows: rowsOut, debug };
+    debug.push(`Verarbeitete Personen: ${rowsOut.length}`);
+    debug.push(`Beispiel: ${rowsOut[0]?.personDisplay || 'Keine'} → Wochen: ${Object.keys(rowsOut[0] || {}).filter(k => k.match(/^\d{2}\/\d{2}$/)).slice(0, 3).join(', ')}`);
+
+    return { 
+      isValid: rowsOut.length > 0, 
+      error: rowsOut.length === 0 ? 'Keine gültigen Personenzeilen erkannt' : undefined, 
+      preview: [previewHeader, ...previewBody], 
+      rows: rowsOut, 
+      debug 
+    };
   }
   const UploadSlot = ({
     type,
@@ -651,7 +758,7 @@ export function UploadPanel({
                 <h4 className="text-sm font-medium text-gray-900 mb-2">Dateianforderungen</h4>
                 <ul className="text-sm text-gray-700 space-y-1 list-disc pl-5">
                   <li>Excel-Dateien (.xlsx oder .xls)</li>
-                  <li>KWs: z. B. "KW 25/01", "KW33(2025)", "KW 33-2025"</li>
+                  <li>Wochen: z. B. "KW 25/01", "KW33(2025)", "KW 33-2025" → gespeichert als "25/01"</li>
                   <li>Personen: Auslastung → "Mitarbeiter (ID)", Einsatzplan → "Name"</li>
                 </ul>
               </div>
@@ -688,6 +795,48 @@ export function UploadPanel({
             </div>
           </div>
         </motion.div>}
+
+      {/* Konsolidierungs-Status */}
+      {consolidationStatus && (
+        <motion.div 
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          className={`mt-6 p-4 rounded-lg border ${
+            consolidationStatus.type === 'success' 
+              ? 'bg-green-50 border-green-200' 
+              : consolidationStatus.type === 'warning'
+              ? 'bg-yellow-50 border-yellow-200'
+              : 'bg-red-50 border-red-200'
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            {consolidationStatus.type === 'success' && <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />}
+            {consolidationStatus.type === 'warning' && <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />}
+            {consolidationStatus.type === 'error' && <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />}
+            <div>
+              <p className={`text-sm font-medium ${
+                consolidationStatus.type === 'success' 
+                  ? 'text-green-900' 
+                  : consolidationStatus.type === 'warning'
+                  ? 'text-yellow-900'
+                  : 'text-red-900'
+              }`}>
+                {consolidationStatus.message}
+              </p>
+              <p className={`text-sm mt-1 ${
+                consolidationStatus.type === 'success' 
+                  ? 'text-green-700' 
+                  : consolidationStatus.type === 'warning'
+                  ? 'text-yellow-700'
+                  : 'text-red-700'
+              }`}>
+                {consolidationStatus.details}
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {hasErrors && !hasValidFiles && <motion.div initial={{
       opacity: 0,

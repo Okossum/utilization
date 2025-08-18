@@ -106,9 +106,9 @@ async function upsert() {
   if (idx > 0) {
     await batch.commit();
   }
-  console.log('Upserted rows:', total);
+  
 }
 
-upsert().then(() => process.exit(0)).catch(e => { console.error(e); process.exit(1); });
+  upsert().then(() => process.exit(0)).catch(e => { process.exit(1); });
 
 

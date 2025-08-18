@@ -18,12 +18,13 @@ interface DataUploadSectionProps {
     auslastung?: UploadedFile;
     einsatzplan?: UploadedFile;
   }) => void;
+  onDatabaseRefresh?: () => void;
 }
 
-export function DataUploadSection({ uploadedFiles, onFilesChange }: DataUploadSectionProps) {
+export function DataUploadSection({ uploadedFiles, onFilesChange, onDatabaseRefresh }: DataUploadSectionProps) {
   return (
     <div className="w-full">
-      <UploadPanel uploadedFiles={uploadedFiles} onFilesChange={onFilesChange} />
+      <UploadPanel uploadedFiles={uploadedFiles} onFilesChange={onFilesChange} onDatabaseRefresh={onDatabaseRefresh} />
     </div>
   );
 }

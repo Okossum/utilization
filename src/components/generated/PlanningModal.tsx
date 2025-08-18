@@ -129,7 +129,7 @@ export function PlanningModal({ isOpen, onClose, personId, filterByWeek, initial
       });
       onClose();
     } catch (e) {
-      console.error('Speichern fehlgeschlagen', e);
+      
       alert('Speichern fehlgeschlagen');
     } finally {
       setLoading(false);

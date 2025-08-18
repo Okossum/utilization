@@ -39,7 +39,7 @@ export const useFirebaseStorage = () => {
 
   // Error Handler
   const handleError = useCallback((err: any, operation: string) => {
-    console.error(`Firebase ${operation} error:`, err);
+
     setError(`Fehler bei ${operation}: ${err.message || err}`);
     setIsLoading(false);
   }, []);

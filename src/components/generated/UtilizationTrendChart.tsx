@@ -36,10 +36,11 @@ export function UtilizationTrendChart({
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const chartData: ChartRow[] = useMemo(() => {
-    // Build ordered list of week labels (strings used in data)
+    // Build ordered list of week labels in YY/WW format
     const leftWeeks = Array.from({ length: lookbackWeeks }, (_, i) => (forecastStartWeek - lookbackWeeks + 1) + i);
     const rightWeeks = Array.from({ length: forecastWeeks }, (_, i) => (forecastStartWeek + 1) + i);
-    const orderedWeeks = [...leftWeeks, ...rightWeeks].map(n => `${isoYear}-KW${n}`);
+    const yy = String(isoYear).slice(-2);
+    const orderedWeeks = [...leftWeeks, ...rightWeeks].map(n => `${yy}/${String(n).padStart(2, '0')}`);
 
     // Aggregate per week: average of available values
     const groups = new Map<string, { historical: number[]; forecast: number[] }>();
@@ -56,12 +57,11 @@ export function UtilizationTrendChart({
 
     const rows: ChartRow[] = orderedWeeks.map(w => {
       const g = groups.get(w)!;
-      const weekNumber = parseInt(w.split('-KW')[1] || '0', 10);
       const histAvg = g.historical.length ? Math.round((g.historical.reduce((s, v) => s + v, 0) / g.historical.length) * 10) / 10 : null;
       const foreAvg = g.forecast.length ? Math.round((g.forecast.reduce((s, v) => s + v, 0) / g.forecast.length) * 10) / 10 : null;
       return {
         week: w,
-        shortWeek: `KW${weekNumber}`,
+        shortWeek: w, // Use YY/WW format directly
         historical: histAvg,
         forecast: foreAvg
       };

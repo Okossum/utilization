@@ -42,8 +42,6 @@ export function UtilizationReportView() {
     einsatzplan?: UploadedFile;
   }>({});
   const [databaseData, setDatabaseData] = useState<{
-    auslastung?: any[];
-    einsatzplan?: any[];
     utilizationData?: any[];
   }>({});
   const [dataSource, setDataSource] = useState<'upload' | 'database'>('upload');
@@ -70,28 +68,43 @@ export function UtilizationReportView() {
     try {
       console.log('🔍 loadDatabaseData() wird aufgerufen...');
 
-      // ✅ SCHRITT 6: Nur utilizationData Collection verwenden (konsolidierte, aktuelle Daten)
-      // Keine veralteten auslastung/einsatzplan Collections mehr laden
+      // ✅ VEREINFACHT: Nur noch UtilizationData laden
       const utilizationData = await DatabaseService.getUtilizationData();
       
-      console.log('🔍 Daten geladen:', {
-        utilizationData: utilizationData.length
+      console.log('🔍 UtilizationData geladen:', {
+        count: utilizationData?.length || 0,
+        sample: utilizationData?.[0]
       });
-      
-      // Immer Datenbank-Modus setzen, wenn API-Aufrufe erfolgreich sind
-      // Auch leere Arrays sind OK - das bedeutet einfach, dass noch keine Daten vorhanden sind
-      setDatabaseData({
-        auslastung: undefined, // Veraltete Collection nicht mehr verwenden
-        einsatzplan: undefined, // Veraltete Collection nicht mehr verwenden
-        utilizationData: utilizationData.length > 0 ? utilizationData : undefined
-      });
-      
-      console.log('✅ dataSource wird auf "database" gesetzt');
-      setDataSource('database');
+
+      // Prüfe ob gültige Daten vorhanden sind
+      if (utilizationData && utilizationData.length > 0) {
+        const hasValidValues = utilizationData.some(item => 
+          item.finalValue !== null && item.finalValue !== undefined ||
+          item.utilization !== null && item.utilization !== undefined ||
+          item.auslastungValue !== null && item.auslastungValue !== undefined ||
+          item.einsatzplanValue !== null && item.einsatzplanValue !== undefined
+        );
+        
+        if (hasValidValues) {
+          console.log('✅ Gültige UtilizationData verfügbar - wechsle zu Datenbank-Modus');
+          setDatabaseData({ utilizationData });
+          setDataSource('database');
+          
+          // ✅ KRITISCHER FIX: Lösche Upload-Dateien nach erfolgreichem DB-Switch
+          setUploadedFiles({});
+          console.log('✅ Upload-Dateien geleert - App ist jetzt im Database-Modus');
+          return;
+        }
+      }
+
+      // Keine gültigen Daten - bleibe im Upload-Modus
+      console.log('⚠️ Keine gültigen UtilizationData verfügbar - bleibe im Upload-Modus');
+      setDatabaseData({});
+      setDataSource('upload');
       
     } catch (error) {
       console.error('❌ Fehler in loadDatabaseData:', error);
-      // Nur bei echten API-Fehlern auf Upload-Modus wechseln
+      setDatabaseData({});
       setDataSource('upload');
     }
   };
@@ -244,24 +257,39 @@ export function UtilizationReportView() {
 
   // Helper functions to get status icon and color
   const getWeekValue = (row: any, weekNum: number, year: number): number | undefined => {
-    const values = row?.values as Record<string, unknown> | undefined;
-    if (!values) return undefined;
+    if (!row) return undefined;
+    
     const asNumber = (raw: unknown): number | undefined => {
       const num = Number(raw);
       return Number.isFinite(num) ? (num as number) : undefined;
     };
 
-    // 1) Exact: "KW n-YYYY"
+    // ✅ NEUE STRUKTUR: UtilizationData aus Datenbank (konsolidierte Daten)
+    // Diese Struktur wird verwendet, wenn utilizationData direkt transformiert wurde
+    if (typeof row === 'object' && row.week && (row.finalValue !== undefined || row.utilization !== undefined)) {
+      // Das ist bereits ein transformierter UtilizationData-Eintrag
+      // Die Woche wird in der transformation direkt als "utilization" gesetzt
+      return asNumber(row.utilization);
+    }
+
+    // ✅ ALTE STRUKTUR: Upload-Daten oder ursprüngliche Datenbankdaten (flache Struktur)
+    // Support both structures: values object and flat properties
+    const values = row?.values as Record<string, unknown> | undefined || row as Record<string, unknown>;
+    if (!values) return undefined;
+
+    // 1) YY/WW format e.g., "25/33" - PRIMÄRES FORMAT vom Parser
+    const yy = String(year).slice(-2);
+    const ww = String(weekNum).padStart(2, '0');
+    const yyWwKey = `${yy}/${ww}`;
+    if (yyWwKey in values) return asNumber(values[yyWwKey]);
+
+    // 2) Exact: "KW n-YYYY"
     const key1 = `KW ${weekNum}-${year}`;
     if (key1 in values) return asNumber(values[key1]);
 
-    // 2) Exact without year: "KW n"
+    // 3) Exact without year: "KW n"
     const key2 = `KW ${weekNum}`;
     if (key2 in values) return asNumber(values[key2]);
-
-    // 3) Any variant starting with "KW n-" (different year) e.g., "KW n-2024"
-    const altYearKey = Object.keys(values).find(k => k.trim().toLowerCase().startsWith(`kw ${weekNum}-`));
-    if (altYearKey) return asNumber(values[altYearKey]);
 
     // 4) Variant: "YYYY-KWn" or "YYYY-KW n"
     const regexYFirst = new RegExp(`^\\d{4}[-\\/]?kw\\s*${weekNum}$`, 'i');
@@ -322,16 +350,17 @@ export function UtilizationReportView() {
       careerLevel: string;
     } | undefined = undefined;
     
-    if (dataSource === 'database') {
-      const einsatzplanData = databaseData.einsatzplan?.find(item => item.person === person);
-      if (einsatzplanData) {
+    if (dataSource === 'database' && databaseData.utilizationData) {
+      // Extrahiere Metadaten aus UtilizationData
+      const personData = databaseData.utilizationData.find(item => item.person === person);
+      if (personData) {
         excelData = {
           name: person,
-          manager: String(einsatzplanData.vg || ''),
-          team: String(einsatzplanData.team || ''),
-          competenceCenter: String(einsatzplanData.cc || ''),
-          lineOfBusiness: String(einsatzplanData.bereich || ''),
-          careerLevel: String(einsatzplanData.lbs || '')
+          manager: '', // VG nicht in UtilizationData verfügbar
+          team: String(personData.team || ''),
+          competenceCenter: String(personData.cc || ''),
+          lineOfBusiness: String(personData.bereich || ''),
+          careerLevel: String(personData.lbs || '')
         };
       }
     } else {
@@ -419,100 +448,137 @@ export function UtilizationReportView() {
       isHistorical: weekIndex < lookbackWeeks
     })));
   }, [lookbackWeeks, forecastWeeks, forecastStartWeek, currentIsoYear]);
-  // Build consolidated data from uploaded files or database (Auslastung = Rückblick, Einsatzplan = Vorblick)
+  // ✅ VEREINFACHT: Nur noch UtilizationData verarbeiten
   const consolidatedData: UtilizationData[] | null = useMemo(() => {
-    let aus: any[] | null = null;
-    let ein: any[] | null = null;
+    if (dataSource === 'database' && databaseData.utilizationData) {
+      console.log('🔍 UtilizationData für UI transformieren:', {
+        count: databaseData.utilizationData.length,
+        sample: databaseData.utilizationData[0]
+      });
 
-    if (dataSource === 'database') {
-      // ✅ SCHRITT 6: Nur noch utilizationData verwenden (konsolidierte, aktuelle Daten)
-      // Keine veralteten auslastung/einsatzplan Collections mehr
-      if (databaseData.utilizationData && databaseData.utilizationData.length > 0) {
-        console.log('🔍 Daten aus der Datenbank werden transformiert:', {
-          count: databaseData.utilizationData.length,
-          sample: databaseData.utilizationData[0]
-        });
-        // Daten aus der Datenbank in das erwartete UtilizationData Format transformieren
-        const transformed = databaseData.utilizationData.map((item: any) => ({
+      // ✅ Konvertiere Backend YY/WW Format zu Frontend YYYY-KWnn Format
+      const transformed = databaseData.utilizationData.map((item: any) => {
+        // Backend: "25/33" → Frontend: "2025-KW33"
+        let uiWeek = item.week;
+        if (item.week && item.week.match(/^\d{2}\/\d{2}$/)) {
+          const [yy, ww] = item.week.split('/');
+          const fullYear = `20${yy}`;
+          uiWeek = `${fullYear}-KW${parseInt(ww, 10)}`;
+        }
+        
+        return {
           person: item.person,
-          week: item.week,
-          utilization: item.finalValue !== undefined ? item.finalValue : item.utilization,
+          week: uiWeek,
+          utilization: item.finalValue !== undefined ? item.finalValue : 
+                      item.utilization !== undefined ? item.utilization :
+                      item.auslastungValue !== undefined ? item.auslastungValue :
+                      item.einsatzplanValue,
           isHistorical: item.isHistorical
-        }));
-        console.log('✅ Transformierte Daten:', {
-          count: transformed.length,
-          sample: transformed[0]
-        });
-        return transformed;
-      }
-      return null;
-    } else {
-      // Verwende Upload-Daten (Fallback für lokale Tests)
-      aus = uploadedFiles.auslastung?.isValid ? (uploadedFiles.auslastung?.data as any[]) : null;
-      ein = uploadedFiles.einsatzplan?.isValid ? (uploadedFiles.einsatzplan?.data as any[]) : null;
+        };
+      }).filter((item: any) => item.utilization !== null && item.utilization !== undefined);
+
+      console.log('✅ UtilizationData transformiert:', {
+        inputCount: databaseData.utilizationData.length,
+        outputCount: transformed.length,
+        sample: transformed[0]
+      });
+
+      return transformed;
+    }
+
+    // Upload-Modus: Verarbeite Upload-Dateien (Original-Logik beibehalten für Upload)
+    if (dataSource === 'upload') {
+      const aus = uploadedFiles.auslastung?.data as any[] | null;
+      const ein = uploadedFiles.einsatzplan?.data as any[] | null;
       
       if (!aus && !ein) return null;
-    }
-    const normalizePersonKey = (s: string) => {
-      // Nur Klammern und Leerzeichen entfernen, KEINE Buchstaben ändern
-      // Das verhindert, dass "Leisen, Wei" zu "Leisen, Wie" wird
-      const cleaned = s.replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
+
+      const normalizePersonKey = (s: string) => {
+        const cleaned = s.replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
+        if (cleaned === 'Leisen, Wie') return 'Leisen, Wei';
+        if (cleaned === 'Leisen, Wei') return 'Leisen, Wei';
+        return cleaned;
+      };
+
+      const leftStart = forecastStartWeek - lookbackWeeks + 1;
+      const leftWeeksArr = Array.from({ length: lookbackWeeks }, (_, i) => leftStart + i);
+      const rightWeeksArr = Array.from({ length: forecastWeeks }, (_, i) => forecastStartWeek + 1 + i);
+      const currentYear = currentIsoYear;
+
+      const ausMap = new Map<string, any>();
+      const einMap = new Map<string, any>();
+      aus?.forEach(r => ausMap.set(normalizePersonKey(r.person), r));
+      ein?.forEach(r => einMap.set(normalizePersonKey(r.person), r));
       
-      // Spezielle Behandlung für bekannte Namensabweichungen
-      if (cleaned === 'Leisen, Wie') return 'Leisen, Wei';
-      if (cleaned === 'Leisen, Wei') return 'Leisen, Wei';
-      
-      return cleaned;
-    };
-    // Left side includes current week; right side starts after current week
-    const leftStart = forecastStartWeek - lookbackWeeks + 1;
-    const leftWeeksArr = Array.from({ length: lookbackWeeks }, (_, i) => leftStart + i);
-    const rightWeeksArr = Array.from({ length: forecastWeeks }, (_, i) => forecastStartWeek + 1 + i);
-    const currentYear = currentIsoYear;
+      const allNames = Array.from(new Set([
+        ...(aus || []).map(r => normalizePersonKey(r.person)),
+        ...(ein || []).map(r => normalizePersonKey(r.person))
+      ])).sort((a, b) => a.split(',')[0].localeCompare(b.split(',')[0], 'de'));
 
-    const ausMap = new Map<string, any>();
-    const einMap = new Map<string, any>();
-    aus?.forEach(r => ausMap.set(normalizePersonKey(r.person), r));
-    ein?.forEach(r => einMap.set(normalizePersonKey(r.person), r));
-    const allNames = Array.from(new Set([...(aus ? aus.map(r => normalizePersonKey(r.person)) : []), ...(ein ? ein.map(r => normalizePersonKey(r.person)) : [])]))
-      .sort((a, b) => a.split(',')[0].localeCompare(b.split(',')[0], 'de'));
-
-    const out: UtilizationData[] = [];
-    for (const personKey of allNames) {
-      const personOriginal = personKey; // already normalized for display we keep original label
-      // Left (historical, includes current week)
-      for (let i = 0; i < leftWeeksArr.length; i++) {
-        const weekNum = leftWeeksArr[i];
-        const fileKey = `KW ${weekNum}-${currentYear}`;
-        const uiLabel = `${currentYear}-KW${weekNum}`;
-        const aRow = ausMap.get(personKey);
-        const eRow = einMap.get(personKey);
-        let val: number | null = null;
-        const fromAus = getWeekValue(aRow, weekNum, currentYear);
-        const fromEin = getWeekValue(eRow, weekNum, currentYear);
-        if (fromAus !== undefined) val = fromAus;
-        else if (fromEin !== undefined) val = fromEin;
-        out.push({ person: personOriginal, week: uiLabel, utilization: Number.isFinite(val as number) ? Math.round((val as number) * 10) / 10 : null, isHistorical: true });
+      const out: UtilizationData[] = [];
+      for (const personKey of allNames) {
+        // Historical weeks
+        for (const weekNum of leftWeeksArr) {
+          const uiLabel = `${currentYear}-KW${weekNum}`;
+          const aRow = ausMap.get(personKey);
+          const eRow = einMap.get(personKey);
+          let val: number | null = null;
+          const fromAus = getWeekValue(aRow, weekNum, currentYear);
+          const fromEin = getWeekValue(eRow, weekNum, currentYear);
+          if (fromAus !== undefined) val = fromAus;
+          else if (fromEin !== undefined) val = fromEin;
+          if (val !== null) {
+            out.push({ 
+              person: personKey, 
+              week: uiLabel, 
+              utilization: Math.round(val * 10) / 10, 
+              isHistorical: true 
+            });
+          }
+        }
+        // Forecast weeks
+        for (const weekNum of rightWeeksArr) {
+          const uiLabel = `${currentYear}-KW${weekNum}`;
+          const aRow = ausMap.get(personKey);
+          const eRow = einMap.get(personKey);
+          let val: number | null = null;
+          const fromAus = getWeekValue(aRow, weekNum, currentYear);
+          const fromEin = getWeekValue(eRow, weekNum, currentYear);
+          if (fromAus !== undefined) val = fromAus;
+          else if (fromEin !== undefined) val = fromEin;
+          if (val !== null) {
+            out.push({ 
+              person: personKey, 
+              week: uiLabel, 
+              utilization: Math.round(val * 10) / 10, 
+              isHistorical: false 
+            });
+          }
+        }
       }
-      // Right (forecast, strictly after current week)
-      for (let i = 0; i < rightWeeksArr.length; i++) {
-        const weekNum = rightWeeksArr[i];
-        const fileKey = `KW ${weekNum}-${currentYear}`;
-        const uiLabel = `${currentYear}-KW${weekNum}`;
-        const aRow = ausMap.get(personKey);
-        const eRow = einMap.get(personKey);
-        let val: number | null = null;
-        const fromAus = getWeekValue(aRow, weekNum, currentYear);
-        const fromEin = getWeekValue(eRow, weekNum, currentYear);
-        if (fromAus !== undefined) val = fromAus;
-        else if (fromEin !== undefined) val = fromEin;
-        out.push({ person: personOriginal, week: uiLabel, utilization: Number.isFinite(val as number) ? Math.round((val as number) * 10) / 10 : null, isHistorical: false });
-      }
+      return out;
     }
-    return out;
-  }, [uploadedFiles, databaseData, dataSource, forecastStartWeek, lookbackWeeks, forecastWeeks]);
 
-  const dataForUI: UtilizationData[] = consolidatedData ?? mockData;
+    // ✅ ROBUSTER FALLBACK: Wenn weder DB noch Upload-Daten da sind
+    console.log('⚠️ Keine Daten verfügbar - weder Database noch Upload');
+    return [];
+  }, [uploadedFiles, databaseData, dataSource, forecastStartWeek, lookbackWeeks, forecastWeeks, currentIsoYear]);
+
+  const dataForUI: UtilizationData[] = (() => {
+    if (consolidatedData && consolidatedData.length > 0) {
+      console.log('✅ Verwende echte Daten:', { count: consolidatedData.length, sample: consolidatedData[0] });
+      return consolidatedData;
+    } else {
+      console.log('⚠️ Verwende Mock-Daten, Grund:', {
+        consolidatedDataExists: !!consolidatedData,
+        consolidatedDataLength: consolidatedData?.length || 0,
+        dataSource,
+        databaseDataExists: !!databaseData.utilizationData,
+        databaseDataLength: databaseData.utilizationData?.length || 0
+      });
+      return mockData;
+    }
+  })();
   
   // Debug-Log für dataForUI
   useEffect(() => {
@@ -579,70 +645,74 @@ export function UtilizationReportView() {
     autoSetActionItems();
   }, [dataForUI, forecastStartWeek, currentIsoYear]);
 
-  // Build person → meta mapping from uploaded data or database (prefer Auslastung, fallback Einsatzplan)
+  // ✅ VEREINFACHT: PersonMeta nur noch aus UtilizationData oder Upload-Dateien
   const personMeta = useMemo(() => {
     const meta = new Map<string, { lob?: string; bereich?: string; cc?: string; team?: string; lbs?: string }>();
     
-    let aus: any[] | undefined;
-    let ein: any[] | undefined;
-
-    if (dataSource === 'database') {
-      // ✅ SCHRITT 6: Nur noch utilizationData verwenden für Metadaten
-      // utilizationData enthält bereits alle Metadaten (lob, bereich, cc, team, lbs)
-      if (databaseData.utilizationData && databaseData.utilizationData.length > 0) {
-        // Direkt aus utilizationData extrahieren - das sind bereits konsolidierte Daten
-        return new Map(databaseData.utilizationData.map(item => [
-          item.person,
-          {
+    if (dataSource === 'database' && databaseData.utilizationData) {
+      // UtilizationData enthält bereits alle konsolidierten Metadaten
+      const personMetaMap = new Map<string, any>();
+      
+      // Sammle alle einzigartigen Personen und ihre Metadaten (nehme ersten Eintrag pro Person)
+      databaseData.utilizationData.forEach((item: any) => {
+        if (!personMetaMap.has(item.person)) {
+          personMetaMap.set(item.person, {
             lob: item.lob,
             bereich: item.bereich,
             cc: item.cc,
             team: item.team,
             lbs: item.lbs
-          }
-        ]));
-      }
-      return new Map();
-    } else {
-      aus = uploadedFiles.auslastung?.data as any[] | undefined;
-      ein = uploadedFiles.einsatzplan?.data as any[] | undefined;
+          });
+        }
+      });
+      
+      return personMetaMap;
     }
 
-    const getField = (row: any, candidates: string[]): string | undefined => {
-      for (const key of candidates) {
-        const v = row?.[key];
-        if (typeof v === 'string' && v.trim()) return String(v);
-      }
-      return undefined;
-    };
-    const parseBereich = (raw?: string): { bereich?: string } => {
-      if (!raw || !raw.trim()) return {};
-      // Muster: "BU AT II (BAYERN)" → extrahiere nur den Bereichsteil in Klammern; sonst kompletter String
-      const match = raw.match(/^\s*.+?\s*\(([^)]+)\)\s*$/);
-      if (match) return { bereich: match[1].trim() };
-      return { bereich: raw.trim() };
-    };
-    const fill = (rows?: any[]) => {
-      rows?.forEach(r => {
-        if (!r?.person) return;
-        const current = meta.get(r.person) || {} as any;
-        const lob = getField(r, ['LoB','lob','LOB','lineOfBusiness','LineOfBusiness','Line of Business']);
-        const bereichRaw = getField(r, ['Bereich','bereich']);
-        const bereichValue = parseBereich(bereichRaw || '').bereich || bereichRaw;
-        const cc = getField(r, ['CC','cc','competenceCenter','CompetenceCenter','Competence Center','CC ']);
-        const team = getField(r, ['Team','team','T ']);
-        const lbs = getField(r, ['lbs','LBS']);
-        meta.set(r.person, {
-          lob: lob ?? current.lob,
-          cc: cc ?? current.cc,
-          lbs: lbs ?? current.lbs,
-          team: team ?? current.team,
+    // Upload-Modus: Verarbeite Upload-Dateien mit Original-Logik
+    if (dataSource === 'upload') {
+      const aus = uploadedFiles.auslastung?.data as any[] | null;
+      const ein = uploadedFiles.einsatzplan?.data as any[] | null;
+
+      const getField = (row: any, candidates: string[]): string | undefined => {
+        for (const key of candidates) {
+          const v = row?.[key];
+          if (typeof v === 'string' && v.trim()) return String(v);
+        }
+        return undefined;
+      };
+      
+      const parseBereich = (raw?: string): { bereich?: string } => {
+        if (!raw || !raw.trim()) return {};
+        const match = raw.match(/^\s*.+?\s*\(([^)]+)\)\s*$/);
+        if (match) return { bereich: match[1].trim() };
+        return { bereich: raw.trim() };
+      };
+      
+      const fill = (rows?: any[]) => {
+        rows?.forEach(r => {
+          if (!r?.person) return;
+          const current = meta.get(r.person) || {} as any;
+          const lob = getField(r, ['LoB','lob','LOB','lineOfBusiness','LineOfBusiness','Line of Business']);
+          const bereichRaw = getField(r, ['Bereich','bereich']);
+          const bereichValue = parseBereich(bereichRaw || '').bereich || bereichRaw;
+          const cc = getField(r, ['CC','cc','competenceCenter','CompetenceCenter','Competence Center','CC ']);
+          const team = getField(r, ['Team','team','T ']);
+          const lbs = getField(r, ['lbs','LBS']);
+          meta.set(r.person, {
+            lob: lob ?? current.lob,
+            cc: cc ?? current.cc,
+            lbs: lbs ?? current.lbs,
+            team: team ?? current.team,
+          });
+          if (bereichValue) (meta.get(r.person) as any).bereich = bereichValue;
         });
-        if (bereichValue) (meta.get(r.person) as any).bereich = bereichValue;
-      });
-    };
-    fill(aus);
-    fill(ein);
+      };
+      
+      fill(aus || undefined);
+      fill(ein || undefined);
+    }
+
     return meta;
   }, [uploadedFiles, databaseData, dataSource]);
 
@@ -923,26 +993,10 @@ export function UtilizationReportView() {
       try {
 
         
-        // Warte bis consolidatedData berechnet wurde
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // ✅ VEREINFACHT: Direkt Datenbank-Modus setzen ohne Frontend-Konsolidierung
+        await loadDatabaseData();
         
-        // Hole die aktuellen normalisierten Daten
-        if (consolidatedData && consolidatedData.length > 0) {
-
-          
-          // Speichere in Firebase
-          await DatabaseService.saveConsolidatedDataToFirebase(consolidatedData);
-          
-          
-          
-          // Lade App aus Firebase neu
-          await loadDatabaseData();
-          
-          // Setze dataSource auf 'database' um Firebase-Daten zu verwenden
-          setDataSource('database');
-          
-          
-        } else {
+        if (true) {
           
         }
       } catch (error) {
@@ -1137,8 +1191,10 @@ export function UtilizationReportView() {
               </h3>
               <p className="text-sm text-gray-600">
                 {dataSource === 'database' 
-                  ? 'Daten aus der lokalen Datenbank geladen' 
-                  : 'Daten aus Excel-Uploads (Updates)'
+                  ? databaseData.utilizationData 
+                    ? 'Konsolidierte Daten aus der Datenbank geladen' 
+                    : 'Keine Daten in der Datenbank verfügbar'
+                  : 'Daten aus Excel-Uploads'
                 }
               </p>
             </div>
@@ -1154,9 +1210,27 @@ export function UtilizationReportView() {
                 </button>
               ) : (
                 <button
-                  onClick={switchToDatabase}
-                  disabled={!databaseData.utilizationData}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                  onClick={async () => {
+                    console.log('🔍 DEBUG: Lade Daten direkt aus der Datenbank...');
+                    try {
+                      const utilData = await DatabaseService.getUtilizationData();
+                      console.log('🔍 Direkte Datenbank-Abfrage Ergebnis:', {
+                        count: utilData?.length || 0,
+                        sample: utilData?.[0],
+                        first5: utilData?.slice(0, 5)
+                      });
+                      
+                      const ausData = await DatabaseService.getAuslastung();
+                      const einData = await DatabaseService.getEinsatzplan();
+                      console.log('🔍 Ursprüngliche Daten:', {
+                        auslastung: ausData?.length || 0,
+                        einsatzplan: einData?.length || 0
+                      });
+                    } catch (error) {
+                      console.error('❌ Debug-Fehler:', error);
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   <Database className="w-4 h-4" />
                   Datenbank-Daten verwenden
@@ -1168,7 +1242,83 @@ export function UtilizationReportView() {
         )}
 
         {/* Upload Section (extracted component) */}
-        <DataUploadSection uploadedFiles={uploadedFiles} onFilesChange={handleFilesChange} />
+        <DataUploadSection uploadedFiles={uploadedFiles} onFilesChange={handleFilesChange} onDatabaseRefresh={loadDatabaseData} />
+
+        {/* 🔍 TEMPORÄRER DEBUG-BEREICH - GUT SICHTBAR */}
+        <div className="mb-8 p-6 bg-yellow-50 border-2 border-yellow-300 rounded-xl">
+          <h3 className="text-xl font-bold text-gray-900 mb-4">🔍 DEBUG & TEST BEREICH</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button
+              onClick={async () => {
+                console.log('🔍 DEBUG: Teste Datenbank-Verbindung mit Auth...');
+                try {
+                  // Verwende DatabaseService mit Auth statt direkte fetch
+                  const utilData = await DatabaseService.getUtilizationData();
+                  const ausData = await DatabaseService.getAuslastung();
+                  const einData = await DatabaseService.getEinsatzplan();
+                  
+                  console.log('🔍 AUTH API-TESTS:', {
+                    utilizationData: { count: utilData?.length || 0, sample: utilData?.[0] },
+                    auslastung: { count: ausData?.length || 0, sample: ausData?.[0] },
+                    einsatzplan: { count: einData?.length || 0, sample: einData?.[0] }
+                  });
+                  
+                  alert(`✅ DB Status (mit Auth):\n📊 UtilizationData: ${utilData?.length || 0} Einträge\n📈 Auslastung: ${ausData?.length || 0} Einträge\n📋 Einsatzplan: ${einData?.length || 0} Einträge\n\n👀 Schau in die Console (F12) für Details!`);
+                } catch (error) {
+                  console.error('❌ Auth-API-Fehler:', error);
+                  alert(`❌ Auth-Fehler: ${error.message}\n\n🔐 Bist du eingeloggt? Login erforderlich!`);
+                }
+              }}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+            >
+              📊 DB Status prüfen
+            </button>
+            
+            <button
+              onClick={async () => {
+                console.log('🔍 DEBUG: Starte manuelle Konsolidierung...');
+                try {
+                  const result = await DatabaseService.consolidateFromDatabase();
+                  console.log('✅ Konsolidierung Ergebnis:', result);
+                  await loadDatabaseData();
+                  alert(`✅ Konsolidierung erfolgreich!\n📊 ${result.result?.count || 0} Datensätze verarbeitet`);
+                } catch (error) {
+                  console.error('❌ Konsolidierung-Fehler:', error);
+                  alert(`❌ Konsolidierung-Fehler: ${error.message}`);
+                }
+              }}
+              className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
+            >
+              🔄 Konsolidierung starten
+            </button>
+            
+            <button
+              onClick={async () => {
+                console.log('🔍 DEBUG: Lade Datenbank neu und force Database Mode...');
+                
+                // Force Database Mode
+                setDataSource('database');
+                
+                await loadDatabaseData();
+                
+                console.log('🔍 Nach Reload Status:', {
+                  dataSource: 'database',
+                  databaseDataCount: databaseData.utilizationData?.length || 0,
+                  consolidatedDataCount: consolidatedData?.length || 0,
+                  dataForUICount: dataForUI.length
+                });
+                
+                alert('🔄 Datenbank neu geladen & Database Mode aktiviert! Schau in die Console für Details.');
+              }}
+              className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold"
+            >
+              🔄 DB neu laden
+            </button>
+          </div>
+          <div className="mt-4 text-sm text-gray-600">
+            💡 <strong>Anleitung:</strong> 1) Erst "DB Status prüfen", 2) Falls leer → Excel-Dateien hochladen, 3) "Konsolidierung starten", 4) "DB neu laden"
+          </div>
+        </div>
 
         {/* Auslastung Preview ausgeblendet (weiterhin über Upload einsehbar) */}
 
@@ -1257,7 +1407,7 @@ export function UtilizationReportView() {
                 <tr>
                   {visibleColumns.avg4 && (
                     <th className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-12">
-                      Ø KW{(forecastStartWeek - lookbackWeeks + 1)}-{(forecastStartWeek - lookbackWeeks + 4)}
+                      Ø {String(new Date().getFullYear()).slice(-2)}/{String(forecastStartWeek - lookbackWeeks + 1).padStart(2, '0')}-{String(forecastStartWeek - lookbackWeeks + 4).padStart(2, '0')}
                     </th>
                   )}
                   {/* 4 Einzelwochen bis zur aktuellen KW */}
@@ -1265,7 +1415,7 @@ export function UtilizationReportView() {
                     const weekNumber = (forecastStartWeek - lookbackWeeks + 5) + i;
                     return (
                       <th key={`left-single-${i}`} className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-12">
-                        {`${currentIsoYear}-KW${weekNumber}`}
+                        {`${String(currentIsoYear).slice(-2)}/${String(weekNumber).padStart(2, '0')}`}
                       </th>
                     );
                   })}
@@ -1311,7 +1461,7 @@ export function UtilizationReportView() {
                     const weekNumber = (forecastStartWeek + 1) + i; // starts after current week
                     return (
                       <th key={`right-${i}`} className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-12">
-                        {`${currentIsoYear}-KW${weekNumber}`}
+                        {`${String(currentIsoYear).slice(-2)}/${String(weekNumber).padStart(2, '0')}`}
                       </th>
                     );
                   })}
@@ -1429,9 +1579,9 @@ export function UtilizationReportView() {
                             // Hole VG-Information aus dem Einsatzplan
                             let vgName = '';
                             
-                            if (dataSource === 'database') {
-                              const einsatzplanData = databaseData.einsatzplan?.find(item => item.person === person);
-                              vgName = einsatzplanData?.vg || '';
+                            if (dataSource === 'database' && databaseData.utilizationData) {
+                              // VG nicht in UtilizationData verfügbar
+                              vgName = '';
                             } else {
                               const einsatzplanData = uploadedFiles.einsatzplan?.data?.find((item: any) => item.person === person);
                               vgName = einsatzplanData?.vg || '';
@@ -1591,8 +1741,11 @@ export function UtilizationReportView() {
                                 };
                                 const overlappingOffers = (dossier.projectOffers || []).filter((o: any) => {
                                   if (o.startWeek && o.endWeek) {
-                                    const sw = parseInt(String(o.startWeek).split('KW')[1]);
-                                    const ew = parseInt(String(o.endWeek).split('KW')[1]);
+                                                        // Parse YY/WW format for start and end weeks
+                    const swMatch = String(o.startWeek).match(/(\d{2})\/(\d{2})/);
+                    const ewMatch = String(o.endWeek).match(/(\d{2})\/(\d{2})/);
+                    const sw = swMatch ? parseInt(swMatch[2], 10) : 0;
+                    const ew = ewMatch ? parseInt(ewMatch[2], 10) : 0;
                                     return weekNumber >= sw && weekNumber <= ew;
                                   }
                                   if (o.startDate && o.endDate) return overlapsWeek(o.startDate, o.endDate);
@@ -1601,8 +1754,11 @@ export function UtilizationReportView() {
                                 const overlappingJira = (dossier.jiraTickets || []).filter((j: any) => {
                                   if (j.startDate && j.endDate) return overlapsWeek(j.startDate, j.endDate);
                                   if (j.startWeek && j.endWeek) {
-                                    const sw = parseInt(String(j.startWeek).split('KW')[1]);
-                                    const ew = parseInt(String(j.endWeek).split('KW')[1]);
+                                                        // Parse YY/WW format for start and end weeks
+                    const swMatch = String(j.startWeek).match(/(\d{2})\/(\d{2})/);
+                    const ewMatch = String(j.endWeek).match(/(\d{2})\/(\d{2})/);
+                    const sw = swMatch ? parseInt(swMatch[2], 10) : 0;
+                    const ew = ewMatch ? parseInt(ewMatch[2], 10) : 0;
                                     return weekNumber >= sw && weekNumber <= ew;
                                   }
                                   return false;
@@ -1770,7 +1926,7 @@ export function UtilizationReportView() {
                     {Array.from({
                   length: 20
                 }, (_, i) => <option key={i} value={30 + i}>
-                        2025-KW{30 + i}
+                        {String(new Date().getFullYear()).slice(-2)}/{String(30 + i).padStart(2, '0')}
                       </option>)}
                   </select>
                 </div>
@@ -1781,8 +1937,8 @@ export function UtilizationReportView() {
                     Zeitraum-Übersicht
                   </h4>
                   <div className="text-sm text-blue-700 space-y-1">
-                    <p>• Rückblick: KW{forecastStartWeek - lookbackWeeks} - KW{forecastStartWeek - 1} ({lookbackWeeks} Wochen)</p>
-                    <p>• Vorblick: KW{forecastStartWeek} - KW{forecastStartWeek + forecastWeeks - 1} ({forecastWeeks} Wochen)</p>
+                    <p>• Rückblick: {String(new Date().getFullYear()).slice(-2)}/{String(forecastStartWeek - lookbackWeeks).padStart(2, '0')} - {String(new Date().getFullYear()).slice(-2)}/{String(forecastStartWeek - 1).padStart(2, '0')} ({lookbackWeeks} Wochen)</p>
+                    <p>• Vorblick: {String(new Date().getFullYear()).slice(-2)}/{String(forecastStartWeek).padStart(2, '0')} - {String(new Date().getFullYear()).slice(-2)}/{String(forecastStartWeek + forecastWeeks - 1).padStart(2, '0')} ({forecastWeeks} Wochen)</p>
                     <p>• Gesamt: {lookbackWeeks + forecastWeeks} Wochen</p>
                   </div>
                 </div>

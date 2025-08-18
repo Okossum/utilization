@@ -145,7 +145,7 @@ export function EmployeeDossierModal({
         setFormData(combinedData);
         setPlanningComment(String(savedDossier?.planningComment || ''));
       } catch (error) {
-        console.error('Fehler beim Laden der Employee-Daten:', error);
+
         // Fallback: Verwende nur Excel-Daten
         if (excelData) {
           setFormData(prev => ({
@@ -202,7 +202,7 @@ export function EmployeeDossierModal({
       onSave(formData);
       onClose();
     } catch (error) {
-      console.error('Fehler beim Speichern des Employee Dossiers:', error);
+      
       // Hier könnte man einen Toast/Alert anzeigen
       alert('Fehler beim Speichern. Bitte versuchen Sie es erneut.');
     }
@@ -431,7 +431,7 @@ export function EmployeeDossierModal({
               }));
             }
           } catch (e) {
-            console.error('Fehler beim Aktualisieren nach Planung:', e);
+    
           }
         }}
         personId={formData.id}

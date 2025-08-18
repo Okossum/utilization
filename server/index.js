@@ -140,7 +140,7 @@ app.get('/api/me', requireAuth, async (req, res) => {
     }
     return res.json({ id: snap.id, ...snap.data() });
   } catch (error) {
-    console.error('Fehler bei /api/me:', error);
+    
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -173,7 +173,7 @@ app.put('/api/me', requireAuth, async (req, res) => {
     const snap = await docRef.get();
     return res.json({ id: snap.id, ...snap.data() });
   } catch (error) {
-    console.error('Fehler bei PUT /api/me:', error);
+    
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -219,50 +219,107 @@ app.post('/api/auslastung', requireAuth, async (req, res) => {
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    // Bestehende Daten als "nicht mehr aktuell" markieren
+    // Lade bestehende Daten (nur die neuesten pro Person+Team+CC)
     const latestSnap = await db.collection('auslastung').where('isLatest', '==', true).get();
-    if (!latestSnap.empty) {
-      const batch = db.batch();
-      latestSnap.forEach(doc => batch.update(doc.ref, { isLatest: false }));
-      await batch.commit();
-    }
+    const existingData = new Map();
+    latestSnap.forEach(doc => {
+      const data = doc.data();
+      // Composite Key: Person + Team + CC für eindeutige Identifikation
+      const compositeKey = `${data.person || 'unknown'}__${data.team || 'unknown'}__${data.cc || 'unknown'}`;
+      existingData.set(compositeKey, { id: doc.id, data });
+    });
 
     // Neue Versionsnummer ermitteln
     const maxVerSnap = await db.collection('auslastung').orderBy('uploadVersion', 'desc').limit(1).get();
     const newVersion = maxVerSnap.empty ? 1 : ((maxVerSnap.docs[0].data().uploadVersion || 0) + 1);
 
     const results = [];
+    const batch = db.batch();
 
-    // Alle Auslastung-Daten speichern (neue Versionen als eigene Docs)
+    // Personen-basiertes Update: Merge KW-Werte (mit Composite Key)
     for (const row of data) {
       if (!row.person) continue;
-      const docRef = await db.collection('auslastung').add({
-        fileName,
-        uploadDate: FieldValue.serverTimestamp(),
-        uploadVersion: newVersion,
-        person: row.person,
-        lob: row.lob ?? null,
-        bereich: row.bereich ?? null,
-        cc: row.cc ?? null,
-        team: row.team ?? null,
-        values: buildWeekValuesMap(row),
-        isLatest: true,
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-      results.push({ action: 'created', person: row.person, id: docRef.id });
+      
+      const newWeekValues = buildWeekValuesMap(row);
+      // Composite Key: Person + Team + CC für eindeutige Identifikation
+      const compositeKey = `${row.person || 'unknown'}__${row.team || 'unknown'}__${row.cc || 'unknown'}`;
+      const existing = existingData.get(compositeKey);
+      
+      if (existing) {
+        // Update bestehende Person: Merge KW-Werte
+        const mergedValues = { ...existing.data.values, ...newWeekValues };
+        const docRef = db.collection('auslastung').doc(existing.id);
+        
+        batch.update(docRef, {
+          fileName,
+          uploadDate: FieldValue.serverTimestamp(),
+          uploadVersion: newVersion,
+          lob: row.lob ?? existing.data.lob ?? null,
+          bereich: row.bereich ?? existing.data.bereich ?? null,
+          cc: row.cc ?? existing.data.cc ?? null,
+          team: row.team ?? existing.data.team ?? null,
+          values: mergedValues,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        
+        results.push({ 
+          action: 'updated', 
+          person: row.person,
+          team: row.team,
+          cc: row.cc,
+          compositeKey,
+          id: existing.id,
+          newWeeks: Object.keys(newWeekValues).length,
+          totalWeeks: Object.keys(mergedValues).length
+        });
+      } else {
+        // Neue Person: Erstelle neues Dokument
+        const docRef = db.collection('auslastung').doc();
+        batch.set(docRef, {
+          fileName,
+          uploadDate: FieldValue.serverTimestamp(),
+          uploadVersion: newVersion,
+          person: row.person,
+          lob: row.lob ?? null,
+          bereich: row.bereich ?? null,
+          cc: row.cc ?? null,
+          team: row.team ?? null,
+          values: newWeekValues,
+          isLatest: true,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        
+                results.push({ 
+          action: 'created', 
+          person: row.person,
+          team: row.team,
+          cc: row.cc,
+          compositeKey,
+          id: docRef.id,
+          newWeeks: Object.keys(newWeekValues).length 
+        });
+      }
     }
+
+    // Alle Änderungen in einem Batch commit
+    await batch.commit();
+
+    // Statistiken für Response
+    const updatedCount = results.filter(r => r.action === 'updated').length;
+    const createdCount = results.filter(r => r.action === 'created').length;
+    const totalNewWeeks = results.reduce((sum, r) => sum + r.newWeeks, 0);
 
     res.json({ 
       success: true, 
       historyId: historyRef.id, 
       version: newVersion,
       results,
-      message: `${results.length} Personen verarbeitet`
+      message: `${results.length} Personen verarbeitet (${updatedCount} aktualisiert, ${createdCount} neu erstellt, ${totalNewWeeks} KW-Werte hinzugefügt)`
     });
 
   } catch (error) {
-    console.error('Fehler beim Speichern der Auslastung:', error);
+    
     res.status(500).json({ error: 'Interner Server-Fehler', details: error.message });
   }
 });
@@ -285,64 +342,124 @@ app.post('/api/einsatzplan', requireAuth, async (req, res) => {
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    // Bestehende Daten als "nicht mehr aktuell" markieren
+    // Lade bestehende Daten (nur die neuesten pro Person+Team+CC)
     const latestSnap = await db.collection('einsatzplan').where('isLatest', '==', true).get();
-    if (!latestSnap.empty) {
-      const batch = db.batch();
-      latestSnap.forEach(doc => batch.update(doc.ref, { isLatest: false }));
-      await batch.commit();
-    }
+    const existingData = new Map();
+    latestSnap.forEach(doc => {
+      const data = doc.data();
+      // Composite Key: Person + Team + CC für eindeutige Identifikation
+      const compositeKey = `${data.person || 'unknown'}__${data.team || 'unknown'}__${data.cc || 'unknown'}`;
+      existingData.set(compositeKey, { id: doc.id, data });
+    });
 
     // Neue Versionsnummer ermitteln
     const maxVerSnap = await db.collection('einsatzplan').orderBy('uploadVersion', 'desc').limit(1).get();
     const newVersion = maxVerSnap.empty ? 1 : ((maxVerSnap.docs[0].data().uploadVersion || 0) + 1);
 
-    const results = [];
-
-    // Alle Einsatzplan-Daten speichern (neue Versionen als eigene Docs)
-    for (const row of data) {
-      if (!row.person) continue;
-      const values = {};
+    // Hilfsfunktion zum Aufbau der Wochen-Werte Map
+    function buildWeekValuesMap(row) {
+      const weekValues = {};
       for (const [key, value] of Object.entries(row)) {
-        if (key !== 'person' && key !== 'lbs' && typeof value === 'number' && Number.isFinite(value)) {
-          values[key] = value;
+        if (key !== 'person' && key !== 'lbs' && key !== 'vg' && 
+            key !== 'lob' && key !== 'cc' && key !== 'team' && key !== 'bereich' &&
+            typeof value === 'number' && Number.isFinite(value)) {
+          weekValues[key] = value;
         }
       }
-      // Map structural fields robustly
-      const lob = pickField(row, ['lob','LoB','LOB']);
-      const cc = pickField(row, ['cc','CC']);
-      const team = pickField(row, ['team','Team']);
-      const bereich = pickField(row, ['bereich','Bereich']) ?? null;
-
-      const docRef = await db.collection('einsatzplan').add({
-        fileName,
-        uploadDate: FieldValue.serverTimestamp(),
-        uploadVersion: newVersion,
-        person: row.person,
-        lbs: row.lbs ?? null,
-        vg: row.vg ?? null,
-        cc: cc ?? null,
-        team: team ?? null,
-        lob: lob ?? null,
-        bereich,
-        values,
-        isLatest: true,
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-      results.push({ action: 'created', person: row.person, id: docRef.id });
+      return weekValues;
     }
+
+    const results = [];
+    const batch = db.batch();
+
+    // Personen-basiertes Update: Merge KW-Werte (mit Composite Key)
+    for (const row of data) {
+      if (!row.person) continue;
+      
+      const newWeekValues = buildWeekValuesMap(row);
+      // Composite Key: Person + Team + CC für eindeutige Identifikation
+      const compositeKey = `${row.person || 'unknown'}__${row.team || 'unknown'}__${row.cc || 'unknown'}`;
+      const existing = existingData.get(compositeKey);
+      
+      if (existing) {
+        // Update bestehende Person: Merge KW-Werte
+        const mergedValues = { ...existing.data.values, ...newWeekValues };
+        const docRef = db.collection('einsatzplan').doc(existing.id);
+        
+        batch.update(docRef, {
+          fileName,
+          uploadDate: FieldValue.serverTimestamp(),
+          uploadVersion: newVersion,
+          lob: row.lob ?? existing.data.lob ?? null,
+          bereich: row.bereich ?? existing.data.bereich ?? null,
+          cc: row.cc ?? existing.data.cc ?? null,
+          team: row.team ?? existing.data.team ?? null,
+          lbs: row.lbs ?? existing.data.lbs ?? null,
+          vg: row.vg ?? existing.data.vg ?? null,
+          values: mergedValues,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        
+        results.push({ 
+          action: 'updated', 
+          person: row.person,
+          team: row.team,
+          cc: row.cc,
+          compositeKey,
+          id: existing.id,
+          newWeeks: Object.keys(newWeekValues).length,
+          totalWeeks: Object.keys(mergedValues).length
+        });
+      } else {
+        // Neue Person: Erstelle neues Dokument
+        const docRef = db.collection('einsatzplan').doc();
+        batch.set(docRef, {
+          fileName,
+          uploadDate: FieldValue.serverTimestamp(),
+          uploadVersion: newVersion,
+          person: row.person,
+          lbs: row.lbs ?? null,
+          vg: row.vg ?? null,
+          cc: row.cc ?? null,
+          team: row.team ?? null,
+          lob: row.lob ?? null,
+          bereich: row.bereich ?? null,
+          values: newWeekValues,
+          isLatest: true,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        
+        results.push({ 
+          action: 'created', 
+          person: row.person,
+          team: row.team,
+          cc: row.cc,
+          compositeKey,
+          id: docRef.id,
+          newWeeks: Object.keys(newWeekValues).length 
+        });
+      }
+    }
+
+    // Alle Änderungen in einem Batch commit
+    await batch.commit();
+
+    // Statistiken für Response
+    const updatedCount = results.filter(r => r.action === 'updated').length;
+    const createdCount = results.filter(r => r.action === 'created').length;
+    const totalNewWeeks = results.reduce((sum, r) => sum + r.newWeeks, 0);
 
     res.json({ 
       success: true, 
       historyId: historyRef.id, 
       version: newVersion,
       results,
-      message: `${results.length} Personen verarbeitet`
+      message: `${results.length} Personen verarbeitet (${updatedCount} aktualisiert, ${createdCount} neu erstellt, ${totalNewWeeks} KW-Werte hinzugefügt)`
     });
 
   } catch (error) {
-    console.error('Fehler beim Speichern des Einsatzplans:', error);
+    
     res.status(500).json({ error: 'Interner Server-Fehler', details: error.message });
   }
 });
@@ -357,7 +474,7 @@ app.get('/api/auslastung', requireAuth, async (req, res) => {
     out = applyScopeFilter(out, profile, req.user?.admin);
     res.json(out);
   } catch (error) {
-    console.error('Fehler beim Abrufen der Auslastung:', error);
+    
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -372,7 +489,7 @@ app.get('/api/einsatzplan', requireAuth, async (req, res) => {
     out = applyScopeFilter(out, profile, req.user?.admin);
     res.json(out);
   } catch (error) {
-    console.error('Fehler beim Abrufen des Einsatzplans:', error);
+    
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -384,7 +501,7 @@ app.get('/api/upload-history', requireAuth, async (req, res) => {
     const out = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     res.json(out);
   } catch (error) {
-    console.error('Fehler beim Abrufen der Upload-Historie:', error);
+    
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -400,21 +517,72 @@ app.post('/api/consolidate', requireAuth, async (req, res) => {
 
     const consolidatedData = [];
     
-    // Alle Personen sammeln
+    // Alle Personen sammeln (mit Composite Key Unterstützung)
     const allPersons = new Set([
       ...auslastungData.map(row => row.person).filter(Boolean),
       ...einsatzplanData.map(row => row.person).filter(Boolean)
     ]);
 
-    for (const person of allPersons) {
-      const ausRow = auslastungData.find(row => row.person === person);
-      const einRow = einsatzplanData.find(row => row.person === person);
+    // Gruppiere Auslastungsdaten nach Person (um mehrere Team/CC Kombinationen zu handhaben)
+    const auslastungByPerson = new Map();
+    auslastungData.forEach(row => {
+      if (!row.person) return;
+      if (!auslastungByPerson.has(row.person)) {
+        auslastungByPerson.set(row.person, []);
+      }
+      auslastungByPerson.get(row.person).push(row);
+    });
 
-      // Historische Wochen (links von aktueller Woche)
-      for (let i = 0; i < lookbackWeeks; i++) {
+    // Gruppiere Einsatzplandaten nach Person
+    const einsatzplanByPerson = new Map();
+    einsatzplanData.forEach(row => {
+      if (!row.person) return;
+      if (!einsatzplanByPerson.has(row.person)) {
+        einsatzplanByPerson.set(row.person, []);
+      }
+      einsatzplanByPerson.get(row.person).push(row);
+    });
+
+    for (const person of allPersons) {
+      const ausRows = auslastungByPerson.get(person) || [];
+      const einRows = einsatzplanByPerson.get(person) || [];
+
+      // Erstelle Kombinationen für alle Team/CC Variationen einer Person
+      const personCombinations = new Set();
+      
+      // Sammle alle einzigartigen Team/CC Kombinationen
+      ausRows.forEach(row => {
+        const combo = `${row.team || 'unknown'}__${row.cc || 'unknown'}`;
+        personCombinations.add(combo);
+      });
+      einRows.forEach(row => {
+        const combo = `${row.team || 'unknown'}__${row.cc || 'unknown'}`;
+        personCombinations.add(combo);
+      });
+
+      // Falls keine spezifischen Kombinationen gefunden wurden, erstelle Standard-Eintrag
+      if (personCombinations.size === 0) {
+        personCombinations.add('unknown__unknown');
+      }
+
+      // Verarbeite jede Team/CC Kombination separat
+      for (const combo of personCombinations) {
+        const [team, cc] = combo.split('__');
+        
+        const ausRow = ausRows.find(row => 
+          (row.team || 'unknown') === team && (row.cc || 'unknown') === cc
+        );
+        const einRow = einRows.find(row => 
+          (row.team || 'unknown') === team && (row.cc || 'unknown') === cc
+        );
+
+        // Historische Wochen (links von aktueller Woche)
+        for (let i = 0; i < lookbackWeeks; i++) {
         const weekNum = forecastStartWeek - lookbackWeeks + i;
-        const weekKey = `KW ${weekNum}-${currentYear}`;
-        const uiLabel = `${currentYear}-KW${weekNum}`;
+        const yy = String(currentYear).slice(-2);
+        const ww = String(weekNum).padStart(2, '0');
+        const weekKey = `${yy}/${ww}`;
+        const uiLabel = `${yy}/${ww}`;
         
         const ausValue = ausRow ? extractWeekValue(ausRow, weekNum, currentYear) : null;
         const einValue = einRow ? extractWeekValue(einRow, weekNum, currentYear) : null;
@@ -426,8 +594,8 @@ app.post('/api/consolidate', requireAuth, async (req, res) => {
             person,
             lob: ausRow?.lob,
             bereich: ausRow?.bereich,
-            cc: ausRow?.cc,
-            team: ausRow?.team,
+            cc: cc !== 'unknown' ? cc : ausRow?.cc,
+            team: team !== 'unknown' ? team : ausRow?.team,
             lbs: einRow?.lbs,
             week: uiLabel,
             year: currentYear,
@@ -437,40 +605,45 @@ app.post('/api/consolidate', requireAuth, async (req, res) => {
             finalValue,
             isHistorical: true,
             source: ausValue !== undefined && einValue !== undefined ? 'both' : (ausValue !== undefined ? 'auslastung' : 'einsatzplan'),
-            isLatest: true
+            isLatest: true,
+            compositeKey: `${person}__${team !== 'unknown' ? team : (ausRow?.team || 'unknown')}__${cc !== 'unknown' ? cc : (ausRow?.cc || 'unknown')}`
           });
         }
-      }
+        }
 
-      // Forecast-Wochen (rechts von aktueller Woche)
-      for (let i = 0; i < forecastWeeks; i++) {
-        const weekNum = forecastStartWeek + i;
-        const weekKey = `KW ${weekNum}-${currentYear}`;
-        const uiLabel = `${currentYear}-KW${weekNum}`;
-        
-        const ausValue = ausRow ? extractWeekValue(ausRow, weekNum, currentYear) : null;
-        const einValue = einRow ? extractWeekValue(einRow, weekNum, currentYear) : null;
-        
-        const finalValue = ausValue !== undefined ? ausValue : einValue;
-        
-        if (finalValue !== undefined) {
-          consolidatedData.push({
-            person,
-            lob: ausRow?.lob,
-            bereich: ausRow?.bereich,
-            cc: ausRow?.cc,
-            team: ausRow?.team,
-            lbs: einRow?.lbs,
-            week: uiLabel,
-            year: currentYear,
-            weekNumber: weekNum,
-            auslastungValue: ausValue,
-            einsatzplanValue: einValue,
-            finalValue,
-            isHistorical: false,
-            source: ausValue !== undefined && einValue !== undefined ? 'both' : (ausValue !== undefined ? 'auslastung' : 'einsatzplan'),
-            isLatest: true
-          });
+        // Forecast-Wochen (rechts von aktueller Woche)
+        for (let i = 0; i < forecastWeeks; i++) {
+          const weekNum = forecastStartWeek + i;
+          const yy = String(currentYear).slice(-2);
+          const ww = String(weekNum).padStart(2, '0');
+          const weekKey = `${yy}/${ww}`;
+          const uiLabel = `${yy}/${ww}`;
+          
+          const ausValue = ausRow ? extractWeekValue(ausRow, weekNum, currentYear) : null;
+          const einValue = einRow ? extractWeekValue(einRow, weekNum, currentYear) : null;
+          
+          const finalValue = ausValue !== undefined ? ausValue : einValue;
+          
+          if (finalValue !== undefined) {
+            consolidatedData.push({
+              person,
+              lob: ausRow?.lob,
+              bereich: ausRow?.bereich,
+              cc: cc !== 'unknown' ? cc : ausRow?.cc,
+              team: team !== 'unknown' ? team : ausRow?.team,
+              lbs: einRow?.lbs,
+              week: uiLabel,
+              year: currentYear,
+              weekNumber: weekNum,
+              auslastungValue: ausValue,
+              einsatzplanValue: einValue,
+              finalValue,
+              isHistorical: false,
+              source: ausValue !== undefined && einValue !== undefined ? 'both' : (ausValue !== undefined ? 'auslastung' : 'einsatzplan'),
+              isLatest: true,
+              compositeKey: `${person}__${team !== 'unknown' ? team : (ausRow?.team || 'unknown')}__${cc !== 'unknown' ? cc : (ausRow?.cc || 'unknown')}`
+            });
+          }
         }
       }
     }
@@ -483,10 +656,13 @@ app.post('/api/consolidate', requireAuth, async (req, res) => {
       await batch.commit();
     }
 
-    // Neue Daten speichern
+    // Neue Daten speichern (mit Composite Key)
     const savedCount = [];
     for (const row of consolidatedData) {
-      const docId = `${row.person}__${row.week}`;
+      // Verwende Composite Key: Person__Team__CC__Week für eindeutige Identifikation
+      // ✅ OPTIMAL: Ersetze '/' nur für Document-ID, behalte Original-Format in Daten  
+      const sanitizedWeek = row.week ? String(row.week).replace(/\//g, '|') : 'unknown';
+      const docId = `${row.compositeKey}__${sanitizedWeek}`;
       await db.collection('utilizationData').doc(docId).set({
         ...row,
         createdAt: FieldValue.serverTimestamp(),
@@ -502,7 +678,7 @@ app.post('/api/consolidate', requireAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Fehler beim Konsolidieren der Daten:', error);
+    
     res.status(500).json({ error: 'Interner Server-Fehler', details: error.message });
   }
 });
@@ -532,7 +708,7 @@ app.get('/api/utilization-data', requireAuth, async (req, res) => {
     out = applyScopeFilter(out, profile, req.user?.admin);
     res.json(out);
   } catch (error) {
-    console.error('Fehler beim Abrufen der normalisierten Daten:', error);
+    
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -546,7 +722,7 @@ app.post('/api/utilization-data/bulk', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Ungültige Daten - Array erwartet' });
     }
 
-    console.log(`Speichere ${data.length} Datensätze in utilizationData Collection`);
+    console.log(`🔍 Bulk-Speicherung startet: ${data.length} Datensätze`);
 
     // Bestehende Daten als "nicht mehr aktuell" markieren
     const latestUtilSnap = await db.collection('utilizationData').where('isLatest', '==', true).get();
@@ -554,7 +730,7 @@ app.post('/api/utilization-data/bulk', requireAuth, async (req, res) => {
       const batch = db.batch();
       latestUtilSnap.forEach(doc => batch.update(doc.ref, { isLatest: false }));
       await batch.commit();
-      console.log(`${latestUtilSnap.size} bestehende Datensätze als veraltet markiert`);
+      console.log(`🔍 ${latestUtilSnap.size} bestehende Dokumente als nicht aktuell markiert`);
     }
 
     // Neue Daten speichern (Update oder Insert)
@@ -562,8 +738,13 @@ app.post('/api/utilization-data/bulk', requireAuth, async (req, res) => {
     const savedCount = [];
     
     for (const row of data) {
-      const docId = `${row.person}__${row.week}`;
+      // Verwende Composite Key falls vorhanden, sonst fallback auf Person__Week
+      // ✅ OPTIMAL: Ersetze '/' nur für Document-ID, behalte Original-Format in Daten
+      const sanitizedWeek = row.week ? String(row.week).replace(/\//g, '|') : 'unknown';
+      const docId = row.compositeKey ? `${row.compositeKey}__${sanitizedWeek}` : `${row.person}__${sanitizedWeek}`;
       const docRef = db.collection('utilizationData').doc(docId);
+      
+      console.log(`🔍 Speichere Document: ${docId}`);
       
       batch.set(docRef, {
         ...row,
@@ -576,7 +757,7 @@ app.post('/api/utilization-data/bulk', requireAuth, async (req, res) => {
     }
 
     await batch.commit();
-    console.log(`${savedCount.length} Datensätze erfolgreich gespeichert/aktualisiert`);
+    console.log(`✅ Bulk-Speicherung erfolgreich: ${savedCount.length} Datensätze`);
 
     res.json({
       success: true,
@@ -585,14 +766,16 @@ app.post('/api/utilization-data/bulk', requireAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Fehler beim Bulk-Speichern der Daten:', error);
+    console.error('❌ Fehler bei Bulk-Speicherung:', error);
     res.status(500).json({ error: 'Interner Server-Fehler', details: error.message });
   }
 });
 
-// Hilfsfunktion zum Extrahieren von Wochenwerten
+// Hilfsfunktion zum Extrahieren von Wochenwerten im YY/WW Format
 function extractWeekValue(row, weekNum, year) {
-  const weekKey = `KW ${weekNum}-${year}`;
+  const yy = String(year).slice(-2);
+  const ww = String(weekNum).padStart(2, '0');
+  const weekKey = `${yy}/${ww}`;
   return row[weekKey] !== undefined ? row[weekKey] : null;
 }
 
@@ -630,7 +813,7 @@ app.post('/api/employee-dossier', requireAuth, async (req, res) => {
     const updated = await docRef.get();
     res.json({ success: true, message: snap.exists ? 'Employee Dossier aktualisiert' : 'Employee Dossier erstellt', data: { id: updated.id, ...updated.data() } });
   } catch (error) {
-    console.error('Fehler beim Speichern des Employee Dossiers:', error);
+    
     res.status(500).json({ error: 'Interner Server-Fehler', details: error.message });
   }
 });
@@ -647,7 +830,7 @@ app.get('/api/employee-dossier/:employeeId', requireAuth, async (req, res) => {
     
     res.json({ id: snap.id, ...snap.data() });
   } catch (error) {
-    console.error('Fehler beim Abrufen des Employee Dossiers:', error);
+    
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -661,7 +844,7 @@ app.get('/api/employee-dossiers', requireAuth, async (req, res) => {
       .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'de'));
     res.json(out);
   } catch (error) {
-    console.error('Fehler beim Abrufen aller Employee Dossiers:', error);
+    
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -673,7 +856,7 @@ app.get('/api/users', requireAdmin, async (_req, res) => {
     const out = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     res.json(out);
   } catch (error) {
-    console.error('Fehler beim Abrufen der Nutzer:', error);
+    
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -699,7 +882,7 @@ app.put('/api/users/:uid', requireAdmin, async (req, res) => {
     const snap = await docRef.get();
     res.json({ id: snap.id, ...snap.data() });
   } catch (error) {
-    console.error('Fehler beim Aktualisieren des Nutzers:', error);
+    
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
