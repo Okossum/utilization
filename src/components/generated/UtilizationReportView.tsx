@@ -1520,44 +1520,28 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                       </th>
                     );
                   })}
-                  {visibleColumns.act && (
-                    <>
-                      {/* Neue Kommentar-Spalte links von Act */}
-                      <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
-                        <div className="flex items-center justify-center gap-1">
-                          <ArrowLeft className="w-4 h-4" />
-                          <MessageSquare className="w-4 h-4" />
-                        </div>
-                      </th>
-                      <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
-                        Act
-                      </th>
-                    </>
-                  )}
-                  {visibleColumns.vg && (
-                    <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
-                      VG
-                    </th>
-                  )}
-                  {visibleColumns.person && (
-                    <th className="px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">
-                      Mitarbeitende
-                    </th>
-                  )}
-                  {visibleColumns.lbs && (
-                    <th className="px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">LBS</th>
-                  )}
-                  {visibleColumns.status && (
-                    <th className="px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">Status</th>
-                  )}
-                  {visibleColumns.planningComment && (
-                    <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
-                      <div className="flex items-center justify-center gap-1">
-                        <MessageSquare className="w-4 h-4" />
-                        <ArrowRight className="w-4 h-4" />
-                      </div>
-                    </th>
-                  )}
+
+                  {/* Act-Spalte */}
+                  <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
+                    Act
+                  </th>
+                  {/* Name-Spalte zwischen Auslastung und Einsatzplan */}
+                  <th className="px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">
+                    Name
+                  </th>
+                  {/* LBS-Spalte */}
+                  <th className="px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">
+                    LBS
+                  </th>
+                  {/* Details-Spalte für Mitarbeiter-Dossier */}
+                  <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
+                    Details
+                  </th>
+                  {/* Status-Spalte */}
+                  <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
+                    Status
+                  </th>
+
                   {visibleColumns.forecastWeeks && availableWeeksFromData.slice(0, forecastWeeks).map((week, i) => {
                     // ✅ DEBUG: Zeige erste 3 Header-Wochen
                     if (i < 3) {
@@ -1640,197 +1624,44 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                           </td>
                         );
                       })}
-                                            {/* Act-Spalte mit Checkbox */}
-                      {visibleColumns.act && (
-                      <>
-                        {/* Kommentar-Spalte links von Act */}
-                        <td className={`px-2 py-1 text-sm ${actionItems[person] ? 'bg-blue-100' : 'bg-gray-50'}`}>
-                          <div className="flex items-center justify-center">
-                            {actionItems[person] && (
-                              <button
-                                type="button"
-                                onClick={() => setUtilizationCommentForPerson(person)}
-                                className="relative inline-flex items-center gap-1 text-gray-700 hover:text-blue-700 hover:bg-blue-50 rounded px-1 py-0.5"
-                                title="Auslastungs-Kommentar öffnen"
-                              >
-                                <ArrowLeft className="w-4 h-4" />
-                                <MessageSquare className="w-4 h-4" />
-                                {(dossiersByPerson[person]?.utilizationComment || '').trim() && (
-                                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-600 rounded-full" />
-                                )}
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                        {/* Act-Checkbox */}
-                        <td className={`px-2 py-1 text-sm ${
-                          actionItems[person] 
-                            ? 'bg-blue-100'
-                            : 'bg-gray-50'
-                        }`}>
-                          <div className="flex items-center justify-center">
-                            <input
-                              type="checkbox"
-                              checked={actionItems[person] || false}
-                              onChange={(e) => setActionItems(prev => ({ ...prev, [person]: e.target.checked }))}
-                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                          </div>
-                        </td>
-                      </>
-                      )}
                       
-                      {/* VG-Avatar-Spalte */}
-                      {visibleColumns.vg && (
-                      <td className={`px-2 py-1 text-sm ${
+                      
+
+                      
+
+                      
+                      
+
+                      
+
+
+                      {/* Act-Spalte */}
+                      <td className={`px-2 py-2 text-sm ${
                         actionItems[person] 
                           ? 'bg-blue-100'
                           : 'bg-gray-50'
                       }`}>
                         <div className="flex items-center justify-center">
-                          {(() => {
-                            // Hole VG-Information aus dem Einsatzplan
-                            let vgName = '';
-                            
-                            if (dataSource === 'database' && databaseData.auslastung) {
-                              // VG nicht in UtilizationData verfügbar
-                              vgName = '';
-                            } else {
-                              const einsatzplanData = uploadedFiles.einsatzplan?.data?.find((item: any) => item.person === person);
-                              vgName = einsatzplanData?.vg || '';
-                            }
-                            
-                            if (vgName && vgName.trim()) {
-                              // Extrahiere Initialen (erste Buchstaben von Vor- und Nachname)
-                              const initials = vgName
-                                .split(' ')
-                                .map(word => word.charAt(0).toUpperCase())
-                                .join('')
-                                .slice(0, 2); // Maximal 2 Initialen
-                              
-                              return (
-                                <div 
-                                  className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-medium flex items-center justify-center cursor-pointer hover:bg-blue-700 transition-colors"
-                                  title={vgName}
-                                >
-                                  {initials}
-                                </div>
-                              );
-                            }
-                            
-                            return (
-                              <div className="w-6 h-6 rounded-full bg-gray-300 text-gray-500 text-xs font-medium flex items-center justify-center">
-                                —
-                              </div>
-                            );
-                          })()}
+                          <input
+                            type="checkbox"
+                            checked={actionItems[person] || false}
+                            onChange={(e) => {
+                              const newActionItems = { ...actionItems, [person]: e.target.checked };
+                              setActionItems(newActionItems);
+                            }}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
                         </div>
                       </td>
-                      )}
-                      
-                      <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium text-gray-900 ${
-                        actionItems[person] 
-                          ? 'bg-blue-100'
-                          : 'bg-gray-50'
-                      }`}>
-                        <div className={`flex items-center gap-2 w-full ${isTerminated ? 'line-through opacity-60' : ''}`}>
-                          {personStatus[person] && (
-                            <span className={getStatusColor(personStatus[person])}>
-                              {getStatusIcon(personStatus[person])}
-                            </span>
-                          )}
-
-                          <div className="flex items-center gap-2">
-                            <span>{person}</span>
-                            {(() => {
-                              const dossier = dossiersByPerson[person] || { projectOffers: [], jiraTickets: [] };
-                              const hasOffers = Array.isArray(dossier.projectOffers) && dossier.projectOffers.length > 0;
-                              const hasJira = Array.isArray(dossier.jiraTickets) && dossier.jiraTickets.length > 0;
-                              return (hasOffers || hasJira) ? (
-                                <span title="Aktive Angebote oder Jira-Tickets" className="inline-block w-2 h-2 rounded-full bg-amber-500" />
-                              ) : null;
-                            })()}
-                          </div>
-                          <button
-                            onClick={() => openEmployeeDossier(person)}
-                            className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors ml-auto"
-                            title="Mitarbeiter-Dossier öffnen"
-                          >
-                            <User className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                      {visibleColumns.person && (
+                      {/* Name-Spalte zwischen Auslastung und Einsatzplan */}
                       <td className={`px-2 py-2 text-sm ${
                         actionItems[person] 
                           ? 'bg-blue-100'
                           : 'bg-gray-50'
                       } ${isTerminated ? 'line-through opacity-60' : ''}`}>
-                        <div className="flex items-center gap-2 w-full">
-                          {personStatus[person] && (
-                            <span className={getStatusColor(personStatus[person])}>
-                              {getStatusIcon(personStatus[person])}
-                            </span>
-                          )}
-                          {/* Student-Icon basierend auf LBS "Working Student" */}
-                          {personMeta.get(person)?.lbs?.toLowerCase().includes('working student') && (
-                            <span className="text-green-600" title="Working Student">
-                              <GraduationCap className="w-4 h-4" />
-                            </span>
-                          )}
-                          {/* Chef-Icon für Führungskräfte basierend auf LBS */}
-                          {(personMeta.get(person)?.lbs?.toLowerCase().includes('competence center lead - senior manager') || 
-                            personMeta.get(person)?.lbs?.toLowerCase().includes('team lead - manager')) && (
-                            <span className="text-blue-600" title="Führungskraft">
-                              <ChefHat className="w-4 h-4" />
-                            </span>
-                          )}
-                          {/* Baby-Icon für Elternzeit */}
-                          {personStatus[person] === 'parental_leave' && (
-                            <span className="text-pink-600" title="Elternzeit">
-                              <Baby className="w-4 h-4" />
-                            </span>
-                          )}
-                          {/* Herz-Icon für Krankheit */}
-                          {personStatus[person] === 'sick' && (
-                            <span className="text-red-600" title="Krank">
-                              <Heart className="w-4 h-4" />
-                            </span>
-                          )}
-                          {/* Thermometer-Icon für Urlaub */}
-                          {personStatus[person] === 'vacation' && (
-                            <span className="text-orange-600" title="Urlaub">
-                              <Thermometer className="w-4 h-4" />
-                            </span>
-                          )}
-                          {/* UserX-Icon für Kündigung */}
-                          {personStatus[person] === 'termination' && (
-                            <span className="text-gray-600" title="Kündigung">
-                              <UserX className="w-4 h-4" />
-                            </span>
-                          )}
-                          {/* VG-Überlappung-Indikator */}
-                          {(() => {
-                            const dossier = dossiersByPerson[person] || { projectOffers: [], jiraTickets: [] };
-                            const hasOffers = (dossier.projectOffers || []).length > 0;
-                            const hasJira = (dossier.jiraTickets || []).length > 0;
-                            
-                            return (hasOffers || hasJira) ? (
-                              <span title="Aktive Angebote oder Jira-Tickets" className="inline-block w-2 h-2 rounded-full bg-amber-500" />
-                            ) : null;
-                          })()}
-                        </div>
-                        <button
-                          onClick={() => openEmployeeDossier(person)}
-                          className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors ml-auto"
-                          title="Mitarbeiter-Dossier öffnen"
-                        >
-                          <User className="w-4 h-4" />
-                        </button>
+                        <span className="font-medium text-gray-900">{person}</span>
                       </td>
-                      )}
-                      
-                      {visibleColumns.lbs && (
+                      {/* LBS-Spalte */}
                       <td className={`px-2 py-2 text-sm ${
                         actionItems[person] 
                           ? 'bg-blue-100'
@@ -1842,39 +1673,37 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                           <span className="text-xs text-gray-400">—</span>
                         )}
                       </td>
-                      )}
-                      
-                      {visibleColumns.status && (
+                      {/* Details-Spalte für Mitarbeiter-Dossier */}
                       <td className={`px-2 py-2 text-sm ${
                         actionItems[person] 
                           ? 'bg-blue-100'
                           : 'bg-gray-50'
                       }`}>
-                        <StatusLabelSelector
-                          person={person}
-                          value={personStatus[person]}
-                          onChange={(status) => setPersonStatus(prev => ({ ...prev, [person]: status }))}
-                        />
-                      </td>
-                      )}
-                      {visibleColumns.planningComment && (
-                      <td className={`px-2 py-1 text-sm ${actionItems[person] ? 'bg-blue-100' : 'bg-gray-50'}`}>
                         <div className="flex items-center justify-center">
                           <button
-                            type="button"
-                            onClick={() => setPlanningCommentForPerson(person)}
-                            className="relative inline-flex items-center gap-1 text-gray-700 hover:text-blue-700 hover:bg-blue-50 rounded px-1 py-0.5"
-                            title="Einsatzplan-Kommentar öffnen"
+                            onClick={() => openEmployeeDossier(person)}
+                            className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                            title="Mitarbeiter-Dossier öffnen"
                           >
-                            <MessageSquare className="w-4 h-4" />
-                            <ArrowRight className="w-4 h-4" />
-                            {(dossiersByPerson[person]?.planningComment || '').trim() && (
-                              <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-600 rounded-full" />
-                            )}
+                            <User className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
-                      )}
+                      {/* Status-Spalte */}
+                      <td className={`px-2 py-2 text-sm ${
+                        actionItems[person] 
+                          ? 'bg-blue-100'
+                          : 'bg-gray-50'
+                      }`}>
+                        <div className="flex items-center justify-center">
+                          <StatusLabelSelector
+                            person={person}
+                            value={personStatus[person]}
+                            onChange={(status) => setPersonStatus(prev => ({ ...prev, [person]: status }))}
+                          />
+                        </div>
+                      </td>
+
                       {visibleColumns.forecastWeeks && availableWeeksFromData.slice(0, forecastWeeks).map((week, i) => {
                         const weekData = personData.find(item => item.week === week);
                         const utilization = weekData?.utilization;

@@ -1,0 +1,140 @@
+---
+description:general rules
+globs:# CURSOR AI REGELN - NIEMALS IGNORIEREN
+# Diese Regeln gelten für JEDEN Prompt und JEDE Interaktion
+
+## 🚨 KRITISCHE SICHERHEITSREGELN
+
+### Datei-Operationen
+- NIEMALS Dateien löschen, verschieben oder umbenennen ohne explizite Bestätigung
+- IMMER fragen: "Soll ich diese Änderungen durchführen?" vor strukturellen Änderungen
+- Vor dem Markieren von Dateien als "deprecated": Vollständige Dependency-Analyse durchführen
+- Rechtlich erforderliche Dateien (Impressum, Datenschutz, etc.) sind NIEMALS veraltet oder löschbar
+
+### Code-Analyse vor Aktion
+- ERST analysieren, DANN vorschlagen, DANN handeln
+- Verwende grep/search um Abhängigkeiten zu finden bevor du Komponenten als ungenutzt einstufst
+- Prüfe alle Import-Statements, Routing-Konfigurationen und dynamische Imports
+
+## 📋 ARBEITSWEISE
+
+### Mehrstufiger Ansatz bei komplexen Aufgaben
+1. **Analyse-Phase**: Vollständige Bestandsaufnahme ohne Änderungen
+2. **Planungs-Phase**: Detaillierte Vorschläge mit Begründung
+3. **Validierungs-Phase**: Warten auf User-Freigabe
+4. **Umsetzungs-Phase**: Schrittweise Implementierung
+5. Nicht einfach automatisch einen Commit machen, sondern vorher Fragen
+
+### Bei Refactoring IMMER:
+- Dependency-Map erstellen
+- Alle Verwendungen einer Komponente auflisten
+- Potential breaking changes identifizieren
+- Alternative Lösungswege aufzeigen
+- Vorher einen Commit in einem GitHub Branch machen. 
+- Fragen, ob du dafür einen neuen Branch erstellen sollst.
+
+## 🎯 PROJEKTSPEZIFISCHE REGELN
+
+### React/TypeScript Projekt
+- Komponenten in `src/components/` sind aktiv bis Gegenteil bewiesen
+- UI-Komponenten können in mehreren Bereichen verwendet werden
+- Timeline, Cookie-Einstellungen und rechtliche Komponenten NIEMALS als deprecated markieren
+
+### Code-Qualität
+- TypeScript-Typen immer korrekt definieren
+- Komponenten-Props vollständig typisieren
+- Performance-Optimierungen nur nach Bestätigung
+
+## 💬 KOMMUNIKATIONSREGELN
+
+### Antwort-Format
+- Beginne komplexe Antworten mit: "Ich analysiere zuerst..."
+- Strukturiere Antworten mit klaren Überschriften
+- Verwende ✅ für sichere Aktionen, ⚠️ für potentielle Probleme
+- Erkläre WARUM du etwas vorschlägst
+
+### Bei Unsicherheit
+- "Ich bin nicht sicher, ob..." statt falscher Annahmen
+- Biete Validierungsschritte an
+- Frage nach spezifischen Details wenn unklar
+
+## 🔍 ANALYSE-CHECKLISTE
+
+Vor jeder größeren Änderung prüfe:
+- [ ] Wird die Datei irgendwo importiert?
+- [ ] Steht sie in Routing-Konfigurationen?
+- [ ] Gibt es dynamische Imports oder lazy loading?
+- [ ] Ist sie in package.json oder Config-Dateien referenziert?
+- [ ] Handelt es sich um rechtlich erforderliche Inhalte?
+- [ ] Wird sie in Tests verwendet?
+
+## ⚡ PROMPTS RICHTIG INTERPRETIEREN
+
+### Wenn User sagt "lösche veraltete Dateien":
+1. Erst analysieren welche Dateien wirklich ungenutzt sind
+2. Liste mit Begründung erstellen
+3. User-Bestätigung einholen
+4. Nie rechtliche/kritische Dateien einbeziehen
+
+### Wenn User sagt "strukturiere um":
+1. Aktuellen Zustand dokumentieren
+2. Verbesserungsvorschläge mit Vor/Nachteilen
+3. Migrations-Plan erstellen
+4. Schrittweise Umsetzung vorschlagen
+
+### Wenn User sagt "optimiere":
+1. Performance-Analyse durchführen
+2. Konkrete Bottlenecks identifizieren
+3. Messbare Verbesserungen vorschlagen
+4. Risiken und Aufwand bewerten
+
+## 🛡️ FEHLER-VERMEIDUNG
+
+### Häufige Fallen:
+- Annahme dass ähnlich aussehende Dateien identisch sind
+- Pattern-Matching statt echter Dependency-Analyse
+- Übersehen von dynamischen Imports
+- Ignorieren von rechtlichen Anforderungen
+
+### Sicherheits-Fragen die ich mir stellen muss:
+- "Könnte diese Änderung die Website kaputt machen?"
+- "Habe ich alle Verwendungsorte gefunden?"
+- "Ist das eine Annahme oder ein Fakt?"
+- "Sollte ich den User nochmal fragen?"
+
+## 🎨 CODE-STIL PRÄFERENZEN
+
+### React/TypeScript:
+- Funktionale Komponenten bevorzugen
+- TypeScript strict mode befolgen
+- Konsistente Namenskonventionen
+- Sinnvolle Kommentare für komplexe Logik
+
+### Ordnerstruktur:
+- Logische Gruppierung nach Funktionalität
+- Klare Trennung von UI, Logic und Data
+- Konsistente Namensgebung
+
+## 🔄 FEEDBACK-LOOP
+
+Nach jeder größeren Änderung:
+1. "Funktioniert alles wie erwartet?"
+2. "Soll ich weitere Optimierungen vornehmen?"
+3. "Gibt es andere Bereiche die angepasst werden sollten?"
+
+### Deployments:
+1. Nur wenn ich aktive einen Commit in GitHub angestoßen habe, 
+soll ein Deployment gemacht werde.
+
+### Qusetions
+1. wenn ich frage hast du das verstanden, soll unr eine Antwort gegeben werden, aber NICHTS am code geändert werden, bevor ich nichjt gesagt habe das es getan werden soll.
+
+---
+
+# WICHTIG: Diese Regeln gelten für JEDEN Prompt
+# Bei Konflikten zwischen User-Anfrage und Sicherheitsregeln: 
+# IMMER erst nachfragen und Risiken erklären
+
+
+alwaysApply: true
+---
