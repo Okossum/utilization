@@ -871,7 +871,7 @@ app.post('/api/employee-dossier', requireAuth, async (req, res) => {
           name: String(skill.name || skill.skillName || ''),
           level: Math.max(0, Math.min(5, Number(skill.level) || 0))
         })).filter(skill => skill.skillId && skill.name)
-      : [];
+      : null; // ⚠️ FIX: null statt [] um zu signalisieren, dass Skills nicht verwaltet werden sollen
 
     const sanitizedExcelData = (dossierData.excelData && typeof dossierData.excelData === 'object')
       ? removeUndefinedDeep(dossierData.excelData)
@@ -892,7 +892,8 @@ app.post('/api/employee-dossier', requireAuth, async (req, res) => {
       simpleProjects: Array.isArray(dossierData.simpleProjects) ? dossierData.simpleProjects : [],
       projectOffers: Array.isArray(dossierData.projectOffers) ? dossierData.projectOffers : [],
       jiraTickets: Array.isArray(dossierData.jiraTickets) ? dossierData.jiraTickets : [],
-      skills: normalizedSkills, // Verwende die normalisierten Skills
+      // ⚠️ FIX: Skills nur setzen wenn explizit übergeben, sonst bestehende Skills beibehalten
+      ...(normalizedSkills !== null && { skills: normalizedSkills }),
       excelData: sanitizedExcelData,
       // Neue Felder
       careerLevel: dossierData.careerLevel || '',

@@ -171,7 +171,7 @@ export function EmployeeDossierModal({
           // Skills aus Firebase haben Vorrang, dann lokale DB, dann employee
           skills: firebaseSkills.length > 0 
             ? firebaseSkills.map(fs => ({ skillId: fs.skillId, name: fs.skillName, level: fs.level }))
-            : Array.isArray(savedDossier?.skills) ? savedDossier?.skills : (employee.skills || []),
+            : Array.isArray(savedDossier?.skills) ? savedDossier.skills : (employee.skills || []),
           // Speichere Excel-Daten für Referenz
           excelData: excelData
         };
@@ -226,13 +226,12 @@ export function EmployeeDossierModal({
       }
 
       // Speichere alle bearbeitbaren Felder in der DB
-      // Konvertiere zu kompatiblem Format für DatabaseService
+      // ⚠️ KRITISCH: Skills NICHT überschreiben - die werden separat über saveEmployeeSkills gespeichert
       const dossierData = {
         uid: formData.name,
         displayName: formData.name,
         email: formData.email || '',
-        // Legacy-Felder für API-Kompatibilität
-        skills: formData.skills?.map(s => s.name) || [],
+        // Legacy-Felder für API-Kompatibilität - aber OHNE Skills
         experience: 0,
         // Alle anderen Daten als dynamische Felder
         phone: formData.phone,
@@ -240,6 +239,7 @@ export function EmployeeDossierModal({
         weaknesses: formData.weaknesses,
         comments: formData.comments,
         utilizationComment: formData.utilizationComment,
+        planningComment: planningComment, // ✅ FIX: Planning Comment hinzugefügt
         travelReadiness: formData.travelReadiness,
         projectHistory: formData.projectHistory,
 
@@ -253,6 +253,7 @@ export function EmployeeDossierModal({
         team: formData.team,
         competenceCenter: formData.competenceCenter,
         lineOfBusiness: formData.lineOfBusiness
+        // ⚠️ SKILLS NICHT HIER - die werden separat gespeichert!
       };
 
       // Clientseitige Sanitisierung: entferne undefined aus excelData und projectHistory
@@ -426,6 +427,11 @@ export function EmployeeDossierModal({
                 employeeId={formData.id}
                 employeeName={formData.name}
                 onSkillsChange={(skills) => {
+                  // ⚠️ FIX: Verhindere Überschreibung mit leeren Skills beim initialen Laden
+                  if (skills.length === 0 && formData.skills && formData.skills.length > 0) {
+                    return; // Breche ab, überschreibe nicht mit leeren Skills
+                  }
+                  
                   // Konvertiere zu kompatiblem Format für das bestehende Interface
                   const convertedSkills = skills.map(s => ({
                     skillId: s.skillId,

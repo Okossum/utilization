@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Mail, Phone, MapPin, Clock, ChevronDown, ChevronUp, User } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Mail, Phone, MapPin, Clock, ChevronDown, ChevronUp, User, Briefcase } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAssignments } from '../../contexts/AssignmentsContext';
 interface Employee {
   id: string;
   name: string;
@@ -16,8 +17,20 @@ interface Employee {
   profileImage?: string;
   // Neue Dossier-Felder
   careerLevel?: string;           // LBS
+  competenceCenter?: string;      // CC
+  team?: string;                  // Team
   strengths?: string;             // Stärken
   weaknesses?: string;            // Schwächen
+  roles?: string[];               // Rollen
+  currentProjectAssignments?: Array<{  // Aktuelle Projektzuordnungen
+    id: string;
+    projectName: string;
+    customer: string;
+    role: string;
+    startDate?: string;
+    endDate?: string;
+    workload?: number;
+  }>;
   projectHistory?: Array<{        // Projekt Kurzlebenslauf
     id: string;
     projectName: string;
@@ -45,6 +58,32 @@ export const EmployeeCard = ({
   onToggleActive
 }: EmployeeCardProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [assignments, setAssignments] = useState<any[]>([]);
+  const [assignmentsLoading, setAssignmentsLoading] = useState(false);
+  
+  // Assignments Context
+  const { getAssignmentsForEmployee } = useAssignments();
+  
+  // Lade Assignments für diesen Mitarbeiter
+  useEffect(() => {
+    const loadAssignments = async () => {
+      if (!employee.name) return;
+      
+      setAssignmentsLoading(true);
+      try {
+        const assignmentsList = await getAssignmentsForEmployee(employee.name);
+        setAssignments(assignmentsList || []);
+        console.log('🔍 Assignments geladen für', employee.name, ':', assignmentsList);
+      } catch (error) {
+        console.error('Fehler beim Laden der Assignments:', error);
+        setAssignments([]);
+      } finally {
+        setAssignmentsLoading(false);
+      }
+    };
+    
+    loadAssignments();
+  }, [employee.name, getAssignmentsForEmployee]);
   const getAvailabilityColor = (availability: string) => {
     switch (availability) {
       case 'Available':
@@ -121,6 +160,26 @@ export const EmployeeCard = ({
               <User className="w-4 h-4 text-slate-400" />
               <span className="text-slate-600 text-sm">
                 <span className="font-medium">LBS:</span> {employee.careerLevel}
+              </span>
+            </div>
+          )}
+
+          {/* Competence Center */}
+          {employee.competenceCenter && (
+            <div className="flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-slate-400" />
+              <span className="text-slate-600 text-sm">
+                <span className="font-medium">CC:</span> {employee.competenceCenter}
+              </span>
+            </div>
+          )}
+
+          {/* Team */}
+          {employee.team && (
+            <div className="flex items-center gap-2">
+              <User className="w-4 h-4 text-slate-400" />
+              <span className="text-slate-600 text-sm">
+                <span className="font-medium">Team:</span> {employee.team}
               </span>
             </div>
           )}
@@ -222,18 +281,148 @@ export const EmployeeCard = ({
           </div>
         )}
 
+        {/* Rollen */}
+        {employee.roles && employee.roles.length > 0 && (
+          <div className="mb-4">
+            <h4 className="text-sm font-semibold text-cyan-700 mb-2 flex items-center gap-2">
+              <span className="w-2 h-2 bg-cyan-500 rounded-full"></span>
+              Rollen
+            </h4>
+            <div className="flex flex-wrap gap-2">
+              {employee.roles.slice(0, 4).map(role => (
+                <span key={role} className="px-3 py-1 bg-cyan-100 text-cyan-700 rounded-lg text-sm font-medium border border-cyan-200">
+                  {role}
+                </span>
+              ))}
+              {employee.roles.length > 4 && (
+                <span className="px-3 py-1 bg-cyan-50 text-cyan-600 rounded-lg text-sm">
+                  +{employee.roles.length - 4} weitere
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Aktuelle Projektzuordnungen aus AssignmentsContext */}
+        {(assignments.length > 0 || assignmentsLoading) && (
+          <div className="mb-4">
+            <h4 className="text-sm font-semibold text-indigo-700 mb-2 flex items-center gap-2">
+              <Briefcase className="w-4 h-4 text-indigo-600" />
+              {assignmentsLoading ? 'Lade Projektzuordnungen...' : `Projektzuordnungen (${assignments.length})`}
+            </h4>
+            {assignmentsLoading ? (
+              <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600 mx-auto mb-2"></div>
+                <span className="text-xs text-indigo-600">Lade...</span>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {assignments.slice(0, 3).map((assignment) => (
+                  <div key={assignment.id} className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium text-indigo-900">
+                        {assignment.projectName || assignment.projectId}
+                      </span>
+                      {assignment.plannedAllocationPct && (
+                        <span className="text-xs text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full">
+                          {assignment.plannedAllocationPct}% Auslastung
+                        </span>
+                      )}
+                    </div>
+                    {assignment.customer && (
+                      <div className="text-xs text-indigo-700 mb-1">{assignment.customer}</div>
+                    )}
+                    <div className="flex items-center justify-between">
+                      {assignment.role && (
+                        <span className="text-xs text-indigo-600 bg-indigo-100 px-2 py-1 rounded">
+                          {assignment.role}
+                        </span>
+                      )}
+                      {assignment.status && (
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          assignment.status === 'active' ? 'bg-green-100 text-green-700' :
+                          assignment.status === 'planned' ? 'bg-blue-100 text-blue-700' :
+                          assignment.status === 'prospect' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {assignment.status}
+                        </span>
+                      )}
+                    </div>
+                    {(assignment.startDate || assignment.endDate) && (
+                      <div className="text-xs text-indigo-600 mt-1">
+                        {assignment.startDate || '—'} → {assignment.endDate || '—'}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {assignments.length > 3 && (
+                  <div className="text-xs text-indigo-600 text-center py-2">
+                    +{assignments.length - 3} weitere Zuordnungen
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Legacy: Aktuelle Projektzuordnungen (falls aus Dossier-Daten) */}
+        {employee.currentProjectAssignments && employee.currentProjectAssignments.length > 0 && assignments.length === 0 && (
+          <div className="mb-4">
+            <h4 className="text-sm font-semibold text-green-700 mb-2 flex items-center gap-2">
+              <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+              Aktuelle Projektzuordnungen ({employee.currentProjectAssignments.length})
+            </h4>
+            <div className="space-y-2">
+              {employee.currentProjectAssignments.slice(0, 3).map((assignment, index) => (
+                <div key={assignment.id} className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium text-green-900">{assignment.projectName}</span>
+                    {assignment.workload && (
+                      <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                        {assignment.workload}% Auslastung
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-green-700 mb-1">{assignment.customer}</div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
+                      {assignment.role}
+                    </span>
+                    {assignment.startDate && assignment.endDate && (
+                      <span className="text-xs text-green-600">
+                        {assignment.startDate} - {assignment.endDate}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {employee.currentProjectAssignments.length > 3 && (
+                <div className="text-xs text-green-600 text-center py-2">
+                  +{employee.currentProjectAssignments.length - 3} weitere Zuordnungen
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Fähigkeiten */}
         <div className="mb-4">
-          <h4 className="text-sm font-semibold text-slate-700 mb-2">
-            <span>Fähigkeiten</span>
+          <h4 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+            <span className="w-2 h-2 bg-slate-500 rounded-full"></span>
+            Fähigkeiten & Kompetenzen
           </h4>
           <div className="flex flex-wrap gap-2">
-            {employee.skills.slice(0, 3).map(skill => <span key={skill} className="px-3 py-1 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium">
-                <span>{skill}</span>
-              </span>)}
-            {employee.skills.length > 3 && <span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-lg text-sm">
-                <span>+{employee.skills.length - 3} mehr</span>
-              </span>}
+            {employee.skills.slice(0, 6).map(skill => (
+              <span key={skill} className="px-3 py-1 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium border border-slate-200">
+                {skill}
+              </span>
+            ))}
+            {employee.skills.length > 6 && (
+              <span className="px-3 py-1 bg-slate-50 text-slate-500 rounded-lg text-sm">
+                +{employee.skills.length - 6} weitere
+              </span>
+            )}
           </div>
         </div>
 

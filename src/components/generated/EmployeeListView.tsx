@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { EmployeeCard } from './EmployeeCard';
 import { EmployeeUploadModal } from './EmployeeUploadModal';
 import DatabaseService from '../../services/database';
+import { useAssignments } from '../../contexts/AssignmentsContext';
 
 // ✅ NEU: Props für Action-Items aus der Auslastungs-Übersicht
 interface EmployeeListViewProps {
@@ -24,8 +25,20 @@ interface Employee {
   profileImage?: string;
   // Neue Dossier-Felder
   careerLevel?: string;           // LBS
+  competenceCenter?: string;      // CC
+  team?: string;                  // Team
   strengths?: string;             // Stärken
   weaknesses?: string;            // Schwächen
+  roles?: string[];               // Rollen
+  currentProjectAssignments?: Array<{  // Aktuelle Projektzuordnungen
+    id: string;
+    projectName: string;
+    customer: string;
+    role: string;
+    startDate?: string;
+    endDate?: string;
+    workload?: number;
+  }>;
   projectHistory?: Array<{        // Projekt Kurzlebenslauf
     id: string;
     projectName: string;
@@ -124,6 +137,9 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
+  // Assignments Context für Projektzuordnungen
+  const { getAssignmentsForEmployee } = useAssignments();
+  
   // Lade echte Dossier-Daten
   useEffect(() => {
     const loadEmployeeDossiers = async () => {
@@ -131,26 +147,53 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
         setIsLoading(true);
         const dossiers = await DatabaseService.getAllEmployeeDossiers();
         
+        console.log('🔍 DEBUG: Geladene Dossiers:', dossiers);
+        console.log('🔍 DEBUG: Anzahl Dossiers:', dossiers?.length || 0);
+        console.log('🔍 DEBUG: Erstes Dossier:', dossiers?.[0]);
+        
+        // Lade auch Einsatzplan-Daten für CC und Team
+        const einsatzplanData = await DatabaseService.getEinsatzplan();
+        const einsatzplanMap = new Map();
+        einsatzplanData?.forEach(entry => {
+          if (entry.person) {
+            einsatzplanMap.set(entry.person, entry);
+          }
+        });
+        
+        console.log('🔍 DEBUG: Einsatzplan geladen:', einsatzplanData?.length || 0, 'Einträge');
+
         // Konvertiere Dossier-Daten zu Employee-Format
-        const enrichedEmployees: Employee[] = dossiers.map(dossier => ({
-          id: dossier.employeeId || dossier.id || dossier.name,
-          name: dossier.name || dossier.displayName || 'Unbekannt',
-          role: dossier.careerLevel || 'Keine Angabe',
-          department: dossier.team || dossier.competenceCenter || 'Keine Angabe',
-          skills: Array.isArray(dossier.skills) ? dossier.skills.map(s => typeof s === 'string' ? s : s.name || s.skillName || 'Unbekannt') : [],
-          experience: dossier.careerLevel || 'Keine Angabe',
-          availability: 'Available', // Standard, könnte später erweitert werden
-          comments: dossier.comments || dossier.utilizationComment || 'Keine Kommentare',
-          email: dossier.email || 'Keine E-Mail',
-          phone: dossier.phone || 'Kein Telefon',
-          isActive: dossier.isActive !== undefined ? dossier.isActive : true, // Lade ACT-Status aus der DB
-          // Neue Dossier-Felder
-          careerLevel: dossier.careerLevel,
-          strengths: dossier.strengths,
-          weaknesses: dossier.weaknesses,
-          projectHistory: Array.isArray(dossier.projectHistory) ? dossier.projectHistory : [],
-          projectOffers: Array.isArray(dossier.projectOffers) ? dossier.projectOffers : [],
-        }));
+        const enrichedEmployees: Employee[] = dossiers.map(dossier => {
+          const einsatzplanEntry = einsatzplanMap.get(dossier.name);
+          
+          return {
+            id: dossier.employeeId || dossier.id || dossier.name,
+            name: dossier.name || dossier.displayName || 'Unbekannt',
+            role: dossier.careerLevel || 'Keine Angabe',
+            department: dossier.team || dossier.competenceCenter || 'Keine Angabe',
+            skills: Array.isArray(dossier.skills) ? dossier.skills.map(s => typeof s === 'string' ? s : s.name || s.skillName || 'Unbekannt') : [],
+            experience: dossier.careerLevel || 'Keine Angabe',
+            availability: 'Available', // Standard, könnte später erweitert werden
+            comments: dossier.comments || dossier.utilizationComment || 'Keine Kommentare',
+            email: dossier.email || 'Keine E-Mail',
+            phone: dossier.phone || 'Kein Telefon',
+            isActive: dossier.isActive !== undefined ? dossier.isActive : true,
+            // Neue Dossier-Felder aus Mitarbeiter-Dossier
+            careerLevel: dossier.careerLevel || einsatzplanEntry?.lbs,
+            competenceCenter: einsatzplanEntry?.cc || dossier.competenceCenter,
+            team: einsatzplanEntry?.team || dossier.team,
+            strengths: dossier.strengths,
+            weaknesses: dossier.weaknesses,
+            roles: Array.isArray(dossier.roles) ? dossier.roles : [],
+            currentProjectAssignments: Array.isArray(dossier.currentProjectAssignments) ? dossier.currentProjectAssignments : [],
+            projectHistory: Array.isArray(dossier.projectHistory) ? dossier.projectHistory : [],
+            projectOffers: Array.isArray(dossier.projectOffers) ? dossier.projectOffers : [],
+          };
+        });
+        
+        console.log('🔍 DEBUG: Transformierte Employees:', enrichedEmployees);
+        console.log('🔍 DEBUG: Anzahl transformierte Employees:', enrichedEmployees.length);
+        console.log('🔍 DEBUG: Erster Employee:', enrichedEmployees[0]);
         
         setEmployees(enrichedEmployees);
       } catch (error) {
