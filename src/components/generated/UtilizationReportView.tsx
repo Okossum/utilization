@@ -1481,6 +1481,10 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                   <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
                     Act
                   </th>
+                  {/* FK-Spalte für Führungskraft */}
+                  <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
+                    FK
+                  </th>
                   {/* Name-Spalte zwischen Auslastung und Einsatzplan */}
                   <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
                     Name
@@ -1607,6 +1611,31 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                             }}
                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                           />
+                        </div>
+                      </td>
+                      {/* FK-Spalte für Führungskraft */}
+                      <td className={`px-0.5 py-0.5 text-sm ${
+                        actionItems[person] 
+                          ? 'bg-blue-100'
+                          : 'bg-gray-50'
+                      }`} style={{padding: '2px 2px'}}>
+                        <div className="flex items-center justify-center">
+                          {(() => {
+                            const manager = personMeta.get(person)?.manager;
+                            if (!manager) {
+                              return (
+                                <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center text-xs text-gray-600 font-medium" title="Keine Führungskraft">
+                                  X
+                                </div>
+                              );
+                            }
+                            const initials = manager.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                            return (
+                              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-xs text-white font-medium" title={manager}>
+                                {initials}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </td>
                       {/* Name-Spalte zwischen Auslastung und Einsatzplan */}
