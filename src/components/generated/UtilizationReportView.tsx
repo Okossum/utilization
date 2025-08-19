@@ -1449,6 +1449,29 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
             >
               🔍 Collections prüfen
             </button>
+            
+            <button
+              onClick={() => {
+                console.log('🔍 DEBUG: Einsatzplan-Daten Struktur prüfen...');
+                if (databaseData.einsatzplan && databaseData.einsatzplan.length > 0) {
+                  const firstRow = databaseData.einsatzplan[0];
+                  console.log('📋 Erste Einsatzplan-Zeile:', firstRow);
+                  console.log('🔑 Verfügbare Felder:', Object.keys(firstRow));
+                  if (firstRow.values) {
+                    console.log('📊 Values-Objekt:', firstRow.values);
+                    console.log('🔑 Verfügbare Wochen-Schlüssel:', Object.keys(firstRow.values));
+                    console.log('📈 Erste 5 Wochen-Werte:', Object.entries(firstRow.values).slice(0, 5));
+                  }
+                  
+                  alert(`✅ Einsatzplan-Daten gefunden!\n📊 ${databaseData.einsatzplan.length} Einträge\n👤 Erste Person: ${firstRow.person}\n🔑 Verfügbare Felder: ${Object.keys(firstRow).join(', ')}\n\n💡 Schau in die Console (F12) für Details!`);
+                } else {
+                  alert('❌ Keine Einsatzplan-Daten verfügbar!');
+                }
+              }}
+              className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
+            >
+              🔍 Einsatzplan-Struktur
+            </button>
           </div>
           <div className="mt-4 text-sm text-gray-600">
             💡 <strong>Anleitung:</strong> 1) Erst "DB Status prüfen", 2) Falls leer → Excel-Dateien hochladen, 3) "Konsolidierung starten", 4) "DB neu laden"
@@ -1540,19 +1563,6 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
             <table className="w-full">
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
-                  {visibleColumns.avg4 && (
-                    <th className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-12">
-                      Ø {availableWeeksFromData.slice(0, 4).length > 0 ? `${availableWeeksFromData[0]}-${availableWeeksFromData[3] || availableWeeksFromData.slice(-1)[0]}` : 'Ø'}
-                    </th>
-                  )}
-                  {/* 8 Wochen ab der aktuellen KW */}
-                  {visibleColumns.historyWeeks && availableWeeksFromData.map((week, i) => {
-                    return (
-                      <th key={`forecast-${i}`} className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-12">
-                        {week}
-                      </th>
-                    );
-                  })}
 
                   {/* Act-Spalte */}
                   <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
@@ -1592,67 +1602,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                   }
                   return (
                     <tr key={person} className="hover:bg-gray-50">
-                      {/* Durchschnitt der ältesten 4 Wochen */}
-                      {visibleColumns.avg4 && (
-                      <td className="px-1 py-2 text-center text-xs bg-gray-100">
-                        {(() => {
-                          const oldestWeeks = Array.from({ length: 4 }, (_, i) => {
-                            const weekKey = availableWeeksFromData[i];
-                            const weekData = personData.find(item => item.week === weekKey);
-                            return weekData?.utilization;
-                          }).filter(util => util !== null && util !== undefined);
-                          
-                          if (oldestWeeks.length === 0) return '—';
-                          
-                          const average = Math.round(oldestWeeks.reduce((sum, util) => sum + util!, 0) / oldestWeeks.length);
-                          let bgColor = 'bg-gray-100';
-                          if (average > 90) bgColor = 'bg-green-100';
-                          else if (average > 80) bgColor = 'bg-yellow-100';
-                          else bgColor = 'bg-red-100';
-                          
-                          return (
-                            <span className={`inline-block px-2 py-1 rounded ${bgColor}`}>
-                              <span className={`flex items-center justify-center gap-1 ${isTerminated ? 'line-through opacity-60' : ''}`}>
-                                {average}%
-                                {average > 100 && <Star className="w-3 h-3 text-yellow-500" />}
-                              </span>
-                            </span>
-                          );
-                        })()}
-                      </td>
-                      )}
-                      {/* 8 Wochen ab der aktuellen KW */}
-                      {visibleColumns.historyWeeks && availableWeeksFromData.map((week, i) => {
-                        const weekData = personData.find(item => item.week === week);
-                        const utilization = weekData?.utilization;
-                        let bgColor = 'bg-gray-100';
-                        if (utilization !== null && utilization !== undefined) {
-                          if (utilization > 90) bgColor = 'bg-green-100';
-                          else if (utilization > 80) bgColor = 'bg-yellow-100';
-                          else bgColor = 'bg-red-100';
-                        }
-                        return (
-                          <td key={`forecast-${i}`} className={`px-1 py-2 text-center text-xs ${bgColor}`}>
-                            {utilization !== null && utilization !== undefined ? (
-                              <span className={`flex items-center justify-center gap-1 ${isTerminated ? 'line-through opacity-60' : ''}`}>
-                                {utilization}%
-                                {utilization > 100 && <Star className="w-3 h-3 text-yellow-500" />}
-                              </span>
-                            ) : (
-                              <span className={`${isTerminated ? 'line-through opacity-60' : ''}`}>—</span>
-                            )}
-                          </td>
-                        );
-                      })}
-                      
-                      
-
-                      
-
-                      
-                      
-
-                      
+                      {/* Auslastung-Spalten entfernt */}
 
 
                       {/* Act-Spalte */}
