@@ -852,7 +852,30 @@ app.get('/api/employee-dossier/:employeeId', requireAuth, async (req, res) => {
     
     const snap = await db.collection('employeeDossiers').doc(String(employeeId)).get();
     if (!snap.exists) {
-      return res.status(404).json({ error: 'Employee Dossier nicht gefunden' });
+      const defaultDossier = {
+        id: String(employeeId),
+        employeeId: String(employeeId),
+        name: String(employeeId),
+        email: '',
+        phone: '',
+        strengths: '',
+        weaknesses: '',
+        comments: '',
+        utilizationComment: '',
+        planningComment: '',
+        travelReadiness: '',
+        projectHistory: [],
+        projectOffers: [],
+        jiraTickets: [],
+        skills: [],
+        excelData: {},
+        careerLevel: '',
+        manager: '',
+        team: '',
+        competenceCenter: '',
+        lineOfBusiness: ''
+      };
+      return res.json(defaultDossier);
     }
     
     res.json({ id: snap.id, ...snap.data() });
@@ -883,11 +906,11 @@ app.get('/api/employee-skills/:employeeName', requireAuth, async (req, res) => {
     
     const snap = await db.collection('employeeDossiers').doc(String(employeeName)).get();
     if (!snap.exists) {
-      return res.status(404).json({ error: 'Employee Dossier nicht gefunden' });
+      return res.json([]);
     }
     
     const data = snap.data();
-    res.json(data.skills || []);
+    res.json(Array.isArray(data.skills) ? data.skills : []);
   } catch (error) {
     console.error('❌ Fehler beim Laden der Employee Skills:', error);
     res.status(500).json({ error: 'Interner Server-Fehler' });
@@ -907,13 +930,21 @@ app.post('/api/employee-skills/:employeeName', requireAuth, async (req, res) => 
     const snap = await docRef.get();
     
     if (!snap.exists) {
-      return res.status(404).json({ error: 'Employee Dossier nicht gefunden' });
+      await docRef.set({
+        employeeId: String(employeeName),
+        name: String(employeeName),
+        email: '',
+        skills,
+        projectHistory: [],
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+    } else {
+      await docRef.update({
+        skills,
+        updatedAt: FieldValue.serverTimestamp()
+      });
     }
-    
-    await docRef.update({
-      skills,
-      updatedAt: FieldValue.serverTimestamp()
-    });
     
     res.json({ success: true, message: 'Skills erfolgreich gespeichert' });
   } catch (error) {
