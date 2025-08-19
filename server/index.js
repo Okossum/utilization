@@ -1000,6 +1000,7 @@ app.get('/api/employee-skills/:employeeName', requireAuth, async (req, res) => {
   try {
     const { employeeName } = req.params;
     console.log(`🔍 GET /api/employee-skills/${employeeName} - Lade Skills`);
+    console.log(`🔍 DEBUG: Suche nach Dokument-ID: "${employeeName}"`);
     
     const snap = await db.collection('employeeDossiers').doc(String(employeeName)).get();
     if (!snap.exists) {
@@ -1008,6 +1009,7 @@ app.get('/api/employee-skills/:employeeName', requireAuth, async (req, res) => {
     }
     
     const data = snap.data();
+    console.log(`🔍 DEBUG: Dokument gefunden, data.skills:`, data.skills);
     const skills = Array.isArray(data.skills) ? data.skills : [];
     console.log(`✅ Skills für ${employeeName} geladen:`, skills.length, 'Skills');
     res.json(skills);
@@ -1314,6 +1316,64 @@ app.get('/api/skills', requireAuth, async (req, res) => {
   }
 });
 
+// Erstelle Test-Skills (einmalig)
+app.post('/api/skills/init', requireAuth, async (req, res) => {
+  try {
+    console.log('🔧 Initialisiere Test-Skills...');
+    
+    const testSkills = [
+      { name: 'JavaScript' },
+      { name: 'TypeScript' },
+      { name: 'React' },
+      { name: 'Node.js' },
+      { name: 'Python' },
+      { name: 'Java' },
+      { name: 'C#' },
+      { name: 'SQL' },
+      { name: 'MongoDB' },
+      { name: 'Docker' },
+      { name: 'Kubernetes' },
+      { name: 'AWS' },
+      { name: 'Azure' },
+      { name: 'Git' },
+      { name: 'Agile/Scrum' },
+      { name: 'Project Management' },
+      { name: 'UI/UX Design' },
+      { name: 'DevOps' },
+      { name: 'Machine Learning' },
+      { name: 'Data Analysis' }
+    ];
+    
+    let created = 0;
+    let skipped = 0;
+    
+    for (const skill of testSkills) {
+      // Prüfe ob Skill bereits existiert
+      const existing = await db.collection('skills').where('name', '==', skill.name).get();
+      
+      if (existing.empty) {
+        await db.collection('skills').add(skill);
+        created++;
+        console.log(`✅ Skill erstellt: ${skill.name}`);
+      } else {
+        skipped++;
+        console.log(`⏭️ Skill existiert bereits: ${skill.name}`);
+      }
+    }
+    
+    console.log(`🎉 Skills initialisiert: ${created} erstellt, ${skipped} übersprungen`);
+    res.json({ 
+      message: `Skills erfolgreich initialisiert: ${created} erstellt, ${skipped} übersprungen`,
+      created,
+      skipped 
+    });
+    
+  } catch (error) {
+    console.error('❌ Fehler beim Initialisieren der Skills:', error);
+    res.status(500).json({ error: 'Fehler beim Initialisieren der Skills' });
+  }
+});
+
 // Employee Skills API Endpoints
 app.post('/api/employee-skills', requireAuth, async (req, res) => {
   try {
@@ -1323,32 +1383,50 @@ app.post('/api/employee-skills', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Alle Felder sind erforderlich' });
     }
     
-    // Prüfe ob Skill bereits zugewiesen ist
-    const existingSkill = await db.collection('employeeSkills')
-      .where('employeeId', '==', employeeId)
-      .where('skillId', '==', skillId)
-      .get();
+    // Lade das employeeDossier
+    const dossierRef = db.collection('employeeDossiers').doc(employeeId);
+    const dossierDoc = await dossierRef.get();
     
-    if (!existingSkill.empty) {
+    let dossierData = {};
+    if (dossierDoc.exists) {
+      dossierData = dossierDoc.data();
+    }
+    
+    // Initialisiere skills Array falls es nicht existiert
+    if (!dossierData.skills || !Array.isArray(dossierData.skills)) {
+      dossierData.skills = [];
+    }
+    
+    // Prüfe ob Skill bereits zugewiesen ist
+    const existingSkillIndex = dossierData.skills.findIndex(skill => skill.skillId === skillId);
+    
+    if (existingSkillIndex !== -1) {
       return res.status(400).json({ error: 'Skill ist bereits diesem Mitarbeiter zugewiesen' });
     }
     
     // Erstelle neuen Skill-Eintrag
     const skillData = {
+      id: `${employeeId}_${skillId}_${Date.now()}`, // Eindeutige ID
       employeeId,
       skillId,
       skillName,
       level: parseInt(level),
-      timestamp: admin.firestore.FieldValue.serverTimestamp()
+      timestamp: new Date().toISOString()
     };
     
-    const docRef = await db.collection('employeeSkills').add(skillData);
+    // Füge den Skill zum Array hinzu
+    dossierData.skills.push(skillData);
+    
+    // Speichere das aktualisierte Dossier
+    await dossierRef.set(dossierData, { merge: true });
     
     console.log(`✅ Skill ${skillName} (Level ${level}) erfolgreich Mitarbeiter ${employeeId} zugewiesen`);
+    console.log(`🔍 DEBUG: Gespeichert in Dokument-ID: "${employeeId}"`);
+    console.log(`🔍 DEBUG: Skills Array Länge nach Speichern: ${dossierData.skills.length}`);
     
     res.json({
       success: true,
-      id: docRef.id,
+      id: skillData.id,
       message: 'Skill erfolgreich zugewiesen'
     });
     
@@ -1361,19 +1439,18 @@ app.post('/api/employee-skills', requireAuth, async (req, res) => {
 app.get('/api/employee-skills/:employeeId', requireAuth, async (req, res) => {
   try {
     const { employeeId } = req.params;
+    console.log(`🔍 GET /api/employee-skills/${employeeId} - Lade Skills aus employeeDossiers`);
     
-    const snapshot = await db.collection('employeeSkills')
-      .where('employeeId', '==', employeeId)
-      .orderBy('timestamp', 'desc')
-      .get();
+    // Lade das employeeDossier
+    const dossierDoc = await db.collection('employeeDossiers').doc(employeeId).get();
     
-    const skills = [];
-    snapshot.forEach(doc => {
-      skills.push({
-        id: doc.id,
-        ...doc.data()
-      });
-    });
+    if (!dossierDoc.exists) {
+      console.log(`📝 Employee ${employeeId} nicht gefunden, gebe leeres Array zurück`);
+      return res.json([]);
+    }
+    
+    const dossierData = dossierDoc.data();
+    const skills = Array.isArray(dossierData.skills) ? dossierData.skills : [];
     
     console.log(`✅ ${skills.length} Skills für Mitarbeiter ${employeeId} geladen`);
     res.json(skills);
@@ -1393,20 +1470,30 @@ app.put('/api/employee-skills/:employeeId/:skillId', requireAuth, async (req, re
       return res.status(400).json({ error: 'Level muss zwischen 1 und 5 liegen' });
     }
     
-    const snapshot = await db.collection('employeeSkills')
-      .where('employeeId', '==', employeeId)
-      .where('skillId', '==', skillId)
-      .get();
+    // Lade das employeeDossier
+    const dossierRef = db.collection('employeeDossiers').doc(employeeId);
+    const dossierDoc = await dossierRef.get();
     
-    if (snapshot.empty) {
+    if (!dossierDoc.exists) {
+      return res.status(404).json({ error: 'Mitarbeiter-Dossier nicht gefunden' });
+    }
+    
+    const dossierData = dossierDoc.data();
+    const skills = dossierData.skills || [];
+    
+    // Finde den Skill im Array
+    const skillIndex = skills.findIndex(skill => skill.skillId === skillId);
+    
+    if (skillIndex === -1) {
       return res.status(404).json({ error: 'Skill-Zuweisung nicht gefunden' });
     }
     
-    const docRef = snapshot.docs[0].ref;
-    await docRef.update({
-      level: parseInt(level),
-      timestamp: admin.firestore.FieldValue.serverTimestamp()
-    });
+    // Aktualisiere das Level
+    skills[skillIndex].level = parseInt(level);
+    skills[skillIndex].timestamp = new Date().toISOString();
+    
+    // Speichere die Änderungen
+    await dossierRef.update({ skills: skills });
     
     console.log(`✅ Skill-Level für Mitarbeiter ${employeeId}, Skill ${skillId} auf ${level} aktualisiert`);
     
@@ -1425,17 +1512,29 @@ app.delete('/api/employee-skills/:employeeId/:skillId', requireAuth, async (req,
   try {
     const { employeeId, skillId } = req.params;
     
-    const snapshot = await db.collection('employeeSkills')
-      .where('employeeId', '==', employeeId)
-      .where('skillId', '==', skillId)
-      .get();
+    // Lade das employeeDossier
+    const dossierRef = db.collection('employeeDossiers').doc(employeeId);
+    const dossierDoc = await dossierRef.get();
     
-    if (snapshot.empty) {
+    if (!dossierDoc.exists) {
+      return res.status(404).json({ error: 'Mitarbeiter-Dossier nicht gefunden' });
+    }
+    
+    const dossierData = dossierDoc.data();
+    const skills = dossierData.skills || [];
+    
+    // Finde den Skill im Array
+    const skillIndex = skills.findIndex(skill => skill.skillId === skillId);
+    
+    if (skillIndex === -1) {
       return res.status(404).json({ error: 'Skill-Zuweisung nicht gefunden' });
     }
     
-    const docRef = snapshot.docs[0].ref;
-    await docRef.delete();
+    // Entferne den Skill aus dem Array
+    skills.splice(skillIndex, 1);
+    
+    // Speichere die Änderungen
+    await dossierRef.update({ skills: skills });
     
     console.log(`✅ Skill ${skillId} erfolgreich von Mitarbeiter ${employeeId} entfernt`);
     
@@ -1446,6 +1545,368 @@ app.delete('/api/employee-skills/:employeeId/:skillId', requireAuth, async (req,
     
   } catch (error) {
     console.error('❌ Fehler beim Entfernen des Skills:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+// ==========================================
+// ROLES MANAGEMENT API ENDPOINTS
+// ==========================================
+
+// GET /api/roles - Alle Rollen laden
+app.get('/api/roles', requireAuth, async (req, res) => {
+  try {
+    console.log('🔍 GET /api/roles - Lade alle Rollen');
+    
+    const rolesSnap = await db.collection('roles')
+      .where('isActive', '==', true)
+      .get();
+    
+    const roles = rolesSnap.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    // Sortiere Rollen nach Name (im Code, da Firebase Index benötigt)
+    roles.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    
+    console.log(`✅ ${roles.length} aktive Rollen geladen`);
+    res.json(roles);
+  } catch (error) {
+    console.error('❌ Fehler beim Laden der Rollen:', error);
+    res.status(500).json({ error: 'Fehler beim Laden der Rollen' });
+  }
+});
+
+// POST /api/roles - Neue Rolle erstellen
+app.post('/api/roles', requireAuth, async (req, res) => {
+  try {
+    const { name, description, category } = req.body;
+    
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Rollenname ist erforderlich' });
+    }
+    
+    console.log(`🔍 POST /api/roles - Erstelle neue Rolle: ${name}`);
+    
+    // Prüfe ob Rolle bereits existiert
+    const existingRoleSnap = await db.collection('roles')
+      .where('name', '==', name.trim())
+      .where('isActive', '==', true)
+      .get();
+    
+    if (!existingRoleSnap.empty) {
+      return res.status(400).json({ error: 'Eine Rolle mit diesem Namen existiert bereits' });
+    }
+    
+    const roleData = {
+      name: name.trim(),
+      description: description?.trim() || '',
+      category: category?.trim() || '',
+      createdAt: new Date(),
+      isActive: true
+    };
+    
+    const docRef = await db.collection('roles').add(roleData);
+    
+    console.log(`✅ Rolle "${name}" erfolgreich erstellt mit ID: ${docRef.id}`);
+    
+    res.json({
+      success: true,
+      id: docRef.id,
+      role: { id: docRef.id, ...roleData }
+    });
+  } catch (error) {
+    console.error('❌ Fehler beim Erstellen der Rolle:', error);
+    res.status(500).json({ error: 'Fehler beim Erstellen der Rolle' });
+  }
+});
+
+// PUT /api/roles/:id - Rolle bearbeiten
+app.put('/api/roles/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, category } = req.body;
+    
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Rollenname ist erforderlich' });
+    }
+    
+    console.log(`🔍 PUT /api/roles/${id} - Bearbeite Rolle: ${name}`);
+    
+    // Prüfe ob Rolle existiert
+    const roleDoc = await db.collection('roles').doc(id).get();
+    if (!roleDoc.exists) {
+      return res.status(404).json({ error: 'Rolle nicht gefunden' });
+    }
+    
+    // Prüfe ob anderer Name bereits existiert
+    const existingRoleSnap = await db.collection('roles')
+      .where('name', '==', name.trim())
+      .where('isActive', '==', true)
+      .get();
+    
+    const hasConflict = existingRoleSnap.docs.some(doc => doc.id !== id);
+    if (hasConflict) {
+      return res.status(400).json({ error: 'Eine andere Rolle mit diesem Namen existiert bereits' });
+    }
+    
+    const updateData = {
+      name: name.trim(),
+      description: description?.trim() || '',
+      category: category?.trim() || '',
+      updatedAt: new Date()
+    };
+    
+    await db.collection('roles').doc(id).update(updateData);
+    
+    console.log(`✅ Rolle "${name}" erfolgreich aktualisiert`);
+    
+    res.json({
+      success: true,
+      role: { id, ...roleDoc.data(), ...updateData }
+    });
+  } catch (error) {
+    console.error('❌ Fehler beim Bearbeiten der Rolle:', error);
+    res.status(500).json({ error: 'Fehler beim Bearbeiten der Rolle' });
+  }
+});
+
+// DELETE /api/roles/:id - Rolle löschen (soft delete)
+app.delete('/api/roles/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    console.log(`🔍 DELETE /api/roles/${id} - Lösche Rolle`);
+    
+    // Prüfe ob Rolle existiert
+    const roleDoc = await db.collection('roles').doc(id).get();
+    if (!roleDoc.exists) {
+      return res.status(404).json({ error: 'Rolle nicht gefunden' });
+    }
+    
+    const roleName = roleDoc.data().name;
+    
+    // Soft Delete - markiere als inaktiv
+    await db.collection('roles').doc(id).update({
+      isActive: false,
+      deletedAt: new Date()
+    });
+    
+    console.log(`✅ Rolle "${roleName}" erfolgreich als inaktiv markiert`);
+    
+    res.json({
+      success: true,
+      message: `Rolle "${roleName}" wurde gelöscht`
+    });
+  } catch (error) {
+    console.error('❌ Fehler beim Löschen der Rolle:', error);
+    res.status(500).json({ error: 'Fehler beim Löschen der Rolle' });
+  }
+});
+
+// ==========================================
+// EMPLOYEE ROLE ASSIGNMENT API ENDPOINTS
+// ==========================================
+
+// GET /api/employee-roles/:employeeId - Zugewiesene Rollen eines Mitarbeiters laden
+app.get('/api/employee-roles/:employeeId', requireAuth, async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    console.log(`🔍 GET /api/employee-roles/${employeeId} - Lade zugewiesene Rollen`);
+    
+    // Lade das employeeDossier
+    const dossierDoc = await db.collection('employeeDossiers').doc(employeeId).get();
+    
+    if (!dossierDoc.exists) {
+      console.log(`📝 Employee ${employeeId} nicht gefunden, gebe leeres Array zurück`);
+      return res.json([]);
+    }
+    
+    const dossierData = dossierDoc.data();
+    const assignedRoles = Array.isArray(dossierData.assignedRoles) ? dossierData.assignedRoles : [];
+    
+    console.log(`✅ ${assignedRoles.length} zugewiesene Rollen für Mitarbeiter ${employeeId} geladen`);
+    res.json(assignedRoles);
+    
+  } catch (error) {
+    console.error('❌ Fehler beim Laden der zugewiesenen Rollen:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+// POST /api/employee-roles/:employeeId - Rolle einem Mitarbeiter zuweisen
+app.post('/api/employee-roles/:employeeId', requireAuth, async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const { roleId, level } = req.body;
+    
+    if (!roleId || !level || level < 1 || level > 5) {
+      return res.status(400).json({ error: 'roleId und level (1-5) sind erforderlich' });
+    }
+    
+    console.log(`🔍 POST /api/employee-roles/${employeeId} - Weise Rolle ${roleId} zu (Level ${level})`);
+    
+    // Lade die Rolle, um den Namen zu bekommen
+    const roleDoc = await db.collection('roles').doc(roleId).get();
+    if (!roleDoc.exists) {
+      return res.status(404).json({ error: 'Rolle nicht gefunden' });
+    }
+    
+    const roleData = roleDoc.data();
+    const roleName = roleData.name;
+    
+    // Lade das employeeDossier
+    const dossierRef = db.collection('employeeDossiers').doc(employeeId);
+    const dossierDoc = await dossierRef.get();
+    
+    let dossierData;
+    if (dossierDoc.exists) {
+      dossierData = dossierDoc.data();
+    } else {
+      // Erstelle neues Dossier falls es nicht existiert
+      dossierData = {
+        employeeId: employeeId,
+        id: employeeId,
+        assignedRoles: []
+      };
+    }
+    
+    // Initialisiere assignedRoles Array falls es nicht existiert
+    if (!Array.isArray(dossierData.assignedRoles)) {
+      dossierData.assignedRoles = [];
+    }
+    
+    // Prüfe ob Rolle bereits zugewiesen ist
+    const existingRole = dossierData.assignedRoles.find(role => role.roleId === roleId);
+    if (existingRole) {
+      return res.status(400).json({ error: 'Diese Rolle ist dem Mitarbeiter bereits zugewiesen' });
+    }
+    
+    // Erstelle neue Rollen-Zuweisung
+    const roleAssignment = {
+      id: `${employeeId}_${roleId}_${Date.now()}`, // Eindeutige ID
+      roleId: roleId,
+      roleName: roleName, // Denormalisiert für Performance
+      level: parseInt(level),
+      assignedAt: new Date(),
+      lastUpdated: new Date()
+    };
+    
+    // Füge die Rolle zum Array hinzu
+    dossierData.assignedRoles.push(roleAssignment);
+    
+    // Speichere das aktualisierte Dossier
+    await dossierRef.set(dossierData, { merge: true });
+    
+    console.log(`✅ Rolle ${roleName} (Level ${level}) erfolgreich Mitarbeiter ${employeeId} zugewiesen`);
+    
+    res.json({
+      success: true,
+      id: roleAssignment.id,
+      assignment: roleAssignment,
+      message: 'Rolle erfolgreich zugewiesen'
+    });
+  } catch (error) {
+    console.error('❌ Fehler beim Zuweisen der Rolle:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+// PUT /api/employee-roles/:employeeId/:assignmentId - Rollen-Level ändern
+app.put('/api/employee-roles/:employeeId/:assignmentId', requireAuth, async (req, res) => {
+  try {
+    const { employeeId, assignmentId } = req.params;
+    const { level } = req.body;
+    
+    if (!level || level < 1 || level > 5) {
+      return res.status(400).json({ error: 'level (1-5) ist erforderlich' });
+    }
+    
+    console.log(`🔍 PUT /api/employee-roles/${employeeId}/${assignmentId} - Ändere Level auf ${level}`);
+    
+    // Lade das employeeDossier
+    const dossierRef = db.collection('employeeDossiers').doc(employeeId);
+    const dossierDoc = await dossierRef.get();
+    
+    if (!dossierDoc.exists) {
+      return res.status(404).json({ error: 'Mitarbeiter-Dossier nicht gefunden' });
+    }
+    
+    const dossierData = dossierDoc.data();
+    if (!Array.isArray(dossierData.assignedRoles)) {
+      return res.status(404).json({ error: 'Keine Rollen-Zuweisungen gefunden' });
+    }
+    
+    // Finde die entsprechende Rollen-Zuweisung
+    const assignmentIndex = dossierData.assignedRoles.findIndex(role => role.id === assignmentId);
+    if (assignmentIndex === -1) {
+      return res.status(404).json({ error: 'Rollen-Zuweisung nicht gefunden' });
+    }
+    
+    // Aktualisiere das Level
+    dossierData.assignedRoles[assignmentIndex].level = parseInt(level);
+    dossierData.assignedRoles[assignmentIndex].lastUpdated = new Date();
+    
+    // Speichere das aktualisierte Dossier
+    await dossierRef.set(dossierData, { merge: true });
+    
+    const updatedAssignment = dossierData.assignedRoles[assignmentIndex];
+    console.log(`✅ Rollen-Level für ${updatedAssignment.roleName} erfolgreich auf ${level} geändert`);
+    
+    res.json({
+      success: true,
+      assignment: updatedAssignment,
+      message: 'Rollen-Level erfolgreich geändert'
+    });
+  } catch (error) {
+    console.error('❌ Fehler beim Ändern des Rollen-Levels:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+// DELETE /api/employee-roles/:employeeId/:assignmentId - Rollen-Zuweisung entfernen
+app.delete('/api/employee-roles/:employeeId/:assignmentId', requireAuth, async (req, res) => {
+  try {
+    const { employeeId, assignmentId } = req.params;
+    
+    console.log(`🔍 DELETE /api/employee-roles/${employeeId}/${assignmentId} - Entferne Rollen-Zuweisung`);
+    
+    // Lade das employeeDossier
+    const dossierRef = db.collection('employeeDossiers').doc(employeeId);
+    const dossierDoc = await dossierRef.get();
+    
+    if (!dossierDoc.exists) {
+      return res.status(404).json({ error: 'Mitarbeiter-Dossier nicht gefunden' });
+    }
+    
+    const dossierData = dossierDoc.data();
+    if (!Array.isArray(dossierData.assignedRoles)) {
+      return res.status(404).json({ error: 'Keine Rollen-Zuweisungen gefunden' });
+    }
+    
+    // Finde die entsprechende Rollen-Zuweisung
+    const assignmentIndex = dossierData.assignedRoles.findIndex(role => role.id === assignmentId);
+    if (assignmentIndex === -1) {
+      return res.status(404).json({ error: 'Rollen-Zuweisung nicht gefunden' });
+    }
+    
+    const removedAssignment = dossierData.assignedRoles[assignmentIndex];
+    
+    // Entferne die Rollen-Zuweisung
+    dossierData.assignedRoles.splice(assignmentIndex, 1);
+    
+    // Speichere das aktualisierte Dossier
+    await dossierRef.set(dossierData, { merge: true });
+    
+    console.log(`✅ Rollen-Zuweisung ${removedAssignment.roleName} erfolgreich entfernt`);
+    
+    res.json({
+      success: true,
+      message: `Rollen-Zuweisung "${removedAssignment.roleName}" wurde entfernt`
+    });
+  } catch (error) {
+    console.error('❌ Fehler beim Entfernen der Rollen-Zuweisung:', error);
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });

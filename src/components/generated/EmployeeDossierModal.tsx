@@ -8,6 +8,7 @@ import { AssignmentsList } from './AssignmentsList';
 import { AssignmentEditorModal } from './AssignmentEditorModal';
 import DatabaseService from '../../services/database';
 import { EmployeeSkillAssignment } from './EmployeeSkillAssignment';
+import EmployeeRoleAssignment from './EmployeeRoleAssignment';
 import { UtilizationComment } from './UtilizationComment';
 import { PlanningCommentModal } from './PlanningCommentModal';
 
@@ -471,6 +472,12 @@ export function EmployeeDossierModal({
                   }));
                   setFormData(prev => ({ ...prev, skills: convertedSkills }));
                 }}
+              />
+
+              {/* Rollen */}
+              <EmployeeRoleAssignment
+                employeeId={formData.id}
+                employeeName={formData.name}
               />
 
               {/* Assignments */}

@@ -18,7 +18,7 @@ interface AuthContextValue {
   updateProfile: (data: Partial<UserProfile & { canViewAll: boolean }>) => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export interface UserProfile {
   id?: string;
