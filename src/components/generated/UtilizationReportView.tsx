@@ -931,12 +931,25 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
     return base;
   }, [dataForUI, selectedPersons, filterCC, filterLBS, filterStatus, personMeta, personStatus, showWorkingStudents, showActionItems, actionItems, personSearchTerm, showAllData, profile, selectedLoB, selectedBereich, selectedCC, selectedTeam]);
   
-  // ✅ Ermittle verfügbare Wochen für Header aus gefilterten Daten
+  // ✅ Ermittle verfügbare Wochen für Header - nur 8 Wochen von der heutigen KW zurück
   const availableWeeksFromData = useMemo(() => {
-    const weeks = [...new Set(filteredData.map(item => item.week))].sort();
-    console.log('🔍 Wochen für Header-Generierung:', weeks.slice(0, 15));
-    return weeks;
-  }, [filteredData]);
+    // Berechne die aktuelle Kalenderwoche
+    const today = new Date();
+    const currentWeek = getISOWeek(today);
+    const currentYear = getISOWeekYear(today);
+    
+    // Generiere die letzten 8 Wochen von der aktuellen KW zurück
+    const historicalWeeks = Array.from({ length: 8 }, (_, i) => {
+      const weekNumber = currentWeek - 8 + i + 1;
+      const year = weekNumber <= 0 ? currentYear - 1 : currentYear;
+      const adjustedWeek = weekNumber <= 0 ? weekNumber + 52 : weekNumber;
+      const yy = String(year).slice(-2);
+      return `${yy}/${String(adjustedWeek).padStart(2, '0')}`;
+    });
+    
+    console.log('🔍 Historische Wochen (8 Wochen zurück):', historicalWeeks);
+    return historicalWeeks;
+  }, []);
   
   const visiblePersons = useMemo(() => {
     return Array.from(new Set(filteredData.map(item => item.person)));
@@ -1509,11 +1522,11 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                 <tr>
                   {visibleColumns.avg4 && (
                     <th className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-12">
-                      Ø {availableWeeksFromData.slice(-8, -4).length > 0 ? `${availableWeeksFromData.slice(-8, -4)[0]}-${availableWeeksFromData.slice(-8, -4)[3] || availableWeeksFromData.slice(-8, -4).slice(-1)[0]}` : 'Ø'}
+                      Ø {availableWeeksFromData.slice(0, 4).length > 0 ? `${availableWeeksFromData[0]}-${availableWeeksFromData[3] || availableWeeksFromData.slice(-1)[0]}` : 'Ø'}
                     </th>
                   )}
-                  {/* 4 Einzelwochen bis zur aktuellen KW */}
-                  {visibleColumns.historyWeeks && availableWeeksFromData.slice(-8, -4).map((week, i) => {
+                  {/* 8 Einzelwochen von der aktuellen KW zurück */}
+                  {visibleColumns.historyWeeks && availableWeeksFromData.map((week, i) => {
                     return (
                       <th key={`left-single-${i}`} className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-12">
                         {week}
@@ -1575,9 +1588,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                       <td className="px-1 py-2 text-center text-xs bg-gray-100">
                         {(() => {
                           const oldestWeeks = Array.from({ length: 4 }, (_, i) => {
-                            const weekNumber = (forecastStartWeek - lookbackWeeks + 1) + i;
-                            const yy = String(currentIsoYear).slice(-2);
-                            const weekKey = `${yy}/${String(weekNumber).padStart(2, '0')}`;
+                            const weekKey = availableWeeksFromData[i];
                             const weekData = personData.find(item => item.week === weekKey);
                             return weekData?.utilization;
                           }).filter(util => util !== null && util !== undefined);
@@ -1601,8 +1612,8 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                         })()}
                       </td>
                       )}
-                      {/* 4 Einzelwochen bis zur aktuellen KW */}
-                      {visibleColumns.historyWeeks && availableWeeksFromData.slice(-8, -4).map((week, i) => {
+                      {/* 8 Einzelwochen von der aktuellen KW zurück */}
+                      {visibleColumns.historyWeeks && availableWeeksFromData.map((week, i) => {
                         const weekData = personData.find(item => item.week === week);
                         const utilization = weekData?.utilization;
                         let bgColor = 'bg-gray-100';
