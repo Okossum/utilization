@@ -8,30 +8,45 @@ interface AssignmentEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
   employeeName: string;
+  editingAssignment?: any | null;
   onAssignmentCreated?: () => void;
 }
 
-export function AssignmentEditorModal({ isOpen, onClose, employeeName, onAssignmentCreated }: AssignmentEditorModalProps) {
+export function AssignmentEditorModal({ isOpen, onClose, employeeName, editingAssignment, onAssignmentCreated }: AssignmentEditorModalProps) {
   const { customers, projects, addCustomer, addProject } = useCustomers();
-  const { linkEmployeeToProject, getAssignmentsForEmployee, assignmentsByEmployee } = useAssignments();
+  const { linkEmployeeToProject, getAssignmentsForEmployee, assignmentsByEmployee, updateAssignment, unlinkAssignment } = useAssignments();
 
   // Reset state when employeeName changes or modal opens
   useEffect(() => {
     if (employeeName && isOpen) {
-      setSelectedCustomer('');
-      setSelectedProjectId('');
-      setStartDate('');
-      setEndDate('');
-      setOfferedSkill('');
-      setAllocation(100);
-      setStatus('planned');
-      setProbability(50);
-      setComment('');
+      if (editingAssignment) {
+        // Edit mode - populate with existing data
+        setSelectedCustomer(editingAssignment.customer || '');
+        setSelectedProjectId(editingAssignment.projectId || '');
+        setStartDate(editingAssignment.startDate || '');
+        setEndDate(editingAssignment.endDate || '');
+        setOfferedSkill(editingAssignment.role || '');
+        setAllocation(editingAssignment.plannedAllocationPct || 100);
+        setStatus(editingAssignment.status || 'planned');
+        setProbability(editingAssignment.probability || 50);
+        setComment(editingAssignment.comment || '');
+      } else {
+        // Create mode - reset to defaults
+        setSelectedCustomer('');
+        setSelectedProjectId('');
+        setStartDate('');
+        setEndDate('');
+        setOfferedSkill('');
+        setAllocation(100);
+        setStatus('planned');
+        setProbability(50);
+        setComment('');
+      }
       
       // Load existing assignments for this employee
       getAssignmentsForEmployee(employeeName);
     }
-  }, [employeeName, isOpen, getAssignmentsForEmployee]);
+  }, [employeeName, isOpen, editingAssignment, getAssignmentsForEmployee]);
 
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
@@ -82,7 +97,7 @@ export function AssignmentEditorModal({ isOpen, onClose, employeeName, onAssignm
     if (!canSave) return;
     setSaving(true);
     try {
-      await linkEmployeeToProject(employeeName, selectedProjectId, {
+      const assignmentData = {
         startDate: startDate || undefined,
         endDate: endDate || undefined,
         offeredSkill: offeredSkill || undefined,
@@ -90,7 +105,15 @@ export function AssignmentEditorModal({ isOpen, onClose, employeeName, onAssignm
         status,
         probability: (status === 'planned' || status === 'onHold') ? probability : undefined,
         comment: comment || undefined,
-      });
+      };
+
+      if (editingAssignment) {
+        // Update existing assignment
+        await updateAssignment(editingAssignment.id, assignmentData);
+      } else {
+        // Create new assignment
+        await linkEmployeeToProject(employeeName, selectedProjectId, assignmentData);
+      }
       
       // Rufe Callback auf, um die AssignmentsList zu aktualisieren
       if (onAssignmentCreated) {
@@ -124,7 +147,7 @@ export function AssignmentEditorModal({ isOpen, onClose, employeeName, onAssignm
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <div className="flex items-center gap-2 text-gray-900 font-medium">
                 <Link2 className="w-4 h-4 text-blue-600" />
-                Projektzuordnung für {employeeName}
+                {editingAssignment ? 'Projektzuordnung bearbeiten' : 'Projektzuordnung erstellen'} für {employeeName}
               </div>
               <button onClick={onClose} className="p-2 rounded hover:bg-gray-100">
                 <X className="w-4 h-4 text-gray-500"/>
@@ -325,6 +348,45 @@ export function AssignmentEditorModal({ isOpen, onClose, employeeName, onAssignm
                     </div>
                   );
                 })()}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between p-4 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              >
+                Abbrechen
+              </button>
+              <div className="flex items-center gap-2">
+                {editingAssignment && (
+                  <button
+                    onClick={async () => {
+                      if (window.confirm('Möchten Sie diese Projektzuweisung wirklich löschen?')) {
+                        try {
+                          await unlinkAssignment(editingAssignment.id);
+                          onAssignmentCreated?.();
+                        } catch (error) {
+                          console.error('Fehler beim Löschen:', error);
+                          alert('Fehler beim Löschen der Projektzuweisung.');
+                        }
+                      }
+                    }}
+                    disabled={saving}
+                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Löschen
+                  </button>
+                )}
+                <button
+                  onClick={onSave}
+                  disabled={saving || !canSave}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  {saving && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+                  {editingAssignment ? 'Speichern' : 'Erstellen'}
+                </button>
               </div>
             </div>
           </motion.div>

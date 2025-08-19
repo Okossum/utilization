@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Mail, Phone, MapPin, Clock, ChevronDown, ChevronUp, User, Briefcase } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAssignments } from '../../contexts/AssignmentsContext';
+import { AssignmentEditorModal } from './AssignmentEditorModal';
 interface Employee {
   id: string;
   name: string;
@@ -60,6 +61,8 @@ export const EmployeeCard = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [assignmentsLoading, setAssignmentsLoading] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState<any | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
   
   // Assignments Context
   const { getAssignmentsForEmployee } = useAssignments();
@@ -84,6 +87,16 @@ export const EmployeeCard = ({
     
     loadAssignments();
   }, [employee.name, getAssignmentsForEmployee]);
+
+  // Handler für Assignment-Editing - vereinfacht: Klick auf Card öffnet Edit-Modal
+  const handleAssignmentClick = (assignment: any) => {
+    console.log('Assignment clicked:', assignment);
+    setEditingAssignment(assignment);
+    setShowEditModal(true);
+  };
+
+
+
   const getAvailabilityColor = (availability: string) => {
     switch (availability) {
       case 'Available':
@@ -317,8 +330,17 @@ export const EmployeeCard = ({
               </div>
             ) : (
               <div className="space-y-2">
+                {console.log('🎯 EMPLOYEECARD: Rendering assignments:', assignments)}
                 {assignments.slice(0, 3).map((assignment) => (
-                  <div key={assignment.id} className="p-3 bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-lg hover:from-purple-100 hover:to-violet-100 transition-colors">
+                  <div 
+                    key={assignment.id} 
+                    className="p-3 bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-lg hover:from-purple-100 hover:to-violet-100 transition-colors cursor-pointer"
+                    onClick={() => {
+                      console.log('CLICK DETECTED!', assignment);
+                      handleAssignmentClick(assignment);
+                    }}
+                    title="Klicken zum Bearbeiten"
+                  >
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-medium text-purple-900">
                         {assignment.projectName || assignment.projectId}
@@ -469,5 +491,38 @@ export const EmployeeCard = ({
           </AnimatePresence>
         </div>
       </div>
+      
+      {/* Assignment Editor Modal */}
+      {console.log('showEditModal:', showEditModal, 'editingAssignment:', editingAssignment)}
+      {showEditModal && (
+        <AssignmentEditorModal
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditingAssignment(null);
+          }}
+          employeeName={employee.name}
+          editingAssignment={editingAssignment}
+          onAssignmentCreated={() => {
+            // Neu laden nach Bearbeitung
+            const loadAssignments = async () => {
+              if (!employee.name) return;
+              setAssignmentsLoading(true);
+              try {
+                const result = await getAssignmentsForEmployee(employee.name);
+                setAssignments(result || []);
+              } catch (error) {
+                console.error('Fehler beim Laden der Assignments:', error);
+                setAssignments([]);
+              } finally {
+                setAssignmentsLoading(false);
+              }
+            };
+            loadAssignments();
+            setShowEditModal(false);
+            setEditingAssignment(null);
+          }}
+        />
+      )}
     </motion.div>;
 };

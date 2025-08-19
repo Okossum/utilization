@@ -102,7 +102,8 @@ export function EmployeeDossierModal({
 
   const [planningComment, setPlanningComment] = useState<string>('');
   const [isAssignmentEditorOpen, setAssignmentEditorOpen] = useState(false);
-  const { getAssignmentsForEmployee } = useAssignments();
+  const [editingAssignment, setEditingAssignment] = useState<any | null>(null);
+  const { getAssignmentsForEmployee, assignmentsByEmployee } = useAssignments();
 
   // Lade Employee Dossier aus der Datenbank und kombiniere mit Excel-Daten
   useEffect(() => {
@@ -449,10 +450,24 @@ export function EmployeeDossierModal({
               />
 
               {/* Assignments */}
-              <AssignmentsList employeeName={formData.name} />
+              <AssignmentsList 
+                employeeName={formData.name} 
+                onEdit={(assignmentId) => {
+                  // Finde das Assignment und öffne Edit-Modal
+                  const assignments = assignmentsByEmployee[formData.name] || [];
+                  const assignment = assignments.find(a => a.id === assignmentId);
+                  if (assignment) {
+                    setEditingAssignment(assignment);
+                    setAssignmentEditorOpen(true);
+                  }
+                }}
+              />
               <div>
                 <button
-                  onClick={() => setAssignmentEditorOpen(true)}
+                  onClick={() => {
+                    setEditingAssignment(null); // Create-Modus
+                    setAssignmentEditorOpen(true);
+                  }}
                   className="mt-2 inline-flex items-center gap-2 px-3 py-2 text-sm text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
                 >
                   Projekt zuordnen
@@ -502,6 +517,7 @@ export function EmployeeDossierModal({
         isOpen={isAssignmentEditorOpen}
         onClose={async () => {
           setAssignmentEditorOpen(false);
+          setEditingAssignment(null); // Reset editing state
           // Lade die Assignments neu, nachdem eine Zuordnung erstellt wurde
           try {
             await getAssignmentsForEmployee(formData.name, true);
@@ -510,6 +526,7 @@ export function EmployeeDossierModal({
           }
         }}
         employeeName={formData.name}
+        editingAssignment={editingAssignment}
         onAssignmentCreated={() => {
           console.log('✅ Assignment erstellt, aktualisiere Liste...');
           // Force refresh der Assignments für diesen Mitarbeiter
