@@ -721,7 +721,8 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
             cc: row.cc,
             team: row.team,
             lbs: row.lbs,
-            careerLevel: row.careerLevel
+            careerLevel: row.careerLevel,
+            manager: row.vg
           });
         }
       });
@@ -1624,15 +1625,25 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                             const manager = personMeta.get(person)?.manager;
                             if (!manager) {
                               return (
-                                <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center text-xs text-gray-600 font-medium" title="Keine Führungskraft">
-                                  X
+                                <div className="relative group">
+                                  <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center text-xs text-gray-600 font-medium">
+                                    X
+                                  </div>
+                                  <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-[10px] rounded px-2 py-1 whitespace-nowrap z-20">
+                                    Keine Führungskraft
+                                  </div>
                                 </div>
                               );
                             }
                             const initials = manager.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
                             return (
-                              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-xs text-white font-medium" title={manager}>
-                                {initials}
+                              <div className="relative group">
+                                <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-xs text-white font-medium">
+                                  {initials}
+                                </div>
+                                <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-[10px] rounded px-2 py-1 whitespace-nowrap z-20">
+                                  {manager}
+                                </div>
                               </div>
                             );
                           })()}
