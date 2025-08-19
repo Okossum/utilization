@@ -1292,6 +1292,28 @@ app.listen(PORT, () => {
   console.log(`🏥 Health Check: http://localhost:${PORT}/health`);
 });
 
+// Skills API Endpoint - Alle verfügbaren Skills laden
+app.get('/api/skills', requireAuth, async (req, res) => {
+  try {
+    const snapshot = await db.collection('skills').get();
+    const skills = [];
+    
+    snapshot.forEach(doc => {
+      skills.push({
+        id: doc.id,
+        name: doc.data().name
+      });
+    });
+    
+    console.log(`✅ ${skills.length} verfügbare Skills geladen`);
+    res.json(skills);
+    
+  } catch (error) {
+    console.error('❌ Fehler beim Laden der Skills:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
 // Employee Skills API Endpoints
 app.post('/api/employee-skills', requireAuth, async (req, res) => {
   try {
