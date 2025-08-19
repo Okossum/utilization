@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { getISOWeek, getISOWeekYear } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, ChefHat, Database, Target, User, Ticket, Columns, ArrowLeft, MessageSquare, X, ArrowRight, Building2, Link2 } from 'lucide-react';
+import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, ChefHat, Database, Target, User, Ticket, Columns, ArrowLeft, MessageSquare, X, ArrowRight, Building2, Link2, Banknote, Dog, Coffee } from 'lucide-react';
 import { AdminDataUploadModal } from './AdminDataUploadModal';
 import { EinsatzplanView } from './EinsatzplanView';
 import { AuslastungView } from './AuslastungView';
@@ -1486,6 +1486,10 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                   <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
                     FK
                   </th>
+                  {/* Info-Spalte für Career Level Icons */}
+                  <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
+                    Info
+                  </th>
                   {/* Name-Spalte zwischen Auslastung und Einsatzplan */}
                   <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
                     Name
@@ -1646,6 +1650,69 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                                 </div>
                               </div>
                             );
+                          })()}
+                        </div>
+                      </td>
+                      {/* Info-Spalte für Career Level Icons */}
+                      <td className={`px-0.5 py-0.5 text-sm ${
+                        actionItems[person] 
+                          ? 'bg-blue-100'
+                          : 'bg-gray-50'
+                      }`} style={{padding: '2px 2px'}}>
+                        <div className="flex items-center justify-center">
+                          {(() => {
+                            const lbs = personMeta.get(person)?.lbs;
+                            if (!lbs) return null;
+                            
+                            // Chef-Icon für Führungskräfte
+                            if (lbs.includes('Team Lead - Manager') || 
+                                lbs.includes('Competence Center Lead - Senior Manager') ||
+                                lbs.includes('Business Line Lead - Senior Director') ||
+                                lbs.includes('Business Unit Lead - Senior Director')) {
+                              return (
+                                <div className="w-5 h-5 text-yellow-600" title={lbs}>
+                                  <ChefHat className="w-5 h-5" />
+                                </div>
+                              );
+                            }
+                            
+                            // Sales-Icon für Sales Assistant
+                            if (lbs.includes('Sales Assistant')) {
+                              return (
+                                <div className="w-5 h-5 text-blue-600" title={lbs}>
+                                  <Banknote className="w-5 h-5" />
+                                </div>
+                              );
+                            }
+                            
+                            // Hund-Icon für Trainee
+                            if (lbs.includes('Trainee')) {
+                              return (
+                                <div className="w-5 h-5 text-green-600" title={lbs}>
+                                  <Dog className="w-5 h-5" />
+                                </div>
+                              );
+                            }
+                            
+                            // Kaffee-Icon für Intern
+                            if (lbs.includes('Intern')) {
+                              return (
+                                <div className="w-5 h-5 text-orange-600" title={lbs}>
+                                  <Coffee className="w-5 h-5" />
+                                </div>
+                              );
+                            }
+                            
+                            // Graduation-Cap Icon für Working Student
+                            if (lbs.includes('Working Student')) {
+                              return (
+                                <div className="w-5 h-5 text-purple-600" title={lbs}>
+                                  <GraduationCap className="w-5 h-5" />
+                                </div>
+                              );
+                            }
+                            
+                            return null;
                           })()}
                         </div>
                       </td>
