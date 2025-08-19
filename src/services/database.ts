@@ -55,6 +55,13 @@ class ApiService {
       console.log(`🔍 API-Response ${endpoint}: Status ${response.status}`);
 
       if (!response.ok) {
+        // Spezielle Behandlung: 404 bei Dossier/Skills gilt als "nicht vorhanden" und ist kein harter Fehler
+        if (response.status === 404 && (endpoint.startsWith('/employee-dossier') || endpoint.startsWith('/employee-skills'))) {
+          if (endpoint.startsWith('/employee-skills')) {
+            return [] as any;
+          }
+          return null as any;
+        }
         if (response.status === 401) {
           throw new Error('Authentifizierung fehlgeschlagen - bitte melden Sie sich erneut an');
         }
@@ -216,8 +223,8 @@ export class DatabaseService {
   // Employee Dossier abrufen
   static async getEmployeeDossier(employeeId: string) {
     try {
-      // Direkte Übertragung ohne URL-Encoding
-      return await ApiService.get(`/employee-dossier/${employeeId}`);
+      const id = encodeURIComponent(employeeId);
+      return await ApiService.get(`/employee-dossier/${id}`);
     } catch (error) {
 
       return null;
@@ -571,7 +578,8 @@ export class DatabaseService {
     
     try {
       await this.waitForTokenProvider();
-      const response = await ApiService.get(`/employee-skills/${employeeName}`);
+      const id = encodeURIComponent(employeeName);
+      const response = await ApiService.get(`/employee-skills/${id}`);
       return response || [];
     } catch (error) {
       console.error('❌ getEmployeeSkills() Fehler:', error);
@@ -587,7 +595,8 @@ export class DatabaseService {
     
     try {
       await this.waitForTokenProvider();
-      const response = await ApiService.post(`/employee-skills/${employeeName}`, { skills });
+      const id = encodeURIComponent(employeeName);
+      const response = await ApiService.post(`/employee-skills/${id}`, { skills });
       return response;
     } catch (error) {
       console.error('❌ saveEmployeeSkills() Fehler:', error);
@@ -603,7 +612,9 @@ export class DatabaseService {
     
     try {
       await this.waitForTokenProvider();
-      const response = await ApiService.put(`/employee-skills/${employeeName}/${skillId}`, { level });
+      const id = encodeURIComponent(employeeName);
+      const sid = encodeURIComponent(skillId);
+      const response = await ApiService.put(`/employee-skills/${id}/${sid}`, { level });
       return response;
     } catch (error) {
       console.error('❌ updateEmployeeSkillLevel() Fehler:', error);
@@ -619,7 +630,9 @@ export class DatabaseService {
     
     try {
       await this.waitForTokenProvider();
-      const response = await ApiService.delete(`/employee-skills/${employeeName}/${skillId}`);
+      const id = encodeURIComponent(employeeName);
+      const sid = encodeURIComponent(skillId);
+      const response = await ApiService.delete(`/employee-skills/${id}/${sid}`);
       return response;
     } catch (error) {
       console.error('❌ deleteEmployeeSkill() Fehler:', error);

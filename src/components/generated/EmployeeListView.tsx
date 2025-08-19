@@ -1,8 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Filter, Users, Upload } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { EmployeeCard } from './EmployeeCard';
 import { EmployeeUploadModal } from './EmployeeUploadModal';
+import DatabaseService from '../../services/database';
+
+// ✅ NEU: Props für Action-Items aus der Auslastungs-Übersicht
+interface EmployeeListViewProps {
+  actionItems: Record<string, boolean>;
+}
 interface Employee {
   id: string;
   name: string;
@@ -16,6 +22,25 @@ interface Employee {
   phone: string;
   isActive: boolean;
   profileImage?: string;
+  // Neue Dossier-Felder
+  careerLevel?: string;           // LBS
+  strengths?: string;             // Stärken
+  weaknesses?: string;            // Schwächen
+  projectHistory?: Array<{        // Projekt Kurzlebenslauf
+    id: string;
+    projectName: string;
+    customer: string;
+    role: string;
+    duration: string;
+    activities: string[];
+  }>;
+  projectOffers?: Array<{         // Angebotene Projekte
+    id: string;
+    customerName: string;
+    startWeek: string;
+    endWeek: string;
+    probability: number;
+  }>;
 }
 const employeeData: Employee[] = [{
   id: '1',
@@ -92,23 +117,103 @@ const employeeData: Employee[] = [{
 }];
 
 // @component: EmployeeListView
-export const EmployeeListView = () => {
-  const [employees, setEmployees] = useState<Employee[]>(employeeData);
+export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('All');
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Lade echte Dossier-Daten
+  useEffect(() => {
+    const loadEmployeeDossiers = async () => {
+      try {
+        setIsLoading(true);
+        const dossiers = await DatabaseService.getAllEmployeeDossiers();
+        
+        // Konvertiere Dossier-Daten zu Employee-Format
+        const enrichedEmployees: Employee[] = dossiers.map(dossier => ({
+          id: dossier.employeeId || dossier.id || dossier.name,
+          name: dossier.name || dossier.displayName || 'Unbekannt',
+          role: dossier.careerLevel || 'Keine Angabe',
+          department: dossier.team || dossier.competenceCenter || 'Keine Angabe',
+          skills: Array.isArray(dossier.skills) ? dossier.skills.map(s => typeof s === 'string' ? s : s.name || s.skillName || 'Unbekannt') : [],
+          experience: dossier.careerLevel || 'Keine Angabe',
+          availability: 'Available', // Standard, könnte später erweitert werden
+          comments: dossier.comments || dossier.utilizationComment || 'Keine Kommentare',
+          email: dossier.email || 'Keine E-Mail',
+          phone: dossier.phone || 'Kein Telefon',
+          isActive: dossier.isActive !== undefined ? dossier.isActive : true, // Lade ACT-Status aus der DB
+          // Neue Dossier-Felder
+          careerLevel: dossier.careerLevel,
+          strengths: dossier.strengths,
+          weaknesses: dossier.weaknesses,
+          projectHistory: Array.isArray(dossier.projectHistory) ? dossier.projectHistory : [],
+          projectOffers: Array.isArray(dossier.projectOffers) ? dossier.projectOffers : [],
+        }));
+        
+        setEmployees(enrichedEmployees);
+      } catch (error) {
+        console.error('Fehler beim Laden der Employee Dossiers:', error);
+        // Kein Fallback zu Mock-Daten - nur echte Dossier-Mitarbeiter
+        setEmployees([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadEmployeeDossiers();
+  }, []);
+  
+  // Toggle ACT-Status für einen Mitarbeiter
+  const handleToggleActive = async (employeeId: string) => {
+    try {
+      // Finde den Mitarbeiter
+      const employee = employees.find(emp => emp.id === employeeId);
+      if (!employee) return;
+      
+      // Toggle den Status
+      const newActiveStatus = !employee.isActive;
+      
+      // Aktualisiere den lokalen State
+      setEmployees(prev => prev.map(emp => 
+        emp.id === employeeId 
+          ? { ...emp, isActive: newActiveStatus }
+          : emp
+      ));
+      
+      // Speichere den neuen Status in der Datenbank
+      await DatabaseService.saveEmployeeDossier(employeeId, {
+        uid: employeeId,
+        displayName: employee.name,
+        email: employee.email,
+        skills: employee.skills,
+        experience: 0, // Standard-Wert
+        isActive: newActiveStatus
+      });
+      
+      console.log(`✅ ACT-Status für ${employee.name} auf ${newActiveStatus ? 'aktiv' : 'inaktiv'} gesetzt`);
+    } catch (error) {
+      console.error('❌ Fehler beim Speichern des ACT-Status:', error);
+      // Bei Fehler: Status zurücksetzen
+      setEmployees(prev => prev.map(emp => 
+        emp.id === employeeId 
+          ? { ...emp, isActive: !emp.isActive }
+          : emp
+      ));
+    }
+  };
+  
   const departments = ['All', ...Array.from(new Set(employees.map(emp => emp.department)))];
-  const filteredEmployees = employees.filter(employee => {
+  
+  // ✅ NEU: Filtere nur Mitarbeiter, deren Act-Toggle in der Auslastungs-Übersicht aktiviert ist
+  const activeEmployees = employees.filter(emp => actionItems[emp.name] === true);
+  
+  const filteredEmployees = activeEmployees.filter(employee => {
     const matchesSearch = employee.name.toLowerCase().includes(searchTerm.toLowerCase()) || employee.role.toLowerCase().includes(searchTerm.toLowerCase()) || employee.skills.some(skill => skill.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesDepartment = selectedDepartment === 'All' || employee.department === selectedDepartment;
     return matchesSearch && matchesDepartment;
   });
-  const handleToggleActive = (employeeId: string) => {
-    setEmployees(prev => prev.map(emp => emp.id === employeeId ? {
-      ...emp,
-      isActive: !emp.isActive
-    } : emp));
-  };
 
   // @return
   return <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
@@ -177,18 +282,42 @@ export const EmployeeListView = () => {
         duration: 0.6,
         delay: 0.4
       }} className="grid grid-cols-1 gap-6">
-          {filteredEmployees.map((employee, index) => <motion.div key={employee.id} initial={{
-          opacity: 0,
-          y: 20
-        }} animate={{
-          opacity: 1,
-          y: 0
-        }} transition={{
-          duration: 0.4,
-          delay: index * 0.1
-        }}>
-              <EmployeeCard employee={employee} onToggleActive={handleToggleActive} />
-            </motion.div>)}
+          {isLoading ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-slate-600">Lade Mitarbeiter-Dossiers...</p>
+            </div>
+          ) : (
+            <>
+              {/* Status-Übersicht */}
+              <div className="bg-slate-50 rounded-lg p-4 mb-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-600">
+                    <span className="font-medium">{activeEmployees.length}</span> Mitarbeiter mit aktiviertem Act-Toggle
+                  </span>
+                  <span className="text-slate-500">
+                    {employees.length - activeEmployees.length} Mitarbeiter ohne Act-Toggle
+                  </span>
+                </div>
+                <div className="mt-2 text-xs text-slate-500">
+                  Nur Mitarbeiter mit aktiviertem Act-Toggle aus der Auslastungs-Übersicht werden angezeigt
+                </div>
+              </div>
+              
+              {filteredEmployees.map((employee, index) => <motion.div key={employee.id} initial={{
+                opacity: 0,
+                y: 20
+              }} animate={{
+                opacity: 1,
+                y: 0
+              }} transition={{
+                duration: 0.4,
+                delay: index * 0.1
+              }}>
+                  <EmployeeCard employee={employee} onToggleActive={handleToggleActive} />
+                </motion.div>)}
+            </>
+          )}
         </motion.div>
 
         {filteredEmployees.length === 0 && <motion.div initial={{

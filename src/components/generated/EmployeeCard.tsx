@@ -14,6 +14,25 @@ interface Employee {
   phone: string;
   isActive: boolean;
   profileImage?: string;
+  // Neue Dossier-Felder
+  careerLevel?: string;           // LBS
+  strengths?: string;             // Stärken
+  weaknesses?: string;            // Schwächen
+  projectHistory?: Array<{        // Projekt Kurzlebenslauf
+    id: string;
+    projectName: string;
+    customer: string;
+    role: string;
+    duration: string;
+    activities: string[];
+  }>;
+  projectOffers?: Array<{         // Angebotene Projekte
+    id: string;
+    customerName: string;
+    startWeek: string;
+    endWeek: string;
+    probability: number;
+  }>;
 }
 interface EmployeeCardProps {
   employee: Employee;
@@ -96,6 +115,16 @@ export const EmployeeCard = ({
             <span className="text-slate-600 text-sm">{employee.department}</span>
           </div>
           
+          {/* LBS (Career Level) */}
+          {employee.careerLevel && (
+            <div className="flex items-center gap-2">
+              <User className="w-4 h-4 text-slate-400" />
+              <span className="text-slate-600 text-sm">
+                <span className="font-medium">LBS:</span> {employee.careerLevel}
+              </span>
+            </div>
+          )}
+          
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-slate-400" />
             <span className="text-slate-600 text-sm">{employee.experience}</span>
@@ -105,6 +134,95 @@ export const EmployeeCard = ({
           </div>
         </div>
 
+        {/* Stärken und Schwächen */}
+        {(employee.strengths || employee.weaknesses) && (
+          <div className="mb-4 space-y-3">
+            {employee.strengths && (
+              <div>
+                <h4 className="text-sm font-semibold text-emerald-700 mb-2 flex items-center gap-2">
+                  <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                  Stärken
+                </h4>
+                <p className="text-sm text-slate-600 leading-relaxed">{employee.strengths}</p>
+              </div>
+            )}
+            
+            {employee.weaknesses && (
+              <div>
+                <h4 className="text-sm font-semibold text-amber-700 mb-2 flex items-center gap-2">
+                  <span className="w-2 h-2 bg-amber-500 rounded-full"></span>
+                  Schwächen
+                </h4>
+                <p className="text-sm text-slate-600 leading-relaxed">{employee.weaknesses}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Projektangebote */}
+        {employee.projectOffers && employee.projectOffers.length > 0 && (
+          <div className="mb-4">
+            <h4 className="text-sm font-semibold text-blue-700 mb-2 flex items-center gap-2">
+              <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+              Angebotene Projekte ({employee.projectOffers.length})
+            </h4>
+            <div className="space-y-2">
+              {employee.projectOffers.slice(0, 3).map((offer, index) => (
+                <div key={offer.id} className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium text-blue-900">{offer.customerName}</span>
+                    <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
+                      {offer.probability}% Wahrscheinlichkeit
+                    </span>
+                  </div>
+                  {offer.startWeek && offer.endWeek && (
+                    <div className="text-xs text-blue-700">
+                      {offer.startWeek} - {offer.endWeek}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {employee.projectOffers.length > 3 && (
+                <div className="text-xs text-blue-600 text-center py-2">
+                  +{employee.projectOffers.length - 3} weitere Projekte
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Projekt Kurzlebenslauf */}
+        {employee.projectHistory && employee.projectHistory.length > 0 && (
+          <div className="mb-4">
+            <h4 className="text-sm font-semibold text-purple-700 mb-2 flex items-center gap-2">
+              <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+              Projekt Kurzlebenslauf ({employee.projectHistory.length})
+            </h4>
+            <div className="space-y-2">
+              {employee.projectHistory.slice(0, 3).map((project, index) => (
+                <div key={project.id} className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium text-purple-900">{project.projectName}</span>
+                    <span className="text-xs text-purple-600 bg-purple-100 px-2 py-1 rounded-full">
+                      {project.role}
+                    </span>
+                  </div>
+                  <div className="text-xs text-purple-700 mb-1">{project.customer}</div>
+                  {project.duration && (
+                    <div className="text-xs text-purple-600">{project.duration}</div>
+                  )}
+                </div>
+              ))}
+              {employee.projectHistory.length > 3 && (
+                <div className="text-xs text-purple-600 text-center py-2">
+                  +{employee.projectHistory.length - 3} weitere Projekte
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Fähigkeiten */}
         <div className="mb-4">
           <h4 className="text-sm font-semibold text-slate-700 mb-2">
             <span>Fähigkeiten</span>

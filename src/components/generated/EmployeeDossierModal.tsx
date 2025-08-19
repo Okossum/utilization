@@ -9,6 +9,7 @@ import DatabaseService from '../../services/database';
 import { EmployeeSkillsEditor } from './EmployeeSkillsEditor';
 import { UtilizationComment } from './UtilizationComment';
 import { PlanningCommentModal } from './PlanningCommentModal';
+import { SimpleProjectList, SimpleProject } from './SimpleProjectList';
 
 export interface ProjectHistoryItem {
   id: string;
@@ -46,6 +47,7 @@ export interface Employee {
   email: string;
   phone: string;
   projectHistory: ProjectHistoryItem[];
+  simpleProjects: SimpleProject[];
   strengths: string;
   weaknesses: string;
   comments: string;
@@ -127,6 +129,17 @@ export function EmployeeDossierModal({
             }))
           : undefined;
         
+        // Normalisierung: stelle sicher, dass simpleProjects korrekt geladen werden
+        const normalizedSimpleProjects = Array.isArray(savedDossier?.simpleProjects)
+          ? savedDossier.simpleProjects.map((p: any) => ({
+              id: String(p.id ?? Date.now().toString()),
+              customer: String(p.customer ?? ''),
+              role: String(p.role ?? ''),
+              activities: String(p.activities ?? ''),
+              duration: String(p.duration ?? ''),
+            }))
+          : undefined;
+        
         // Kombiniere DB-Daten mit Excel-Daten
         const combinedData: Employee = {
           ...employee,
@@ -147,6 +160,7 @@ export function EmployeeDossierModal({
           utilizationComment: savedDossier?.utilizationComment || employee.utilizationComment || '',
           travelReadiness: savedDossier?.travelReadiness || employee.travelReadiness || '',
           projectHistory: normalizedProjectHistory || employee.projectHistory || [],
+          simpleProjects: normalizedSimpleProjects || employee.simpleProjects || [],
           projectOffers: savedDossier?.projectOffers || employee.projectOffers || [],
           jiraTickets: savedDossier?.jiraTickets || employee.jiraTickets || [],
           // Skills aus Firebase haben Vorrang, dann lokale DB, dann employee
@@ -223,6 +237,7 @@ export function EmployeeDossierModal({
         utilizationComment: formData.utilizationComment,
         travelReadiness: formData.travelReadiness,
         projectHistory: formData.projectHistory,
+        simpleProjects: formData.simpleProjects,
         projectOffers: formData.projectOffers,
         jiraTickets: formData.jiraTickets,
         // Excel-Daten als Referenz (werden nie überschrieben)
@@ -441,9 +456,18 @@ export function EmployeeDossierModal({
 
               {/* Skills */}
               <EmployeeSkillsEditor
-                employeeName={formData.name} // NEW: Employee Name für Persistierung
+                employeeName={formData.id}
                 value={formData.skills || []}
                 onChange={(skills)=>setFormData(prev=>({ ...prev, skills }))}
+              />
+
+              {/* Simple Projects */}
+              <SimpleProjectList 
+                projects={formData.simpleProjects} 
+                onChange={projects => setFormData(prev => ({
+                  ...prev,
+                  simpleProjects: projects
+                }))} 
               />
 
               {/* Project Offers */}

@@ -41,6 +41,17 @@ function App() {
     const [isAdminModalOpen, setAdminModalOpen] = useState(false);
     const [isMenuOpen, setMenuOpen] = useState(false);
     const [currentView, setCurrentView] = useState<'utilization' | 'employees'>('utilization');
+    
+    // ✅ NEU: Action-Items State für beide Views (Act-Toggle aus Auslastungs-Übersicht)
+    const [actionItems, setActionItems] = useState<Record<string, boolean>>(() => {
+      try { return JSON.parse(localStorage.getItem('utilization_action_items') || '{}'); } catch { return {}; }
+    });
+    
+    // Speichere Action-Items im localStorage
+    useEffect(() => {
+      try { localStorage.setItem('utilization_action_items', JSON.stringify(actionItems)); } catch {}
+    }, [actionItems]);
+    
     const menuRef = useRef<HTMLDivElement>(null);
     
     useEffect(() => {
@@ -134,14 +145,19 @@ function App() {
         {/* Main Content */}
         {currentView === 'utilization' && (
           <>
-            <UtilizationReportView />
+            <UtilizationReportView 
+              actionItems={actionItems}
+              setActionItems={setActionItems}
+            />
             <CustomerProjectsManagerButton />
             <SkillManagementButton className="fixed bottom-4 right-44 z-40" label="Skills" />
           </>
         )}
         
         {currentView === 'employees' && (
-          <EmployeeListView />
+          <EmployeeListView 
+            actionItems={actionItems}
+          />
         )}
         
         <AdminUserManagementModal isOpen={isAdminModalOpen} onClose={() => setAdminModalOpen(false)} />

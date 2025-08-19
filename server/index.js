@@ -23,21 +23,54 @@ app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 
 // Entfernt rekursiv undefined-Werte aus Objekten/Arrays (Firestore-kompatibel)
-function removeUndefinedDeep(value) {
+function removeUndefinedDeep(value, depth = 0) {
+  // Verhindere Stack Overflow bei sehr tiefen Objekten
+  if (depth > 10) {
+    console.warn('⚠️ removeUndefinedDeep: Maximale Tiefe erreicht, stoppe Rekursion');
+    return value;
+  }
+  
   if (Array.isArray(value)) {
     return value
-      .map(v => removeUndefinedDeep(v))
+      .map(v => removeUndefinedDeep(v, depth + 1))
       .filter(v => v !== undefined);
   }
   if (value && typeof value === 'object') {
     const out = {};
     Object.keys(value).forEach((k) => {
-      const v = removeUndefinedDeep(value[k]);
+      const v = removeUndefinedDeep(value[k], depth + 1);
       if (v !== undefined) out[k] = v;
     });
     return out;
   }
   return value === undefined ? undefined : value;
+}
+
+// Entfernt rekursiv ungültige Zahlen (NaN/Infinity) aus Objekten/Arrays
+function removeInvalidNumbersDeep(value, depth = 0) {
+  // Verhindere Stack Overflow bei sehr tiefen Objekten
+  if (depth > 10) {
+    console.warn('⚠️ removeInvalidNumbersDeep: Maximale Tiefe erreicht, stoppe Rekursion');
+    return value;
+  }
+  
+  if (Array.isArray(value)) {
+    return value
+      .map(v => removeInvalidNumbersDeep(v, depth + 1))
+      .filter(v => v !== undefined);
+  }
+  if (value && typeof value === 'object') {
+    const out = {};
+    Object.keys(value).forEach((k) => {
+      const v = removeInvalidNumbersDeep(value[k], depth + 1);
+      if (v !== undefined) out[k] = v;
+    });
+    return out;
+  }
+  if (typeof value === 'number' && !Number.isFinite(value)) {
+    return undefined;
+  }
+  return value;
 }
 
 // Helpers for field mapping from Excel rows
@@ -571,7 +604,7 @@ app.post('/api/consolidate', requireAuth, async (req, res) => {
             valuesKeys: row.values ? Object.keys(row.values) : 'keine values'
           });
           
-          // Prüfe sowohl direkte Keys als auch values-Objekt
+          // Prüfe sowohl direkte Keys als auch values-objekt
           const keysToCheck = [
             ...Object.keys(row),
             ...(row.values ? Object.keys(row.values) : [])
@@ -801,9 +834,12 @@ app.post('/api/utilization-data/bulk', requireAuth, async (req, res) => {
 // Employee Dossier speichern oder aktualisieren
 app.post('/api/employee-dossier', requireAuth, async (req, res) => {
   try {
+    console.log('🔍 POST /api/employee-dossier - Request Headers:', req.headers);
+    console.log('🔍 POST /api/employee-dossier - Request Body:', JSON.stringify(req.body, null, 2));
+    
     const { employeeId, dossierData } = req.body;
     
-    console.log('🔍 POST /api/employee-dossier - Request Body:', { employeeId, dossierData });
+    console.log('🔍 POST /api/employee-dossier - Extrahierte Daten:', { employeeId, dossierData });
     
     if (!employeeId || !dossierData) {
       console.error('❌ Ungültige Daten:', { employeeId, dossierData });
@@ -827,8 +863,18 @@ app.post('/api/employee-dossier', requireAuth, async (req, res) => {
         }))
       : [];
 
-    const sanitizedExcelData = dossierData.excelData && typeof dossierData.excelData === 'object' \
-      ? removeUndefinedDeep(dossierData.excelData) \
+    // Skills werden über den separaten Skills-Endpoint verwaltet
+    // Hier nur als Backup, falls sie direkt übergeben werden
+    const normalizedSkills = Array.isArray(dossierData.skills)
+      ? dossierData.skills.map((skill) => ({
+          skillId: String(skill.skillId || skill.id || ''),
+          name: String(skill.name || skill.skillName || ''),
+          level: Math.max(0, Math.min(5, Number(skill.level) || 0))
+        })).filter(skill => skill.skillId && skill.name)
+      : [];
+
+    const sanitizedExcelData = (dossierData.excelData && typeof dossierData.excelData === 'object')
+      ? removeUndefinedDeep(dossierData.excelData)
       : {};
 
     let payload = {
@@ -843,9 +889,10 @@ app.post('/api/employee-dossier', requireAuth, async (req, res) => {
       planningComment: dossierData.planningComment || '',
       travelReadiness: dossierData.travelReadiness || '',
       projectHistory: normalizedProjectHistory,
+      simpleProjects: Array.isArray(dossierData.simpleProjects) ? dossierData.simpleProjects : [],
       projectOffers: Array.isArray(dossierData.projectOffers) ? dossierData.projectOffers : [],
       jiraTickets: Array.isArray(dossierData.jiraTickets) ? dossierData.jiraTickets : [],
-      skills: Array.isArray(dossierData.skills) ? dossierData.skills : [],
+      skills: normalizedSkills, // Verwende die normalisierten Skills
       excelData: sanitizedExcelData,
       // Neue Felder
       careerLevel: dossierData.careerLevel || '',
@@ -853,12 +900,26 @@ app.post('/api/employee-dossier', requireAuth, async (req, res) => {
       team: dossierData.team || '',
       competenceCenter: dossierData.competenceCenter || '',
       lineOfBusiness: dossierData.lineOfBusiness || '',
+      // ACT-Status
+      isActive: dossierData.isActive !== undefined ? dossierData.isActive : true,
       updatedAt: FieldValue.serverTimestamp(),
       createdAt: snap.exists ? snap.data().createdAt || FieldValue.serverTimestamp() : FieldValue.serverTimestamp(),
     };
 
-    // Letzte Absicherung: undefined aus gesamtem Payload entfernen
-    payload = removeUndefinedDeep(payload);
+    // Letzte Absicherung: undefined und ungültige Zahlen entfernen
+    try {
+      payload = removeUndefinedDeep(removeInvalidNumbersDeep(payload));
+      console.log('✅ Payload nach Sanitisierung:', JSON.stringify(payload, null, 2));
+    } catch (sanitizeError) {
+      console.error('❌ Fehler bei der Payload-Sanitisierung:', sanitizeError);
+      // Verwende den ursprünglichen Payload ohne Sanitisierung
+      payload = {
+        employeeId: docId,
+        name: dossierData.displayName || dossierData.name || employeeId,
+        updatedAt: FieldValue.serverTimestamp(),
+        createdAt: snap.exists ? snap.data().createdAt || FieldValue.serverTimestamp() : FieldValue.serverTimestamp(),
+      };
+    }
     
     console.log('💾 Speichere Employee Dossier:', { docId, payload });
     
@@ -898,6 +959,7 @@ app.get('/api/employee-dossier/:employeeId', requireAuth, async (req, res) => {
         planningComment: '',
         travelReadiness: '',
         projectHistory: [],
+        simpleProjects: [],
         projectOffers: [],
         jiraTickets: [],
         skills: [],
@@ -906,7 +968,8 @@ app.get('/api/employee-dossier/:employeeId', requireAuth, async (req, res) => {
         manager: '',
         team: '',
         competenceCenter: '',
-        lineOfBusiness: ''
+        lineOfBusiness: '',
+        isActive: true // Standard: aktiv
       };
       return res.json(defaultDossier);
     }
@@ -936,17 +999,21 @@ app.get('/api/employee-dossiers', requireAuth, async (req, res) => {
 app.get('/api/employee-skills/:employeeName', requireAuth, async (req, res) => {
   try {
     const { employeeName } = req.params;
+    console.log(`🔍 GET /api/employee-skills/${employeeName} - Lade Skills`);
     
     const snap = await db.collection('employeeDossiers').doc(String(employeeName)).get();
     if (!snap.exists) {
+      console.log(`📝 Employee ${employeeName} nicht gefunden, gebe leeres Array zurück`);
       return res.json([]);
     }
     
     const data = snap.data();
-    res.json(Array.isArray(data.skills) ? data.skills : []);
+    const skills = Array.isArray(data.skills) ? data.skills : [];
+    console.log(`✅ Skills für ${employeeName} geladen:`, skills.length, 'Skills');
+    res.json(skills);
   } catch (error) {
     console.error('❌ Fehler beim Laden der Employee Skills:', error);
-    res.status(500).json({ error: 'Interner Server-Fehler' });
+    res.status(500).json({ error: 'Interner Server-Fehler', details: error.message });
   }
 });
 
@@ -955,34 +1022,57 @@ app.post('/api/employee-skills/:employeeName', requireAuth, async (req, res) => 
     const { employeeName } = req.params;
     const { skills } = req.body;
     
+    console.log(`💾 POST /api/employee-skills/${employeeName} - Speichere Skills:`, skills);
+    
     if (!Array.isArray(skills)) {
-      return res.status(400).json({ error: 'Ungültige Skills-Daten' });
+      console.error('❌ Ungültige Skills-Daten:', skills);
+      return res.status(400).json({ error: 'Ungültige Skills-Daten - Array erwartet' });
     }
+    
+    // Validiere Skills-Struktur
+    const validatedSkills = skills.map(skill => ({
+      skillId: String(skill.skillId || skill.id || ''),
+      name: String(skill.name || skill.skillName || ''),
+      level: Math.max(0, Math.min(5, Number(skill.level) || 0))
+    })).filter(skill => skill.skillId && skill.name);
+    
+    console.log(`✅ Validierte Skills:`, validatedSkills);
     
     const docRef = db.collection('employeeDossiers').doc(String(employeeName));
     const snap = await docRef.get();
     
     if (!snap.exists) {
+      // Erstelle neues Dossier
       await docRef.set({
         employeeId: String(employeeName),
         name: String(employeeName),
-        email: '',
-        skills,
+        skills: validatedSkills,
         projectHistory: [],
+        simpleProjects: [],
+        projectOffers: [],
+        jiraTickets: [],
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp()
       }, { merge: true });
+      console.log(`✅ Neues Dossier für ${employeeName} mit Skills erstellt`);
     } else {
+      // Aktualisiere bestehendes Dossier
       await docRef.update({
-        skills,
+        skills: validatedSkills,
         updatedAt: FieldValue.serverTimestamp()
       });
+      console.log(`✅ Skills für ${employeeName} aktualisiert`);
     }
     
-    res.json({ success: true, message: 'Skills erfolgreich gespeichert' });
+    res.json({ 
+      success: true, 
+      message: 'Skills erfolgreich gespeichert',
+      skills: validatedSkills,
+      count: validatedSkills.length
+    });
   } catch (error) {
     console.error('❌ Fehler beim Speichern der Employee Skills:', error);
-    res.status(500).json({ error: 'Interner Server-Fehler' });
+    res.status(500).json({ error: 'Interner Server-Fehler', details: error.message });
   }
 });
 

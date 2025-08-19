@@ -29,7 +29,14 @@ interface UploadedFile {
   isValid: boolean;
   error?: string;
 }
-export function UtilizationReportView() {
+
+// ✅ NEU: Action-Items Props von App.tsx
+interface UtilizationReportViewProps {
+  actionItems: Record<string, boolean>;
+  setActionItems: (actionItems: Record<string, boolean>) => void;
+}
+
+export function UtilizationReportView({ actionItems, setActionItems }: UtilizationReportViewProps) {
   const { user, loading, profile, updateProfile } = useAuth();
   const [showAllData, setShowAllData] = useState<boolean>(() => {
     try { return JSON.parse(localStorage.getItem('utilization_show_all_data') || 'false'); } catch { return false; }
@@ -156,7 +163,7 @@ export function UtilizationReportView() {
   const [filterLBS, setFilterLBS] = useState<string[]>([]);
   const [filterStatus, setFilterStatus] = useState<string[]>([]);
   const [showActionItems, setShowActionItems] = useState<boolean>(false);
-  const [actionItems, setActionItems] = useState<Record<string, boolean>>({});
+  // ✅ ENTFERNT: actionItems und setActionItems sind jetzt Props
   const [personSearchTerm, setPersonSearchTerm] = useState<string>('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showWorkingStudents, setShowWorkingStudents] = useState(() => {
@@ -380,40 +387,22 @@ export function UtilizationReportView() {
       };
     }
 
-    // Lade Dossier nur bei Bedarf (wenn noch nicht geladen)
+    // Prefetch vermeiden: Modal lädt Dossier selbst anhand der Employee-ID
     if (!dossiersByPerson[person]) {
-      try {
-        const dossier = await DatabaseService.getEmployeeDossier(person);
-        setDossiersByPerson(prev => ({
-          ...prev,
-          [person]: {
-            projectOffers: dossier?.projectOffers || [],
-            jiraTickets: dossier?.jiraTickets || [],
-            utilizationComment: String(dossier?.utilizationComment || ''),
-            planningComment: String(dossier?.planningComment || '')
-          }
-        }));
-      } catch (error) {
-        // Bei 404-Fehlern leeres Dossier erstellen
-        if (error instanceof Error && error.message.includes('404')) {
-  
-        } else {
-          
+      setDossiersByPerson(prev => ({
+        ...prev,
+        [person]: {
+          projectOffers: [],
+          jiraTickets: [],
+          utilizationComment: '',
+          planningComment: ''
         }
-        setDossiersByPerson(prev => ({
-          ...prev,
-          [person]: {
-            projectOffers: [],
-            jiraTickets: [],
-            utilizationComment: '',
-            planningComment: ''
-          }
-        }));
-      }
+      }));
     }
 
+    const employeeId = String(personMeta.get(person)?.id || person);
     const employee: Employee = {
-      id: person, // Verwende den Personennamen als ID
+      id: employeeId,
       name: person,
       careerLevel: excelData?.careerLevel || '',
       manager: excelData?.manager || '',
@@ -702,7 +691,7 @@ export function UtilizationReportView() {
 
   // ✅ VEREINFACHT: PersonMeta nur noch aus UtilizationData oder Upload-Dateien
   const personMeta = useMemo(() => {
-    const meta = new Map<string, { lob?: string; bereich?: string; cc?: string; team?: string; lbs?: string }>();
+    const meta = new Map<string, { lob?: string; bereich?: string; cc?: string; team?: string; lbs?: string; careerLevel?: string }>();
     
     // ✅ VEREINFACHT: Extrahiere Metadaten direkt aus Auslastung Collection  
     if (dataSource === 'database' && databaseData.auslastung) {
@@ -716,7 +705,8 @@ export function UtilizationReportView() {
             bereich: row.bereich,
             cc: row.cc,
             team: row.team,
-            lbs: row.lbs
+            lbs: row.lbs,
+            careerLevel: row.careerLevel
           });
         }
       });
@@ -730,7 +720,8 @@ export function UtilizationReportView() {
               bereich: row.bereich,
               cc: row.cc,
               team: row.team,
-              lbs: row.lbs
+              lbs: row.lbs,
+              careerLevel: row.careerLevel
             });
           }
         });
@@ -1060,7 +1051,7 @@ export function UtilizationReportView() {
   // Upload-Funktionalität läuft jetzt über AdminDataUploadModal
 
   if (loading) {
-    return <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">Lade...</div>;
+    return <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">Lade...</div>
   }
   if (!user) {
     return <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -1068,7 +1059,7 @@ export function UtilizationReportView() {
         <h2 className="text-xl font-semibold text-gray-900 mb-2">Bitte anmelden</h2>
         <p className="text-gray-600">Zugriff nur für angemeldete Benutzer.</p>
       </div>
-    </div>;
+    </div>
   }
   if (!hasData) {
     return <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -1087,9 +1078,10 @@ export function UtilizationReportView() {
           </h2>
           <p className="text-gray-600">um den Report zu sehen</p>
         </motion.div>
-      </div>;
+      </div>
   }
-  return <div className="min-h-screen bg-gray-50">
+  return (
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-4 py-6">
         <div className="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -1787,6 +1779,76 @@ export function UtilizationReportView() {
                           ? 'bg-blue-100'
                           : 'bg-gray-50'
                       } ${isTerminated ? 'line-through opacity-60' : ''}`}>
+                        <div className="flex items-center gap-2 w-full">
+                          {personStatus[person] && (
+                            <span className={getStatusColor(personStatus[person])}>
+                              {getStatusIcon(personStatus[person])}
+                            </span>
+                          )}
+                          {/* Student-Icon basierend auf LBS "Working Student" */}
+                          {personMeta.get(person)?.lbs?.toLowerCase().includes('working student') && (
+                            <span className="text-green-600" title="Working Student">
+                              <GraduationCap className="w-4 h-4" />
+                            </span>
+                          )}
+                          {/* Chef-Icon für Führungskräfte basierend auf LBS */}
+                          {(personMeta.get(person)?.lbs?.toLowerCase().includes('competence center lead - senior manager') || 
+                            personMeta.get(person)?.lbs?.toLowerCase().includes('team lead - manager')) && (
+                            <span className="text-blue-600" title="Führungskraft">
+                              <ChefHat className="w-4 h-4" />
+                            </span>
+                          )}
+                          {/* Baby-Icon für Elternzeit */}
+                          {personStatus[person] === 'parental_leave' && (
+                            <span className="text-pink-600" title="Elternzeit">
+                              <Baby className="w-4 h-4" />
+                            </span>
+                          )}
+                          {/* Herz-Icon für Krankheit */}
+                          {personStatus[person] === 'sick' && (
+                            <span className="text-red-600" title="Krank">
+                              <Heart className="w-4 h-4" />
+                            </span>
+                          )}
+                          {/* Thermometer-Icon für Urlaub */}
+                          {personStatus[person] === 'vacation' && (
+                            <span className="text-orange-600" title="Urlaub">
+                              <Thermometer className="w-4 h-4" />
+                            </span>
+                          )}
+                          {/* UserX-Icon für Kündigung */}
+                          {personStatus[person] === 'termination' && (
+                            <span className="text-gray-600" title="Kündigung">
+                              <UserX className="w-4 h-4" />
+                            </span>
+                          )}
+                          {/* VG-Überlappung-Indikator */}
+                          {(() => {
+                            const dossier = dossiersByPerson[person] || { projectOffers: [], jiraTickets: [] };
+                            const hasOffers = (dossier.projectOffers || []).length > 0;
+                            const hasJira = (dossier.jiraTickets || []).length > 0;
+                            
+                            return (hasOffers || hasJira) ? (
+                              <span title="Aktive Angebote oder Jira-Tickets" className="inline-block w-2 h-2 rounded-full bg-amber-500" />
+                            ) : null;
+                          })()}
+                        </div>
+                        <button
+                          onClick={() => openEmployeeDossier(person)}
+                          className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors ml-auto"
+                          title="Mitarbeiter-Dossier öffnen"
+                        >
+                          <User className="w-4 h-4" />
+                        </button>
+                      </td>
+                      )}
+                      
+                      {visibleColumns.lbs && (
+                      <td className={`px-2 py-2 text-sm ${
+                        actionItems[person] 
+                          ? 'bg-blue-100'
+                          : 'bg-gray-50'
+                      } ${isTerminated ? 'line-through opacity-60' : ''}`}>
                         {personMeta.get(person)?.lbs ? (
                           <span className="text-xs text-gray-700">{personMeta.get(person)?.lbs}</span>
                         ) : (
@@ -2135,5 +2197,6 @@ export function UtilizationReportView() {
       />
 
       {/* Scope Settings Modal entfernt: Es gibt nur noch EIN Dropdown für alle Filter */}
-    </div>;
+    </div>
+  );
 }
