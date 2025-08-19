@@ -971,8 +971,111 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
   }, []);
   
   const visiblePersons = useMemo(() => {
-    return Array.from(new Set(filteredData.map(item => item.person)));
-  }, [filteredData]);
+    // ✅ ALLE Personen aus Collections berücksichtigen, nicht nur die mit Wochen-Daten
+    const allPersonsFromDB = new Set<string>();
+    
+    if (dataSource === 'database') {
+      // Sammle alle Personen aus Auslastung
+      databaseData.auslastung?.forEach(row => {
+        if (row.person) allPersonsFromDB.add(row.person);
+      });
+      
+      // Sammle alle Personen aus Einsatzplan
+      databaseData.einsatzplan?.forEach(row => {
+        if (row.person) allPersonsFromDB.add(row.person);
+      });
+    }
+    
+    // Personen aus filteredData (haben Wochen-Daten)
+    const personsWithData = new Set(filteredData.map(item => item.person));
+    
+    // Kombiniere alle Personen
+    const allPersons = Array.from(new Set([...allPersonsFromDB, ...personsWithData]));
+    
+    // Wende die gleichen Filter wie in filteredData an
+    return allPersons.filter(person => {
+      // Working Students Filter
+      if (!showWorkingStudents) {
+        const lbs = personMeta.get(person)?.lbs;
+        if (lbs === 'Working Student' || lbs === 'Working student' || lbs === 'working student') {
+          return false;
+        }
+      }
+      
+      // Personensuche Filter
+      if (personSearchTerm.trim()) {
+        if (!person.toLowerCase().includes(personSearchTerm.toLowerCase())) {
+          return false;
+        }
+      }
+      
+      // CC Filter
+      if (filterCC.length > 0) {
+        const cc = String(personMeta.get(person)?.cc || '');
+        if (!filterCC.includes(cc)) return false;
+      }
+      
+      // LBS Filter
+      if (filterLBS.length > 0) {
+        const lbs = String(personMeta.get(person)?.lbs || '');
+        if (!filterLBS.includes(lbs)) return false;
+      }
+      
+      // Status Filter (EXCLUDE)
+      if (filterStatus.length > 0) {
+        const personStatusValue = personStatus[person];
+        if (personStatusValue) {
+          const statusMatches = filterStatus.some(filterStatusItem => {
+            if (filterStatusItem === personStatusValue) return true;
+            const statusMapping: Record<string, string> = {
+              'vacation': 'Urlaub',
+              'parental-leave': 'Elternzeit',
+              'maternity-leave': 'Mutterschutz',
+              'sick-leave': 'Krankheit',
+              'long-absence': 'Lange Abwesent',
+              'termination': 'Kündigung'
+            };
+            return filterStatusItem === statusMapping[personStatusValue] || 
+                   personStatusValue === statusMapping[filterStatusItem];
+          });
+          if (statusMatches) return false; // EXCLUDE Filter
+        }
+      }
+      
+      // Action Items Filter
+      if (showActionItems) {
+        if (!actionItems[person]) return false;
+      }
+      
+      // Selected Persons Filter
+      if (selectedPersons.length > 0) {
+        if (!selectedPersons.includes(person)) return false;
+      }
+      
+      // Header-Auswahl-Filter (nur wenn nicht "Alle Daten")
+      if (!showAllData) {
+        const meta = personMeta.get(person);
+        if (selectedLoB && (meta as any)?.lob !== selectedLoB) return false;
+        if (selectedBereich && (meta as any)?.bereich !== selectedBereich) return false;
+        if (selectedCC && (meta as any)?.cc !== selectedCC) return false;
+        if (selectedTeam && (meta as any)?.team !== selectedTeam) return false;
+      }
+      
+      // Scope-Filter (nur wenn nicht "Alle Daten" und Profil vorhanden)
+      if (!showAllData && profile) {
+        const scopeTeam = profile.team || '';
+        const scopeCc = profile.competenceCenter || '';
+        const scopeBereich = (profile as any).bereich || '';
+        const meta = personMeta.get(person) || {} as any;
+        
+        if (scopeTeam && String(meta.team || '') !== String(scopeTeam)) return false;
+        if (!scopeTeam && scopeCc && String(meta.cc || '') !== String(scopeCc)) return false;
+        if (!scopeTeam && !scopeCc && scopeBereich && String(meta.bereich || '') !== String(scopeBereich)) return false;
+      }
+      
+      return true;
+    });
+  }, [filteredData, dataSource, databaseData, personMeta, showWorkingStudents, personSearchTerm, filterCC, filterLBS, filterStatus, personStatus, showActionItems, actionItems, selectedPersons, showAllData, selectedLoB, selectedBereich, selectedCC, selectedTeam, profile]);
 
   // Assignments: Vorladen für sichtbare Personen
   useEffect(() => {
@@ -1170,6 +1273,19 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                 } catch {}
               }}
             />
+
+            {/* Sichtbarer "Alle Daten anzeigen" Toggle */}
+            <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+              <label className="flex items-center gap-2 text-sm font-medium text-blue-900 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showAllData}
+                  onChange={(e) => setShowAllData(e.target.checked)}
+                  className="rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span>Alle Daten anzeigen</span>
+              </label>
+            </div>
 
             <button onClick={handleExportCSV} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
               <Download className="w-4 h-4" />
