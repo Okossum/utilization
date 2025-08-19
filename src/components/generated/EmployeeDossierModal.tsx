@@ -9,13 +9,14 @@ import DatabaseService from '../../services/database';
 import { EmployeeSkillsEditor } from './EmployeeSkillsEditor';
 import { UtilizationComment } from './UtilizationComment';
 import { PlanningCommentModal } from './PlanningCommentModal';
-import { employeeSkillService } from '../../lib/firebase-services';
+
 export interface ProjectHistoryItem {
   id: string;
   projectName: string;
   customer: string;
-  role: string;
+  role: string;           // Hauptrolle (aus zentralem Skill-Management)
   duration: string;
+  activities: string[];   // Individuelle Tätigkeiten im Projekt
 }
 export interface ProjectOffer {
   id: string;
@@ -106,8 +107,14 @@ export function EmployeeDossierModal({
         // Lade gespeicherte Dossier-Daten aus der DB
         const savedDossier = await DatabaseService.getEmployeeDossier(employee.id);
         
-        // Lade Skills aus Firebase
-        const firebaseSkills = await employeeSkillService.getByEmployee(employee.id);
+        // Lade Skills über DatabaseService
+        let firebaseSkills: any[] = [];
+        try {
+          firebaseSkills = await DatabaseService.getEmployeeSkills(employee.id);
+        } catch (skillError) {
+          console.warn('Fehler beim Laden der Skills, verwende leeres Array:', skillError);
+          firebaseSkills = [];
+        }
 
         // Normalisierung: stelle sicher, dass projectHistory Items immer projectName befüllt haben
         const normalizedProjectHistory = Array.isArray(savedDossier?.projectHistory)
@@ -125,11 +132,12 @@ export function EmployeeDossierModal({
           ...employee,
           // Excel-Daten haben Vorrang (werden nie überschrieben)
           name: excelData?.name || employee.name,
-          manager: excelData?.manager || employee.manager,
-          team: excelData?.team || employee.team,
-          competenceCenter: excelData?.competenceCenter || employee.competenceCenter,
-          lineOfBusiness: excelData?.lineOfBusiness || employee.lineOfBusiness,
-          careerLevel: excelData?.careerLevel || employee.careerLevel,
+          // DB-Daten haben Vorrang vor Excel-Daten für bearbeitbare Felder
+          manager: savedDossier?.manager || excelData?.manager || employee.manager,
+          team: savedDossier?.team || excelData?.team || employee.team,
+          competenceCenter: savedDossier?.competenceCenter || excelData?.competenceCenter || employee.competenceCenter,
+          lineOfBusiness: savedDossier?.lineOfBusiness || excelData?.lineOfBusiness || employee.lineOfBusiness,
+          careerLevel: savedDossier?.careerLevel || excelData?.careerLevel || employee.careerLevel,
           // DB-Daten für manuelle Eingaben
           email: savedDossier?.email || employee.email || '',
           phone: savedDossier?.phone || employee.phone || '',
@@ -182,25 +190,23 @@ export function EmployeeDossierModal({
   };
   const handleSave = async () => {
     try {
-      // Speichere Skills persistent in Firebase
+      // Speichere Skills über DatabaseService (API)
       if (formData.skills && formData.skills.length > 0) {
-        await employeeSkillService.replaceAllForEmployee(
-          formData.id,
-          formData.skills.map(skill => ({
+        try {
+          await DatabaseService.saveEmployeeSkills(formData.name, formData.skills.map(skill => ({
             skillId: skill.skillId,
             skillName: skill.name,
             level: skill.level
-          }))
-        );
-      } else {
-        // Lösche alle Skills wenn keine vorhanden
-        const existingSkills = await employeeSkillService.getByEmployee(formData.id);
-        for (const skill of existingSkills) {
-          await employeeSkillService.delete(formData.id, skill.skillId);
+          })));
+        } catch (skillError) {
+          console.warn('Fehler beim Speichern der Skills, fahre mit Dossier fort:', skillError);
+          // Fahre mit dem Speichern des Dossiers fort, auch wenn Skills fehlschlagen
         }
+      } else {
+        // Keine Skills vorhanden - das ist in Ordnung
       }
 
-      // Speichere nur die manuellen Eingaben in der DB (nicht die Excel-Daten)
+      // Speichere alle bearbeitbaren Felder in der DB
       // Konvertiere zu kompatiblem Format für DatabaseService
       const dossierData = {
         uid: formData.id,
@@ -220,7 +226,13 @@ export function EmployeeDossierModal({
         projectOffers: formData.projectOffers,
         jiraTickets: formData.jiraTickets,
         // Excel-Daten als Referenz (werden nie überschrieben)
-        excelData: formData.excelData
+        excelData: formData.excelData,
+        // Neue Felder: Alle bearbeitbaren Metadaten
+        careerLevel: formData.careerLevel,
+        manager: formData.manager,
+        team: formData.team,
+        competenceCenter: formData.competenceCenter,
+        lineOfBusiness: formData.lineOfBusiness
       };
 
       // Speichere in der Datenbank
@@ -302,7 +314,7 @@ export function EmployeeDossierModal({
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Career Level</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">LBS</label>
                     <input type="text" value={formData.careerLevel} onChange={e => handleInputChange('careerLevel', e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                   </div>
                   <div>

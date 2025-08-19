@@ -338,8 +338,25 @@ export function UtilizationReportView() {
       careerLevel: string;
     } | undefined = undefined;
     
-    if (dataSource === 'database' && databaseData.auslastung) {
-      // Extrahiere Metadaten aus Auslastung Collection
+    // Priorität: Datenbank hat immer erste Priorität
+    let einsatzplanData: any = null;
+    
+    if (dataSource === 'database' && databaseData.einsatzplan) {
+      einsatzplanData = databaseData.einsatzplan.find((item: any) => item.person === person);
+    }
+    
+    if (einsatzplanData) {
+      // Einsatzplan-Daten aus der Datenbank haben höchste Priorität
+      excelData = {
+        name: person,
+        manager: String(einsatzplanData.vg || ''),
+        team: String(einsatzplanData.team || ''),
+        competenceCenter: String(einsatzplanData.cc || ''),
+        lineOfBusiness: String(einsatzplanData.bereich || ''),
+        careerLevel: String(einsatzplanData.lbs || '')
+      };
+    } else if (dataSource === 'database' && databaseData.auslastung) {
+      // Fallback: Auslastung Collection wenn kein Einsatzplan verfügbar
       const personData = databaseData.auslastung.find(item => item.person === person);
       if (personData) {
         excelData = {
@@ -352,17 +369,15 @@ export function UtilizationReportView() {
         };
       }
     } else {
-      const einsatzplanData = uploadedFiles.einsatzplan?.data?.find((item: any) => item.person === person);
-      if (einsatzplanData) {
-        excelData = {
-          name: person,
-          manager: String(einsatzplanData.vg || ''),
-          team: String(einsatzplanData.team || ''),
-          competenceCenter: String(einsatzplanData.cc || ''),
-          lineOfBusiness: String(einsatzplanData.bereich || ''),
-          careerLevel: String(einsatzplanData.lbs || '')
-        };
-      }
+      // Kein Eintrag in der Datenbank gefunden
+      excelData = {
+        name: person,
+        manager: 'Eintrag fehlt',
+        team: 'Eintrag fehlt',
+        competenceCenter: 'Eintrag fehlt',
+        lineOfBusiness: 'Eintrag fehlt',
+        careerLevel: 'Eintrag fehlt'
+      };
     }
 
     // Lade Dossier nur bei Bedarf (wenn noch nicht geladen)
@@ -1814,6 +1829,9 @@ export function UtilizationReportView() {
                       {visibleColumns.forecastWeeks && availableWeeksFromData.slice(0, forecastWeeks).map((week, i) => {
                         const weekData = personData.find(item => item.week === week);
                         const utilization = weekData?.utilization;
+                        // Extrahiere Wochennummer aus dem week-String (z.B. "2025-KW33" -> 33)
+                        const weekNumber = parseInt(week.match(/KW(\d+)/)?.[1] || '0', 10);
+                        
                         let bgColor = 'bg-gray-100';
                         if (utilization !== null && utilization !== undefined) {
                           if (utilization > 90) bgColor = 'bg-green-100';

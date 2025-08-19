@@ -785,15 +785,22 @@ app.post('/api/employee-dossier', requireAuth, async (req, res) => {
   try {
     const { employeeId, dossierData } = req.body;
     
+    console.log('🔍 POST /api/employee-dossier - Request Body:', { employeeId, dossierData });
+    
     if (!employeeId || !dossierData) {
-      return res.status(400).json({ error: 'Ungültige Daten' });
+      console.error('❌ Ungültige Daten:', { employeeId, dossierData });
+      return res.status(400).json({ error: 'Ungültige Daten', received: { employeeId, dossierData } });
     }
 
-    const docRef = db.collection('employeeDossiers').doc(String(employeeId));
+    // Verwende employeeId als Dokument-ID, falls nicht vorhanden
+    const docId = String(employeeId);
+    const docRef = db.collection('employeeDossiers').doc(docId);
     const snap = await docRef.get();
+    
+    // Erstelle Payload mit allen verfügbaren Feldern
     const payload = {
-      employeeId,
-      name: dossierData.name,
+      employeeId: docId,
+      name: dossierData.displayName || dossierData.name || employeeId,
       email: dossierData.email || '',
       phone: dossierData.phone || '',
       strengths: dossierData.strengths || '',
@@ -802,19 +809,38 @@ app.post('/api/employee-dossier', requireAuth, async (req, res) => {
       utilizationComment: dossierData.utilizationComment || '',
       planningComment: dossierData.planningComment || '',
       travelReadiness: dossierData.travelReadiness || '',
-      projectHistory: dossierData.projectHistory || [],
-      projectOffers: dossierData.projectOffers || [],
-      jiraTickets: dossierData.jiraTickets || [],
-      skills: dossierData.skills || [],
+      projectHistory: Array.isArray(dossierData.projectHistory) ? dossierData.projectHistory.map(project => ({
+        ...project,
+        activities: Array.isArray(project.activities) ? project.activities : []
+      })) : [],
+      projectOffers: Array.isArray(dossierData.projectOffers) ? dossierData.projectOffers : [],
+      jiraTickets: Array.isArray(dossierData.jiraTickets) ? dossierData.jiraTickets : [],
+      skills: Array.isArray(dossierData.skills) ? dossierData.skills : [],
       excelData: dossierData.excelData || {},
+      // Neue Felder
+      careerLevel: dossierData.careerLevel || '',
+      manager: dossierData.manager || '',
+      team: dossierData.team || '',
+      competenceCenter: dossierData.competenceCenter || '',
+      lineOfBusiness: dossierData.lineOfBusiness || '',
       updatedAt: FieldValue.serverTimestamp(),
       createdAt: snap.exists ? snap.data().createdAt || FieldValue.serverTimestamp() : FieldValue.serverTimestamp(),
     };
+    
+    console.log('💾 Speichere Employee Dossier:', { docId, payload });
+    
     await docRef.set(payload, { merge: true });
     const updated = await docRef.get();
-    res.json({ success: true, message: snap.exists ? 'Employee Dossier aktualisiert' : 'Employee Dossier erstellt', data: { id: updated.id, ...updated.data() } });
-  } catch (error) {
     
+    console.log('✅ Employee Dossier erfolgreich gespeichert:', { docId, exists: snap.exists });
+    
+    res.json({ 
+      success: true, 
+      message: snap.exists ? 'Employee Dossier aktualisiert' : 'Employee Dossier erstellt', 
+      data: { id: updated.id, ...updated.data() } 
+    });
+  } catch (error) {
+    console.error('❌ Fehler beim Speichern des Employee Dossiers:', error);
     res.status(500).json({ error: 'Interner Server-Fehler', details: error.message });
   }
 });
@@ -846,6 +872,142 @@ app.get('/api/employee-dossiers', requireAuth, async (req, res) => {
     res.json(out);
   } catch (error) {
     
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+// Employee Skills Endpoints
+app.get('/api/employee-skills/:employeeName', requireAuth, async (req, res) => {
+  try {
+    const { employeeName } = req.params;
+    
+    const snap = await db.collection('employeeDossiers').doc(String(employeeName)).get();
+    if (!snap.exists) {
+      return res.status(404).json({ error: 'Employee Dossier nicht gefunden' });
+    }
+    
+    const data = snap.data();
+    res.json(data.skills || []);
+  } catch (error) {
+    console.error('❌ Fehler beim Laden der Employee Skills:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+app.post('/api/employee-skills/:employeeName', requireAuth, async (req, res) => {
+  try {
+    const { employeeName } = req.params;
+    const { skills } = req.body;
+    
+    if (!Array.isArray(skills)) {
+      return res.status(400).json({ error: 'Ungültige Skills-Daten' });
+    }
+    
+    const docRef = db.collection('employeeDossiers').doc(String(employeeName));
+    const snap = await docRef.get();
+    
+    if (!snap.exists) {
+      return res.status(404).json({ error: 'Employee Dossier nicht gefunden' });
+    }
+    
+    await docRef.update({
+      skills,
+      updatedAt: FieldValue.serverTimestamp()
+    });
+    
+    res.json({ success: true, message: 'Skills erfolgreich gespeichert' });
+  } catch (error) {
+    console.error('❌ Fehler beim Speichern der Employee Skills:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+app.put('/api/employee-skills/:employeeName/:skillId', requireAuth, async (req, res) => {
+  try {
+    const { employeeName, skillId } = req.params;
+    const { level } = req.body;
+    
+    if (typeof level !== 'number' || level < 0 || level > 5) {
+      return res.status(400).json({ error: 'Ungültiges Skill-Level' });
+    }
+    
+    const docRef = db.collection('employeeDossiers').doc(String(employeeName));
+    const snap = await docRef.get();
+    
+    if (!snap.exists) {
+      return res.status(404).json({ error: 'Employee Dossier nicht gefunden' });
+    }
+    
+    const data = snap.data();
+    const skills = data.skills || [];
+    const skillIndex = skills.findIndex(s => s.skillId === skillId);
+    
+    if (skillIndex === -1) {
+      return res.status(404).json({ error: 'Skill nicht gefunden' });
+    }
+    
+    skills[skillIndex].level = level;
+    
+    await docRef.update({
+      skills,
+      updatedAt: FieldValue.serverTimestamp()
+    });
+    
+    res.json({ success: true, message: 'Skill-Level erfolgreich aktualisiert' });
+  } catch (error) {
+    console.error('❌ Fehler beim Aktualisieren des Skill-Levels:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+app.delete('/api/employee-skills/:employeeName/:skillId', requireAuth, async (req, res) => {
+  try {
+    const { employeeName, skillId } = req.params;
+    
+    const docRef = db.collection('employeeDossiers').doc(String(employeeName));
+    const snap = await docRef.get();
+    
+    if (!snap.exists) {
+      return res.status(404).json({ error: 'Employee Dossier nicht gefunden' });
+    }
+    
+    const data = snap.data();
+    const skills = data.skills || [];
+    const filteredSkills = skills.filter(s => s.skillId !== skillId);
+    
+    await docRef.update({
+      skills: filteredSkills,
+      updatedAt: FieldValue.serverTimestamp()
+    });
+    
+    res.json({ success: true, message: 'Skill erfolgreich gelöscht' });
+  } catch (error) {
+    console.error('❌ Fehler beim Löschen des Skills:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+app.get('/api/employee-skills', requireAuth, async (req, res) => {
+  try {
+    const snap = await db.collection('employeeDossiers').get();
+    const allSkills = [];
+    
+    snap.docs.forEach(doc => {
+      const data = doc.data();
+      if (data.skills && Array.isArray(data.skills)) {
+        data.skills.forEach(skill => {
+          allSkills.push({
+            employeeName: data.name || doc.id,
+            employeeId: doc.id,
+            ...skill
+          });
+        });
+      }
+    });
+    
+    res.json(allSkills);
+  } catch (error) {
+    console.error('❌ Fehler beim Laden aller Employee Skills:', error);
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });

@@ -1,23 +1,27 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, Edit2, Trash2, Settings } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { skillService } from '../../lib/firebase-services';
 
 interface SkillItem {
   id: string;
   name: string;
+  type: 'CON' | 'DEV';
 }
 
 export function SkillManagement() {
   const [skills, setSkills] = useState<SkillItem[]>([]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newName, setNewName] = useState('');
+  const [newType, setNewType] = useState<'CON' | 'DEV'>('CON');
   
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [editType, setEditType] = useState<'CON' | 'DEV'>('CON');
   
 
   useEffect(() => {
@@ -26,7 +30,8 @@ export function SkillManagement() {
       setError(null);
       try {
         const all = await skillService.getAll();
-        setSkills(all.map(s => ({ id: s.id, name: s.name })));
+        const skillsData = all.map(s => ({ id: s.id, name: s.name, type: s.type || 'CON' }));
+        setSkills(skillsData);
       } catch (e: any) {
         setError('Fehler beim Laden der Skills');
       } finally {
@@ -38,6 +43,7 @@ export function SkillManagement() {
 
   const resetAdd = () => {
     setNewName('');
+    setNewType('CON');
     setIsAddOpen(false);
   };
 
@@ -47,8 +53,9 @@ export function SkillManagement() {
     if (!newName.trim()) return;
     setLoading(true);
     try {
-      const id = await skillService.save({ name: newName.trim() });
-      setSkills(prev => [...prev, { id, name: newName.trim() }]);
+      const id = await skillService.save({ name: newName.trim(), type: newType });
+      const newSkill = { id, name: newName.trim(), type: newType };
+      setSkills(prev => [...prev, newSkill]);
       resetAdd();
     } catch (e) {
       setError('Fehler beim Anlegen des Skills');
@@ -60,21 +67,22 @@ export function SkillManagement() {
   const startEdit = (s: SkillItem) => {
     setEditingId(s.id);
     setEditName(s.name);
-    
+    setEditType(s.type);
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditName('');
-    
+    setEditType('CON');
   };
 
   const saveEdit = async () => {
     if (!editingId || !editName.trim()) return;
     setLoading(true);
     try {
-      await skillService.update(editingId, { name: editName.trim() });
-      setSkills(prev => prev.map(s => s.id === editingId ? { ...s, name: editName.trim() } : s));
+      await skillService.update(editingId, { name: editName.trim(), type: editType });
+      const updatedSkill = { id: editingId, name: editName.trim(), type: editType };
+      setSkills(prev => prev.map(s => s.id === editingId ? updatedSkill : s));
       cancelEdit();
     } catch (e) {
       setError('Fehler beim Aktualisieren');
@@ -95,6 +103,8 @@ export function SkillManagement() {
       setLoading(false);
     }
   };
+
+
 
   const isBusy = loading;
 
@@ -130,6 +140,17 @@ export function SkillManagement() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
                   <input value={newName} onChange={e=>setNewName(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded"/>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Typ</label>
+                  <select 
+                    value={newType} 
+                    onChange={e => setNewType(e.target.value as 'CON' | 'DEV')}
+                    className="w-full px-3 py-2 border border-gray-200 rounded"
+                  >
+                    <option value="CON">CON (Consultant)</option>
+                    <option value="DEV">DEV (Developer)</option>
+                  </select>
+                </div>
                 
               </div>
               <div className="p-4 border-t border-gray-200 flex justify-end gap-2">
@@ -155,6 +176,14 @@ export function SkillManagement() {
               {editingId === s.id ? (
                 <div className="space-y-3">
                   <input value={editName} onChange={e=>setEditName(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded"/>
+                  <select 
+                    value={editType} 
+                    onChange={e => setEditType(e.target.value as 'CON' | 'DEV')}
+                    className="w-full px-3 py-2 border border-gray-200 rounded"
+                  >
+                    <option value="CON">CON (Consultant)</option>
+                    <option value="DEV">DEV (Developer)</option>
+                  </select>
                   
                   <div className="flex justify-end gap-2">
                     <button onClick={cancelEdit} className="px-3 py-2 bg-gray-100 rounded border border-gray-200">Abbrechen</button>
@@ -163,9 +192,15 @@ export function SkillManagement() {
                 </div>
               ) : (
                 <div className="flex items-center justify-between gap-3">
-                  <div>
+                  <div className="flex items-center gap-3">
                     <div className="text-sm font-medium text-gray-900">{s.name}</div>
-                    
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                      s.type === 'CON' 
+                        ? 'bg-blue-100 text-blue-800' 
+                        : 'bg-green-100 text-green-800'
+                    }`}>
+                      {s.type}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <button onClick={()=>startEdit(s)} className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded">

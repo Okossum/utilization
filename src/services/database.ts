@@ -216,6 +216,7 @@ export class DatabaseService {
   // Employee Dossier abrufen
   static async getEmployeeDossier(employeeId: string) {
     try {
+      // Direkte Übertragung ohne URL-Encoding
       return await ApiService.get(`/employee-dossier/${employeeId}`);
     } catch (error) {
 
@@ -565,57 +566,81 @@ export class DatabaseService {
   /**
    * Employee Skills für spezifischen Employee abrufen
    */
-  async getEmployeeSkills(employeeName: string): Promise<any[]> {
+  static async getEmployeeSkills(employeeName: string): Promise<any[]> {
     console.log(`🔍 DatabaseService.getEmployeeSkills() für: ${employeeName}`);
     
-    const endpoint: ApiEndpoint = `/employee-skills/${encodeURIComponent(employeeName)}`;
-    return await makeApiCall<any[]>(endpoint, { method: 'GET' });
+    try {
+      await this.waitForTokenProvider();
+      const response = await ApiService.get(`/employee-skills/${employeeName}`);
+      return response || [];
+    } catch (error) {
+      console.error('❌ getEmployeeSkills() Fehler:', error);
+      return [];
+    }
   }
 
   /**
    * Employee Skills speichern/ersetzen
    */
-  async saveEmployeeSkills(employeeName: string, skills: Array<{ skillId: string; skillName: string; level: number }>): Promise<any> {
+  static async saveEmployeeSkills(employeeName: string, skills: Array<{ skillId: string; skillName: string; level: number }>): Promise<any> {
     console.log(`🔄 DatabaseService.saveEmployeeSkills() für: ${employeeName} mit ${skills.length} Skills`);
     
-    const endpoint: ApiEndpoint = `/employee-skills/${encodeURIComponent(employeeName)}`;
-    return await makeApiCall<any>(endpoint, {
-      method: 'POST',
-      body: { skills }
-    });
+    try {
+      await this.waitForTokenProvider();
+      const response = await ApiService.post(`/employee-skills/${employeeName}`, { skills });
+      return response;
+    } catch (error) {
+      console.error('❌ saveEmployeeSkills() Fehler:', error);
+      throw error;
+    }
   }
 
   /**
    * Einzelnes Employee Skill Level aktualisieren
    */
-  async updateEmployeeSkillLevel(employeeName: string, skillId: string, level: number): Promise<any> {
+  static async updateEmployeeSkillLevel(employeeName: string, skillId: string, level: number): Promise<any> {
     console.log(`🔄 DatabaseService.updateEmployeeSkillLevel(): ${employeeName} -> ${skillId} = ${level}`);
     
-    const endpoint: ApiEndpoint = `/employee-skills/${encodeURIComponent(employeeName)}/${encodeURIComponent(skillId)}`;
-    return await makeApiCall<any>(endpoint, {
-      method: 'PUT',
-      body: { level }
-    });
+    try {
+      await this.waitForTokenProvider();
+      const response = await ApiService.put(`/employee-skills/${employeeName}/${skillId}`, { level });
+      return response;
+    } catch (error) {
+      console.error('❌ updateEmployeeSkillLevel() Fehler:', error);
+      throw error;
+    }
   }
 
   /**
    * Employee Skill löschen
    */
-  async deleteEmployeeSkill(employeeName: string, skillId: string): Promise<any> {
+  static async deleteEmployeeSkill(employeeName: string, skillId: string): Promise<any> {
     console.log(`🗑️ DatabaseService.deleteEmployeeSkill(): ${employeeName} -> ${skillId}`);
     
-    const endpoint: ApiEndpoint = `/employee-skills/${encodeURIComponent(employeeName)}/${encodeURIComponent(skillId)}`;
-    return await makeApiCall<any>(endpoint, { method: 'DELETE' });
+    try {
+      await this.waitForTokenProvider();
+      const response = await ApiService.delete(`/employee-skills/${employeeName}/${skillId}`);
+      return response;
+    } catch (error) {
+      console.error('❌ deleteEmployeeSkill() Fehler:', error);
+      throw error;
+    }
   }
 
   /**
    * Alle Employee Skills abrufen (für Admin-Übersicht)
    */
-  async getAllEmployeeSkills(): Promise<any[]> {
+  static async getAllEmployeeSkills(): Promise<any[]> {
     console.log('🔍 DatabaseService.getAllEmployeeSkills()');
     
-    const endpoint: ApiEndpoint = '/employee-skills';
-    return await makeApiCall<any[]>(endpoint, { method: 'GET' });
+    try {
+      await this.waitForTokenProvider();
+      const response = await ApiService.get('/employee-skills');
+      return response || [];
+    } catch (error) {
+      console.error('❌ getAllEmployeeSkills() Fehler:', error);
+      return [];
+    }
   }
 
   /**

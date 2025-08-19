@@ -133,16 +133,15 @@ export function SkillSelector({
         </span>
         <div className="flex items-center gap-1">
           {value && (
-            <button
-              type="button"
+            <span
               onClick={(e) => {
                 e.stopPropagation();
                 clearSelection();
               }}
-              className="p-1 hover:bg-gray-100 rounded"
+              className="p-1 hover:bg-gray-100 rounded cursor-pointer"
             >
               <X className="w-3 h-3 text-gray-400" />
-            </button>
+            </span>
           )}
           <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
         </div>

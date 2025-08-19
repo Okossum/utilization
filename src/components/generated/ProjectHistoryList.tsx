@@ -20,7 +20,8 @@ export function ProjectHistoryList({
     projectName: '',
     customer: '',
     role: '',
-    duration: ''
+    duration: '',
+    activities: []
   });
   const handleAdd = () => {
     const newProject: ProjectHistoryItem = {
@@ -28,7 +29,8 @@ export function ProjectHistoryList({
       projectName: 'Neues Projekt',
       customer: '',
       role: '',
-      duration: ''
+      duration: '',
+      activities: []
     };
     onChange([...projects, newProject]);
     setEditingId(newProject.id);
@@ -36,7 +38,8 @@ export function ProjectHistoryList({
       projectName: newProject.projectName,
       customer: newProject.customer,
       role: newProject.role,
-      duration: newProject.duration
+      duration: newProject.duration,
+      activities: newProject.activities
     });
   };
   const handleEdit = (project: ProjectHistoryItem) => {
@@ -45,7 +48,8 @@ export function ProjectHistoryList({
       projectName: project.projectName,
       customer: project.customer,
       role: project.role,
-      duration: project.duration
+      duration: project.duration,
+      activities: project.activities
     });
   };
   const handleSave = () => {
@@ -58,6 +62,7 @@ export function ProjectHistoryList({
         customer: editForm.customer,
         role: editForm.role,
         duration: editForm.duration,
+        activities: editForm.activities,
       } : project);
       onChange(updatedProjects);
       setEditingId(null);
@@ -69,7 +74,8 @@ export function ProjectHistoryList({
       projectName: '',
       customer: '',
       role: '',
-      duration: ''
+      duration: '',
+      activities: []
     });
   };
   const handleDelete = (id: string) => {
@@ -112,15 +118,16 @@ export function ProjectHistoryList({
                         value={editForm.customer}
                         onChange={(customer) => {
                           // Nur aktualisieren, wenn sich der Wert wirklich ändert
-                          setEditForm(prev => {
-                            if (prev.customer === customer) return prev;
-                            const next = { ...prev, customer };
-                            if (editingId) {
-                              const updated = projects.map(p => p.id === editingId ? { ...p, customer } : p);
-                              onChange(updated);
-                            }
-                            return next;
-                          });
+                          if (editForm.customer === customer) return;
+                          
+                          setEditForm(prev => ({ ...prev, customer }));
+                          
+                          // onChange außerhalb des setState aufrufen
+                          if (editingId) {
+                            const updated = projects.map(p => p.id === editingId ? { ...p, customer } : p);
+                            // setTimeout verwenden, um den Aufruf nach dem Rendering zu verschieben
+                            setTimeout(() => onChange(updated), 0);
+                          }
                         }}
                         showManagement={false}
                         allowCreate={false}
@@ -134,15 +141,16 @@ export function ProjectHistoryList({
                         selectedProject={editForm.projectName}
                         onProjectSelect={(projectName) => {
                           // Nur aktualisieren, wenn sich der Wert wirklich ändert
-                          setEditForm(prev => {
-                            if (prev.projectName === projectName) return prev;
-                            const next = { ...prev, projectName };
-                            if (editingId) {
-                              const updated = projects.map(p => p.id === editingId ? { ...p, projectName } : p);
-                              onChange(updated);
-                            }
-                            return next;
-                          });
+                          if (editForm.projectName === projectName) return;
+                          
+                          setEditForm(prev => ({ ...prev, projectName }));
+                          
+                          // onChange außerhalb des setState aufrufen
+                          if (editingId) {
+                            const updated = projects.map(p => p.id === editingId ? { ...p, projectName } : p);
+                            // setTimeout verwenden, um den Aufruf nach dem Rendering zu verschieben
+                            setTimeout(() => onChange(updated), 0);
+                          }
                         }}
                         className="text-sm"
                       />
@@ -165,6 +173,47 @@ export function ProjectHistoryList({
                 }))} className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="z.B. 6 Monate" />
                     </div>
                   </div>
+                  
+                  {/* Tätigkeiten im Projekt */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-2">Tätigkeiten im Projekt</label>
+                    <div className="space-y-2">
+                      {editForm.activities.map((activity, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={activity}
+                            onChange={(e) => {
+                              const newActivities = [...editForm.activities];
+                              newActivities[index] = e.target.value;
+                              setEditForm(prev => ({ ...prev, activities: newActivities }));
+                            }}
+                            className="flex-1 px-2 py-1 text-sm border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="z.B. Onboarding neuer Teammitglieder"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newActivities = editForm.activities.filter((_, i) => i !== index);
+                              setEditForm(prev => ({ ...prev, activities: newActivities }));
+                            }}
+                            className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setEditForm(prev => ({ ...prev, activities: [...prev.activities, ''] }))}
+                        className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 bg-blue-50 rounded hover:bg-blue-100 transition-colors"
+                      >
+                        <Plus className="w-3 h-3" />
+                        Tätigkeit hinzufügen
+                      </button>
+                    </div>
+                  </div>
+                  
                   <div className="flex items-center gap-2">
                     <button onClick={handleSave} className="flex items-center gap-1 px-2 py-1 text-xs text-green-700 bg-green-100 rounded hover:bg-green-200 transition-colors">
                       <Save className="w-3 h-3" />
@@ -187,13 +236,30 @@ export function ProjectHistoryList({
                     </div>
                     <div>
                       <p className="text-sm text-gray-700">{project.role}</p>
-                      <p className="text-xs text-gray-500">Rolle</p>
+                      <p className="text-xs text-gray-500">Hauptrolle</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-700">{project.duration}</p>
                       <p className="text-xs text-gray-500">Dauer</p>
                     </div>
                   </div>
+                  
+                  {/* Tätigkeiten anzeigen */}
+                  {project.activities && project.activities.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <p className="text-xs font-medium text-gray-600 mb-2">Tätigkeiten im Projekt:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {project.activities.map((activity, index) => (
+                          <span
+                            key={index}
+                            className="inline-block px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full"
+                          >
+                            {activity}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div className="flex items-center gap-1 ml-4">
                     <button onClick={() => handleEdit(project)} className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors">
                       <Edit2 className="w-4 h-4" />
