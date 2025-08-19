@@ -1920,13 +1920,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                       {/* Opportunities Spalte */}
                       <td className="px-0.5 py-0.5 text-center text-xs bg-gray-100">
                         <div className="flex items-center justify-center gap-1">
-                          <button
-                            onClick={() => { setSalesOpportunitiesPerson(person); setIsSalesOpportunitiesOpen(true); }}
-                            className="p-1 text-green-600 hover:text-green-800 hover:bg-green-50 rounded border border-green-300 transition-colors"
-                            title="Sales Opportunities öffnen"
-                          >
-                            <Building2 className="w-4 h-4" />
-                          </button>
+
                           <div className="relative group">
                             <button
                               onClick={() => { setAssignmentEditorPerson(person); setIsAssignmentEditorOpen(true); }}
