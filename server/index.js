@@ -1292,6 +1292,142 @@ app.listen(PORT, () => {
   console.log(`🏥 Health Check: http://localhost:${PORT}/health`);
 });
 
+// Employee Skills API Endpoints
+app.post('/api/employee-skills', requireAuth, async (req, res) => {
+  try {
+    const { employeeId, skillId, skillName, level } = req.body;
+    
+    if (!employeeId || !skillId || !skillName || !level) {
+      return res.status(400).json({ error: 'Alle Felder sind erforderlich' });
+    }
+    
+    // Prüfe ob Skill bereits zugewiesen ist
+    const existingSkill = await db.collection('employeeSkills')
+      .where('employeeId', '==', employeeId)
+      .where('skillId', '==', skillId)
+      .get();
+    
+    if (!existingSkill.empty) {
+      return res.status(400).json({ error: 'Skill ist bereits diesem Mitarbeiter zugewiesen' });
+    }
+    
+    // Erstelle neuen Skill-Eintrag
+    const skillData = {
+      employeeId,
+      skillId,
+      skillName,
+      level: parseInt(level),
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    };
+    
+    const docRef = await db.collection('employeeSkills').add(skillData);
+    
+    console.log(`✅ Skill ${skillName} (Level ${level}) erfolgreich Mitarbeiter ${employeeId} zugewiesen`);
+    
+    res.json({
+      success: true,
+      id: docRef.id,
+      message: 'Skill erfolgreich zugewiesen'
+    });
+    
+  } catch (error) {
+    console.error('❌ Fehler beim Zuweisen des Skills:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+app.get('/api/employee-skills/:employeeId', requireAuth, async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    
+    const snapshot = await db.collection('employeeSkills')
+      .where('employeeId', '==', employeeId)
+      .orderBy('timestamp', 'desc')
+      .get();
+    
+    const skills = [];
+    snapshot.forEach(doc => {
+      skills.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+    
+    console.log(`✅ ${skills.length} Skills für Mitarbeiter ${employeeId} geladen`);
+    res.json(skills);
+    
+  } catch (error) {
+    console.error('❌ Fehler beim Laden der Skills:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+app.put('/api/employee-skills/:employeeId/:skillId', requireAuth, async (req, res) => {
+  try {
+    const { employeeId, skillId } = req.params;
+    const { level } = req.body;
+    
+    if (!level || level < 1 || level > 5) {
+      return res.status(400).json({ error: 'Level muss zwischen 1 und 5 liegen' });
+    }
+    
+    const snapshot = await db.collection('employeeSkills')
+      .where('employeeId', '==', employeeId)
+      .where('skillId', '==', skillId)
+      .get();
+    
+    if (snapshot.empty) {
+      return res.status(404).json({ error: 'Skill-Zuweisung nicht gefunden' });
+    }
+    
+    const docRef = snapshot.docs[0].ref;
+    await docRef.update({
+      level: parseInt(level),
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    console.log(`✅ Skill-Level für Mitarbeiter ${employeeId}, Skill ${skillId} auf ${level} aktualisiert`);
+    
+    res.json({
+      success: true,
+      message: 'Skill-Level erfolgreich aktualisiert'
+    });
+    
+  } catch (error) {
+    console.error('❌ Fehler beim Aktualisieren des Skill-Levels:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+app.delete('/api/employee-skills/:employeeId/:skillId', requireAuth, async (req, res) => {
+  try {
+    const { employeeId, skillId } = req.params;
+    
+    const snapshot = await db.collection('employeeSkills')
+      .where('employeeId', '==', employeeId)
+      .where('skillId', '==', skillId)
+      .get();
+    
+    if (snapshot.empty) {
+      return res.status(404).json({ error: 'Skill-Zuweisung nicht gefunden' });
+    }
+    
+    const docRef = snapshot.docs[0].ref;
+    await docRef.delete();
+    
+    console.log(`✅ Skill ${skillId} erfolgreich von Mitarbeiter ${employeeId} entfernt`);
+    
+    res.json({
+      success: true,
+      message: 'Skill erfolgreich entfernt'
+    });
+    
+  } catch (error) {
+    console.error('❌ Fehler beim Entfernen des Skills:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
 // Debug-Endpoint: Collection-Inhalte prüfen
 app.get('/api/debug/collections', requireAuth, async (req, res) => {
   try {

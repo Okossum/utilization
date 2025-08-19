@@ -7,7 +7,7 @@ import { PlanningModal } from './PlanningModal';
 import { AssignmentsList } from './AssignmentsList';
 import { AssignmentEditorModal } from './AssignmentEditorModal';
 import DatabaseService from '../../services/database';
-import { EmployeeSkillsEditor } from './EmployeeSkillsEditor';
+import { EmployeeSkillAssignment } from './EmployeeSkillAssignment';
 import { UtilizationComment } from './UtilizationComment';
 import { PlanningCommentModal } from './PlanningCommentModal';
 
@@ -459,10 +459,18 @@ export function EmployeeDossierModal({
               </section>
 
               {/* Skills */}
-              <EmployeeSkillsEditor
+              <EmployeeSkillAssignment
+                employeeId={formData.id}
                 employeeName={formData.name}
-                value={formData.skills || []}
-                onChange={(skills)=>setFormData(prev=>({ ...prev, skills }))}
+                onSkillsChange={(skills) => {
+                  // Konvertiere zu kompatiblem Format für das bestehende Interface
+                  const convertedSkills = skills.map(s => ({
+                    skillId: s.skillId,
+                    name: s.skillName,
+                    level: s.level
+                  }));
+                  setFormData(prev => ({ ...prev, skills: convertedSkills }));
+                }}
               />
 
               {/* Assignments */}
