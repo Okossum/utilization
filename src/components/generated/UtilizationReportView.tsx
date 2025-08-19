@@ -689,16 +689,16 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
     autoSetActionItems();
   }, [dataForUI, forecastStartWeek, currentIsoYear]);
 
-  // ✅ VEREINFACHT: PersonMeta nur noch aus UtilizationData oder Upload-Dateien
+  // ✅ NEU: PersonMeta primär aus Einsatzplan Collection für alle Mitarbeiter-Informationen
   const personMeta = useMemo(() => {
     const meta = new Map<string, { lob?: string; bereich?: string; cc?: string; team?: string; lbs?: string; careerLevel?: string }>();
     
-    // ✅ VEREINFACHT: Extrahiere Metadaten direkt aus Auslastung Collection  
-    if (dataSource === 'database' && databaseData.auslastung) {
+    // ✅ NEU: Extrahiere Metadaten primär aus Einsatzplan Collection (Master-Daten)
+    if (dataSource === 'database' && databaseData.einsatzplan) {
       const personMetaMap = new Map<string, any>();
       
-      // Sammle Metadaten aus Auslastung Collection (nehme ersten Eintrag pro Person)
-      databaseData.auslastung.forEach((row: any) => {
+      // Sammle Metadaten aus Einsatzplan Collection (nehme ersten Eintrag pro Person)
+      databaseData.einsatzplan.forEach((row: any) => {
         if (row.person && !personMetaMap.has(row.person)) {
           personMetaMap.set(row.person, {
             lob: row.lob,
@@ -711,9 +711,9 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
         }
       });
       
-      // Ergänze fehlende Personen aus Einsatzplan Collection
-      if (databaseData.einsatzplan) {
-        databaseData.einsatzplan.forEach((row: any) => {
+      // Ergänze fehlende Personen aus Auslastung Collection (nur als Fallback)
+      if (databaseData.auslastung) {
+        databaseData.auslastung.forEach((row: any) => {
           if (row.person && !personMetaMap.has(row.person)) {
             personMetaMap.set(row.person, {
               lob: row.lob,
