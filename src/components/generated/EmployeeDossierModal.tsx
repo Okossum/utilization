@@ -10,7 +10,7 @@ import DatabaseService from '../../services/database';
 import { EmployeeSkillAssignment } from './EmployeeSkillAssignment';
 import EmployeeRoleAssignment from './EmployeeRoleAssignment';
 import { UtilizationComment } from './UtilizationComment';
-import { PlanningCommentModal } from './PlanningCommentModal';
+import { PlanningComment } from './PlanningComment';
 
 import { useAssignments } from '../../contexts/AssignmentsContext';
 
@@ -99,7 +99,7 @@ export function EmployeeDossierModal({
   const [formData, setFormData] = useState<Employee>(employee);
   const [isLoading, setIsLoading] = useState(false);
   const [isPlanningOpen, setPlanningOpen] = useState(false);
-  const [isPlanningCommentOpen, setPlanningCommentOpen] = useState(false);
+
   const [planningComment, setPlanningComment] = useState<string>('');
   const [isAssignmentEditorOpen, setAssignmentEditorOpen] = useState(false);
   const { getAssignmentsForEmployee } = useAssignments();
@@ -330,9 +330,7 @@ export function EmployeeDossierModal({
                 <button onClick={() => setPlanningOpen(true)} className="px-3 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
                   Planung (Angebote & Jira)
                 </button>
-                <button onClick={() => setPlanningCommentOpen(true)} className="px-3 py-2 text-sm text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
-                  Einsatzplan-Kommentar
-                </button>
+
                 <button onClick={onClose} className="p-2 hover:bg-white/50 rounded-lg transition-colors">
                   <X className="w-5 h-5 text-gray-500" />
                 </button>
@@ -425,29 +423,13 @@ export function EmployeeDossierModal({
                   className="h-full"
                 />
 
-                {/* Planning Comment (inline card with edit via modal) */}
-                <section className="space-y-3">
-                  <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
-                    <MessageSquare className="w-5 h-5 text-blue-600" />
-                    <ArrowRight className="w-5 h-5 text-blue-600" />
-                    Einsatzplan
-                    <button
-                      type="button"
-                      className="ml-2 inline-flex items-center gap-1 text-sm text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded px-2 py-1"
-                      onClick={() => setPlanningCommentOpen(true)}
-                      title="Bearbeiten"
-                    >
-                      Bearbeiten
-                    </button>
-                  </h2>
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded min-h-24">
-                    {planningComment?.trim() ? (
-                      <p className="text-sm text-gray-800 whitespace-pre-wrap">{planningComment}</p>
-                    ) : (
-                      <p className="text-sm text-gray-500">Kein Einsatzplan-Kommentar vorhanden.</p>
-                    )}
-                  </div>
-                </section>
+                {/* Planning Comment Component */}
+                <PlanningComment
+                  personId={formData.name}
+                  initialValue={planningComment}
+                  onLocalChange={(v) => setPlanningComment(v)}
+                  className="h-full"
+                />
               </div>
 
               {/* Skills */}
@@ -520,17 +502,7 @@ export function EmployeeDossierModal({
         }}
         personId={formData.name}
       />
-      <PlanningCommentModal
-        isOpen={isPlanningCommentOpen}
-        onClose={async () => {
-          setPlanningCommentOpen(false);
-          try {
-            const updated = await DatabaseService.getEmployeeDossier(formData.name);
-            setPlanningComment(String(updated?.planningComment || ''));
-          } catch {}
-        }}
-        personId={formData.name}
-      />
+
       <AssignmentEditorModal
         isOpen={isAssignmentEditorOpen}
         onClose={async () => {

@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { MessageSquare, ArrowLeft, Save, X, Trash2, Loader2 } from 'lucide-react';
+import { MessageSquare, ArrowRight, Save, X, Trash2, Loader2 } from 'lucide-react';
 import DatabaseService from '../../services/database';
 
-interface UtilizationCommentProps {
+interface PlanningCommentProps {
   personId: string;
   initialValue?: string;
   onLocalChange?: (value: string) => void;
   className?: string;
 }
 
-export function UtilizationComment({ personId, initialValue, onLocalChange, className = '' }: UtilizationCommentProps) {
+export function PlanningComment({ personId, initialValue, onLocalChange, className = '' }: PlanningCommentProps) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,12 +24,12 @@ export function UtilizationComment({ personId, initialValue, onLocalChange, clas
       try {
         const dossier = await DatabaseService.getEmployeeDossier(personId);
         if (!cancelled && dossier) {
-          const v = String(dossier.utilizationComment || '');
+          const v = String(dossier.planningComment || '');
           setValue(v);
           setRemoteValue(v);
         }
       } catch (e) {
-        if (!cancelled) setError('Fehler beim Laden des Auslastungskommentars');
+        if (!cancelled) setError('Fehler beim Laden des Einsatzplan-Kommentars');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -51,7 +51,8 @@ export function UtilizationComment({ personId, initialValue, onLocalChange, clas
         strengths: existing?.strengths || '',
         weaknesses: existing?.weaknesses || '',
         comments: existing?.comments || '',
-        utilizationComment: value || '',
+        utilizationComment: existing?.utilizationComment || '',
+        planningComment: value || '',
         travelReadiness: existing?.travelReadiness || '',
         projectHistory: existing?.projectHistory || [],
         projectOffers: existing?.projectOffers || [],
@@ -82,7 +83,8 @@ export function UtilizationComment({ personId, initialValue, onLocalChange, clas
         strengths: existing?.strengths || '',
         weaknesses: existing?.weaknesses || '',
         comments: existing?.comments || '',
-        utilizationComment: '',
+        utilizationComment: existing?.utilizationComment || '',
+        planningComment: '',
         travelReadiness: existing?.travelReadiness || '',
         projectHistory: existing?.projectHistory || [],
         projectOffers: existing?.projectOffers || [],
@@ -105,8 +107,8 @@ export function UtilizationComment({ personId, initialValue, onLocalChange, clas
     <div className="space-y-3">
       <div className="flex items-center gap-2 text-gray-900 font-medium">
         <MessageSquare className="w-4 h-4 text-blue-600" />
-        <ArrowLeft className="w-4 h-4 text-blue-600" />
-        Auslastungskommentar
+        <ArrowRight className="w-4 h-4 text-blue-600" />
+        Einsatzplan
       </div>
 
       {error && (
@@ -124,7 +126,7 @@ export function UtilizationComment({ personId, initialValue, onLocalChange, clas
             onChange={e => setValue(e.target.value)}
             rows={5}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-            placeholder="Kommentar zur Auslastung / Act-Notizen..."
+            placeholder="Kommentar zum Einsatzplan..."
           />
           <div className="flex items-center gap-3">
             <button
@@ -163,6 +165,4 @@ export function UtilizationComment({ personId, initialValue, onLocalChange, clas
   );
 }
 
-export default UtilizationComment;
-
-
+export default PlanningComment;
