@@ -1739,19 +1739,6 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                               {getStatusIcon(personStatus[person])}
                             </span>
                           )}
-                          {/* Student-Icon basierend auf LBS "Working Student" */}
-                          {personMeta.get(person)?.lbs?.toLowerCase().includes('working student') && (
-                            <span className="text-green-600" title="Working Student">
-                              <GraduationCap className="w-4 h-4" />
-                            </span>
-                          )}
-                          {/* Chef-Icon für Führungskräfte basierend auf LBS */}
-                          {(personMeta.get(person)?.lbs?.toLowerCase().includes('competence center lead - senior manager') || 
-                            personMeta.get(person)?.lbs?.toLowerCase().includes('team lead - manager')) && (
-                            <span className="text-blue-600" title="Führungskraft">
-                              <ChefHat className="w-4 h-4" />
-                            </span>
-                          )}
 
                           <div className="flex items-center gap-2">
                             <span>{person}</span>
