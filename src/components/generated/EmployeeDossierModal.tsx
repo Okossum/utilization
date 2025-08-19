@@ -193,7 +193,7 @@ export function EmployeeDossierModal({
       // Speichere Skills über DatabaseService (API)
       if (formData.skills && formData.skills.length > 0) {
         try {
-          await DatabaseService.saveEmployeeSkills(formData.name, formData.skills.map(skill => ({
+          await DatabaseService.saveEmployeeSkills(formData.id, formData.skills.map(skill => ({
             skillId: skill.skillId,
             skillName: skill.name,
             level: skill.level
@@ -235,8 +235,23 @@ export function EmployeeDossierModal({
         lineOfBusiness: formData.lineOfBusiness
       };
 
+      // Clientseitige Sanitisierung: entferne undefined aus excelData und projectHistory
+      const sanitize = (v: any): any => {
+        if (Array.isArray(v)) return v.map(sanitize).filter(x => x !== undefined);
+        if (v && typeof v === 'object') {
+          const out: any = {};
+          Object.keys(v).forEach(k => {
+            const sv = sanitize((v as any)[k]);
+            if (sv !== undefined) out[k] = sv;
+          });
+          return out;
+        }
+        return v === undefined ? undefined : v;
+      };
+      const safeDossierData = sanitize(dossierData);
+
       // Speichere in der Datenbank
-      await DatabaseService.saveEmployeeDossier(formData.id, dossierData);
+      await DatabaseService.saveEmployeeDossier(formData.id, safeDossierData);
       
       // Rufe onSave auf
       onSave(formData);

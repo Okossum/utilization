@@ -22,6 +22,24 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 
+// Entfernt rekursiv undefined-Werte aus Objekten/Arrays (Firestore-kompatibel)
+function removeUndefinedDeep(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map(v => removeUndefinedDeep(v))
+      .filter(v => v !== undefined);
+  }
+  if (value && typeof value === 'object') {
+    const out = {};
+    Object.keys(value).forEach((k) => {
+      const v = removeUndefinedDeep(value[k]);
+      if (v !== undefined) out[k] = v;
+    });
+    return out;
+  }
+  return value === undefined ? undefined : value;
+}
+
 // Helpers for field mapping from Excel rows
 function pickField(row, candidates) {
   for (const key of candidates) {
@@ -797,8 +815,23 @@ app.post('/api/employee-dossier', requireAuth, async (req, res) => {
     const docRef = db.collection('employeeDossiers').doc(docId);
     const snap = await docRef.get();
     
-    // Erstelle Payload mit allen verfügbaren Feldern
-    const payload = {
+    // Erstelle Payload mit allen verfügbaren Feldern (mit Normalisierung)
+    const normalizedProjectHistory = Array.isArray(dossierData.projectHistory)
+      ? dossierData.projectHistory.map((project) => ({
+          id: String(project.id || Date.now().toString()),
+          projectName: String(project.projectName || project.project || ''),
+          customer: String(project.customer || ''),
+          role: String(project.role || ''),
+          duration: String(project.duration || ''),
+          activities: Array.isArray(project.activities) ? project.activities.filter(a => typeof a === 'string') : []
+        }))
+      : [];
+
+    const sanitizedExcelData = dossierData.excelData && typeof dossierData.excelData === 'object' \
+      ? removeUndefinedDeep(dossierData.excelData) \
+      : {};
+
+    let payload = {
       employeeId: docId,
       name: dossierData.displayName || dossierData.name || employeeId,
       email: dossierData.email || '',
@@ -809,14 +842,11 @@ app.post('/api/employee-dossier', requireAuth, async (req, res) => {
       utilizationComment: dossierData.utilizationComment || '',
       planningComment: dossierData.planningComment || '',
       travelReadiness: dossierData.travelReadiness || '',
-      projectHistory: Array.isArray(dossierData.projectHistory) ? dossierData.projectHistory.map(project => ({
-        ...project,
-        activities: Array.isArray(project.activities) ? project.activities : []
-      })) : [],
+      projectHistory: normalizedProjectHistory,
       projectOffers: Array.isArray(dossierData.projectOffers) ? dossierData.projectOffers : [],
       jiraTickets: Array.isArray(dossierData.jiraTickets) ? dossierData.jiraTickets : [],
       skills: Array.isArray(dossierData.skills) ? dossierData.skills : [],
-      excelData: dossierData.excelData || {},
+      excelData: sanitizedExcelData,
       // Neue Felder
       careerLevel: dossierData.careerLevel || '',
       manager: dossierData.manager || '',
@@ -826,6 +856,9 @@ app.post('/api/employee-dossier', requireAuth, async (req, res) => {
       updatedAt: FieldValue.serverTimestamp(),
       createdAt: snap.exists ? snap.data().createdAt || FieldValue.serverTimestamp() : FieldValue.serverTimestamp(),
     };
+
+    // Letzte Absicherung: undefined aus gesamtem Payload entfernen
+    payload = removeUndefinedDeep(payload);
     
     console.log('💾 Speichere Employee Dossier:', { docId, payload });
     
