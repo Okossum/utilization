@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MessageSquare, Pencil, Check, X, Trash2, Loader2 } from 'lucide-react';
+import { MessageSquare, ArrowLeft, Check, X, Trash2, Loader2 } from 'lucide-react';
 import DatabaseService from '../../services/database';
 
 interface UtilizationCommentProps {
@@ -15,7 +15,6 @@ export function UtilizationComment({ personId, initialValue, onLocalChange, clas
   const [error, setError] = useState<string | null>(null);
   const [value, setValue] = useState<string>(initialValue || '');
   const [remoteValue, setRemoteValue] = useState<string>(initialValue || '');
-  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,10 +42,8 @@ export function UtilizationComment({ personId, initialValue, onLocalChange, clas
     setSaving(true);
     setError(null);
     try {
-      // Lade bestehendes Dossier, merge mit neuem Feld
       const existing = await DatabaseService.getEmployeeDossier(personId);
       const payload = {
-        // Pflicht-/Bestandsfelder absichern, um kein Datenloch zu erzeugen
         id: existing?.employeeId || personId,
         name: existing?.name || '',
         email: existing?.email || '',
@@ -64,7 +61,6 @@ export function UtilizationComment({ personId, initialValue, onLocalChange, clas
       };
       await DatabaseService.saveEmployeeDossier(personId, payload);
       setRemoteValue(value);
-      setEditing(false);
       onLocalChange?.(value);
     } catch (e) {
       setError('Fehler beim Speichern');
@@ -97,7 +93,6 @@ export function UtilizationComment({ personId, initialValue, onLocalChange, clas
       await DatabaseService.saveEmployeeDossier(personId, payload);
       setValue('');
       setRemoteValue('');
-      setEditing(false);
       onLocalChange?.('');
     } catch (e) {
       setError('Fehler beim Löschen');
@@ -107,21 +102,12 @@ export function UtilizationComment({ personId, initialValue, onLocalChange, clas
   };
 
   return (
-    <section className={`space-y-3 ${className}`}>
-      <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
-        <MessageSquare className="w-5 h-5 text-blue-600" />
-        Auslastung
-        {!editing && !loading && (
-          <button
-            type="button"
-            className="ml-2 inline-flex items-center gap-1 text-sm text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded px-2 py-1"
-            onClick={() => setEditing(true)}
-            title="Bearbeiten"
-          >
-            <Pencil className="w-4 h-4" /> Bearbeiten
-          </button>
-        )}
-      </h2>
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-gray-900 font-medium">
+        <MessageSquare className="w-4 h-4 text-blue-600" />
+        <ArrowLeft className="w-4 h-4 text-blue-600" />
+        Auslastungskommentar
+      </div>
 
       {error && (
         <div className="p-2 text-sm bg-red-50 text-red-700 border border-red-200 rounded">{error}</div>
@@ -131,12 +117,12 @@ export function UtilizationComment({ personId, initialValue, onLocalChange, clas
         <div className="flex items-center gap-2 text-sm text-gray-600">
           <Loader2 className="w-4 h-4 animate-spin" /> Lädt...
         </div>
-      ) : editing ? (
-        <div className="space-y-3">
+      ) : (
+        <>
           <textarea
             value={value}
             onChange={e => setValue(e.target.value)}
-            rows={3}
+            rows={5}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
             placeholder="Kommentar zur Auslastung / Act-Notizen..."
           />
@@ -151,7 +137,7 @@ export function UtilizationComment({ personId, initialValue, onLocalChange, clas
             </button>
             <button
               type="button"
-              onClick={() => { setValue(remoteValue); setEditing(false); }}
+              onClick={() => { setValue(remoteValue); }}
               disabled={saving}
               className="inline-flex items-center gap-2 px-3 py-2 text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
             >
@@ -168,17 +154,9 @@ export function UtilizationComment({ personId, initialValue, onLocalChange, clas
               </button>
             )}
           </div>
-        </div>
-      ) : (
-        <div className="p-3 bg-gray-50 border border-gray-200 rounded">
-          {remoteValue ? (
-            <p className="text-sm text-gray-800 whitespace-pre-wrap">{remoteValue}</p>
-          ) : (
-            <p className="text-sm text-gray-500">Kein Auslastungskommentar vorhanden.</p>
-          )}
-        </div>
+        </>
       )}
-    </section>
+    </div>
   );
 }
 

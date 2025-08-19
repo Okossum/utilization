@@ -1572,36 +1572,52 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                     const weekKey = `${yy}/${String(adjustedWeek).padStart(2, '0')}`;
                     
                     return (
-                      <th key={`view-week-${i}`} className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-12">
+                      <th key={`view-week-${i}`} className="px-0.5 py-1 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-8">
                         {weekKey}
                       </th>
                     );
                   })}
 
+                  {/* Utilization Comments Spalte */}
+                  <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
+                    <div className="flex items-center justify-center gap-1">
+                      <ArrowLeft className="w-3 h-3" />
+                      <MessageSquare className="w-3 h-3" />
+                    </div>
+                  </th>
+
                   {/* Act-Spalte */}
-                  <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
+                  <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
                     Act
                   </th>
                   {/* Name-Spalte zwischen Auslastung und Einsatzplan */}
-                  <th className="px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">
+                  <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
                     Name
                   </th>
                   {/* LBS-Spalte */}
-                  <th className="px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-20">
+                  <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
                     LBS
                   </th>
                   {/* Details-Spalte für Mitarbeiter-Dossier */}
-                  <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
+                  <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
                     Details
                   </th>
                   {/* Status-Spalte */}
-                  <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
+                  <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
                     Status
+                  </th>
+
+                  {/* Planning Comments Spalte */}
+                  <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
+                    <div className="flex items-center justify-center gap-1">
+                      <MessageSquare className="w-3 h-3" />
+                      <ArrowRight className="w-3 h-3" />
+                    </div>
                   </th>
 
                   {/* Forecast-Wochen aus dem Einsatzplan */}
                   {visibleColumns.forecastWeeks && availableWeeksFromData.slice(0, forecastWeeks).map((week, i) => (
-                    <th key={`forecast-${i}`} className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-12">
+                    <th key={`forecast-${i}`} className="px-0.5 py-1 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-8">
                       {week}
                     </th>
                   ))}
@@ -1650,7 +1666,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                         }
                         
                         return (
-                          <td key={`view-week-${i}`} className={`px-1 py-2 text-center text-xs ${bgColor} ${isTerminated ? 'line-through opacity-60' : ''}`}>
+                          <td key={`view-week-${i}`} className={`px-0.5 py-1 text-center text-xs ${bgColor} ${isTerminated ? 'line-through opacity-60' : ''}`}>
                             {weekValue !== null && weekValue !== undefined ? (
                               <span className={`font-medium ${textColor}`}>
                                 {Math.round(weekValue * 10) / 10}%
@@ -1662,12 +1678,29 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                         );
                       })}
 
-                      {/* Act-Spalte */}
-                      <td className={`px-2 py-2 text-sm ${
+                      {/* Utilization Comments Spalte */}
+                      <td className={`px-0.5 py-0.5 text-sm ${
                         actionItems[person] 
                           ? 'bg-blue-100'
                           : 'bg-gray-50'
-                      }`}>
+                      }`} style={{padding: '2px 2px'}}>
+                        <div className="flex items-center justify-center">
+                          <button
+                            onClick={() => setUtilizationCommentForPerson(person)}
+                            className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded border border-blue-300 transition-colors"
+                            title="Utilization Comment öffnen"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+
+                      {/* Act-Spalte */}
+                      <td className={`px-0.5 py-0.5 text-sm ${
+                        actionItems[person] 
+                          ? 'bg-blue-100'
+                          : 'bg-gray-50'
+                      }`} style={{padding: '2px 2px'}}>
                         <div className="flex items-center justify-center">
                           <input
                             type="checkbox"
@@ -1681,19 +1714,19 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                         </div>
                       </td>
                       {/* Name-Spalte zwischen Auslastung und Einsatzplan */}
-                      <td className={`px-2 py-2 text-sm ${
+                      <td className={`px-0.5 py-0.5 text-sm ${
                         actionItems[person] 
                           ? 'bg-blue-100'
                           : 'bg-gray-50'
-                      } ${isTerminated ? 'line-through opacity-60' : ''}`}>
+                      } ${isTerminated ? 'line-through opacity-60' : ''}`} style={{padding: '2px 2px'}}>
                         <span className="font-medium text-gray-900">{person}</span>
                       </td>
                       {/* LBS-Spalte */}
-                      <td className={`px-2 py-2 text-sm ${
+                      <td className={`px-0.5 py-0.5 text-sm ${
                         actionItems[person] 
                           ? 'bg-blue-100'
                           : 'bg-gray-50'
-                      } ${isTerminated ? 'line-through opacity-60' : ''}`}>
+                      } ${isTerminated ? 'line-through opacity-60' : ''}`} style={{padding: '2px 2px'}}>
                         {personMeta.get(person)?.lbs ? (
                           <span className="text-xs text-gray-700">{personMeta.get(person)?.lbs}</span>
                         ) : (
@@ -1701,15 +1734,15 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                         )}
                       </td>
                       {/* Details-Spalte für Mitarbeiter-Dossier */}
-                      <td className={`px-2 py-2 text-sm ${
+                      <td className={`px-0.5 py-0.5 text-sm ${
                         actionItems[person] 
                           ? 'bg-blue-100'
                           : 'bg-gray-50'
-                      }`}>
+                      }`} style={{padding: '2px 2px'}}>
                         <div className="flex items-center justify-center">
                           <button
                             onClick={() => openEmployeeDossier(person)}
-                            className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                            className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded border border-blue-300 transition-colors"
                             title="Mitarbeiter-Dossier öffnen"
                           >
                             <User className="w-4 h-4" />
@@ -1717,17 +1750,34 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                         </div>
                       </td>
                       {/* Status-Spalte */}
-                      <td className={`px-2 py-2 text-sm ${
+                      <td className={`px-0.5 py-0.5 text-sm ${
                         actionItems[person] 
                           ? 'bg-blue-100'
                           : 'bg-gray-50'
-                      }`}>
+                      }`} style={{padding: '2px 2px'}}>
                         <div className="flex items-center justify-center">
                           <StatusLabelSelector
                             person={person}
                             value={personStatus[person]}
                             onChange={(status) => setPersonStatus(prev => ({ ...prev, [person]: status }))}
                           />
+                        </div>
+                      </td>
+
+                      {/* Planning Comments Spalte */}
+                      <td className={`px-0.5 py-0.5 text-sm ${
+                        actionItems[person] 
+                          ? 'bg-blue-100'
+                          : 'bg-gray-50'
+                      }`} style={{padding: '2px 2px'}}>
+                        <div className="flex items-center justify-center">
+                          <button
+                            onClick={() => setPlanningCommentForPerson(person)}
+                            className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded border border-blue-300 transition-colors"
+                            title="Planning Comment öffnen"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
 
@@ -1744,7 +1794,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                           else bgColor = 'bg-red-100';
                         }
                         return (
-                          <td key={`r-${i}`} className={`px-1 py-2 text-center text-xs ${bgColor}`}>
+                          <td key={`r-${i}`} className={`px-0.5 py-0.5 text-center text-xs ${bgColor}`}>
                             <div className={`flex flex-col items-center gap-1 ${isTerminated ? 'line-through opacity-60' : ''}`}>
                               {utilization !== null && utilization !== undefined ? (
                                 <span className={`flex items-center justify-center gap-1 ${isTerminated ? 'line-through opacity-60' : ''}`}>
@@ -2003,21 +2053,20 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-2xl max-h [90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+              className="relative w-full max-w-2xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
-              <header className="flex items-center justify-between p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <MessageSquare className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <h1 className="text-xl font-semibold text-gray-900">Auslastungskommentar</h1>
+              <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                <div className="flex items-center gap-2 text-gray-900 font-medium">
+                  <MessageSquare className="w-4 h-4 text-blue-600" />
+                  <ArrowLeft className="w-4 h-4 text-blue-600" />
+                  Auslastungskommentar
                 </div>
-                <button onClick={() => setUtilizationCommentForPerson(null)} className="p-2 hover:bg-white/50 rounded-lg transition-colors" aria-label="Schließen">
-                  <X className="w-5 h-5 text-gray-500" />
+                <button onClick={() => setUtilizationCommentForPerson(null)} className="p-2 rounded hover:bg-gray-100">
+                  <X className="w-4 h-4 text-gray-500"/>
                 </button>
-              </header>
-              <div className="p-6 overflow-y-auto">
+              </div>
+              <div className="p-4 space-y-3">
                 <UtilizationComment personId={utilizationCommentForPerson} />
               </div>
             </motion.div>
