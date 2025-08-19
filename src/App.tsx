@@ -5,6 +5,7 @@ import { EmployeeListView } from './components/generated/EmployeeListView';
 import { CustomerProjectsManagerButton } from './components/generated/CustomerProjectsManagerButton';
 import { SkillManagementButton } from './components/generated/SkillManagementButton';
 import RoleManagementButton from './components/generated/RoleManagementButton';
+import TechnicalSkillManagementButton from './components/generated/TechnicalSkillManagementButton';
 import { CustomerProvider } from './contexts/CustomerContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './contexts/AuthContext';
@@ -154,7 +155,8 @@ function App() {
               />
               <CustomerProjectsManagerButton />
               <SkillManagementButton className="fixed bottom-4 right-44 z-40" label="Skills" />
-              <RoleManagementButton className="fixed bottom-4 right-80 z-40" label="Rollen" />
+              <TechnicalSkillManagementButton className="fixed bottom-4 right-80 z-40" label="Tech Skills" />
+              <RoleManagementButton className="fixed bottom-4 right-[22rem] z-40" label="Rollen" />
             </>
           )}
           

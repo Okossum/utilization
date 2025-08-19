@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, Edit2, Trash2, User, Briefcase, MessageSquare, Plane, ArrowRight } from 'lucide-react';
+import { X, Plus, Edit2, Trash2, User, Briefcase, MessageSquare, ArrowRight } from 'lucide-react';
 import { ProjectHistoryList } from './ProjectHistoryList';
 
 import { PlanningModal } from './PlanningModal';
@@ -449,15 +449,6 @@ export function EmployeeDossierModal({
                   </div>
                 </section>
               </div>
-
-              {/* Travel Readiness */}
-              <section className="space-y-4">
-                <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
-                  <Plane className="w-5 h-5 text-orange-600" />
-                  Reisebereitschaft
-                </h2>
-                <input type="text" value={formData.travelReadiness} onChange={e => handleInputChange('travelReadiness', e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="z.B. Ja, bis zu 50% oder Nein" />
-              </section>
 
               {/* Skills */}
               <EmployeeSkillAssignment

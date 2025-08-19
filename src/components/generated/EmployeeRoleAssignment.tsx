@@ -223,38 +223,43 @@ const EmployeeRoleAssignment: React.FC<EmployeeRoleAssignmentProps> = ({
   };
 
   // RoleAssignmentCard Component
-  const RoleAssignmentCard: React.FC<{ role: AssignedRole }> = ({ role }) => (
-    <div className="bg-white border border-gray-200 rounded-lg p-4">
-      <div className="flex items-center justify-between mb-2">
-        <h4 className="font-medium text-gray-900">{role.roleName}</h4>
-        <button
-          onClick={() => removeRole(role.id, role.roleName)}
-          disabled={isSubmitting}
-          className="text-red-600 hover:text-red-700 disabled:opacity-50"
-          title="Rolle entfernen"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+  const RoleAssignmentCard: React.FC<{ role: AssignedRole }> = ({ role }) => {
+    // Finde die Beschreibung der Rolle aus den verfügbaren Rollen
+    const roleDetails = availableRoles.find(r => r.id === role.roleId);
+    const roleDescription = roleDetails?.description || '';
+    
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="font-medium text-gray-900">{role.roleName}</h4>
+          <button
+            onClick={() => removeRole(role.id, role.roleName)}
+            disabled={isSubmitting}
+            className="text-red-600 hover:text-red-700 disabled:opacity-50"
+            title="Rolle entfernen"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-600">Bewertung:</span>
+          <StarRating
+            value={role.level}
+            onChange={(newLevel) => updateRoleLevel(role.id, newLevel)}
+            disabled={isSubmitting}
+          />
+          <span className="text-sm text-gray-500">({role.level}/5)</span>
+        </div>
+        
+        {roleDescription && (
+          <div className="mt-2 text-xs text-gray-500">
+            {roleDescription}
+          </div>
+        )}
       </div>
-      
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-gray-600">Bewertung:</span>
-        <StarRating
-          value={role.level}
-          onChange={(newLevel) => updateRoleLevel(role.id, newLevel)}
-          disabled={isSubmitting}
-        />
-        <span className="text-sm text-gray-500">({role.level}/5)</span>
-      </div>
-      
-      <div className="mt-2 text-xs text-gray-500">
-        Zugewiesen: {role.assignedAt?.toDate ? 
-          role.assignedAt.toDate().toLocaleDateString('de-DE') : 
-          'Unbekannt'
-        }
-      </div>
-    </div>
-  );
+    );
+  };
 
 
 

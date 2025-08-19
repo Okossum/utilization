@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Star } from 'lucide-react';
-import { StarRating } from './StarRating';
 import { useAuth } from '../../contexts/AuthContext';
+import TechnicalSkillSelectionModal from './TechnicalSkillSelectionModal';
 
 interface EmployeeSkill {
   id: string;
@@ -15,6 +15,8 @@ interface EmployeeSkill {
 interface AvailableSkill {
   id: string;
   name: string;
+  description: string;
+  category: string;
 }
 
 interface EmployeeSkillAssignmentProps {
@@ -41,6 +43,7 @@ export function EmployeeSkillAssignment({
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [isInitializingSkills, setIsInitializingSkills] = useState(false);
+  const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
 
   // Lade verfügbare Skills und zugewiesene Skills
   useEffect(() => {
@@ -80,8 +83,8 @@ export function EmployeeSkillAssignment({
       console.log('🔑 Token Länge:', token?.length);
       console.log('🔑 Token Anfang:', token?.substring(0, 20) + '...');
       
-      console.log('📡 API-Aufruf an /api/skills startet...');
-      const response = await fetch('/api/skills', {
+      console.log('📡 API-Aufruf an /api/technical-skills startet...');
+      const response = await fetch('/api/technical-skills', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -93,18 +96,18 @@ export function EmployeeSkillAssignment({
       
       if (response.ok) {
         const skills = await response.json();
-        console.log('✅ Verfügbare Skills geladen:', skills);
-        console.log('✅ Skills Array Länge:', skills?.length);
-        console.log('✅ Erstes Skill:', skills?.[0]);
+        console.log('✅ Verfügbare Technical Skills geladen:', skills);
+        console.log('✅ Technical Skills Array Länge:', skills?.length);
+        console.log('✅ Erstes Technical Skill:', skills?.[0]);
         setAvailableSkills(skills);
       } else {
         const errorText = await response.text();
-        console.error('❌ Fehler beim Laden der Skills:', response.status, response.statusText, errorText);
-        setError('Fehler beim Laden der verfügbaren Skills');
+        console.error('❌ Fehler beim Laden der Technical Skills:', response.status, response.statusText, errorText);
+        setError('Fehler beim Laden der verfügbaren Technical Skills');
       }
     } catch (error) {
-      console.error('❌ Exception beim Laden der verfügbaren Skills:', error);
-      setError('Fehler beim Laden der verfügbaren Skills');
+      console.error('❌ Exception beim Laden der verfügbaren Technical Skills:', error);
+      setError('Fehler beim Laden der verfügbaren Technical Skills');
     }
   };
 
@@ -275,100 +278,158 @@ export function EmployeeSkillAssignment({
     return unassignedSkills;
   };
 
+  // Sterne-Bewertung Component (identisch zu Rollen)
+  const SkillStarRating: React.FC<{
+    value: number;
+    onChange: (value: number) => void;
+    disabled?: boolean;
+  }> = ({ value, onChange, disabled = false }) => {
+    return (
+      <div className="flex items-center gap-1">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            type="button"
+            onClick={() => !disabled && onChange(star)}
+            disabled={disabled}
+            className={`text-lg ${
+              star <= value 
+                ? 'text-yellow-400' 
+                : 'text-gray-300'
+            } ${
+              disabled 
+                ? 'cursor-not-allowed' 
+                : 'hover:text-yellow-300 cursor-pointer'
+            }`}
+          >
+            <Star className="w-5 h-5 fill-current" />
+          </button>
+        ))}
+      </div>
+    );
+  };
+
+  // SkillAssignmentCard Component (exakt wie RoleAssignmentCard)
+  const SkillAssignmentCard: React.FC<{ skill: EmployeeSkill }> = ({ skill }) => {
+    // Finde die Beschreibung des Skills aus den verfügbaren Skills
+    const skillDetails = availableSkills.find(s => s.id === skill.skillId);
+    const skillDescription = skillDetails?.description || '';
+    
+    console.log('🔍 SkillAssignmentCard - skill:', skill);
+    console.log('🔍 SkillAssignmentCard - availableSkills:', availableSkills);
+    console.log('🔍 SkillAssignmentCard - skillDetails für ID', skill.skillId, ':', skillDetails);
+    console.log('🔍 SkillAssignmentCard - skillDescription:', skillDescription);
+    
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="font-medium text-gray-900">{skill.skillName}</h4>
+          <button
+            onClick={() => removeSkill(skill.id)}
+            disabled={isLoading}
+            className="text-red-600 hover:text-red-700 disabled:opacity-50"
+            title="Skill entfernen"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-600">Bewertung:</span>
+          <SkillStarRating
+            value={skill.level}
+            onChange={(level) => updateSkillLevel(skill.skillId, level)}
+            disabled={isLoading}
+          />
+          <span className="text-sm text-gray-500">({skill.level}/5)</span>
+        </div>
+        
+        {skillDescription && (
+          <div className="mt-2 text-xs text-gray-500">
+            {skillDescription}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   console.log('🎨 Render wird ausgeführt');
   console.log('📊 availableSkills im Render:', availableSkills);
   console.log('📊 assignedSkills im Render:', assignedSkills);
   
   return (
-    <section className="space-y-4">
-      <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
-        <Star className="w-4 h-4 text-yellow-600" />
-        Skills & Kompetenzen
-      </h2>
-
-      {/* Skill hinzufügen */}
-      <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
-        <select
-          value={selectedSkillId}
-          onChange={(e) => setSelectedSkillId(e.target.value)}
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          disabled={isLoading}
-        >
-          <option value="">Skill auswählen... ({availableSkills.length} verfügbar)</option>
-          {getUnassignedSkills().map(skill => {
-            console.log('🎯 Rendering option für Skill:', skill);
-            return (
-              <option key={skill.id} value={skill.id}>
-                {skill.name}
-              </option>
-            );
-          })}
-        </select>
-        
-
-        
-        <button
-          onClick={addSkill}
-          disabled={!selectedSkillId || isLoading}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Hinzufügen
-        </button>
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h3 className="text-lg font-medium text-gray-900">Skills & Kompetenzen</h3>
+        <p className="text-sm text-gray-600 mt-1">
+          Verwalten Sie die Skills und Bewertungen für {employeeName}
+        </p>
       </div>
 
-      {/* Fehlermeldung */}
+      {/* Error Message */}
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-600">
           {error}
         </div>
       )}
 
       {/* Zugewiesene Skills */}
-      <div className="space-y-3">
+      <div>
+        <h4 className="text-md font-medium text-gray-900 mb-3">
+          Zugewiesene Skills ({assignedSkills.length})
+        </h4>
+        
         {isInitialLoading ? (
           <div className="text-center py-4 text-gray-500">Initialisiere Skills...</div>
         ) : isLoading ? (
           <div className="text-center py-4 text-gray-500">Lade Skills...</div>
         ) : assignedSkills.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
-            <Star className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-            <p>Noch keine Skills zugewiesen</p>
-            <p className="text-sm">Fügen Sie Skills über das Dropdown hinzu</p>
+          <div className="text-center py-8 text-gray-500">
+            <p>Noch keine Skills zugewiesen.</p>
+            <p className="text-sm">Weisen Sie einen Skill aus den verfügbaren Skills unten zu.</p>
           </div>
         ) : (
-          assignedSkills.map(skill => (
-            <div
-              key={skill.id}
-              className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow"
-            >
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <h3 className="font-medium text-gray-900">{skill.skillName}</h3>
-                  <p className="text-sm text-gray-500">Skill ID: {skill.skillId}</p>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600">Level:</span>
-                  <StarRating
-                    value={skill.level}
-                    onChange={(level) => updateSkillLevel(skill.skillId, level)}
-                    size="sm"
-                  />
-                </div>
-              </div>
-              
-              <button
-                onClick={() => removeSkill(skill.id)}
-                className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
-                title="Skill entfernen"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          ))
+          <div className="grid gap-4 md:grid-cols-2">
+            {assignedSkills.map((skill) => (
+              <SkillAssignmentCard key={skill.id} skill={skill} />
+            ))}
+          </div>
         )}
       </div>
-    </section>
+
+      {/* Skills hinzufügen */}
+      <div>
+        <h4 className="text-md font-medium text-gray-900 mb-3">
+          Weitere Skills hinzufügen
+        </h4>
+        
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <p className="text-sm text-gray-600 mb-3">
+            Weisen Sie {employeeName} weitere Technical Skills zu. Es stehen {getUnassignedSkills().length} Skills zur Verfügung.
+          </p>
+          <button
+            onClick={() => setIsSkillModalOpen(true)}
+            disabled={getUnassignedSkills().length === 0}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Skills zuweisen ({getUnassignedSkills().length} verfügbar)
+          </button>
+        </div>
+      </div>
+
+      {/* Technical Skill Selection Modal */}
+      <TechnicalSkillSelectionModal
+        isOpen={isSkillModalOpen}
+        onClose={() => setIsSkillModalOpen(false)}
+        employeeId={employeeId}
+        employeeName={employeeName}
+        onSkillAssigned={() => {
+          // Skill wurde zugewiesen - Daten neu laden
+          loadAssignedSkills();
+        }}
+      />
+    </div>
   );
 }

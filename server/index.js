@@ -1706,6 +1706,162 @@ app.delete('/api/roles/:id', requireAuth, async (req, res) => {
 });
 
 // ==========================================
+// TECHNICAL SKILLS MANAGEMENT API ENDPOINTS
+// ==========================================
+
+// GET /api/technical-skills - Alle Technical Skills laden
+app.get('/api/technical-skills', requireAuth, async (req, res) => {
+  try {
+    console.log('🔍 GET /api/technical-skills - Lade alle Technical Skills');
+    
+    const skillsSnap = await db.collection('technicalSkills')
+      .where('isActive', '==', true)
+      .get();
+    
+    const skills = skillsSnap.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    console.log(`✅ ${skills.length} Technical Skills geladen`);
+    
+    res.json(skills);
+  } catch (error) {
+    console.error('❌ Fehler beim Laden der Technical Skills:', error);
+    res.status(500).json({ error: 'Fehler beim Laden der Technical Skills' });
+  }
+});
+
+// POST /api/technical-skills - Neuen Technical Skill erstellen
+app.post('/api/technical-skills', requireAuth, async (req, res) => {
+  try {
+    const { name, description, category } = req.body;
+    
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Skill-Name ist erforderlich' });
+    }
+    
+    console.log(`🔍 POST /api/technical-skills - Erstelle neuen Skill: ${name}`);
+    
+    // Prüfe ob Skill bereits existiert
+    const existingSkillSnap = await db.collection('technicalSkills')
+      .where('name', '==', name.trim())
+      .where('isActive', '==', true)
+      .get();
+    
+    if (!existingSkillSnap.empty) {
+      return res.status(400).json({ error: 'Ein Skill mit diesem Namen existiert bereits' });
+    }
+    
+    // Erstelle neuen Skill
+    const newSkill = {
+      name: name.trim(),
+      description: description?.trim() || '',
+      category: category?.trim() || '',
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    const docRef = await db.collection('technicalSkills').add(newSkill);
+    
+    console.log(`✅ Technical Skill "${name}" erfolgreich erstellt mit ID: ${docRef.id}`);
+    
+    res.json({
+      success: true,
+      skill: { id: docRef.id, ...newSkill }
+    });
+  } catch (error) {
+    console.error('❌ Fehler beim Erstellen des Technical Skills:', error);
+    res.status(500).json({ error: 'Fehler beim Erstellen des Technical Skills' });
+  }
+});
+
+// PUT /api/technical-skills/:id - Technical Skill bearbeiten
+app.put('/api/technical-skills/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, category } = req.body;
+    
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Skill-Name ist erforderlich' });
+    }
+    
+    console.log(`🔍 PUT /api/technical-skills/${id} - Bearbeite Skill: ${name}`);
+    
+    // Prüfe ob Skill existiert
+    const skillDoc = await db.collection('technicalSkills').doc(id).get();
+    if (!skillDoc.exists) {
+      return res.status(404).json({ error: 'Technical Skill nicht gefunden' });
+    }
+    
+    // Prüfe ob anderer Name bereits existiert
+    const existingSkillSnap = await db.collection('technicalSkills')
+      .where('name', '==', name.trim())
+      .where('isActive', '==', true)
+      .get();
+    
+    const conflictingSkills = existingSkillSnap.docs.filter(doc => doc.id !== id);
+    if (conflictingSkills.length > 0) {
+      return res.status(400).json({ error: 'Ein Skill mit diesem Namen existiert bereits' });
+    }
+    
+    // Update Skill
+    const updatedSkill = {
+      name: name.trim(),
+      description: description?.trim() || '',
+      category: category?.trim() || '',
+      updatedAt: new Date()
+    };
+    
+    await db.collection('technicalSkills').doc(id).update(updatedSkill);
+    
+    console.log(`✅ Technical Skill "${name}" erfolgreich aktualisiert`);
+    
+    res.json({
+      success: true,
+      skill: { id, ...skillDoc.data(), ...updatedSkill }
+    });
+  } catch (error) {
+    console.error('❌ Fehler beim Bearbeiten des Technical Skills:', error);
+    res.status(500).json({ error: 'Fehler beim Bearbeiten des Technical Skills' });
+  }
+});
+
+// DELETE /api/technical-skills/:id - Technical Skill löschen (soft delete)
+app.delete('/api/technical-skills/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    console.log(`🔍 DELETE /api/technical-skills/${id} - Lösche Skill`);
+    
+    // Prüfe ob Skill existiert
+    const skillDoc = await db.collection('technicalSkills').doc(id).get();
+    if (!skillDoc.exists) {
+      return res.status(404).json({ error: 'Technical Skill nicht gefunden' });
+    }
+    
+    const skillName = skillDoc.data().name;
+    
+    // Soft Delete - markiere als inaktiv
+    await db.collection('technicalSkills').doc(id).update({
+      isActive: false,
+      deletedAt: new Date()
+    });
+    
+    console.log(`✅ Technical Skill "${skillName}" erfolgreich als inaktiv markiert`);
+    
+    res.json({
+      success: true,
+      message: `Technical Skill "${skillName}" wurde gelöscht`
+    });
+  } catch (error) {
+    console.error('❌ Fehler beim Löschen des Technical Skills:', error);
+    res.status(500).json({ error: 'Fehler beim Löschen des Technical Skills' });
+  }
+});
+
+// ==========================================
 // EMPLOYEE ROLE ASSIGNMENT API ENDPOINTS
 // ==========================================
 
