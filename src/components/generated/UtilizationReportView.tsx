@@ -882,10 +882,10 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
     if (filterLBS.length > 0) base = base.filter(d => filterLBS.includes(String(personMeta.get(d.person)?.lbs || '')));
     if (filterStatus.length > 0) base = base.filter(d => {
       const personStatusValue = personStatus[d.person];
-      if (!personStatusValue) return false;
+      if (!personStatusValue) return true; // Personen ohne Status werden angezeigt
       
       // Prüfe ob der Status im Filter enthalten ist (sowohl ID als auch Label)
-      return filterStatus.some(filterStatusItem => {
+      const statusMatches = filterStatus.some(filterStatusItem => {
         // Direkte Übereinstimmung
         if (filterStatusItem === personStatusValue) return true;
         
@@ -902,6 +902,9 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
         return filterStatusItem === statusMapping[personStatusValue] || 
                personStatusValue === statusMapping[filterStatusItem];
       });
+      
+      // EXCLUDE Filter: Zeige nur Personen, deren Status NICHT im Filter enthalten ist
+      return !statusMatches;
     });
     
     // Action Items Filter
