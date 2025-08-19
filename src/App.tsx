@@ -13,6 +13,7 @@ import { LoginForm } from './components/LoginForm';
 import { User as UserIcon, ChevronDown, LogOut, Users, BarChart3 } from 'lucide-react';
 import AdminUserManagementModal from './components/generated/AdminUserManagementModal';
 import { AssignmentsProvider } from './contexts/AssignmentsContext';
+import { RoleProvider } from './contexts/RoleContext';
 
 let theme: Theme = 'light';
 // only use 'centered' container for standalone components, never for full page apps or websites.
@@ -80,6 +81,7 @@ function App() {
     return (
       <CustomerProvider>
         <AssignmentsProvider>
+          <RoleProvider>
           {/* Navigation & Account */}
           <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
             {/* Navigation Buttons */}
@@ -167,6 +169,7 @@ function App() {
           )}
           
           <AdminUserManagementModal isOpen={isAdminModalOpen} onClose={() => setAdminModalOpen(false)} />
+          </RoleProvider>
         </AssignmentsProvider>
       </CustomerProvider>
     );

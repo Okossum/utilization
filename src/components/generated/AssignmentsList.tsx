@@ -82,41 +82,64 @@ export function AssignmentsList({ employeeName, className = '', onEdit }: Assign
           </div>
         </div>
 
-        {/* Projekt-Details */}
+        {/* Projekt-Details in kompakter Form */}
         <div className="space-y-2">
-          {assignment.role && (
-            <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-purple-600" />
-              <span className="text-sm text-purple-700">
-                <span className="font-medium">Rolle:</span> {assignment.role}
-              </span>
-            </div>
-          )}
-
-          {typeof assignment.plannedAllocationPct === 'number' && (
-            <div className="flex items-center gap-2">
-              <Target className="w-4 h-4 text-purple-600" />
-              <span className="text-sm text-purple-700">
-                <span className="font-medium">Auslastung:</span> {assignment.plannedAllocationPct}%
-              </span>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 flex items-center justify-center">
-              <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-            </div>
-            <span className="text-sm text-purple-700">
-              <span className="font-medium">Wahrscheinlichkeit:</span> {probability}%
-            </span>
+          {/* Rolle und Auslastung in einer Zeile */}
+          <div className="flex items-center justify-between">
+            {assignment.role && (
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 text-purple-600" />
+                <span className="text-sm text-purple-700">
+                  <span className="font-medium">Rolle:</span> {assignment.role}
+                </span>
+              </div>
+            )}
+            {typeof assignment.plannedAllocationPct === 'number' && (
+              <div className="flex items-center gap-2">
+                <Target className="w-4 h-4 text-purple-600" />
+                <span className="text-sm text-purple-700">
+                  <span className="font-medium">Auslastung:</span> {assignment.plannedAllocationPct}%
+                </span>
+              </div>
+            )}
           </div>
 
-          {(assignment.startDate || assignment.endDate) && (
+          {/* Wahrscheinlichkeit und Zeitraum in einer Zeile */}
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-purple-600" />
+              <div className="w-4 h-4 flex items-center justify-center">
+                <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+              </div>
               <span className="text-sm text-purple-700">
-                <span className="font-medium">Zeitraum:</span> {assignment.startDate || '—'} → {assignment.endDate || '—'}
+                <span className="font-medium">Wahrscheinlichkeit:</span> {probability}%
               </span>
+            </div>
+            {(assignment.startDate || assignment.endDate) && (
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-purple-600" />
+                <span className="text-sm text-purple-700">
+                  <span className="font-medium">Zeitraum:</span> {assignment.startDate || '—'} → {assignment.endDate || '—'}
+                </span>
+              </div>
+            )}
+          </div>
+          
+          {/* Due Date (falls vorhanden) */}
+          {assignment.dueDate && (
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 flex items-center justify-center">
+                <span className="text-lg">📅</span>
+              </div>
+              <span className="text-sm text-purple-700">
+                <span className="font-medium">Due Date:</span> {assignment.dueDate}
+              </span>
+            </div>
+          )}
+
+          {/* Kommentar (falls vorhanden) */}
+          {assignment.comment && (
+            <div className="text-sm text-purple-600 bg-purple-50 px-3 py-2 rounded border-l-2 border-purple-200">
+              💬 {assignment.comment}
             </div>
           )}
         </div>

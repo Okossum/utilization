@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Link2, Building2, Plus } from 'lucide-react';
 import { useCustomers } from '../../contexts/CustomerContext';
 import { useAssignments } from '../../contexts/AssignmentsContext';
+import { useRoles } from '../../contexts/RoleContext';
 
 interface AssignmentEditorModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ interface AssignmentEditorModalProps {
 export function AssignmentEditorModal({ isOpen, onClose, employeeName, editingAssignment, onAssignmentCreated }: AssignmentEditorModalProps) {
   const { customers, projects, addCustomer, addProject } = useCustomers();
   const { linkEmployeeToProject, getAssignmentsForEmployee, assignmentsByEmployee, updateAssignment, unlinkAssignment } = useAssignments();
+  const { getActiveRoles } = useRoles();
 
   // Reset state when employeeName changes or modal opens
   useEffect(() => {
@@ -25,6 +27,7 @@ export function AssignmentEditorModal({ isOpen, onClose, employeeName, editingAs
         setSelectedProjectId(editingAssignment.projectId || '');
         setStartDate(editingAssignment.startDate || '');
         setEndDate(editingAssignment.endDate || '');
+        setDueDate(editingAssignment.dueDate || '');
         setOfferedSkill(editingAssignment.role || '');
         setAllocation(editingAssignment.plannedAllocationPct || 100);
         setStatus(editingAssignment.status || 'planned');
@@ -36,6 +39,7 @@ export function AssignmentEditorModal({ isOpen, onClose, employeeName, editingAs
         setSelectedProjectId('');
         setStartDate('');
         setEndDate('');
+        setDueDate('');
         setOfferedSkill('');
         setAllocation(100);
         setStatus('planned');
@@ -57,6 +61,7 @@ export function AssignmentEditorModal({ isOpen, onClose, employeeName, editingAs
 
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  const [dueDate, setDueDate] = useState<string>('');
   const [offeredSkill, setOfferedSkill] = useState<string>('');
   const [allocation, setAllocation] = useState<number>(100);
   const [status, setStatus] = useState<'prospect'|'proposed'|'planned'|'active'|'onHold'|'closed'>('planned');
@@ -100,10 +105,11 @@ export function AssignmentEditorModal({ isOpen, onClose, employeeName, editingAs
       const assignmentData = {
         startDate: startDate || undefined,
         endDate: endDate || undefined,
-        offeredSkill: offeredSkill || undefined,
+        dueDate: dueDate || undefined,
+        role: offeredSkill || undefined,
         plannedAllocationPct: Number.isFinite(allocation) ? allocation : undefined,
         status,
-        probability: (status === 'planned' || status === 'onHold') ? probability : undefined,
+        probability: undefined, // Wahrscheinlichkeit wird jetzt automatisch basierend auf Status berechnet
         comment: comment || undefined,
       };
 
@@ -253,8 +259,23 @@ export function AssignmentEditorModal({ isOpen, onClose, employeeName, editingAs
                   <input type="date" className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Angebotener Skill</label>
-                  <input type="text" className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm" value={offeredSkill} onChange={(e) => setOfferedSkill(e.target.value)} />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                  <input type="date" className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Rolle</label>
+                  <select 
+                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm" 
+                    value={offeredSkill} 
+                    onChange={(e) => setOfferedSkill(e.target.value)}
+                  >
+                    <option value="">— bitte wählen —</option>
+                    {getActiveRoles().map(role => (
+                      <option key={role.id} value={role.name}>
+                        {role.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Geplante Auslastung (%)</label>

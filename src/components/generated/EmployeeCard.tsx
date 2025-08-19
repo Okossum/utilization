@@ -353,47 +353,71 @@ export const EmployeeCard = ({
                     {assignment.customer && (
                       <div className="text-xs text-purple-700 mb-1">{assignment.customer}</div>
                     )}
-                    <div className="flex items-center justify-between">
-                      {assignment.role && (
-                        <span className="text-xs text-purple-700 bg-purple-100 px-2 py-1 rounded">
-                          {assignment.role}
-                        </span>
-                      )}
-                      {assignment.status && (
-                        <span className={`text-xs px-2 py-1 rounded-full ${
-                          assignment.status === 'active' ? 'bg-green-100 text-green-700' :
-                          assignment.status === 'planned' ? 'bg-blue-100 text-blue-700' :
-                          assignment.status === 'proposed' ? 'bg-orange-100 text-orange-700' :
-                          assignment.status === 'prospect' ? 'bg-yellow-100 text-yellow-700' :
-                          assignment.status === 'onHold' ? 'bg-amber-100 text-amber-700' :
-                          assignment.status === 'closed' ? 'bg-gray-100 text-gray-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
+                    {/* Projekt-Details in kompakter Form */}
+                    <div className="space-y-1 mt-2">
+                      {/* Rolle und Status in einer Zeile */}
+                      <div className="flex items-center justify-between">
+                        {assignment.role && (
+                          <span className="text-xs text-purple-700 bg-purple-100 px-2 py-1 rounded">
+                            Rolle: {assignment.role}
+                          </span>
+                        )}
+                        {assignment.status && (
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            assignment.status === 'active' ? 'bg-green-100 text-green-700' :
+                            assignment.status === 'planned' ? 'bg-blue-100 text-blue-700' :
+                            assignment.status === 'proposed' ? 'bg-orange-100 text-orange-700' :
+                            assignment.status === 'prospect' ? 'bg-yellow-100 text-yellow-700' :
+                            assignment.status === 'onHold' ? 'bg-amber-100 text-amber-700' :
+                            assignment.status === 'closed' ? 'bg-gray-100 text-gray-700' :
+                            'bg-gray-100 text-gray-700'
+                          }`}>
                           {assignment.status}
                         </span>
+                        )}
+                      </div>
+                      
+                      {/* Wahrscheinlichkeit und Auslastung in einer Zeile */}
+                      <div className="flex items-center justify-between text-xs text-purple-700">
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                          <span>Wahrscheinlichkeit: {
+                            assignment.status === 'prospect' ? '25%' : 
+                            assignment.status === 'proposed' ? '50%' : 
+                            assignment.status === 'planned' ? '75%' : 
+                            assignment.status === 'active' ? '100%' : 
+                            assignment.status === 'onHold' ? '50%' : 
+                            assignment.status === 'closed' ? '0%' : '—'
+                          }</span>
+                        </div>
+                        {assignment.plannedAllocationPct && (
+                          <div className="flex items-center gap-1">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                            <span>Auslastung: {assignment.plannedAllocationPct}%</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Kommentar (falls vorhanden) */}
+                      {assignment.comment && (
+                        <div className="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded border-l-2 border-purple-200">
+                          💬 {assignment.comment}
+                        </div>
                       )}
                     </div>
-                    {/* Wahrscheinlichkeit basierend auf Status */}
-                    <div className="flex items-center gap-2 mt-1">
-                      <div className="w-3 h-3 flex items-center justify-center">
-                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                      </div>
-                      <span className="text-xs text-purple-700">
-                        <span className="font-medium">Wahrscheinlichkeit:</span> {
-                          assignment.status === 'prospect' ? '25%' : 
-                          assignment.status === 'proposed' ? '50%' : 
-                          assignment.status === 'planned' ? '75%' : 
-                          assignment.status === 'active' ? '100%' : 
-                          assignment.status === 'onHold' ? '50%' : 
-                          assignment.status === 'closed' ? '0%' : '—'
-                        }
-                      </span>
+                    {/* Zeitraum und Due Date */}
+                    <div className="flex items-center justify-between text-xs text-purple-700 mt-1">
+                      {(assignment.startDate || assignment.endDate) && (
+                        <div>
+                          {assignment.startDate || '—'} → {assignment.endDate || '—'}
+                        </div>
+                      )}
+                      {assignment.dueDate && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-purple-600">📅 Due: {assignment.dueDate}</span>
+                        </div>
+                      )}
                     </div>
-                    {(assignment.startDate || assignment.endDate) && (
-                      <div className="text-xs text-purple-700 mt-1">
-                        {assignment.startDate || '—'} → {assignment.endDate || '—'}
-                      </div>
-                    )}
                   </div>
                 ))}
                 {assignments.length > 3 && (
@@ -425,16 +449,30 @@ export const EmployeeCard = ({
                     )}
                   </div>
                   <div className="text-xs text-green-700 mb-1">{assignment.customer}</div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
-                      {assignment.role}
-                    </span>
-                    {assignment.startDate && assignment.endDate && (
-                      <span className="text-xs text-green-600">
-                        {assignment.startDate} - {assignment.endDate}
-                      </span>
-                    )}
-                  </div>
+                                      {/* Projekt-Details in kompakter Form */}
+                    <div className="space-y-1 mt-2">
+                      {/* Rolle und Zeitraum in einer Zeile */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
+                          Rolle: {assignment.role}
+                        </span>
+                        {assignment.startDate && assignment.endDate && (
+                          <span className="text-xs text-green-600">
+                            {assignment.startDate} - {assignment.endDate}
+                          </span>
+                        )}
+                      </div>
+                      
+
+                      
+                      {/* Auslastung (falls vorhanden) */}
+                      {assignment.workload && (
+                        <div className="flex items-center gap-1 text-xs text-green-700">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                          <span>Auslastung: {assignment.workload}%</span>
+                        </div>
+                      )}
+                    </div>
                 </div>
               ))}
               {employee.currentProjectAssignments.length > 3 && (
