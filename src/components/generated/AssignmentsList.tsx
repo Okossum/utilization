@@ -36,6 +36,7 @@ export function AssignmentsList({ employeeName, className = '', onEdit }: Assign
     const getProbabilityFromStatus = (status?: string) => {
       switch (status) {
         case 'prospect': return 25;
+        case 'proposed': return 50;
         case 'planned': return 75;
         case 'active': return 100;
         case 'onHold': return 50;

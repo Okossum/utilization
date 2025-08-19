@@ -330,7 +330,6 @@ export const EmployeeCard = ({
               </div>
             ) : (
               <div className="space-y-2">
-                {console.log('🎯 EMPLOYEECARD: Rendering assignments:', assignments)}
                 {assignments.slice(0, 3).map((assignment) => (
                   <div 
                     key={assignment.id} 
@@ -364,12 +363,31 @@ export const EmployeeCard = ({
                         <span className={`text-xs px-2 py-1 rounded-full ${
                           assignment.status === 'active' ? 'bg-green-100 text-green-700' :
                           assignment.status === 'planned' ? 'bg-blue-100 text-blue-700' :
+                          assignment.status === 'proposed' ? 'bg-orange-100 text-orange-700' :
                           assignment.status === 'prospect' ? 'bg-yellow-100 text-yellow-700' :
+                          assignment.status === 'onHold' ? 'bg-amber-100 text-amber-700' :
+                          assignment.status === 'closed' ? 'bg-gray-100 text-gray-700' :
                           'bg-gray-100 text-gray-700'
                         }`}>
                           {assignment.status}
                         </span>
                       )}
+                    </div>
+                    {/* Wahrscheinlichkeit basierend auf Status */}
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="w-3 h-3 flex items-center justify-center">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                      </div>
+                      <span className="text-xs text-purple-700">
+                        <span className="font-medium">Wahrscheinlichkeit:</span> {
+                          assignment.status === 'prospect' ? '25%' : 
+                          assignment.status === 'proposed' ? '50%' : 
+                          assignment.status === 'planned' ? '75%' : 
+                          assignment.status === 'active' ? '100%' : 
+                          assignment.status === 'onHold' ? '50%' : 
+                          assignment.status === 'closed' ? '0%' : '—'
+                        }
+                      </span>
                     </div>
                     {(assignment.startDate || assignment.endDate) && (
                       <div className="text-xs text-purple-700 mt-1">
@@ -493,7 +511,7 @@ export const EmployeeCard = ({
       </div>
       
       {/* Assignment Editor Modal */}
-      {console.log('showEditModal:', showEditModal, 'editingAssignment:', editingAssignment)}
+      
       {showEditModal && (
         <AssignmentEditorModal
           isOpen={showEditModal}

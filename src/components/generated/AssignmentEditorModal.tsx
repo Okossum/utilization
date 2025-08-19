@@ -59,7 +59,7 @@ export function AssignmentEditorModal({ isOpen, onClose, employeeName, editingAs
   const [endDate, setEndDate] = useState<string>('');
   const [offeredSkill, setOfferedSkill] = useState<string>('');
   const [allocation, setAllocation] = useState<number>(100);
-  const [status, setStatus] = useState<'prospect'|'planned'|'active'|'onHold'|'closed'>('planned');
+  const [status, setStatus] = useState<'prospect'|'proposed'|'planned'|'active'|'onHold'|'closed'>('planned');
   const [probability, setProbability] = useState<number>(50);
   const [comment, setComment] = useState<string>('');
   const [saving, setSaving] = useState(false);
@@ -154,8 +154,10 @@ export function AssignmentEditorModal({ isOpen, onClose, employeeName, editingAs
               </button>
             </div>
 
-            {/* Body */}
-            <div className="p-4 space-y-4 overflow-y-auto">
+            {/* Body - Split Layout */}
+            <div className="flex flex-col flex-1 min-h-0">
+              {/* Top Section - Input Fields (Fixed Height) */}
+              <div className="p-6 space-y-4 border-b border-gray-100 bg-gray-50 min-h-[60vh]">
               {/* Customer Picker */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Kunde</label>
@@ -262,48 +264,45 @@ export function AssignmentEditorModal({ isOpen, onClose, employeeName, editingAs
                   <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                   <select className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm" value={status} onChange={(e) => setStatus(e.target.value as any)}>
                     <option value="prospect">Prospect</option>
+                    <option value="proposed">Proposed</option>
                     <option value="planned">Planned</option>
                     <option value="active">Active</option>
                     <option value="onHold">On Hold</option>
                     <option value="closed">Closed</option>
                   </select>
                 </div>
-                {(status === 'planned' || status === 'onHold') && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Wahrscheinlichkeit</label>
-                    <select className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm" value={probability} onChange={(e) => setProbability(parseInt(e.target.value))}>
-                      <option value={25}>25%</option>
-                      <option value={50}>50%</option>
-                      <option value={75}>75%</option>
-                    </select>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Wahrscheinlichkeit</label>
+                  <div className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-700">
+                    {status === 'prospect' ? '25%' : 
+                     status === 'proposed' ? '50%' : 
+                     status === 'planned' ? '75%' : 
+                     status === 'active' ? '100%' : 
+                     status === 'onHold' ? '50%' : 
+                     status === 'closed' ? '0%' : '—'}
                   </div>
-                )}
+                </div>
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Kommentar</label>
                   <textarea className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm" rows={3} value={comment} onChange={(e) => setComment(e.target.value)} />
                 </div>
               </div>
-            </div>
-
-            {/* Footer */}
-            <div className="flex items-center justify-end gap-2 p-4 border-t border-gray-200">
-              <button onClick={onClose} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Abbrechen</button>
-              <button onClick={onSave} disabled={!canSave || saving} className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                {saving ? 'Speichern…' : 'Zuordnen'}
-              </button>
-            </div>
-
-            {/* Bestehende Zuordnungen anzeigen */}
-            <div className="border-t border-gray-200">
-              <div className="p-4 border-b border-gray-200 bg-gray-50">
-                <h3 className="text-lg font-medium text-gray-900">
-                  Bestehende Zuordnungen für {employeeName}
-                  <span className="ml-2 text-sm text-gray-500">
-                    ({assignmentsByEmployee[employeeName]?.length || 0} gefunden)
-                  </span>
-                </h3>
               </div>
-              <div className="p-4 max-h-[40vh] overflow-y-auto">
+
+              {/* Bottom Section - Existing Assignments (Scrollable) */}
+              <div className="flex flex-col flex-1 min-h-0">
+                {/* Existing Assignments Header */}
+                <div className="p-4 border-b border-gray-200 bg-gray-50">
+                  <h3 className="text-lg font-medium text-gray-900">
+                    Bestehende Zuordnungen für {employeeName}
+                    <span className="ml-2 text-sm text-gray-500">
+                      ({assignmentsByEmployee[employeeName]?.length || 0} gefunden)
+                    </span>
+                  </h3>
+                </div>
+                
+                {/* Scrollable Assignments List */}
+                <div className="flex-1 overflow-y-auto p-4">
                 {(() => {
                   const existingAssignments = assignmentsByEmployee[employeeName] || [];
                   if (existingAssignments.length === 0) {
@@ -348,6 +347,7 @@ export function AssignmentEditorModal({ isOpen, onClose, employeeName, editingAs
                     </div>
                   );
                 })()}
+                </div>
               </div>
             </div>
 
