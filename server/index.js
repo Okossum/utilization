@@ -1035,9 +1035,9 @@ app.post('/api/employee-skills/:employeeName', requireAuth, async (req, res) => 
     // Validiere Skills-Struktur
     const validatedSkills = skills.map(skill => ({
       skillId: String(skill.skillId || skill.id || ''),
-      name: String(skill.name || skill.skillName || ''),
+      skillName: String(skill.name || skill.skillName || ''), // ✅ FIX: skillName statt name für Konsistenz
       level: Math.max(0, Math.min(5, Number(skill.level) || 0))
-    })).filter(skill => skill.skillId && skill.name);
+    })).filter(skill => skill.skillId && skill.skillName);
     
     console.log(`✅ Validierte Skills:`, validatedSkills);
     

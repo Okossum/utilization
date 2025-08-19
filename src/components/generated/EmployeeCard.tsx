@@ -318,23 +318,23 @@ export const EmployeeCard = ({
             ) : (
               <div className="space-y-2">
                 {assignments.slice(0, 3).map((assignment) => (
-                  <div key={assignment.id} className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                  <div key={assignment.id} className="p-3 bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-lg hover:from-purple-100 hover:to-violet-100 transition-colors">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-indigo-900">
+                      <span className="text-sm font-medium text-purple-900">
                         {assignment.projectName || assignment.projectId}
                       </span>
                       {assignment.plannedAllocationPct && (
-                        <span className="text-xs text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full">
+                        <span className="text-xs text-purple-700 bg-purple-100 px-2 py-1 rounded-full">
                           {assignment.plannedAllocationPct}% Auslastung
                         </span>
                       )}
                     </div>
                     {assignment.customer && (
-                      <div className="text-xs text-indigo-700 mb-1">{assignment.customer}</div>
+                      <div className="text-xs text-purple-700 mb-1">{assignment.customer}</div>
                     )}
                     <div className="flex items-center justify-between">
                       {assignment.role && (
-                        <span className="text-xs text-indigo-600 bg-indigo-100 px-2 py-1 rounded">
+                        <span className="text-xs text-purple-700 bg-purple-100 px-2 py-1 rounded">
                           {assignment.role}
                         </span>
                       )}
@@ -350,14 +350,14 @@ export const EmployeeCard = ({
                       )}
                     </div>
                     {(assignment.startDate || assignment.endDate) && (
-                      <div className="text-xs text-indigo-600 mt-1">
+                      <div className="text-xs text-purple-700 mt-1">
                         {assignment.startDate || '—'} → {assignment.endDate || '—'}
                       </div>
                     )}
                   </div>
                 ))}
                 {assignments.length > 3 && (
-                  <div className="text-xs text-indigo-600 text-center py-2">
+                  <div className="text-xs text-purple-600 text-center py-2">
                     +{assignments.length - 3} weitere Zuordnungen
                   </div>
                 )}

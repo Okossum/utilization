@@ -200,9 +200,13 @@ export function EmployeeSkillAssignment({
 
       if (response.ok) {
         await loadAssignedSkills();
+      } else {
+        console.error('Fehler beim Aktualisieren des Skill-Levels:', response.status, response.statusText);
+        setError('Fehler beim Aktualisieren des Skill-Levels');
       }
     } catch (error) {
       console.error('Fehler beim Aktualisieren des Skill-Levels:', error);
+      setError('Fehler beim Aktualisieren des Skill-Levels');
     }
   };
 
@@ -315,15 +319,13 @@ export function EmployeeSkillAssignment({
     const skillDetails = availableSkills.find(s => s.id === skill.skillId);
     const skillDescription = skillDetails?.description || '';
     
-    console.log('🔍 SkillAssignmentCard - skill:', skill);
-    console.log('🔍 SkillAssignmentCard - availableSkills:', availableSkills);
-    console.log('🔍 SkillAssignmentCard - skillDetails für ID', skill.skillId, ':', skillDetails);
-    console.log('🔍 SkillAssignmentCard - skillDescription:', skillDescription);
+    // ✅ FIX: Skill-Name aus skillDetails nehmen, falls skill.skillName leer ist
+    const displayName = skill.skillName || skillDetails?.name || 'Unbekannter Skill';
     
     return (
-      <div className="bg-white border border-gray-200 rounded-lg p-4">
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 hover:from-blue-100 hover:to-indigo-100 transition-colors">
         <div className="flex items-center justify-between mb-2">
-          <h4 className="font-medium text-gray-900">{skill.skillName}</h4>
+          <h4 className="font-medium text-blue-900">{displayName}</h4>
           <button
             onClick={() => removeSkill(skill.id)}
             disabled={isLoading}
@@ -345,7 +347,7 @@ export function EmployeeSkillAssignment({
         </div>
         
         {skillDescription && (
-          <div className="mt-2 text-xs text-gray-500">
+          <div className="mt-2 text-xs text-blue-600 bg-blue-100 rounded p-2">
             {skillDescription}
           </div>
         )}

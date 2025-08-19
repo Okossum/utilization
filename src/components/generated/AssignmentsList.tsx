@@ -47,17 +47,17 @@ export function AssignmentsList({ employeeName, className = '', onEdit }: Assign
     const probability = getProbabilityFromStatus(assignment.status);
 
     return (
-      <div className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
+      <div className="bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-lg p-4 hover:from-purple-100 hover:to-violet-100 transition-colors">
         {/* Header mit Aktionen */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1 min-w-0">
-            <h4 className="font-medium text-gray-900 truncate">
+            <h4 className="font-medium text-purple-900 truncate">
               {assignment.projectName || assignment.projectId}
             </h4>
             {assignment.customer && (
               <div className="flex items-center gap-1 mt-1">
-                <Building className="w-3 h-3 text-gray-400" />
-                <span className="text-sm text-gray-600">{assignment.customer}</span>
+                <Building className="w-3 h-3 text-purple-500" />
+                <span className="text-sm text-purple-700">{assignment.customer}</span>
               </div>
             )}
           </div>
@@ -85,8 +85,8 @@ export function AssignmentsList({ employeeName, className = '', onEdit }: Assign
         <div className="space-y-2">
           {assignment.role && (
             <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-blue-600" />
-              <span className="text-sm text-gray-700">
+              <User className="w-4 h-4 text-purple-600" />
+              <span className="text-sm text-purple-700">
                 <span className="font-medium">Rolle:</span> {assignment.role}
               </span>
             </div>
@@ -94,8 +94,8 @@ export function AssignmentsList({ employeeName, className = '', onEdit }: Assign
 
           {typeof assignment.plannedAllocationPct === 'number' && (
             <div className="flex items-center gap-2">
-              <Target className="w-4 h-4 text-green-600" />
-              <span className="text-sm text-gray-700">
+              <Target className="w-4 h-4 text-purple-600" />
+              <span className="text-sm text-purple-700">
                 <span className="font-medium">Auslastung:</span> {assignment.plannedAllocationPct}%
               </span>
             </div>
@@ -105,7 +105,7 @@ export function AssignmentsList({ employeeName, className = '', onEdit }: Assign
             <div className="w-4 h-4 flex items-center justify-center">
               <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
             </div>
-            <span className="text-sm text-gray-700">
+            <span className="text-sm text-purple-700">
               <span className="font-medium">Wahrscheinlichkeit:</span> {probability}%
             </span>
           </div>
@@ -113,7 +113,7 @@ export function AssignmentsList({ employeeName, className = '', onEdit }: Assign
           {(assignment.startDate || assignment.endDate) && (
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-purple-600" />
-              <span className="text-sm text-gray-700">
+              <span className="text-sm text-purple-700">
                 <span className="font-medium">Zeitraum:</span> {assignment.startDate || '—'} → {assignment.endDate || '—'}
               </span>
             </div>

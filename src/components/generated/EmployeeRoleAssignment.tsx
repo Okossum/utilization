@@ -117,8 +117,6 @@ const EmployeeRoleAssignment: React.FC<EmployeeRoleAssignmentProps> = ({
     setError(null);
     
     try {
-      console.log(`🔍 Ändere Rollen-Level auf ${newLevel}`);
-      
       const response = await fetch(`/api/employee-roles/${encodeURIComponent(employeeId)}/${assignmentId}`, {
         method: 'PUT',
         headers: {
@@ -229,9 +227,9 @@ const EmployeeRoleAssignment: React.FC<EmployeeRoleAssignmentProps> = ({
     const roleDescription = roleDetails?.description || '';
     
     return (
-      <div className="bg-white border border-gray-200 rounded-lg p-4">
+      <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-lg p-4 hover:from-emerald-100 hover:to-green-100 transition-colors">
         <div className="flex items-center justify-between mb-2">
-          <h4 className="font-medium text-gray-900">{role.roleName}</h4>
+          <h4 className="font-medium text-emerald-900">{role.roleName}</h4>
           <button
             onClick={() => removeRole(role.id, role.roleName)}
             disabled={isSubmitting}
@@ -253,7 +251,7 @@ const EmployeeRoleAssignment: React.FC<EmployeeRoleAssignmentProps> = ({
         </div>
         
         {roleDescription && (
-          <div className="mt-2 text-xs text-gray-500">
+          <div className="mt-2 text-xs text-emerald-600 bg-emerald-100 rounded p-2">
             {roleDescription}
           </div>
         )}
