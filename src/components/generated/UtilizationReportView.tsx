@@ -1563,6 +1563,20 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
             <table className="w-full">
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
+                  {/* 8 Wochen aus dem View (letzte 8 Wochen vor aktueller KW) */}
+                  {Array.from({ length: 8 }, (_, i) => {
+                    const weekNumber = getISOWeek(new Date()) - 8 + i;
+                    const year = weekNumber <= 0 ? getISOWeekYear(new Date()) - 1 : getISOWeekYear(new Date());
+                    const adjustedWeek = weekNumber <= 0 ? weekNumber + 52 : weekNumber;
+                    const yy = String(year).slice(-2);
+                    const weekKey = `${yy}/${String(adjustedWeek).padStart(2, '0')}`;
+                    
+                    return (
+                      <th key={`view-week-${i}`} className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-12">
+                        {weekKey}
+                      </th>
+                    );
+                  })}
 
                   {/* Act-Spalte */}
                   <th className="px-2 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100 min-w-16">
@@ -1585,8 +1599,12 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                     Status
                   </th>
 
-                  {/* Forecast-Wochen entfernt - werden jetzt in historyWeeks angezeigt */}
-                  {/* Removed inline planning columns */}
+                  {/* Forecast-Wochen aus dem Einsatzplan */}
+                  {visibleColumns.forecastWeeks && availableWeeksFromData.slice(0, forecastWeeks).map((week, i) => (
+                    <th key={`forecast-${i}`} className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-12">
+                      {week}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -1602,8 +1620,47 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                   }
                   return (
                     <tr key={person} className="hover:bg-gray-50">
-                      {/* Auslastung-Spalten entfernt */}
-
+                      {/* 8 Wochen aus dem View (letzte 8 Wochen vor aktueller KW) */}
+                      {Array.from({ length: 8 }, (_, i) => {
+                        const weekNumber = getISOWeek(new Date()) - 8 + i;
+                        const year = weekNumber <= 0 ? getISOWeekYear(new Date()) - 1 : getISOWeekYear(new Date());
+                        const adjustedWeek = weekNumber <= 0 ? weekNumber + 52 : weekNumber;
+                        const yy = String(year).slice(-2);
+                        const weekKey = `${yy}/${String(adjustedWeek).padStart(2, '0')}`;
+                        
+                        // Finde den Wert aus dem View für diese Person und Woche
+                        const weekData = personData.find(item => item.week === weekKey);
+                        const weekValue = weekData?.utilization;
+                        
+                        // Farbkodierung basierend auf dem Wert
+                        let bgColor = 'bg-gray-100';
+                        let textColor = 'text-gray-500';
+                        
+                        if (weekValue !== null && weekValue !== undefined) {
+                          if (weekValue > 90) {
+                            bgColor = 'bg-green-100';
+                            textColor = 'text-green-700';
+                          } else if (weekValue > 80) {
+                            bgColor = 'bg-yellow-100';
+                            textColor = 'text-yellow-700';
+                          } else if (weekValue > 0) {
+                            bgColor = 'bg-red-100';
+                            textColor = 'text-red-700';
+                          }
+                        }
+                        
+                        return (
+                          <td key={`view-week-${i}`} className={`px-1 py-2 text-center text-xs ${bgColor} ${isTerminated ? 'line-through opacity-60' : ''}`}>
+                            {weekValue !== null && weekValue !== undefined ? (
+                              <span className={`font-medium ${textColor}`}>
+                                {Math.round(weekValue * 10) / 10}%
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
+                          </td>
+                        );
+                      })}
 
                       {/* Act-Spalte */}
                       <td className={`px-2 py-2 text-sm ${
