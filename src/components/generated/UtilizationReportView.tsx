@@ -3,6 +3,8 @@ import { getISOWeek, getISOWeekYear } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, ChefHat, Database, Target, User, Ticket, Columns, ArrowLeft, MessageSquare, X, ArrowRight } from 'lucide-react';
 import { AdminDataUploadModal } from './AdminDataUploadModal';
+import { EinsatzplanView } from './EinsatzplanView';
+import { AuslastungView } from './AuslastungView';
 import { useAuth } from '../../contexts/AuthContext';
 import { MultiSelectFilter } from './MultiSelectFilter';
 import { PersonFilterBar } from './PersonFilterBar';
@@ -61,6 +63,8 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
   const [utilizationCommentForPerson, setUtilizationCommentForPerson] = useState<string | null>(null);
   const [planningCommentForPerson, setPlanningCommentForPerson] = useState<string | null>(null);
   const [isAdminUploadModalOpen, setIsAdminUploadModalOpen] = useState(false);
+  const [isEinsatzplanViewOpen, setIsEinsatzplanViewOpen] = useState(false);
+  const [isAuslastungViewOpen, setIsAuslastungViewOpen] = useState(false);
 
   // ✅ VEREINFACHT: Nur noch eine Datenquelle - Database (Firebase)
   // Upload-Funktionalität ist jetzt nur noch über Admin-Modal verfügbar
@@ -931,24 +935,24 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
     return base;
   }, [dataForUI, selectedPersons, filterCC, filterLBS, filterStatus, personMeta, personStatus, showWorkingStudents, showActionItems, actionItems, personSearchTerm, showAllData, profile, selectedLoB, selectedBereich, selectedCC, selectedTeam]);
   
-  // ✅ Ermittle verfügbare Wochen für Header - nur 8 Wochen von der heutigen KW zurück
+  // ✅ Ermittle verfügbare Wochen für Header - 8 Wochen ab der aktuellen KW
   const availableWeeksFromData = useMemo(() => {
     // Berechne die aktuelle Kalenderwoche
     const today = new Date();
     const currentWeek = getISOWeek(today);
     const currentYear = getISOWeekYear(today);
     
-    // Generiere die letzten 8 Wochen von der aktuellen KW zurück
-    const historicalWeeks = Array.from({ length: 8 }, (_, i) => {
-      const weekNumber = currentWeek - 8 + i + 1;
-      const year = weekNumber <= 0 ? currentYear - 1 : currentYear;
-      const adjustedWeek = weekNumber <= 0 ? weekNumber + 52 : weekNumber;
+    // Generiere die nächsten 8 Wochen ab der aktuellen KW
+    const forecastWeeks = Array.from({ length: 8 }, (_, i) => {
+      const weekNumber = currentWeek + i;
+      const year = weekNumber > 52 ? currentYear + 1 : currentYear;
+      const adjustedWeek = weekNumber > 52 ? weekNumber - 52 : weekNumber;
       const yy = String(year).slice(-2);
       return `${yy}/${String(adjustedWeek).padStart(2, '0')}`;
     });
     
-    console.log('🔍 Historische Wochen (8 Wochen zurück):', historicalWeeks);
-    return historicalWeeks;
+    console.log('🔍 Forecast Wochen (8 Wochen ab aktueller KW):', forecastWeeks);
+    return forecastWeeks;
   }, []);
   
   const visiblePersons = useMemo(() => {
@@ -1150,6 +1154,22 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
             <button onClick={handleExportExcel} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
               <FileSpreadsheet className="w-4 h-4" />
               Excel
+            </button>
+            <button 
+              onClick={() => setIsAuslastungViewOpen(true)} 
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
+              title="Auslastung-Übersicht öffnen"
+            >
+              <TrendingUp className="w-4 h-4" />
+              Auslastung
+            </button>
+            <button 
+              onClick={() => setIsEinsatzplanViewOpen(true)} 
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+              title="Einsatzplan-Übersicht öffnen"
+            >
+              <Target className="w-4 h-4" />
+              Einsatzplan
             </button>
             <button 
               onClick={() => setIsAdminUploadModalOpen(true)} 
@@ -1525,10 +1545,10 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                       Ø {availableWeeksFromData.slice(0, 4).length > 0 ? `${availableWeeksFromData[0]}-${availableWeeksFromData[3] || availableWeeksFromData.slice(-1)[0]}` : 'Ø'}
                     </th>
                   )}
-                  {/* 8 Einzelwochen von der aktuellen KW zurück */}
+                  {/* 8 Wochen ab der aktuellen KW */}
                   {visibleColumns.historyWeeks && availableWeeksFromData.map((week, i) => {
                     return (
-                      <th key={`left-single-${i}`} className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-12">
+                      <th key={`forecast-${i}`} className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-12">
                         {week}
                       </th>
                     );
@@ -1555,18 +1575,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                     Status
                   </th>
 
-                  {visibleColumns.forecastWeeks && availableWeeksFromData.slice(0, forecastWeeks).map((week, i) => {
-                    // ✅ DEBUG: Zeige erste 3 Header-Wochen
-                    if (i < 3) {
-                      console.log(`🔍 DEBUG Header-Woche ${i}:`, week);
-                    }
-                    
-                    return (
-                      <th key={`right-${i}`} className="px-1 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-12">
-                        {week}
-                      </th>
-                    );
-                  })}
+                  {/* Forecast-Wochen entfernt - werden jetzt in historyWeeks angezeigt */}
                   {/* Removed inline planning columns */}
                 </tr>
               </thead>
@@ -1612,7 +1621,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                         })()}
                       </td>
                       )}
-                      {/* 8 Einzelwochen von der aktuellen KW zurück */}
+                      {/* 8 Wochen ab der aktuellen KW */}
                       {visibleColumns.historyWeeks && availableWeeksFromData.map((week, i) => {
                         const weekData = personData.find(item => item.week === week);
                         const utilization = weekData?.utilization;
@@ -1623,7 +1632,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                           else bgColor = 'bg-red-100';
                         }
                         return (
-                          <td key={`l-single-${i}`} className={`px-1 py-2 text-center text-xs ${bgColor}`}>
+                          <td key={`forecast-${i}`} className={`px-1 py-2 text-center text-xs ${bgColor}`}>
                             {utilization !== null && utilization !== undefined ? (
                               <span className={`flex items-center justify-center gap-1 ${isTerminated ? 'line-through opacity-60' : ''}`}>
                                 {utilization}%
@@ -2022,6 +2031,42 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
         onClose={() => setIsAdminUploadModalOpen(false)}
         onDatabaseRefresh={loadDatabaseData}
       />
+
+      {/* AuslastungView Modal */}
+      {isAuslastungViewOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsAuslastungViewOpen(false)} />
+          <div className="relative w-full max-w-7xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="absolute top-4 right-4 z-10">
+              <button
+                onClick={() => setIsAuslastungViewOpen(false)}
+                className="p-2 bg-white/80 hover:bg-white rounded-full shadow-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+            <AuslastungView />
+          </div>
+        </div>
+      )}
+
+      {/* EinsatzplanView Modal */}
+      {isEinsatzplanViewOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsEinsatzplanViewOpen(false)} />
+          <div className="relative w-full max-w-7xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden">
+                          <div className="absolute top-4 right-4 z-10">
+                <button
+                  onClick={() => setIsEinsatzplanViewOpen(false)}
+                  className="p-2 bg-white/80 hover:bg-white rounded-full shadow-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+            <EinsatzplanView />
+          </div>
+        </div>
+      )}
 
       {/* Scope Settings Modal entfernt: Es gibt nur noch EIN Dropdown für alle Filter */}
     </div>
