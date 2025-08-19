@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Edit2, Trash2, User, Briefcase, MessageSquare, ArrowRight } from 'lucide-react';
-import { ProjectHistoryList } from './ProjectHistoryList';
+
 
 import { PlanningModal } from './PlanningModal';
 import { AssignmentsList } from './AssignmentsList';
@@ -327,10 +327,6 @@ export function EmployeeDossierModal({
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => setPlanningOpen(true)} className="px-3 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
-                  Planung (Angebote & Jira)
-                </button>
-
                 <button onClick={onClose} className="p-2 hover:bg-white/50 rounded-lg transition-colors">
                   <X className="w-5 h-5 text-gray-500" />
                 </button>
@@ -377,14 +373,7 @@ export function EmployeeDossierModal({
                 </div>
               </section>
 
-              {/* Project History */}
-              <ProjectHistoryList 
-                projects={formData.projectHistory} 
-                onChange={projects => setFormData(prev => ({
-                  ...prev,
-                  projectHistory: projects
-                }))}
-              />
+
 
               {/* Strengths & Weaknesses */}
               <section className="space-y-4">
