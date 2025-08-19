@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Star, Trash2, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import RoleSelectionModal from './RoleSelectionModal';
 
 interface Role {
   id: string;
@@ -33,6 +34,7 @@ const EmployeeRoleAssignment: React.FC<EmployeeRoleAssignmentProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
 
   console.log('🚀 EmployeeRoleAssignment Komponente wird gerendert');
   console.log('👤 employeeId:', employeeId);
@@ -107,41 +109,7 @@ const EmployeeRoleAssignment: React.FC<EmployeeRoleAssignmentProps> = ({
     }
   };
 
-  // Rolle zuweisen
-  const assignRole = async (roleId: string, roleName: string, level: number) => {
-    setIsSubmitting(true);
-    setError(null);
-    
-    try {
-      console.log(`🔍 Weise Rolle ${roleName} zu (Level ${level})`);
-      
-      const response = await fetch(`/api/employee-roles/${encodeURIComponent(employeeId)}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ roleId, level })
-      });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Fehler beim Zuweisen der Rolle');
-      }
-
-      const result = await response.json();
-      console.log('✅ Rolle erfolgreich zugewiesen:', result.assignment);
-      
-      // Zugewiesene Rollen neu laden
-      await loadAssignedRoles();
-      
-    } catch (error: any) {
-      console.error('❌ Fehler beim Zuweisen der Rolle:', error);
-      setError(error.message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   // Rollen-Level ändern
   const updateRoleLevel = async (assignmentId: string, newLevel: number) => {
@@ -288,47 +256,7 @@ const EmployeeRoleAssignment: React.FC<EmployeeRoleAssignmentProps> = ({
     </div>
   );
 
-  // AddRoleCard Component
-  const AddRoleCard: React.FC<{ role: Role }> = ({ role }) => {
-    const [selectedLevel, setSelectedLevel] = useState(3);
-    
-    return (
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-        <h4 className="font-medium text-gray-900 mb-2">{role.name}</h4>
-        {role.description && (
-          <p className="text-sm text-gray-600 mb-3">{role.description}</p>
-        )}
-        {role.category && (
-          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mb-3">
-            {role.category}
-          </span>
-        )}
-        
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-sm text-gray-600">Bewertung:</span>
-          <StarRating
-            value={selectedLevel}
-            onChange={setSelectedLevel}
-            disabled={isSubmitting}
-          />
-          <span className="text-sm text-gray-500">({selectedLevel}/5)</span>
-        </div>
-        
-        <button
-          onClick={() => assignRole(role.id, role.name, selectedLevel)}
-          disabled={isSubmitting}
-          className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isSubmitting ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Plus className="w-4 h-4" />
-          )}
-          Zuweisen
-        </button>
-      </div>
-    );
-  };
+
 
   // Beim Laden der Komponente
   useEffect(() => {
@@ -385,24 +313,38 @@ const EmployeeRoleAssignment: React.FC<EmployeeRoleAssignmentProps> = ({
         )}
       </div>
 
-      {/* Verfügbare Rollen */}
+      {/* Rollen hinzufügen */}
       <div>
         <h4 className="text-md font-medium text-gray-900 mb-3">
-          Verfügbare Rollen ({unassignedRoles.length})
+          Weitere Rollen hinzufügen
         </h4>
         
-        {unassignedRoles.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <p>Alle verfügbaren Rollen sind bereits zugewiesen.</p>
-          </div>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {unassignedRoles.map((role) => (
-              <AddRoleCard key={role.id} role={role} />
-            ))}
-          </div>
-        )}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <p className="text-sm text-gray-600 mb-3">
+            Weisen Sie {employeeName} weitere Rollen zu. Es stehen {unassignedRoles.length} Rollen zur Verfügung.
+          </p>
+          <button
+            onClick={() => setIsRoleModalOpen(true)}
+            disabled={unassignedRoles.length === 0}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Rollen zuweisen ({unassignedRoles.length} verfügbar)
+          </button>
+        </div>
       </div>
+
+      {/* Role Selection Modal */}
+      <RoleSelectionModal
+        isOpen={isRoleModalOpen}
+        onClose={() => setIsRoleModalOpen(false)}
+        employeeId={employeeId}
+        employeeName={employeeName}
+        onRoleAssigned={() => {
+          // Rolle wurde zugewiesen - Daten neu laden
+          loadAssignedRoles();
+        }}
+      />
     </div>
   );
 };
