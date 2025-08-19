@@ -55,6 +55,27 @@ export interface ProjectDoc {
   updatedAt: Date;
 }
 
+// NEU: Assignment (Projekt-Zuordnung Mitarbeiter ↔ Projekt)
+export interface AssignmentDoc {
+  // Aktuell nutzen wir employeeName analog zu bestehenden Strukturen
+  employeeName: string;
+  // Projekt-Referenz per ID (aus projects Collection)
+  projectId: string;
+  // Optional denormalisierte Felder (können bei Erstellung mitgegeben werden)
+  projectName?: string;
+  customer?: string;
+  // Metadaten
+  startDate?: string; // ISO-String
+  endDate?: string;   // ISO-String
+  offeredSkill?: string;
+  plannedAllocationPct?: number; // 0-100
+  role?: string;
+  status?: 'prospect' | 'planned' | 'active' | 'onHold' | 'closed';
+  comment?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface SkillDoc {
   name: string;
   createdAt: Date;
@@ -82,7 +103,8 @@ export const COLLECTIONS = {
   CUSTOMERS: 'customers',
   PROJECTS: 'projects',
   SKILLS: 'skills',
-  EMPLOYEE_SKILLS: 'employee_skills'
+  EMPLOYEE_SKILLS: 'employee_skills',
+  ASSIGNMENTS: 'assignments'
 } as const;
 
 // Firestore Document IDs
@@ -122,6 +144,10 @@ export interface FirestoreSkill extends SkillDoc, FirestoreDocument {
 }
 
 export interface FirestoreEmployeeSkill extends EmployeeSkillDoc, FirestoreDocument {
+  userId?: string;
+}
+
+export interface FirestoreAssignment extends AssignmentDoc, FirestoreDocument {
   userId?: string;
 }
 

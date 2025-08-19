@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { getISOWeek, getISOWeekYear } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, ChefHat, Database, Target, User, Ticket, Columns, ArrowLeft, MessageSquare, X, ArrowRight } from 'lucide-react';
+import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, ChefHat, Database, Target, User, Ticket, Columns, ArrowLeft, MessageSquare, X, ArrowRight, Building2, Link2 } from 'lucide-react';
 import { AdminDataUploadModal } from './AdminDataUploadModal';
 import { EinsatzplanView } from './EinsatzplanView';
 import { AuslastungView } from './AuslastungView';
@@ -10,7 +10,7 @@ import { MultiSelectFilter } from './MultiSelectFilter';
 import { PersonFilterBar } from './PersonFilterBar';
 import DatabaseService from '../../services/database';
 import { KpiCardsGrid } from './KpiCardsGrid';
-import { UtilizationChartSection } from './UtilizationChartSection';
+// import { UtilizationChartSection } from './UtilizationChartSection'; // Ausgeblendet
 import { UtilizationTrendChart } from './UtilizationTrendChart';
 // Removed inline planning editor; Planning via modal remains
 import { StatusLabelSelector } from './StatusLabelSelector';
@@ -18,6 +18,9 @@ import { EmployeeDossierModal, Employee } from './EmployeeDossierModal';
 import { PlanningModal } from './PlanningModal';
 import { PlanningCommentModal } from './PlanningCommentModal';
 import { UtilizationComment } from './UtilizationComment';
+import { SalesOpportunities } from './SalesOpportunities';
+import { useAssignments } from '../../contexts/AssignmentsContext';
+import { AssignmentEditorModal } from './AssignmentEditorModal';
 import ScopeFilterDropdown from './ScopeFilterDropdown';
 interface UtilizationData {
   person: string;
@@ -65,6 +68,11 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
   const [isAdminUploadModalOpen, setIsAdminUploadModalOpen] = useState(false);
   const [isEinsatzplanViewOpen, setIsEinsatzplanViewOpen] = useState(false);
   const [isAuslastungViewOpen, setIsAuslastungViewOpen] = useState(false);
+  const [isAssignmentEditorOpen, setIsAssignmentEditorOpen] = useState(false);
+  const [assignmentEditorPerson, setAssignmentEditorPerson] = useState<string | null>(null);
+
+  // Assignments: Zugriff (Preload-Effekt wird weiter unten nach visiblePersons platziert)
+  const { getAssignmentsForEmployee, assignmentsByEmployee } = useAssignments();
 
   // ✅ VEREINFACHT: Nur noch eine Datenquelle - Database (Firebase)
   // Upload-Funktionalität ist jetzt nur noch über Admin-Modal verfügbar
@@ -242,6 +250,8 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
   // Employee Dossier Modal
   const [isEmployeeDossierOpen, setIsEmployeeDossierOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [isSalesOpportunitiesOpen, setIsSalesOpportunitiesOpen] = useState(false);
+  const [salesOpportunitiesPerson, setSalesOpportunitiesPerson] = useState<string | null>(null);
   const currentWeek = getISOWeek(new Date());
   const currentIsoYear = getISOWeekYear(new Date());
   const [forecastStartWeek, setForecastStartWeek] = useState(currentWeek);
@@ -416,6 +426,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
       email: '',
       phone: '',
       projectHistory: [],
+      simpleProjects: [],
       strengths: '',
       weaknesses: '',
       comments: '',
@@ -686,7 +697,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
 
       // Nur setzen wenn sich etwas geändert hat
       if (Object.keys(newActionItems).length > 0) {
-        setActionItems(prev => ({ ...prev, ...newActionItems }));
+        setActionItems({ ...actionItems, ...newActionItems });
       }
     };
 
@@ -958,6 +969,15 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
   const visiblePersons = useMemo(() => {
     return Array.from(new Set(filteredData.map(item => item.person)));
   }, [filteredData]);
+
+  // Assignments: Vorladen für sichtbare Personen
+  useEffect(() => {
+    try {
+      visiblePersons.forEach(p => {
+        getAssignmentsForEmployee(p).catch(() => {});
+      });
+    } catch {}
+  }, [visiblePersons, getAssignmentsForEmployee]);
   
   // Dossiers werden nur bei Bedarf geladen (beim Öffnen des Modals)
   // Kein automatisches Laden beim Start mehr
@@ -1480,11 +1500,11 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
 
         {/* Auslastung Preview ausgeblendet (weiterhin über Upload einsehbar) */}
 
-        {/* KPI Cards */}
-        <KpiCardsGrid kpiData={kpiData} />
+        {/* KPI Cards - ausgeblendet */}
+        {/* <KpiCardsGrid kpiData={kpiData} /> */}
 
-        {/* Chart Section (new standalone component) */}
-        <UtilizationTrendChart data={filteredData as any} forecastStartWeek={forecastStartWeek} lookbackWeeks={lookbackWeeks} forecastWeeks={forecastWeeks} isoYear={currentIsoYear} />
+        {/* Chart Section (new standalone component) - ausgeblendet */}
+        {/* <UtilizationTrendChart data={filteredData as any} forecastStartWeek={forecastStartWeek} lookbackWeeks={lookbackWeeks} forecastWeeks={forecastWeeks} isoYear={currentIsoYear} /> */}
 
         {/* Table Section */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -1621,6 +1641,11 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                       {week}
                     </th>
                   ))}
+
+                  {/* Opport.-Spalte */}
+                  <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-8">
+                    Opport.
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -1706,8 +1731,8 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                             type="checkbox"
                             checked={actionItems[person] || false}
                             onChange={(e) => {
-                              const newActionItems = { ...actionItems, [person]: e.target.checked };
-                              setActionItems(newActionItems);
+                              const checked = e.target.checked;
+                              setActionItems({ ...actionItems, [person]: checked });
                             }}
                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                           />
@@ -1891,6 +1916,47 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                           </td>
                         );
                       })}
+
+                      {/* Opportunities Spalte */}
+                      <td className="px-0.5 py-0.5 text-center text-xs bg-gray-100">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => { setSalesOpportunitiesPerson(person); setIsSalesOpportunitiesOpen(true); }}
+                            className="p-1 text-green-600 hover:text-green-800 hover:bg-green-50 rounded border border-green-300 transition-colors"
+                            title="Sales Opportunities öffnen"
+                          >
+                            <Building2 className="w-4 h-4" />
+                          </button>
+                          <div className="relative group">
+                            <button
+                              onClick={() => { setAssignmentEditorPerson(person); setIsAssignmentEditorOpen(true); }}
+                              className="relative p-1 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded border border-indigo-300 transition-colors"
+                              title="Projekt zuordnen"
+                            >
+                              <Link2 className="w-4 h-4" />
+                              {(() => {
+                                const list = assignmentsByEmployee[person] || [];
+                                const count = list.length;
+                                return count > 0 ? (
+                                  <span className="absolute -top-1 -right-1 z-10 text-[10px] leading-none bg-indigo-600 text-white rounded-full min-w-[14px] h-[14px] px-[4px] flex items-center justify-center">
+                                    {count}
+                                  </span>
+                                ) : null;
+                              })()}
+                            </button>
+                            {(() => {
+                              const list = assignmentsByEmployee[person] || [];
+                              if (list.length === 0) return null;
+                              const tooltip = list.map(a => `${a.projectName || a.projectId}${a.customer ? ` · ${a.customer}` : ''}`).join('\n');
+                              return (
+                                <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-[10px] rounded px-2 py-1 whitespace-pre z-20">
+                                  {tooltip}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      </td>
                       
                     </tr>
                   );
@@ -2123,6 +2189,24 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
           </div>
         </div>
       )}
+
+      {/* Sales Opportunities Modal */}
+      <SalesOpportunities
+        isOpen={isSalesOpportunitiesOpen}
+        onClose={() => {
+          setIsSalesOpportunitiesOpen(false);
+          setSalesOpportunitiesPerson(null);
+        }}
+        personId={salesOpportunitiesPerson || ''}
+        personName={salesOpportunitiesPerson || ''}
+      />
+
+      {/* Assignment Editor Modal */}
+      <AssignmentEditorModal
+        isOpen={isAssignmentEditorOpen}
+        onClose={() => { setIsAssignmentEditorOpen(false); setAssignmentEditorPerson(null); }}
+        employeeName={assignmentEditorPerson || ''}
+      />
 
       {/* Scope Settings Modal entfernt: Es gibt nur noch EIN Dropdown für alle Filter */}
     </div>

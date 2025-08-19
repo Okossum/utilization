@@ -21,11 +21,13 @@ import {
   FirestorePersonStatus,
   FirestorePersonTravelReadiness,
   FirestoreCustomer,
+  FirestoreAssignment,
   UploadedFile,
   PlannedEngagement,
   PersonStatus,
   PersonTravelReadiness,
-  Customer
+  Customer,
+  AssignmentDoc
 } from './types';
 import { FirestoreSkill, SkillDoc, FirestoreEmployeeSkill, EmployeeSkillDoc } from './types';
 
@@ -341,6 +343,157 @@ export const projectService = {
     const docRef = doc(db, COLLECTIONS.PROJECTS, id);
     await deleteDoc(docRef);
   }
+};
+
+// Assignments Services (Mitarbeiter ↔ Projekt Verknüpfungen)
+export const assignmentService = {
+  async create(docIn: Omit<AssignmentDoc, 'createdAt' | 'updatedAt'>): Promise<string> {
+    try {
+      // Entferne alle undefined Werte vor dem Speichern
+      const cleanDoc = Object.fromEntries(
+        Object.entries(docIn).filter(([_, value]) => value !== undefined)
+      );
+      
+      // Wenn projectId vorhanden ist, lade Projekt-Informationen
+      if (cleanDoc.projectId) {
+        try {
+          const projectQuery = query(
+            collection(db, COLLECTIONS.PROJECTS),
+            where('__name__', '==', cleanDoc.projectId)
+          );
+          const projectSnap = await getDocs(projectQuery);
+          
+          if (!projectSnap.empty) {
+            const projectData = projectSnap.docs[0].data();
+            cleanDoc.projectName = projectData.name;
+            cleanDoc.customer = projectData.customer;
+          }
+        } catch (error) {
+          console.warn('Fehler beim Laden der Projekt-Informationen:', error);
+        }
+      }
+      
+      const docRef = await addDoc(collection(db, COLLECTIONS.ASSIGNMENTS), {
+        ...cleanDoc,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      console.log('✅ Assignment erfolgreich erstellt:', docRef.id);
+      return docRef.id;
+    } catch (error) {
+      console.error('❌ Fehler beim Erstellen des Assignments:', error);
+      throw error;
+    }
+  },
+
+  async getByEmployee(employeeName: string): Promise<FirestoreAssignment[]> {
+    try {
+      const q = query(
+        collection(db, COLLECTIONS.ASSIGNMENTS),
+        where('employeeName', '==', employeeName)
+        // orderBy entfernt, da es einen Index benötigt
+      );
+      const snap = await getDocs(q);
+      const assignments = snap.docs.map(d => ({
+        id: d.id,
+        ...(d.data() as any),
+        createdAt: convertTimestamp(d.data().createdAt),
+        updatedAt: convertTimestamp(d.data().updatedAt),
+      })) as FirestoreAssignment[];
+      
+      // Lade Projekt- und Kundeninformationen für alle Assignments
+      const enrichedAssignments = await Promise.all(
+        assignments.map(async (assignment) => {
+          try {
+            // Lade Projekt-Informationen
+            const projectQuery = query(
+              collection(db, COLLECTIONS.PROJECTS),
+              where('__name__', '==', assignment.projectId)
+            );
+            const projectSnap = await getDocs(projectQuery);
+            
+            if (!projectSnap.empty) {
+              const projectData = projectSnap.docs[0].data();
+              return {
+                ...assignment,
+                projectName: projectData.name,
+                customer: projectData.customer
+              };
+            }
+            
+            return assignment;
+          } catch (error) {
+            console.warn('Fehler beim Laden der Projekt-Informationen:', error);
+            return assignment;
+          }
+        })
+      );
+      
+      // Sortiere clientseitig nach createdAt
+      return enrichedAssignments.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    } catch (error) {
+      console.warn('Fehler beim Laden der Assignments für Mitarbeiter:', error);
+      // Wenn Collection nicht existiert, gebe leeres Array zurück
+      return [];
+    }
+  },
+
+  async getByProject(projectId: string): Promise<FirestoreAssignment[]> {
+    try {
+      const q = query(
+        collection(db, COLLECTIONS.ASSIGNMENTS),
+        where('projectId', '==', projectId),
+        orderBy('createdAt')
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({
+        id: d.id,
+        ...(d.data() as any),
+        createdAt: convertTimestamp(d.data().createdAt),
+        updatedAt: convertTimestamp(d.data().updatedAt),
+      })) as FirestoreAssignment[];
+    } catch (error) {
+      console.warn('Fehler beim Laden der Assignments für Projekt:', error);
+      // Wenn Collection nicht existiert, gebe leeres Array zurück
+      return [];
+    }
+  },
+
+  async update(id: string, updates: Partial<AssignmentDoc>): Promise<void> {
+    try {
+      // Entferne alle undefined Werte vor dem Speichern
+      const cleanUpdates = Object.fromEntries(
+        Object.entries(updates).filter(([_, value]) => value !== undefined)
+      );
+      
+      const docRef = doc(db, COLLECTIONS.ASSIGNMENTS, id);
+      await updateDoc(docRef, { ...cleanUpdates, updatedAt: new Date() });
+    } catch (error) {
+      console.error('❌ Fehler beim Aktualisieren des Assignments:', error);
+      throw error;
+    }
+  },
+
+  async remove(id: string): Promise<void> {
+    const docRef = doc(db, COLLECTIONS.ASSIGNMENTS, id);
+    await deleteDoc(docRef);
+  },
+
+  async getAll(): Promise<FirestoreAssignment[]> {
+    try {
+      const snap = await getDocs(collection(db, COLLECTIONS.ASSIGNMENTS));
+      return snap.docs.map(d => ({
+        id: d.id,
+        ...(d.data() as any),
+        createdAt: convertTimestamp(d.data().createdAt),
+        updatedAt: convertTimestamp(d.data().updatedAt),
+      })) as FirestoreAssignment[];
+    } catch (error) {
+      console.warn('Fehler beim Laden aller Assignments:', error);
+      // Wenn Collection nicht existiert, gebe leeres Array zurück
+      return [];
+    }
+  },
 };
 
 // Skills Services

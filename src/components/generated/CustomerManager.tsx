@@ -40,9 +40,20 @@ export function CustomerManager({
   const [editingCustomer, setEditingCustomer] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
 
+  // Debug: Zeige Props und State
+  console.log('🔍 CustomerManager - Props:', { customers, showManagement, allowCreate });
+  console.log('🔍 CustomerManager - State:', { isOpen, searchTerm, filteredCustomers: customers?.filter(c => c.toLowerCase().includes(searchTerm.toLowerCase())) });
+
   const filteredCustomers = customers.filter(customer =>
     customer.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Debug: Zeige Dropdown-Rendering
+  useEffect(() => {
+    if (isOpen) {
+      console.log('🔍 CustomerManager - Dropdown ist geöffnet, filteredCustomers:', filteredCustomers);
+    }
+  }, [isOpen, filteredCustomers]);
 
   const handleAddCustomer = () => {
     if (newCustomerName.trim() && !customers.includes(newCustomerName.trim())) {
@@ -89,7 +100,11 @@ export function CustomerManager({
           placeholder="Kunde auswählen..."
         />
         <button
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={() => {
+            console.log('🔍 CustomerManager - Button geklickt, aktueller isOpen:', isOpen);
+            setIsOpen(!isOpen);
+            console.log('🔍 CustomerManager - Neuer isOpen wird:', !isOpen);
+          }}
           className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
         >
           <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
@@ -99,12 +114,28 @@ export function CustomerManager({
       {/* Dropdown */}
       <AnimatePresence>
         {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.95 }}
-            className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-hidden"
-          >
+          <>
+            {/* Debug Box */}
+            <div className="fixed z-[9998] w-full p-2 bg-red-100 border-2 border-red-500 rounded-lg text-xs text-red-800" style={{ 
+              top: '50%', 
+              left: '50%', 
+              transform: 'translate(-50%, -50%)',
+              width: '300px'
+            }}>
+              🔍 DEBUG: Dropdown ist sichtbar! {filteredCustomers.length} Kunden verfügbar
+            </div>
+            
+            <motion.div
+              initial={{ opacity: 0, y: -10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.95 }}
+              className="fixed z-[9999] w-80 bg-white border-2 border-blue-500 rounded-lg shadow-2xl max-h-60 overflow-hidden"
+              style={{ 
+                top: '50%', 
+                left: '50%', 
+                transform: 'translate(-50%, -50%)'
+              }}
+            >
             {/* Add New Customer Section */}
             {allowCreate && (
               <div className="p-3 border-b border-gray-100 bg-gray-50">
@@ -135,51 +166,64 @@ export function CustomerManager({
                   {searchTerm ? 'Keine Kunden gefunden' : 'Keine Kunden verfügbar'}
                 </div>
               ) : (
-                filteredCustomers.map((customer) => (
-                  <div
-                    key={customer}
-                    className="flex items-center justify-between p-2 hover:bg-gray-50 cursor-pointer"
-                    onClick={() => {
-                      setSearchTerm(customer);
-                      setIsOpen(false);
-                      if (onSelect) onSelect(customer);
-                      if (onChange) onChange(customer);
-                    }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Building2 className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm">{customer}</span>
-                    </div>
-                    
-                    {showManagement && (
-                      <div className="flex items-center gap-1 ml-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            startEditing(customer);
-                          }}
-                          className="p-1 text-gray-400 hover:text-blue-600 rounded"
-                        >
-                          <Edit2 className="w-3 h-3" />
-                        </button>
-                        {onRemoveCustomer && (
+                filteredCustomers.map((customer) => {
+                  console.log('🔍 CustomerManager - Rendering Kunde:', customer);
+                  return (
+                    <div
+                      key={customer}
+                      className="flex items-center justify-between p-2 hover:bg-gray-50 cursor-pointer border border-red-200"
+                      onClick={() => {
+                        console.log('🔍 CustomerManager - Kunde geklickt:', customer);
+                        console.log('🔍 CustomerManager - onSelect:', onSelect);
+                        console.log('🔍 CustomerManager - onChange:', onChange);
+                        setSearchTerm(customer);
+                        setIsOpen(false);
+                        if (onSelect) {
+                          console.log('🔍 CustomerManager - Rufe onSelect auf mit:', customer);
+                          onSelect(customer);
+                        }
+                        if (onChange) {
+                          console.log('🔍 CustomerManager - Rufe onChange auf mit:', customer);
+                          onChange(customer);
+                        }
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Building2 className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm">{customer}</span>
+                      </div>
+                      
+                      {showManagement && (
+                        <div className="flex items-center gap-1 ml-2">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleRemoveCustomer(customer);
+                              startEditing(customer);
                             }}
-                            className="p-1 text-gray-400 hover:text-red-600 rounded"
+                            className="p-1 text-gray-400 hover:text-blue-600 rounded"
                           >
-                            <Trash2 className="w-3 h-3" />
+                            <Edit2 className="w-3 h-3" />
                           </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))
+                          {onRemoveCustomer && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveCustomer(customer);
+                              }}
+                              className="p-1 text-gray-400 hover:text-red-600 rounded"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           </motion.div>
+        </>
         )}
       </AnimatePresence>
 

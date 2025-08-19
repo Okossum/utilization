@@ -5,11 +5,14 @@ import { ProjectHistoryList } from './ProjectHistoryList';
 import { ProjectOffersList } from './ProjectOffersList';
 import { JiraTicketsList } from './JiraTicketsList';
 import { PlanningModal } from './PlanningModal';
+import { AssignmentsList } from './AssignmentsList';
+import { AssignmentEditorModal } from './AssignmentEditorModal';
 import DatabaseService from '../../services/database';
 import { EmployeeSkillsEditor } from './EmployeeSkillsEditor';
 import { UtilizationComment } from './UtilizationComment';
 import { PlanningCommentModal } from './PlanningCommentModal';
 import { SimpleProjectList, SimpleProject } from './SimpleProjectList';
+import { useAssignments } from '../../contexts/AssignmentsContext';
 
 export interface ProjectHistoryItem {
   id: string;
@@ -98,21 +101,23 @@ export function EmployeeDossierModal({
   const [isPlanningOpen, setPlanningOpen] = useState(false);
   const [isPlanningCommentOpen, setPlanningCommentOpen] = useState(false);
   const [planningComment, setPlanningComment] = useState<string>('');
+  const [isAssignmentEditorOpen, setAssignmentEditorOpen] = useState(false);
+  const { getAssignmentsForEmployee } = useAssignments();
 
   // Lade Employee Dossier aus der Datenbank und kombiniere mit Excel-Daten
   useEffect(() => {
     const loadEmployeeData = async () => {
-      if (!isOpen || !employee.id) return;
+      if (!isOpen || !employee.name) return;
       
       setIsLoading(true);
       try {
         // Lade gespeicherte Dossier-Daten aus der DB
-        const savedDossier = await DatabaseService.getEmployeeDossier(employee.id);
+        const savedDossier = await DatabaseService.getEmployeeDossier(employee.name);
         
         // Lade Skills über DatabaseService
         let firebaseSkills: any[] = [];
         try {
-          firebaseSkills = await DatabaseService.getEmployeeSkills(employee.id);
+          firebaseSkills = await DatabaseService.getEmployeeSkills(employee.name);
         } catch (skillError) {
           console.warn('Fehler beim Laden der Skills, verwende leeres Array:', skillError);
           firebaseSkills = [];
@@ -207,7 +212,7 @@ export function EmployeeDossierModal({
       // Speichere Skills über DatabaseService (API)
       if (formData.skills && formData.skills.length > 0) {
         try {
-          await DatabaseService.saveEmployeeSkills(formData.id, formData.skills.map(skill => ({
+          await DatabaseService.saveEmployeeSkills(formData.name, formData.skills.map(skill => ({
             skillId: skill.skillId,
             skillName: skill.name,
             level: skill.level
@@ -223,7 +228,7 @@ export function EmployeeDossierModal({
       // Speichere alle bearbeitbaren Felder in der DB
       // Konvertiere zu kompatiblem Format für DatabaseService
       const dossierData = {
-        uid: formData.id,
+        uid: formData.name,
         displayName: formData.name,
         email: formData.email || '',
         // Legacy-Felder für API-Kompatibilität
@@ -266,7 +271,7 @@ export function EmployeeDossierModal({
       const safeDossierData = sanitize(dossierData);
 
       // Speichere in der Datenbank
-      await DatabaseService.saveEmployeeDossier(formData.id, safeDossierData);
+      await DatabaseService.saveEmployeeDossier(formData.name, safeDossierData);
       
       // Rufe onSave auf
       onSave(formData);
@@ -414,7 +419,7 @@ export function EmployeeDossierModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Utilization Comment Component */}
                 <UtilizationComment
-                  personId={formData.id}
+                  personId={formData.name}
                   initialValue={formData.utilizationComment}
                   onLocalChange={(v)=> setFormData(prev => ({ ...prev, utilizationComment: v }))}
                   className="h-full"
@@ -456,10 +461,21 @@ export function EmployeeDossierModal({
 
               {/* Skills */}
               <EmployeeSkillsEditor
-                employeeName={formData.id}
+                employeeName={formData.name}
                 value={formData.skills || []}
                 onChange={(skills)=>setFormData(prev=>({ ...prev, skills }))}
               />
+
+              {/* Assignments */}
+              <AssignmentsList employeeName={formData.name} />
+              <div>
+                <button
+                  onClick={() => setAssignmentEditorOpen(true)}
+                  className="mt-2 inline-flex items-center gap-2 px-3 py-2 text-sm text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+                >
+                  Projekt zuordnen
+                </button>
+              </div>
 
               {/* Simple Projects */}
               <SimpleProjectList 
@@ -500,7 +516,7 @@ export function EmployeeDossierModal({
         onClose={async () => {
           setPlanningOpen(false);
           try {
-            const updated = await DatabaseService.getEmployeeDossier(formData.id);
+            const updated = await DatabaseService.getEmployeeDossier(formData.name);
             if (updated) {
               setFormData(prev => ({
                 ...prev,
@@ -514,18 +530,36 @@ export function EmployeeDossierModal({
     
           }
         }}
-        personId={formData.id}
+        personId={formData.name}
       />
       <PlanningCommentModal
         isOpen={isPlanningCommentOpen}
         onClose={async () => {
           setPlanningCommentOpen(false);
           try {
-            const updated = await DatabaseService.getEmployeeDossier(formData.id);
+            const updated = await DatabaseService.getEmployeeDossier(formData.name);
             setPlanningComment(String(updated?.planningComment || ''));
           } catch {}
         }}
-        personId={formData.id}
+        personId={formData.name}
+      />
+      <AssignmentEditorModal
+        isOpen={isAssignmentEditorOpen}
+        onClose={async () => {
+          setAssignmentEditorOpen(false);
+          // Lade die Assignments neu, nachdem eine Zuordnung erstellt wurde
+          try {
+            await getAssignmentsForEmployee(formData.name, true);
+          } catch (e) {
+            console.warn('Fehler beim Neuladen der Assignments:', e);
+          }
+        }}
+        employeeName={formData.name}
+        onAssignmentCreated={() => {
+          console.log('✅ Assignment erstellt, aktualisiere Liste...');
+          // Force refresh der Assignments für diesen Mitarbeiter
+          getAssignmentsForEmployee(formData.name, true);
+        }}
       />
     </>
   );
