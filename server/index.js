@@ -411,7 +411,7 @@ app.post('/api/einsatzplan', requireAuth, async (req, res) => {
     function buildWeekValuesMap(row) {
       const weekValues = {};
       for (const [key, value] of Object.entries(row)) {
-        if (key !== 'person' && key !== 'lbs' && key !== 'vg' && 
+        if (key !== 'person' && key !== 'lbs' && key !== 'vg' && key !== 'VG' && 
             key !== 'lob' && key !== 'cc' && key !== 'team' && key !== 'bereich' &&
             typeof value === 'number' && Number.isFinite(value)) {
           weekValues[key] = value;
@@ -446,7 +446,7 @@ app.post('/api/einsatzplan', requireAuth, async (req, res) => {
           cc: row.cc ?? existing.data.cc ?? null,
           team: row.team ?? existing.data.team ?? null,
           lbs: row.lbs ?? existing.data.lbs ?? null,
-          vg: row.vg ?? existing.data.vg ?? null,
+          vg: pickField(row, ['VG', 'vg']) ?? existing.data.vg ?? null,
           values: mergedValues,
           updatedAt: FieldValue.serverTimestamp(),
         });
@@ -470,7 +470,7 @@ app.post('/api/einsatzplan', requireAuth, async (req, res) => {
           uploadVersion: newVersion,
           person: row.person,
           lbs: row.lbs ?? null,
-          vg: row.vg ?? null,
+          vg: pickField(row, ['VG', 'vg']) ?? null,
           cc: row.cc ?? null,
           team: row.team ?? null,
           lob: row.lob ?? null,
