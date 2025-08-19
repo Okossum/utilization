@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Edit2, Trash2, User, Briefcase, MessageSquare, Plane, ArrowRight } from 'lucide-react';
 import { ProjectHistoryList } from './ProjectHistoryList';
-import { ProjectOffersList } from './ProjectOffersList';
-import { JiraTicketsList } from './JiraTicketsList';
+
 import { PlanningModal } from './PlanningModal';
 import { AssignmentsList } from './AssignmentsList';
 import { AssignmentEditorModal } from './AssignmentEditorModal';
@@ -11,7 +10,7 @@ import DatabaseService from '../../services/database';
 import { EmployeeSkillsEditor } from './EmployeeSkillsEditor';
 import { UtilizationComment } from './UtilizationComment';
 import { PlanningCommentModal } from './PlanningCommentModal';
-import { SimpleProjectList, SimpleProject } from './SimpleProjectList';
+
 import { useAssignments } from '../../contexts/AssignmentsContext';
 
 export interface ProjectHistoryItem {
@@ -50,7 +49,7 @@ export interface Employee {
   email: string;
   phone: string;
   projectHistory: ProjectHistoryItem[];
-  simpleProjects: SimpleProject[];
+
   strengths: string;
   weaknesses: string;
   comments: string;
@@ -165,7 +164,7 @@ export function EmployeeDossierModal({
           utilizationComment: savedDossier?.utilizationComment || employee.utilizationComment || '',
           travelReadiness: savedDossier?.travelReadiness || employee.travelReadiness || '',
           projectHistory: normalizedProjectHistory || employee.projectHistory || [],
-          simpleProjects: normalizedSimpleProjects || employee.simpleProjects || [],
+
           projectOffers: savedDossier?.projectOffers || employee.projectOffers || [],
           jiraTickets: savedDossier?.jiraTickets || employee.jiraTickets || [],
           // Skills aus Firebase haben Vorrang, dann lokale DB, dann employee
@@ -242,7 +241,7 @@ export function EmployeeDossierModal({
         utilizationComment: formData.utilizationComment,
         travelReadiness: formData.travelReadiness,
         projectHistory: formData.projectHistory,
-        simpleProjects: formData.simpleProjects,
+
         projectOffers: formData.projectOffers,
         jiraTickets: formData.jiraTickets,
         // Excel-Daten als Referenz (werden nie überschrieben)
@@ -477,26 +476,9 @@ export function EmployeeDossierModal({
                 </button>
               </div>
 
-              {/* Simple Projects */}
-              <SimpleProjectList 
-                projects={formData.simpleProjects} 
-                onChange={projects => setFormData(prev => ({
-                  ...prev,
-                  simpleProjects: projects
-                }))} 
-              />
 
-              {/* Project Offers */}
-              <ProjectOffersList offers={formData.projectOffers} onChange={offers => setFormData(prev => ({
-            ...prev,
-            projectOffers: offers
-          }))} />
 
-              {/* Jira Tickets */}
-              <JiraTicketsList tickets={formData.jiraTickets} onChange={tickets => setFormData(prev => ({
-            ...prev,
-            jiraTickets: tickets
-          }))} />
+
             </div>
 
             {/* Footer */}
