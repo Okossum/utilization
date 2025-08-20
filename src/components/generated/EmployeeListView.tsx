@@ -5,6 +5,8 @@ import { EmployeeCard } from './EmployeeCard';
 import { EmployeeUploadModal } from './EmployeeUploadModal';
 import DatabaseService from '../../services/database';
 import { useAssignments } from '../../contexts/AssignmentsContext';
+import { MultiSelectFilter } from './MultiSelectFilter';
+import { useAuth } from '../../contexts/AuthContext';
 
 // ✅ KORRIGIERT: Props für Action-Items aus der Auslastungs-Übersicht
 interface EmployeeListViewProps {
@@ -137,6 +139,17 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
+  // ✅ NEU: Filter-States wie im UtilizationReportView
+  const [filterCC, setFilterCC] = useState<string[]>([]);
+  const [filterLBS, setFilterLBS] = useState<string[]>([]);
+  const [filterLBSExclude, setFilterLBSExclude] = useState<string[]>([]);
+  const [filterStatus, setFilterStatus] = useState<string[]>([]);
+  const [showWorkingStudents, setShowWorkingStudents] = useState(true);
+  const [selectedBereich, setSelectedBereich] = useState('');
+  
+  // Auth Context für Profil-Informationen
+  const { profile } = useAuth();
+  
   // Assignments Context für Projektzuordnungen
   const { getAssignmentsForEmployee } = useAssignments();
   
@@ -252,15 +265,50 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
     }
   };
   
+  // ✅ NEU: Filter-Optionen wie im UtilizationReportView
+  const ccOptions = Array.from(new Set(employees.map(emp => emp.competenceCenter).filter(Boolean)));
+  const lbsOptions = Array.from(new Set(employees.map(emp => emp.careerLevel).filter(Boolean)));
+  const bereichOptions = Array.from(new Set(employees.map(emp => (emp as any).bereich).filter(Boolean)));
+  const statusOptions = ['Urlaub', 'Elternzeit', 'Mutterschutz', 'Krankheit', 'Lange Abwesent', 'Kündigung'];
+  
   const departments = ['All', ...Array.from(new Set(employees.map(emp => emp.department)))];
   
   // ✅ KORRIGIERT: Alle geladenen Mitarbeiter haben bereits den Act-Toggle aktiviert
   console.log('🔍 DEBUG: Alle Mitarbeiter mit Act-Toggle geladen:', employees.length);
   
   const filteredEmployees = employees.filter(employee => {
-    const matchesSearch = employee.name.toLowerCase().includes(searchTerm.toLowerCase()) || employee.role.toLowerCase().includes(searchTerm.toLowerCase()) || employee.skills.some(skill => skill.toLowerCase().includes(searchTerm.toLowerCase()));
+    // ✅ NEU: Erweiterte Filter-Logik wie im UtilizationReportView
+    
+    // Personensuche Filter
+    const matchesSearch = employee.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         employee.role.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         employee.skills.some(skill => skill.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    // Abteilungs-Filter
     const matchesDepartment = selectedDepartment === 'All' || employee.department === selectedDepartment;
-    return matchesSearch && matchesDepartment;
+    
+    // Bereich-Filter
+    const matchesBereich = !selectedBereich || (employee as any).bereich === selectedBereich;
+    
+    // CC Filter
+    const matchesCC = filterCC.length === 0 || filterCC.includes(String(employee.competenceCenter || ''));
+    
+    // LBS Filter (INCLUDE)
+    const matchesLBS = filterLBS.length === 0 || filterLBS.includes(String(employee.careerLevel || ''));
+    
+    // LBS Filter (EXCLUDE)
+    const matchesLBSExclude = filterLBSExclude.length === 0 || !filterLBSExclude.includes(String(employee.careerLevel || ''));
+    
+    // Working Students Filter
+    const matchesWorkingStudents = showWorkingStudents || 
+      (employee.careerLevel !== 'Working Student' && 
+       employee.careerLevel !== 'Working student' && 
+       employee.careerLevel !== 'working student');
+    
+    // Status Filter (hier vereinfacht, da wir keine Status-Daten haben)
+    const matchesStatus = filterStatus.length === 0; // Alle anzeigen, da keine Status-Daten
+    
+    return matchesSearch && matchesDepartment && matchesBereich && matchesCC && matchesLBS && matchesLBSExclude && matchesWorkingStudents && matchesStatus;
   });
 
   // @return
@@ -364,6 +412,67 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
                   <div className="text-xs font-medium text-slate-500">Gefilterte Ergebnisse</div>
                   <div className="text-lg font-bold text-amber-600">{filteredEmployees.length}</div>
                 </div>
+              </div>
+            </div>
+            
+            {/* ✅ NEU: Erweiterte Filter wie im UtilizationReportView */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pt-4 border-t border-slate-100">
+              {/* Bereich-Filter */}
+              <MultiSelectFilter 
+                label="Bereich" 
+                options={bereichOptions} 
+                selected={[selectedBereich].filter(Boolean)} 
+                onChange={(values) => setSelectedBereich(values[0] || '')} 
+                placeholder="Alle Bereiche" 
+              />
+              
+              {/* CC-Filter */}
+              <MultiSelectFilter 
+                label="CC" 
+                options={ccOptions} 
+                selected={filterCC} 
+                onChange={setFilterCC} 
+                placeholder="Alle CC" 
+              />
+              
+              {/* LBS-Filter */}
+              <MultiSelectFilter 
+                label="LBS" 
+                options={lbsOptions} 
+                selected={filterLBS} 
+                onChange={setFilterLBS} 
+                placeholder="Alle LBS" 
+              />
+              
+              {/* LBS (Ausblenden)-Filter */}
+              <MultiSelectFilter 
+                label="LBS (Ausblenden)" 
+                options={lbsOptions} 
+                selected={filterLBSExclude} 
+                onChange={setFilterLBSExclude} 
+                placeholder="Alle LBS" 
+              />
+              
+              {/* Status-Filter */}
+              <MultiSelectFilter 
+                label="Status" 
+                options={statusOptions} 
+                selected={filterStatus} 
+                onChange={setFilterStatus} 
+                placeholder="Alle Status" 
+              />
+              
+              {/* Working Students Toggle */}
+              <div className="flex items-center justify-center">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showWorkingStudents}
+                    onChange={(e) => setShowWorkingStudents(e.target.checked)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Working Students</span>
+                </label>
               </div>
             </div>
           </div>
