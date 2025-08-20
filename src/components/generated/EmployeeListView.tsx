@@ -3,6 +3,7 @@ import { Search, Filter, Users, Upload, UserCheck, UserX, BarChart3 } from 'luci
 import { motion, AnimatePresence } from 'framer-motion';
 import { EmployeeCard } from './EmployeeCard';
 import { EmployeeUploadModal } from './EmployeeUploadModal';
+import { EmployeeDossierModal } from './EmployeeDossierModal';
 import DatabaseService from '../../services/database';
 import { useAssignments } from '../../contexts/AssignmentsContext';
 import { MultiSelectFilter } from './MultiSelectFilter';
@@ -139,6 +140,10 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
+  // ✅ NEU: State für Employee Dossier Modal
+  const [isDossierModalOpen, setIsDossierModalOpen] = useState(false);
+  const [selectedEmployeeForDossier, setSelectedEmployeeForDossier] = useState<Employee | null>(null);
+  
   // ✅ NEU: Filter-States wie im UtilizationReportView
   const [filterCC, setFilterCC] = useState<string[]>([]);
   const [filterLBS, setFilterLBS] = useState<string[]>([]);
@@ -263,6 +268,12 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
           : emp
       ));
     }
+  };
+  
+  // ✅ NEU: Avatar-Click-Handler für Dossier
+  const handleAvatarClick = (employee: Employee) => {
+    setSelectedEmployeeForDossier(employee);
+    setIsDossierModalOpen(true);
   };
   
   // ✅ NEU: Filter-Optionen wie im UtilizationReportView
@@ -531,7 +542,11 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
                       }}
                       layout
                     >
-                      <EmployeeCard employee={employee} onToggleActive={handleToggleActive} />
+                      <EmployeeCard 
+                  employee={employee} 
+                  onToggleActive={handleToggleActive}
+                  onAvatarClick={handleAvatarClick}
+                />
                     </motion.div>
                   ))}
                 </AnimatePresence>
@@ -571,6 +586,34 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
           </motion.div>
         )}
       </div>
+      
+      {/* ✅ NEU: Employee Dossier Modal */}
+      {selectedEmployeeForDossier && (
+        <EmployeeDossierModal
+          isOpen={isDossierModalOpen}
+          onClose={() => {
+            setIsDossierModalOpen(false);
+            setSelectedEmployeeForDossier(null);
+          }}
+          employee={selectedEmployeeForDossier}
+          onSave={(updatedEmployee) => {
+            // Aktualisiere den lokalen State
+            setEmployees(prev => prev.map(emp => 
+              emp.id === updatedEmployee.id ? updatedEmployee : emp
+            ));
+            setIsDossierModalOpen(false);
+            setSelectedEmployeeForDossier(null);
+          }}
+          excelData={{
+            name: selectedEmployeeForDossier.name,
+            manager: '',
+            team: selectedEmployeeForDossier.team || '',
+            competenceCenter: selectedEmployeeForDossier.competenceCenter || '',
+            lineOfBusiness: '',
+            careerLevel: selectedEmployeeForDossier.careerLevel || ''
+          }}
+        />
+      )}
       
       {/* Upload Modal */}
       <EmployeeUploadModal 

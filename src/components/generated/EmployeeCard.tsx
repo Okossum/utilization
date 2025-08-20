@@ -51,12 +51,14 @@ interface Employee {
 interface EmployeeCardProps {
   employee: Employee;
   onToggleActive: (employeeId: string) => void;
+  onAvatarClick?: (employee: Employee) => void; // ✅ NEU: Avatar-Click-Handler
 }
 
 // @component: EmployeeCard
 export const EmployeeCard = ({
   employee,
-  onToggleActive
+  onToggleActive,
+  onAvatarClick
 }: EmployeeCardProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [assignments, setAssignments] = useState<any[]>([]);
@@ -134,12 +136,19 @@ export const EmployeeCard = ({
       <div className="bg-gradient-to-r from-slate-50 to-blue-50 p-4 border-b border-slate-100">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4 flex-1">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg flex-shrink-0">
+            {/* ✅ NEU: Klickbares Avatar-Icon */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => onAvatarClick?.(employee)}
+              className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg flex-shrink-0 cursor-pointer hover:from-blue-600 hover:to-purple-700 transition-all duration-200"
+              title={`${employee.name} Dossier öffnen`}
+            >
               {employee.profileImage ? 
                 <img src={employee.profileImage} alt={`${employee.name} profile`} className="w-full h-full rounded-xl object-cover" /> : 
                 <User className="w-6 h-6" />
               }
-            </div>
+            </motion.button>
             
             <div className="flex-1 min-w-0">
               <h3 className="text-xl font-bold text-slate-800 mb-1 truncate">
