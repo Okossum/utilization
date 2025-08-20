@@ -14,6 +14,7 @@ import { User as UserIcon, ChevronDown, LogOut, Users, BarChart3, FileText } fro
 import AdminUserManagementModal from './components/generated/AdminUserManagementModal';
 import { AssignmentsProvider } from './contexts/AssignmentsContext';
 import { RoleProvider } from './contexts/RoleContext';
+import { AppHeader } from './components/AppHeader';
 
 let theme: Theme = 'light';
 // only use 'centered' container for standalone components, never for full page apps or websites.
@@ -45,6 +46,12 @@ function App() {
     const [isAdminModalOpen, setAdminModalOpen] = useState(false);
     const [isMenuOpen, setMenuOpen] = useState(false);
     const [currentView, setCurrentView] = useState<'utilization' | 'employees' | 'knowledge'>('utilization');
+    
+    // States für UtilizationReportView spezifische Modals
+    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+    const [isAuslastungViewOpen, setIsAuslastungViewOpen] = useState(false);
+    const [isEinsatzplanViewOpen, setIsEinsatzplanViewOpen] = useState(false);
+    const [isColumnsMenuOpen, setIsColumnsMenuOpen] = useState(false);
     
     // ✅ NEU: Action-Items State für beide Views (Act-Toggle aus Auslastungs-Übersicht)
     const [actionItems, setActionItems] = useState<Record<string, boolean>>(() => {
@@ -82,83 +89,20 @@ function App() {
       <CustomerProvider>
         <AssignmentsProvider>
           <RoleProvider>
-          {/* Navigation & Account */}
-          <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
-            {/* Navigation Buttons */}
-            <div className="flex items-center gap-1 bg-white border border-gray-300 rounded-lg shadow-sm p-1">
-              <button
-                onClick={() => setCurrentView('utilization')}
-                className={`inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  currentView === 'utilization' 
-                    ? 'bg-blue-600 text-white' 
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-                title="Auslastung Report"
-              >
-                <BarChart3 className="w-4 h-4" />
-                Auslastung
-              </button>
-              <button
-                onClick={() => setCurrentView('employees')}
-                className={`inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  currentView === 'employees' 
-                    ? 'bg-blue-600 text-white' 
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-                title="Mitarbeiter Liste"
-              >
-                <Users className="w-4 h-4" />
-                Mitarbeiter
-              </button>
-              <button
-                onClick={() => setCurrentView('knowledge')}
-                className={`inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  currentView === 'knowledge' 
-                    ? 'bg-blue-600 text-white' 
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-                title="Knowledge Upload Test"
-              >
-                <FileText className="w-4 h-4" />
-                Knowledge
-              </button>
-            </div>
-            
-            {/* Account Menu */}
-            <div ref={menuRef}>
-              <button
-                onClick={() => setMenuOpen(v => !v)}
-                className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50"
-                title="Account"
-              >
-                <UserIcon className="w-4 h-4 text-gray-700" />
-                <ChevronDown className="w-4 h-4 text-gray-500" />
-              </button>
-            {isMenuOpen && (
-              <div className="mt-2 w-72 bg-white border border-gray-200 rounded-lg shadow-lg p-3">
-                <div className="mb-3">
-                  <div className="text-xs text-gray-500">Angemeldet als</div>
-                  <div className="text-sm font-medium text-gray-900 truncate">{profile?.displayName || user.email || '—'}</div>
-                  <div className="text-xs text-gray-600">Rolle: {String(profile?.role || 'unknown')}</div>
-                </div>
-                {profile?.role === 'admin' && (
-                  <button
-                    onClick={() => { setAdminModalOpen(true); setMenuOpen(false); }}
-                    className="w-full px-3 py-2 text-sm text-white bg-purple-600 rounded-lg hover:bg-purple-700 mb-2"
-                  >
-                    Benutzerverwaltung
-                  </button>
-                )}
-                <button
-                  onClick={async () => { setMenuOpen(false); await logout(); }}
-                  className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  <LogOut className="w-4 h-4" /> Abmelden
-                </button>
-              </div>
-            )}
-            </div>
-          </div>
+          {/* App Header - IMMER sichtbar */}
+          <AppHeader
+            currentView={currentView}
+            setCurrentView={setCurrentView}
+            logout={logout}
+            setAdminModalOpen={setAdminModalOpen}
+            onSettings={() => setIsSettingsModalOpen(true)}
+            onAdminUpload={() => setAdminModalOpen(true)}
+            onAuslastungView={() => setIsAuslastungViewOpen(true)}
+            onEinsatzplanView={() => setIsEinsatzplanViewOpen(true)}
+            onColumnsMenu={() => setIsColumnsMenuOpen(v => !v)}
+            isColumnsMenuOpen={isColumnsMenuOpen}
+            lobOptions={[]} // TODO: von UtilizationReportView holen
+          />
 
           {/* Main Content */}
           {currentView === 'utilization' && (
@@ -166,9 +110,17 @@ function App() {
               <UtilizationReportView 
                 actionItems={actionItems}
                 setActionItems={setActionItems}
+                isSettingsModalOpen={isSettingsModalOpen}
+                setIsSettingsModalOpen={setIsSettingsModalOpen}
+                isAuslastungViewOpen={isAuslastungViewOpen}
+                setIsAuslastungViewOpen={setIsAuslastungViewOpen}
+                isEinsatzplanViewOpen={isEinsatzplanViewOpen}
+                setIsEinsatzplanViewOpen={setIsEinsatzplanViewOpen}
+                isColumnsMenuOpen={isColumnsMenuOpen}
+                setIsColumnsMenuOpen={setIsColumnsMenuOpen}
               />
               <CustomerProjectsManagerButton />
-                      <TechnicalSkillManagementButton className="fixed bottom-4 right-44 z-40" label="Tech Skills" />
+              <TechnicalSkillManagementButton className="fixed bottom-4 right-44 z-40" label="Tech Skills" />
               <RoleManagementButton className="fixed bottom-4 right-[22rem] z-40" label="Rollen" />
             </>
           )}

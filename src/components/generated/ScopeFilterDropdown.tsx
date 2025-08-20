@@ -42,8 +42,6 @@ export default function ScopeFilterDropdown(props: ScopeFilterDropdownProps) {
   }, []);
 
   const labelParts = [
-    selectedLoB || (lobOptions.length === 1 ? lobOptions[0] : ''),
-    selectedBereich,
     selectedCC,
     selectedTeam,
   ].filter(Boolean);
@@ -67,26 +65,6 @@ export default function ScopeFilterDropdown(props: ScopeFilterDropdownProps) {
               <span>Alle Daten anzeigen</span>
             </label>
 
-            <div>
-              <div className="text-xs text-gray-600 mb-1">LoB</div>
-              {lobOptions.length <= 1 ? (
-                <div className="px-2 py-2 text-xs bg-gray-50 border border-gray-200 rounded">{lobOptions[0] || '—'}</div>
-              ) : (
-                <select value={selectedLoB} onChange={e => setSelectedLoB(e.target.value)} className="w-full px-2 py-2 text-xs bg-white border border-gray-300 rounded">
-                  <option value="">Alle</option>
-                  {lobOptions.map(x => <option key={x} value={x}>{x}</option>)}
-                </select>
-              )}
-            </div>
-
-            <div>
-              <div className="text-xs text-gray-600 mb-1">Bereich</div>
-              <select value={selectedBereich} onChange={e => setSelectedBereich(e.target.value)} className="w-full px-2 py-2 text-xs bg-white border border-gray-300 rounded">
-                <option value="">Alle</option>
-                {bereichOptions.map(x => <option key={x} value={x}>{x}</option>)}
-              </select>
-            </div>
-
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <div className="text-xs text-gray-600 mb-1">CC</div>
@@ -106,8 +84,8 @@ export default function ScopeFilterDropdown(props: ScopeFilterDropdownProps) {
 
             <div className="flex items-center justify-end gap-2 pt-1">
               <button type="button" className="px-2 py-1.5 text-xs text-gray-600 hover:text-gray-800" onClick={() => {
-                setSelectedLoB(''); setSelectedBereich(''); setSelectedCC(''); setSelectedTeam('');
-                onPersist?.({ lob: '', bereich: '', competenceCenter: '', team: '', showAll: showAllData });
+                setSelectedCC(''); setSelectedTeam('');
+                onPersist?.({ lob: selectedLoB, bereich: selectedBereich, competenceCenter: '', team: '', showAll: showAllData });
               }}>Zurücksetzen</button>
               <button type="button" className="px-3 py-1.5 text-xs text-white bg-blue-600 rounded hover:bg-blue-700" onClick={() => { setOpen(false); onPersist?.({ lob: selectedLoB, bereich: selectedBereich, competenceCenter: selectedCC, team: selectedTeam, showAll: showAllData }); }}>Fertig</button>
             </div>

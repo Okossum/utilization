@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { getISOWeek, getISOWeekYear } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, ChefHat, Database, Target, User, Ticket, Columns, ArrowLeft, MessageSquare, X, ArrowRight, Building2, Link2, Banknote, Dog, Coffee } from 'lucide-react';
+import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, ChefHat, Database, Target, User, Ticket, Columns, ArrowLeft, MessageSquare, X, ArrowRight, Building2, Link2, Banknote, Dog, Coffee, BarChart3, FileText, ChevronDown, LogOut } from 'lucide-react';
 import { AdminDataUploadModal } from './AdminDataUploadModal';
 import { EinsatzplanView } from './EinsatzplanView';
 import { AuslastungView } from './AuslastungView';
@@ -39,9 +39,28 @@ interface UploadedFile {
 interface UtilizationReportViewProps {
   actionItems: Record<string, boolean>;
   setActionItems: (actionItems: Record<string, boolean>) => void;
+  isSettingsModalOpen: boolean;
+  setIsSettingsModalOpen: (open: boolean) => void;
+  isAuslastungViewOpen: boolean;
+  setIsAuslastungViewOpen: (open: boolean) => void;
+  isEinsatzplanViewOpen: boolean;
+  setIsEinsatzplanViewOpen: (open: boolean) => void;
+  isColumnsMenuOpen: boolean;
+  setIsColumnsMenuOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
 }
 
-export function UtilizationReportView({ actionItems, setActionItems }: UtilizationReportViewProps) {
+export function UtilizationReportView({ 
+  actionItems, 
+  setActionItems, 
+  isSettingsModalOpen, 
+  setIsSettingsModalOpen,
+  isAuslastungViewOpen, 
+  setIsAuslastungViewOpen,
+  isEinsatzplanViewOpen, 
+  setIsEinsatzplanViewOpen,
+  isColumnsMenuOpen, 
+  setIsColumnsMenuOpen 
+}: UtilizationReportViewProps) {
   const { user, loading, profile, updateProfile } = useAuth();
   const [showAllData, setShowAllData] = useState<boolean>(() => {
     try { return JSON.parse(localStorage.getItem('utilization_show_all_data') || 'false'); } catch { return false; }
@@ -66,8 +85,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
   const [utilizationCommentForPerson, setUtilizationCommentForPerson] = useState<string | null>(null);
   const [planningCommentForPerson, setPlanningCommentForPerson] = useState<string | null>(null);
   const [isAdminUploadModalOpen, setIsAdminUploadModalOpen] = useState(false);
-  const [isEinsatzplanViewOpen, setIsEinsatzplanViewOpen] = useState(false);
-  const [isAuslastungViewOpen, setIsAuslastungViewOpen] = useState(false);
+
   const [isAssignmentEditorOpen, setIsAssignmentEditorOpen] = useState(false);
   const [assignmentEditorPerson, setAssignmentEditorPerson] = useState<string | null>(null);
 
@@ -172,7 +190,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
   const [showActionItems, setShowActionItems] = useState<boolean>(false);
   // ✅ ENTFERNT: actionItems und setActionItems sind jetzt Props
   const [personSearchTerm, setPersonSearchTerm] = useState<string>('');
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
   const [showWorkingStudents, setShowWorkingStudents] = useState(() => {
     try { return JSON.parse(localStorage.getItem('utilization_show_working_students') || 'true'); } catch { return true; }
   });
@@ -230,7 +248,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
   useEffect(() => {
     try { localStorage.setItem(VISIBLE_COLUMNS_KEY, JSON.stringify(visibleColumns)); } catch {}
   }, [visibleColumns]);
-  const [isColumnsMenuOpen, setIsColumnsMenuOpen] = useState(false);
+
   const columnsMenuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -1157,157 +1175,6 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
   }
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-4 py-6">
-        <div className="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              Auslastung & Vorblick {currentIsoYear}
-            </h1>
-            <p className="text-sm text-gray-600 mt-1">
-              Rückblick {lookbackWeeks} W · Vorblick {forecastWeeks} W · ISO-KW
-            </p>
-          </div>
-          <div className="flex items-center gap-2 relative">
-            {/* LoB als feststehender Chip, wenn nur eine vorhanden ist */}
-            {lobOptions.length === 1 && (
-              <span className="px-4 py-2 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg uppercase tracking-wide">
-                {lobOptions[0]}
-              </span>
-            )}
-
-            {/* Vereinheitlichte Auswahl als ein Dropdown */}
-            <ScopeFilterDropdown
-              lobOptions={lobOptions}
-              bereichOptions={bereichOptions}
-              ccOptions={ccOptions}
-              teamOptions={teamOptions}
-              selectedLoB={selectedLoB}
-              setSelectedLoB={setSelectedLoB}
-              selectedBereich={selectedBereich}
-              setSelectedBereich={setSelectedBereich}
-              selectedCC={selectedCC}
-              setSelectedCC={setSelectedCC}
-              selectedTeam={selectedTeam}
-              setSelectedTeam={setSelectedTeam}
-              showAllData={showAllData}
-              setShowAllData={setShowAllData}
-              onPersist={async (next) => {
-                try {
-                  await DatabaseService.updateMe({
-                    lob: next.lob ?? undefined,
-                    bereich: next.bereich ?? undefined,
-                    competenceCenter: next.competenceCenter ?? undefined,
-                    team: next.team ?? undefined,
-                    canViewAll: Boolean(next.showAll),
-                  });
-                } catch {}
-              }}
-            />
-
-            {/* Sichtbarer "Alle Daten anzeigen" Toggle */}
-            <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-              <label className="flex items-center gap-2 text-sm font-medium text-blue-900 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showAllData}
-                  onChange={(e) => setShowAllData(e.target.checked)}
-                  className="rounded border-blue-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span>Alle Daten anzeigen</span>
-              </label>
-            </div>
-
-
-            <button 
-              onClick={() => setIsAuslastungViewOpen(true)} 
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
-              title="Auslastung-Übersicht öffnen"
-            >
-              <TrendingUp className="w-4 h-4" />
-              Auslastung
-            </button>
-            <button 
-              onClick={() => setIsEinsatzplanViewOpen(true)} 
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
-              title="Einsatzplan-Übersicht öffnen"
-            >
-              <Target className="w-4 h-4" />
-              Einsatzplan
-            </button>
-            <button 
-              onClick={() => setIsAdminUploadModalOpen(true)} 
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
-              title="Neue Daten hochladen (Admin)"
-            >
-              <Database className="w-4 h-4" />
-              Admin Upload
-            </button>
-            <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              <Settings className="w-4 h-4" />
-            </button>
-            <button onClick={() => setIsColumnsMenuOpen(v => !v)} className="p-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors" title="Spalten">
-              <Columns className="w-4 h-4" />
-            </button>
-            {isColumnsMenuOpen && (
-              <div ref={columnsMenuRef} className="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-40">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-800">Spalten</span>
-                  <button
-                    className="text-xs text-blue-600 hover:underline"
-                    onClick={() => {
-                      setVisibleColumns(prev => ({ ...prev, avg4: true, historyWeeks: true, act: true, vg: true, person: true, lbs: true, status: true, planningComment: true, forecastWeeks: true, customer: true, probability: true, startKw: true, planning: true, ticket: true }));
-                    }}
-                  >Alle an</button>
-                </div>
-                <div className="space-y-2">
-                  {[
-                    { key: 'avg4', label: 'Ø 4W' },
-                    { key: 'historyWeeks', label: '4 Wochen Rückblick' },
-                    { key: 'act', label: 'Act' },
-                    { key: 'vg', label: 'VG' },
-                    { key: 'person', label: 'Mitarbeitende (fix)' },
-                    { key: 'lbs', label: 'LBS' },
-                    { key: 'status', label: 'Status' },
-                    { key: 'planningComment', label: 'Planung-Comm' },
-                    { key: 'forecastWeeks', label: 'Vorblick-Wochen' },
-                    { key: 'customer', label: 'Kunde' },
-                    { key: 'probability', label: '%' },
-                    { key: 'startKw', label: 'Start KW' },
-                    { key: 'planning', label: 'Planung' },
-                    { key: 'ticket', label: 'Ticket' },
-                  ].map(({ key, label }) => (
-                    <label key={key} className="flex items-center justify-between text-sm">
-                      <span className="text-gray-700">{label}</span>
-                      <input
-                        type="checkbox"
-                        checked={(visibleColumns as any)[key]}
-                        disabled={key === 'person'}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setVisibleColumns(prev => ({ ...(prev as any), [key]: key === 'person' ? true : checked } as any));
-                        }}
-                      />
-                    </label>
-                  ))}
-                </div>
-                <div className="mt-3 flex items-center justify-between">
-                  <button
-                    className="text-xs text-gray-600 hover:underline"
-                    onClick={() => {
-                      setVisibleColumns(prev => ({ ...prev, avg4: false, historyWeeks: false, act: false, vg: false, person: true, lbs: false, status: false, planningComment: false, forecastWeeks: false, customer: false, probability: false, startKw: false, planning: false, ticket: false }));
-                    }}
-                  >Alle aus</button>
-                  <button
-                    className="text-xs text-gray-600 hover:underline"
-                    onClick={() => setVisibleColumns({ ...defaultVisibleColumns })}
-                  >Zurücksetzen</button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
 
       {/* Main Content */}
       <main className="w-full p-4 space-y-6">
@@ -1409,8 +1276,8 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
               Detailansicht nach Person
             </h3>
             
-            {/* Alle Filter in einer Reihe - Personen, CC, LBS, Status und Action */}
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+            {/* Alle Filter in einer Reihe - Personen, Bereich, CC, LBS, Status und Action */}
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
               {/* Personen-Filter mit Suchfunktion */}
               <div className="w-full">
                 <label className="block text-xs font-medium text-gray-600 mb-1">Personen</label>
@@ -1440,6 +1307,9 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                   </div>
                 </div>
               </div>
+              
+              {/* Bereich-Filter oberhalb von CC und LBS */}
+              <MultiSelectFilter label="Bereich" options={bereichOptions} selected={[selectedBereich].filter(Boolean)} onChange={(values) => setSelectedBereich(values[0] || '')} placeholder="Alle Bereiche" />
               
               <MultiSelectFilter label="CC" options={ccOptions} selected={filterCC} onChange={setFilterCC} placeholder="Alle CC" />
               <MultiSelectFilter label="LBS" options={lbsOptions} selected={filterLBS} onChange={setFilterLBS} placeholder="Alle LBS" />
@@ -1658,7 +1528,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                                   <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center text-xs text-gray-600 font-medium">
                                     X
                                   </div>
-                                  <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-[10px] rounded px-2 py-1 whitespace-nowrap z-20">
+                                  <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-[10px] rounded px-2 py-1 whitespace-nowrap">
                                     Keine Führungskraft
                                   </div>
                                 </div>
@@ -1670,7 +1540,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                                 <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-xs text-white font-medium">
                                   {initials}
                                 </div>
-                                <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-[10px] rounded px-2 py-1 whitespace-nowrap z-20">
+                                <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-[10px] rounded px-2 py-1 whitespace-nowrap">
                                   {manager}
                                 </div>
                               </div>
@@ -1891,7 +1761,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                                       >
                                         <Target className="w-4 h-4" />
                                         {offerCount > 1 && (
-                                          <span className="absolute top-0 right-0 translate-x-1/3 -translate-y-1/3 z-10 text-[10px] leading-none bg-emerald-600 text-white rounded-full min-w-[14px] h-[14px] px-[4px] flex items-center justify-center">
+                                          <span className="absolute top-0 right-0 translate-x-1/3 -translate-y-1/3 text-[10px] leading-none bg-emerald-600 text-white rounded-full min-w-[14px] h-[14px] px-[4px] flex items-center justify-center">
                                             {offerCount}
                                           </span>
                                         )}
@@ -1906,7 +1776,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                                       >
                                         <Ticket className="w-4 h-4" />
                                         {jiraCount > 1 && (
-                                          <span className="absolute top-0 right-0 translate-x-1/3 -translate-y-1/3 z-10 text-[10px] leading-none bg-sky-600 text-white rounded-full min-w-[14px] h-[14px] px-[4px] flex items-center justify-center">
+                                          <span className="absolute top-0 right-0 translate-x-1/3 -translate-y-1/3 text-[10px] leading-none bg-sky-600 text-white rounded-full min-w-[14px] h-[14px] px-[4px] flex items-center justify-center">
                                             {jiraCount}
                                           </span>
                                         )}
@@ -1935,7 +1805,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                                 const list = assignmentsByEmployee[person] || [];
                                 const count = list.length;
                                 return count > 0 ? (
-                                  <span className="absolute -top-1 -right-1 z-10 text-[10px] leading-none bg-indigo-600 text-white rounded-full min-w-[14px] h-[14px] px-[4px] flex items-center justify-center">
+                                  <span className="absolute -top-1 -right-1 text-[10px] leading-none bg-indigo-600 text-white rounded-full min-w-[14px] h-[14px] px-[4px] flex items-center justify-center">
                                     {count}
                                   </span>
                                 ) : null;
@@ -1946,7 +1816,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                               if (list.length === 0) return null;
                               const tooltip = list.map(a => `${a.projectName || a.projectId}${a.customer ? ` · ${a.customer}` : ''}`).join('\n');
                               return (
-                                <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-[10px] rounded px-2 py-1 whitespace-pre z-20">
+                                <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-[10px] rounded px-2 py-1 whitespace-pre">
                                   {tooltip}
                                 </div>
                               );
@@ -1992,13 +1862,13 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
 
       {/* Settings Modal */}
       <AnimatePresence>
-        {isSettingsOpen && <motion.div initial={{
+        {isSettingsModalOpen && <motion.div initial={{
         opacity: 0
       }} animate={{
         opacity: 1
       }} exit={{
         opacity: 0
-      }} className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setIsSettingsOpen(false)}>
+      }} className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setIsSettingsModalOpen(false)}>
             <motion.div initial={{
           scale: 0.95,
           opacity: 0
@@ -2090,7 +1960,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
               </div>
               
               <div className="flex justify-end gap-3 mt-6">
-                <button onClick={() => setIsSettingsOpen(false)} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+                <button onClick={() => setIsSettingsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
                   Übernehmen
                 </button>
               </div>
@@ -2156,7 +2026,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsAuslastungViewOpen(false)} />
           <div className="relative w-full max-w-7xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden">
-            <div className="absolute top-4 right-4 z-10">
+                            <div className="absolute top-4 right-4">
               <button
                 onClick={() => setIsAuslastungViewOpen(false)}
                 className="p-2 bg-white/80 hover:bg-white rounded-full shadow-lg transition-colors"
@@ -2174,7 +2044,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsEinsatzplanViewOpen(false)} />
           <div className="relative w-full max-w-7xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden">
-                          <div className="absolute top-4 right-4 z-10">
+                          <div className="absolute top-4 right-4">
                 <button
                   onClick={() => setIsEinsatzplanViewOpen(false)}
                   className="p-2 bg-white/80 hover:bg-white rounded-full shadow-lg transition-colors"
