@@ -106,6 +106,7 @@ export function EmployeeDossierModal({
   const [formData, setFormData] = useState<Employee>(employee);
   const [isLoading, setIsLoading] = useState(false);
   const [isPlanningOpen, setPlanningOpen] = useState(false);
+  const [skillsInitialized, setSkillsInitialized] = useState(false); // Flag für Skills-Initialisierung
 
   const [planningComment, setPlanningComment] = useState<string>('');
   const [isAssignmentEditorOpen, setAssignmentEditorOpen] = useState(false);
@@ -119,6 +120,8 @@ export function EmployeeDossierModal({
     const loadEmployeeData = async () => {
       if (!isOpen || !employee.name) return;
       
+      // Reset Skills-Flag beim Öffnen des Modals
+      setSkillsInitialized(false);
       setIsLoading(true);
       try {
         // Lade gespeicherte Dossier-Daten aus der DB
@@ -443,9 +446,10 @@ export function EmployeeDossierModal({
                 employeeId={formData.id}
                 employeeName={formData.name}
                 onSkillsChange={(skills) => {
-                  // ⚠️ FIX: Verhindere Überschreibung mit leeren Skills beim initialen Laden
-                  if (skills.length === 0 && formData.skills && formData.skills.length > 0) {
-                    return; // Breche ab, überschreibe nicht mit leeren Skills
+                  // Verhindere Überschreibung beim initialen Laden
+                  if (!skillsInitialized) {
+                    setSkillsInitialized(true);
+                    return;
                   }
                   
                   // Konvertiere zu kompatiblem Format für das bestehende Interface

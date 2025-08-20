@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Calendar, Baby, Heart, Thermometer, X, UserX, GraduationCap, Clock, Plane } from 'lucide-react';
+import { ChevronDown, Calendar, Baby, Heart, Thermometer, X, UserX, GraduationCap, Clock, Plane, Flag } from 'lucide-react';
 
 export interface StatusLabel {
   id: string;
@@ -21,9 +21,10 @@ interface StatusLabelSelectorProps {
   person: string;
   value: string | undefined;
   onChange: (status: string | undefined) => void;
+  isManual?: boolean; // Flag für manuelle Änderungen
 }
 
-export function StatusLabelSelector({ person, value, onChange }: StatusLabelSelectorProps) {
+export function StatusLabelSelector({ person, value, onChange, isManual = false }: StatusLabelSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -53,7 +54,14 @@ export function StatusLabelSelector({ person, value, onChange }: StatusLabelSele
     <div className="relative" ref={dropdownRef}>
       {selectedStatus ? (
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-700">{selectedStatus.label}</span>
+          <div className="flex items-center gap-1">
+            <span className="text-sm text-gray-700">{selectedStatus.label}</span>
+            {isManual && (
+              <div title="Manuell gesetzt">
+                <Flag className="w-3 h-3 text-blue-600" />
+              </div>
+            )}
+          </div>
           <button
             onClick={handleClear}
             className="text-gray-400 hover:text-gray-600 transition-colors"

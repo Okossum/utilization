@@ -33,6 +33,14 @@ export interface PlannedEngagement {
 export interface PersonStatus {
   person: string;
   status: string;
+  source: 'manual' | 'rule' | 'default';
+  updatedAt: Date;
+}
+
+export interface PersonActionItem {
+  person: string;
+  actionItem: boolean;
+  source: 'manual' | 'rule' | 'default';
   updatedAt: Date;
 }
 
@@ -99,6 +107,7 @@ export const COLLECTIONS = {
   UTILIZATION_DATA: 'utilization_data',
   PLANNED_ENGAGEMENTS: 'planned_engagements',
   PERSON_STATUS: 'person_status',
+  PERSON_ACTION_ITEMS: 'person_action_items',
   PERSON_TRAVEL_READINESS: 'person_travel_readiness',
   CUSTOMERS: 'customers',
   PROJECTS: 'projects',
@@ -124,6 +133,10 @@ export interface FirestorePlannedEngagement extends PlannedEngagement, Firestore
 }
 
 export interface FirestorePersonStatus extends PersonStatus, FirestoreDocument {
+  userId?: string;
+}
+
+export interface FirestorePersonActionItem extends PersonActionItem, FirestoreDocument {
   userId?: string;
 }
 

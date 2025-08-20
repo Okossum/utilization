@@ -205,16 +205,70 @@ export const personStatusService = {
     })) as FirestorePersonStatus[];
   },
 
-  async update(person: string, status: string): Promise<void> {
+    async update(person: string, status: string, source: 'manual' | 'rule' | 'default' = 'manual'): Promise<void> {
     const existing = await this.getByPerson(person);
     if (existing) {
       const docRef = doc(db, COLLECTIONS.PERSON_STATUS, existing.id);
-      await updateDoc(docRef, {
-        status,
-        updatedAt: new Date()
+      await updateDoc(docRef, { 
+        status, 
+        source,
+        updatedAt: new Date() 
       });
     } else {
-      await this.save({ person, status, updatedAt: new Date() });
+      await this.save({ person, status, source, updatedAt: new Date() });
+    }
+  }
+};
+
+export const personActionItemService = {
+  async save(actionItem: PersonActionItem): Promise<string> {
+    const docRef = await addDoc(collection(db, COLLECTIONS.PERSON_ACTION_ITEMS), {
+      ...addFirestoreFields(actionItem),
+      updatedAt: new Date()
+    });
+    return docRef.id;
+  },
+
+  async getByPerson(person: string): Promise<FirestorePersonActionItem | null> {
+    const q = query(
+      collection(db, COLLECTIONS.PERSON_ACTION_ITEMS), 
+      where('person', '==', person)
+    );
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) return null;
+    
+    const doc = querySnapshot.docs[0];
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      createdAt: convertTimestamp(data.createdAt),
+      updatedAt: convertTimestamp(data.updatedAt)
+    } as FirestorePersonActionItem;
+  },
+
+  async getAll(): Promise<FirestorePersonActionItem[]> {
+    const querySnapshot = await getDocs(collection(db, COLLECTIONS.PERSON_ACTION_ITEMS));
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: convertTimestamp(doc.data().createdAt),
+      updatedAt: convertTimestamp(doc.data().updatedAt)
+    })) as FirestorePersonActionItem[];
+  },
+
+  async update(person: string, actionItem: boolean, source: 'manual' | 'rule' | 'default' = 'manual'): Promise<void> {
+    const existing = await this.getByPerson(person);
+    if (existing) {
+      const docRef = doc(db, COLLECTIONS.PERSON_ACTION_ITEMS, existing.id);
+      await updateDoc(docRef, { 
+        actionItem, 
+        source,
+        updatedAt: new Date() 
+      });
+    } else {
+      await this.save({ person, actionItem, source, updatedAt: new Date() });
     }
   }
 };

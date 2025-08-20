@@ -35,10 +35,7 @@ interface UploadedFile {
   error?: string;
 }
 
-// ✅ NEU: Action-Items Props von App.tsx
 interface UtilizationReportViewProps {
-  actionItems: Record<string, boolean>;
-  setActionItems: (actionItems: Record<string, boolean>) => void;
   isSettingsModalOpen: boolean;
   setIsSettingsModalOpen: (open: boolean) => void;
   isAuslastungViewOpen: boolean;
@@ -50,8 +47,6 @@ interface UtilizationReportViewProps {
 }
 
 export function UtilizationReportView({ 
-  actionItems, 
-  setActionItems, 
   isSettingsModalOpen, 
   setIsSettingsModalOpen,
   isAuslastungViewOpen, 
@@ -159,10 +154,15 @@ export function UtilizationReportView({
           }
         });
         
-        // Speichere bereinigte Daten
-        if (hasChanges) {
+        // Speichere bereinigte Daten (nur für Upload-Modus)
+        if (hasChanges && dataSource === 'upload') {
           localStorage.setItem('utilization_person_status_v1', JSON.stringify(cleaned));
-          setPersonStatus(cleaned);
+          // Verwende protectedSetPersonStatus für Upload-Daten
+          Object.entries(cleaned).forEach(([person, status]) => {
+            if (typeof status === 'string') {
+              protectedSetPersonStatus(person, status, 'default');
+            }
+          });
         }
       }
     } catch {}
@@ -173,14 +173,121 @@ export function UtilizationReportView({
   // Save working students toggle state - wird nach der Definition von showWorkingStudents definiert
 
   // Removed planned engagements and customers state; planning handled via modal & dossier
-  const [personStatus, setPersonStatus] = useState<Record<string, string | undefined>>(() => {
-    try { return JSON.parse(localStorage.getItem('utilization_person_status_v1') || '{}'); } catch { return {}; }
-  });
+  // Status-Struktur mit Prioritäts-System (aus Datenbank)
+  const [personStatus, setPersonStatus] = useState<Record<string, { status: string; source: 'manual' | 'rule' | 'default' }>>({});
+  
+  // Lade Status aus der Datenbank
+  useEffect(() => {
+    const loadPersonStatuses = async () => {
+      try {
+        const { personStatusService } = await import('../../lib/firebase-services');
+        const statuses = await personStatusService.getAll();
+        const statusMap: Record<string, { status: string; source: 'manual' | 'rule' | 'default' }> = {};
+        
+        statuses.forEach(status => {
+          // WICHTIG: Manuelle Status werden NIE überschrieben
+          if (status.source === 'manual') {
+            statusMap[status.person] = {
+              status: status.status,
+              source: 'manual'
+            };
+          } else {
+            // Regel-basierte Status nur setzen, wenn kein manueller Status existiert
+            if (!statusMap[status.person] || statusMap[status.person].source !== 'manual') {
+              statusMap[status.person] = {
+                status: status.status,
+                source: status.source || 'default'
+              };
+            }
+          }
+        });
+        
+        // Verwende protectedSetPersonStatus für alle geladenen Status
+        Object.entries(statusMap).forEach(([person, statusData]) => {
+          protectedSetPersonStatus(person, statusData.status, statusData.source);
+        });
+      } catch (error) {
+        console.warn('Fehler beim Laden der Person-Status:', error);
+      }
+    };
+    
+    // Lade Action Items aus der Datenbank
+    const loadActionItems = async () => {
+      try {
+        const { personActionItemService } = await import('../../lib/firebase-services');
+        const actionItemsData = await personActionItemService.getAll();
+        const actionItemsMap: Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default' }> = {};
+        
+        actionItemsData.forEach(item => {
+          // WICHTIG: Manuelle Action Items werden NIE überschrieben
+          if (item.source === 'manual') {
+            actionItemsMap[item.person] = {
+              actionItem: item.actionItem,
+              source: 'manual'
+            };
+          } else {
+            // Regel-basierte Action Items nur setzen, wenn kein manueller Status existiert
+            if (!actionItemsMap[item.person] || actionItemsMap[item.person].source !== 'manual') {
+              actionItemsMap[item.person] = {
+                actionItem: item.actionItem,
+                source: item.source || 'default'
+              };
+            }
+          }
+        });
+        
+        setActionItems(actionItemsMap);
+      } catch (error) {
+        console.warn('Fehler beim Laden der Action Items:', error);
+      }
+    };
+    
+    if (dataSource === 'database') {
+      loadPersonStatuses();
+      loadActionItems();
+    }
+  }, [dataSource]);
+
+
+  
+  // SCHUTZ: Verhindere, dass manuelle Status überschrieben werden
+  const protectedSetPersonStatus = (person: string, status: string, source: 'manual' | 'rule' | 'default') => {
+    setPersonStatus(prev => {
+      const current = prev[person];
+      
+      // Wenn es bereits einen manuellen Status gibt, darf dieser NIE überschrieben werden
+      if (current && current.source === 'manual' && source !== 'manual') {
+        console.log(`🚫 SCHUTZ: Manueller Status für ${person} wird nicht überschrieben`);
+        return prev; // Keine Änderung
+      }
+      
+      // Ansonsten Status setzen
+      return {
+        ...prev,
+        [person]: { status, source }
+      };
+    });
+  };
   const [personTravelReadiness, setPersonTravelReadiness] = useState<Record<string, number | undefined>>(() => {
     try { return JSON.parse(localStorage.getItem('utilization_person_travel_readiness_v1') || '{}'); } catch { return {}; }
   });
   // Removed persistence effects for planned engagements and customers
-  useEffect(() => { try { localStorage.setItem('utilization_person_status_v1', JSON.stringify(personStatus)); } catch {} }, [personStatus]);
+
+  
+  // Helper-Funktion für Status-Zugriff mit Prioritäts-System
+  const getPersonStatus = (person: string): string | undefined => {
+    const statusData = personStatus[person];
+    if (!statusData) return undefined;
+    
+    // Manuelle Einstellungen haben höchste Priorität
+    return statusData.status;
+  };
+  
+  // Helper-Funktion für Status-Quelle
+  const getPersonStatusSource = (person: string): 'manual' | 'rule' | 'default' => {
+    const statusData = personStatus[person];
+    return statusData?.source || 'default';
+  };
   useEffect(() => { try { localStorage.setItem('utilization_person_travel_readiness_v1', JSON.stringify(personTravelReadiness)); } catch {} }, [personTravelReadiness]);
 
   // Fehlende Variablen hinzufügen
@@ -189,8 +296,15 @@ export function UtilizationReportView({
   const [filterLBSExclude, setFilterLBSExclude] = useState<string[]>([]);
   const [filterStatus, setFilterStatus] = useState<string[]>([]);
   const [showActionItems, setShowActionItems] = useState<boolean>(false);
-  // ✅ ENTFERNT: actionItems und setActionItems sind jetzt Props
   const [personSearchTerm, setPersonSearchTerm] = useState<string>('');
+  
+  // Action Items State mit Prioritäts-System (aus Datenbank)
+  const [actionItems, setActionItems] = useState<Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default' }>>({});
+  
+  // Set Items State für die neue Set-Spalte
+  const [setItems, setSetItems] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem('utilization_set_items_v1') || '{}'); } catch { return {}; }
+  });
 
   const [showWorkingStudents, setShowWorkingStudents] = useState(() => {
     try { return JSON.parse(localStorage.getItem('utilization_show_working_students') || 'true'); } catch { return true; }
@@ -202,6 +316,13 @@ export function UtilizationReportView({
       localStorage.setItem('utilization_show_working_students', JSON.stringify(showWorkingStudents));
     } catch {}
   }, [showWorkingStudents]);
+  
+  // Save set items state
+  useEffect(() => {
+    try {
+      localStorage.setItem('utilization_set_items_v1', JSON.stringify(setItems));
+    } catch {}
+  }, [setItems]);
 
   // Sichtbare Spalten konfigurieren (persistiert)
   const VISIBLE_COLUMNS_KEY = 'utilization_visible_columns_v1';
@@ -439,7 +560,7 @@ export function UtilizationReportView({
       email: '',
       phone: '',
       projectHistory: [],
-      simpleProjects: [],
+              // simpleProjects: [], // Entfernt da nicht in Employee Interface definiert
       strengths: '',
       weaknesses: '',
       comments: '',
@@ -708,14 +829,34 @@ export function UtilizationReportView({
         }
       });
 
-      // Nur setzen wenn sich etwas geändert hat
+      // Nur setzen wenn sich etwas geändert hat UND keine manuellen Einstellungen existieren
       if (Object.keys(newActionItems).length > 0) {
-        setActionItems({ ...actionItems, ...newActionItems });
+        const updatedActionItems = { ...actionItems };
+        
+        Object.entries(newActionItems).forEach(([person, actionItem]) => {
+          const current = actionItems[person];
+          
+          // Nur setzen wenn kein manueller Status existiert
+          if (!current || current.source !== 'manual') {
+            updatedActionItems[person] = { actionItem, source: 'rule' };
+          }
+        });
+        
+        setActionItems(updatedActionItems);
       }
     };
 
-    autoSetActionItems();
-  }, [dataForUI, forecastStartWeek, currentIsoYear]);
+    // ✅ NEU: autoSetActionItems() aufrufen wenn sich Daten ändern (ohne actionItems dependency)
+    if (dataSource === 'database') {
+      autoSetActionItems();
+    }
+  }, [dataForUI, forecastStartWeek, currentIsoYear, dataSource]);
+
+
+
+
+
+
 
   // ✅ NEU: PersonMeta primär aus Einsatzplan Collection für alle Mitarbeiter-Informationen
   const personMeta = useMemo(() => {
@@ -916,7 +1057,7 @@ export function UtilizationReportView({
     if (filterLBS.length > 0) base = base.filter(d => filterLBS.includes(String(personMeta.get(d.person)?.lbs || '')));
     if (filterLBSExclude.length > 0) base = base.filter(d => !filterLBSExclude.includes(String(personMeta.get(d.person)?.lbs || '')));
     if (filterStatus.length > 0) base = base.filter(d => {
-      const personStatusValue = personStatus[d.person];
+      const personStatusValue = getPersonStatus(d.person);
       if (!personStatusValue) return true; // Personen ohne Status werden angezeigt
       
       // Prüfe ob der Status im Filter enthalten ist (sowohl ID als auch Label)
@@ -944,7 +1085,10 @@ export function UtilizationReportView({
     
     // Action Items Filter
     if (showActionItems) {
-      base = base.filter(d => actionItems[d.person] === true);
+      base = base.filter(d => {
+        const actionItem = actionItems[d.person];
+        return actionItem && actionItem.actionItem === true;
+      });
     }
     
     if (selectedPersons.length > 0) {
@@ -1063,7 +1207,7 @@ export function UtilizationReportView({
       
       // Status Filter (EXCLUDE)
       if (filterStatus.length > 0) {
-        const personStatusValue = personStatus[person];
+        const personStatusValue = getPersonStatus(person);
         if (personStatusValue) {
           const statusMatches = filterStatus.some(filterStatusItem => {
             if (filterStatusItem === personStatusValue) return true;
@@ -1405,6 +1549,10 @@ export function UtilizationReportView({
                   <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
                     Act
                   </th>
+                  {/* Set-Spalte */}
+                  <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
+                    Set
+                  </th>
                   {/* FK-Spalte für Führungskraft */}
                   <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
                     FK
@@ -1453,7 +1601,7 @@ export function UtilizationReportView({
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {visiblePersons.map(person => {
-                  const isTerminated = personStatus[person] === 'termination' || personStatus[person] === 'Kündigung';
+                  const isTerminated = getPersonStatus(person) === 'termination' || getPersonStatus(person) === 'Kündigung';
                   const personData = filteredData.filter(item => item.person === person);
                   
                   // ✅ DEBUG: Zeige verfügbare Wochen für erste Person
@@ -1510,7 +1658,7 @@ export function UtilizationReportView({
 
                       {/* Utilization Comments Spalte */}
                       <td className={`px-0.5 py-0.5 text-sm ${
-                        actionItems[person] 
+                        actionItems[person]?.actionItem 
                           ? 'bg-blue-100'
                           : 'bg-gray-50'
                       }`} style={{padding: '2px 2px'}}>
@@ -1527,25 +1675,58 @@ export function UtilizationReportView({
 
                       {/* Act-Spalte */}
                       <td className={`px-0.5 py-0.5 text-sm ${
-                        actionItems[person] 
+                        actionItems[person]?.actionItem 
                           ? 'bg-blue-100'
                           : 'bg-gray-50'
                       }`} style={{padding: '2px 2px'}}>
                         <div className="flex items-center justify-center">
                           <input
                             type="checkbox"
-                            checked={actionItems[person] || false}
-                            onChange={(e) => {
+                            checked={actionItems[person]?.actionItem || false}
+                            onChange={async (e) => {
                               const checked = e.target.checked;
-                              setActionItems({ ...actionItems, [person]: checked });
+                              try {
+                                const { personActionItemService } = await import('../../lib/firebase-services');
+                                await personActionItemService.update(person, checked, 'manual');
+                                
+                                // Aktualisiere lokalen State
+                                setActionItems(prev => ({
+                                  ...prev,
+                                  [person]: { actionItem: checked, source: 'manual' }
+                                }));
+                              } catch (error) {
+                                console.error('Fehler beim Speichern des Action Items:', error);
+                              }
                             }}
                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                           />
                         </div>
                       </td>
+                      {/* Set-Spalte */}
+                      <td className={`px-0.5 py-0.5 text-sm ${
+                        actionItems[person]?.actionItem 
+                          ? 'bg-blue-100'
+                          : 'bg-gray-50'
+                      }`} style={{padding: '2px 2px'}}>
+                        <div className="flex items-center justify-center">
+                          <input
+                            type="checkbox"
+                            checked={setItems[person] || false}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setSetItems({ ...setItems, [person]: checked });
+                            }}
+                            className={`rounded border-2 focus:ring-2 focus:ring-offset-2 transition-colors ${
+                              setItems[person] 
+                                ? 'bg-red-500 border-red-500 text-white focus:ring-red-500' 
+                                : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500'
+                            }`}
+                          />
+                        </div>
+                      </td>
                       {/* FK-Spalte für Führungskraft */}
                       <td className={`px-0.5 py-0.5 text-sm ${
-                        actionItems[person] 
+                        actionItems[person]?.actionItem 
                           ? 'bg-blue-100'
                           : 'bg-gray-50'
                       }`} style={{padding: '2px 2px'}}>
@@ -1580,7 +1761,7 @@ export function UtilizationReportView({
                       </td>
                       {/* Info-Spalte für Career Level Icons */}
                       <td className={`px-0.5 py-0.5 text-sm ${
-                        actionItems[person] 
+                        actionItems[person]?.actionItem 
                           ? 'bg-blue-100'
                           : 'bg-gray-50'
                       }`} style={{padding: '2px 2px'}}>
@@ -1643,7 +1824,7 @@ export function UtilizationReportView({
                       </td>
                       {/* Name-Spalte zwischen Auslastung und Einsatzplan */}
                       <td className={`px-0.5 py-0.5 text-sm ${
-                        actionItems[person] 
+                        actionItems[person]?.actionItem 
                           ? 'bg-blue-100'
                           : 'bg-gray-50'
                       } ${isTerminated ? 'line-through opacity-60' : ''}`} style={{padding: '2px 2px'}}>
@@ -1651,7 +1832,7 @@ export function UtilizationReportView({
                       </td>
                       {/* LBS-Spalte */}
                       <td className={`px-0.5 py-0.5 text-sm ${
-                        actionItems[person] 
+                        actionItems[person]?.actionItem 
                           ? 'bg-blue-100'
                           : 'bg-gray-50'
                       } ${isTerminated ? 'line-through opacity-60' : ''}`} style={{padding: '2px 2px'}}>
@@ -1663,7 +1844,7 @@ export function UtilizationReportView({
                       </td>
                       {/* Details-Spalte für Mitarbeiter-Dossier */}
                       <td className={`px-0.5 py-0.5 text-sm ${
-                        actionItems[person] 
+                        actionItems[person]?.actionItem 
                           ? 'bg-blue-100'
                           : 'bg-gray-50'
                       }`} style={{padding: '2px 2px'}}>
@@ -1679,22 +1860,33 @@ export function UtilizationReportView({
                       </td>
                       {/* Status-Spalte */}
                       <td className={`px-0.5 py-0.5 text-sm ${
-                        actionItems[person] 
+                        actionItems[person]?.actionItem 
                           ? 'bg-blue-100'
                           : 'bg-gray-50'
                       }`} style={{padding: '2px 2px'}}>
                         <div className="flex items-center justify-center">
                           <StatusLabelSelector
                             person={person}
-                            value={personStatus[person]}
-                            onChange={(status) => setPersonStatus(prev => ({ ...prev, [person]: status }))}
+                            value={getPersonStatus(person)}
+                            isManual={getPersonStatusSource(person) === 'manual'}
+                            onChange={async (status) => {
+                              try {
+                                const { personStatusService } = await import('../../lib/firebase-services');
+                                await personStatusService.update(person, status || '', 'manual');
+                                
+                                // Aktualisiere lokalen State mit Schutz
+                                protectedSetPersonStatus(person, status || '', 'manual');
+                              } catch (error) {
+                                console.error('Fehler beim Speichern des Status:', error);
+                              }
+                            }}
                           />
                         </div>
                       </td>
 
                       {/* Planning Comments Spalte */}
                       <td className={`px-0.5 py-0.5 text-sm ${
-                        actionItems[person] 
+                        actionItems[person]?.actionItem 
                           ? 'bg-blue-100'
                           : 'bg-gray-50'
                       }`} style={{padding: '2px 2px'}}>
