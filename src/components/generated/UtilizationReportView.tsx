@@ -216,21 +216,23 @@ export function UtilizationReportView({
       try {
         const { personActionItemService } = await import('../../lib/firebase-services');
         const actionItemsData = await personActionItemService.getAll();
-        const actionItemsMap: Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default' }> = {};
+        const actionItemsMap: Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }> = {};
         
         actionItemsData.forEach(item => {
           // WICHTIG: Manuelle Action Items werden NIE überschrieben
           if (item.source === 'manual') {
             actionItemsMap[item.person] = {
               actionItem: item.actionItem,
-              source: 'manual'
+              source: 'manual',
+              updatedBy: item.updatedBy
             };
           } else {
             // Regel-basierte Action Items nur setzen, wenn kein manueller Status existiert
             if (!actionItemsMap[item.person] || actionItemsMap[item.person].source !== 'manual') {
               actionItemsMap[item.person] = {
                 actionItem: item.actionItem,
-                source: item.source || 'default'
+                source: item.source || 'default',
+                updatedBy: item.updatedBy
               };
             }
           }
@@ -298,13 +300,69 @@ export function UtilizationReportView({
   const [showActionItems, setShowActionItems] = useState<boolean>(false);
   const [personSearchTerm, setPersonSearchTerm] = useState<string>('');
   
-  // Action Items State mit Prioritäts-System (aus Datenbank)
-  const [actionItems, setActionItems] = useState<Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default' }>>({});
+  // Action Items State mit Prioritäts-System (aus Datenbank) - erweitert um updatedBy
+  const [actionItems, setActionItems] = useState<Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }>>({});
+
+  // STD-Status State: Gespeicherte Standardstatus und ausgewählte Status pro Person
+  const [standardStatuses, setStandardStatuses] = useState<string[]>([]);
+  const [personStandardStatuses, setPersonStandardStatuses] = useState<Record<string, string>>({});
+
+  // ✅ NEU: Standardstatus laden und speichern
+  const loadStandardStatuses = async () => {
+    try {
+      const { standardStatusService } = await import('../../lib/firebase-services');
+      const statuses = await standardStatusService.getAll();
+      setStandardStatuses(statuses.map(s => s.name));
+    } catch (error) {
+      console.warn('Fehler beim Laden der Standardstatus:', error);
+      // Fallback: Verwende Standard-Status
+      setStandardStatuses(['Verfügbar', 'Urlaub', 'Krank', 'Schulung', 'Projekt']);
+    }
+  };
+
+  const saveStandardStatus = async (newStatus: string) => {
+    try {
+      const { standardStatusService } = await import('../../lib/firebase-services');
+      await standardStatusService.save({ name: newStatus });
+      setStandardStatuses(prev => [...prev, newStatus]);
+    } catch (error) {
+      console.error('Fehler beim Speichern des Standardstatus:', error);
+    }
+  };
+
+  const loadPersonStandardStatuses = async () => {
+    try {
+      const { personStandardStatusService } = await import('../../lib/firebase-services');
+      const statuses = await personStandardStatusService.getAll();
+      const statusMap: Record<string, string> = {};
+      statuses.forEach(s => {
+        statusMap[s.person] = s.standardStatus;
+      });
+      setPersonStandardStatuses(statusMap);
+    } catch (error) {
+      console.warn('Fehler beim Laden der Person-Standardstatus:', error);
+    }
+  };
+
+  const savePersonStandardStatus = async (person: string, status: string) => {
+    try {
+      const { personStandardStatusService } = await import('../../lib/firebase-services');
+      await personStandardStatusService.save({ person, standardStatus: status });
+      setPersonStandardStatuses(prev => ({ ...prev, [person]: status }));
+    } catch (error) {
+      console.error('Fehler beim Speichern des Person-Standardstatus:', error);
+    }
+  };
+
+  // ✅ NEU: Standardstatus laden wenn Datenbank-Modus aktiviert wird
+  useEffect(() => {
+    if (dataSource === 'database') {
+      loadStandardStatuses();
+      loadPersonStandardStatuses();
+    }
+  }, [dataSource]);
   
-  // Set Items State für die neue Set-Spalte
-  const [setItems, setSetItems] = useState<Record<string, boolean>>(() => {
-    try { return JSON.parse(localStorage.getItem('utilization_set_items_v1') || '{}'); } catch { return {}; }
-  });
+
 
   const [showWorkingStudents, setShowWorkingStudents] = useState(() => {
     try { return JSON.parse(localStorage.getItem('utilization_show_working_students') || 'true'); } catch { return true; }
@@ -317,12 +375,7 @@ export function UtilizationReportView({
     } catch {}
   }, [showWorkingStudents]);
   
-  // Save set items state
-  useEffect(() => {
-    try {
-      localStorage.setItem('utilization_set_items_v1', JSON.stringify(setItems));
-    } catch {}
-  }, [setItems]);
+
 
   // Sichtbare Spalten konfigurieren (persistiert)
   const VISIBLE_COLUMNS_KEY = 'utilization_visible_columns_v1';
@@ -831,14 +884,14 @@ export function UtilizationReportView({
 
       // Nur setzen wenn sich etwas geändert hat UND keine manuellen Einstellungen existieren
       if (Object.keys(newActionItems).length > 0) {
-        const updatedActionItems = { ...actionItems };
+        const updatedActionItems: Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }> = { ...actionItems };
         
         Object.entries(newActionItems).forEach(([person, actionItem]) => {
           const current = actionItems[person];
           
           // Nur setzen wenn kein manueller Status existiert
           if (!current || current.source !== 'manual') {
-            updatedActionItems[person] = { actionItem, source: 'rule' };
+            updatedActionItems[person] = { actionItem, source: 'rule', updatedBy: undefined };
           }
         });
         
@@ -1549,10 +1602,12 @@ export function UtilizationReportView({
                   <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
                     Act
                   </th>
-                  {/* Set-Spalte */}
+
+                  {/* STD-Status Spalte */}
                   <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
-                    Set
+                    STD-Status
                   </th>
+
                   {/* FK-Spalte für Führungskraft */}
                   <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
                     FK
@@ -1680,50 +1735,100 @@ export function UtilizationReportView({
                           : 'bg-gray-50'
                       }`} style={{padding: '2px 2px'}}>
                         <div className="flex items-center justify-center">
-                          <input
-                            type="checkbox"
-                            checked={actionItems[person]?.actionItem || false}
-                            onChange={async (e) => {
-                              const checked = e.target.checked;
-                              try {
-                                const { personActionItemService } = await import('../../lib/firebase-services');
-                                await personActionItemService.update(person, checked, 'manual');
-                                
-                                // Aktualisiere lokalen State
-                                setActionItems(prev => ({
-                                  ...prev,
-                                  [person]: { actionItem: checked, source: 'manual' }
-                                }));
-                              } catch (error) {
-                                console.error('Fehler beim Speichern des Action Items:', error);
-                              }
-                            }}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          />
+                          <div className="relative group">
+                            <input
+                              type="checkbox"
+                              checked={actionItems[person]?.actionItem || false}
+                              onChange={async (e) => {
+                                const checked = e.target.checked;
+                                try {
+                                  const { personActionItemService } = await import('../../lib/firebase-services');
+                                  // Speichere den aktuellen Benutzernamen
+                                  const currentUser = profile?.displayName || user?.email || 'Unbekannt';
+                                  await personActionItemService.update(person, checked, 'manual', currentUser);
+                                  
+                                  // Aktualisiere lokalen State mit updatedBy Information
+                                  setActionItems(prev => ({
+                                    ...prev,
+                                    [person]: { 
+                                      actionItem: checked, 
+                                      source: 'manual',
+                                      updatedBy: currentUser
+                                    }
+                                  }));
+                                } catch (error) {
+                                  console.error('Fehler beim Speichern des Action Items:', error);
+                                }
+                              }}
+                              className={`rounded border-2 focus:ring-2 focus:ring-offset-2 transition-all ${
+                                actionItems[person]?.source === 'manual' 
+                                  ? 'border-orange-400 focus:ring-orange-500' // Manueller Status: Orange Rahmen
+                                  : 'border-gray-300 focus:ring-blue-500'    // Automatischer Status: Normal
+                              }`}
+                            />
+                            {/* Tooltip für manuelle Änderungen */}
+                            {actionItems[person]?.source === 'manual' && actionItems[person]?.updatedBy && (
+                              <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-8 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-[10px] rounded px-2 py-1 whitespace-nowrap z-10">
+                                Status manuell geändert von: {actionItems[person]?.updatedBy}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
-                      {/* Set-Spalte */}
+
+                      {/* STD-Status Spalte */}
                       <td className={`px-0.5 py-0.5 text-sm ${
                         actionItems[person]?.actionItem 
                           ? 'bg-blue-100'
                           : 'bg-gray-50'
                       }`} style={{padding: '2px 2px'}}>
                         <div className="flex items-center justify-center">
-                          <input
-                            type="checkbox"
-                            checked={setItems[person] || false}
-                            onChange={(e) => {
-                              const checked = e.target.checked;
-                              setSetItems({ ...setItems, [person]: checked });
-                            }}
-                            className={`rounded border-2 focus:ring-2 focus:ring-offset-2 transition-colors ${
-                              setItems[person] 
-                                ? 'bg-red-500 border-red-500 text-white focus:ring-red-500' 
-                                : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-500'
-                            }`}
-                          />
+                          <div className="relative group">
+                            <select
+                              value={personStandardStatuses[person] || ''}
+                              onChange={(e) => {
+                                const selectedStatus = e.target.value;
+                                if (selectedStatus) {
+                                  savePersonStandardStatus(person, selectedStatus);
+                                }
+                              }}
+                              className="text-xs border border-gray-300 rounded px-1 py-0.5 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                            >
+                              <option value="">-</option>
+                              {standardStatuses.map(status => (
+                                <option key={status} value={status}>
+                                  {status}
+                                </option>
+                              ))}
+                              <option value="__ADD_NEW__">+ Neuer Status</option>
+                            </select>
+                            {/* Inline-Edit für neue Status */}
+                            {personStandardStatuses[person] === '__ADD_NEW__' && (
+                              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded shadow-lg p-2 z-20 min-w-32">
+                                <input
+                                  type="text"
+                                  placeholder="Neuer Status..."
+                                  className="w-full text-xs border border-gray-300 rounded px-2 py-1 mb-2"
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      const newStatus = e.currentTarget.value.trim();
+                                      if (newStatus) {
+                                        saveStandardStatus(newStatus);
+                                        savePersonStandardStatus(person, newStatus);
+                                      }
+                                    }
+                                  }}
+                                  autoFocus
+                                />
+                                <div className="text-xs text-gray-500">
+                                  Enter drücken zum Speichern
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
+
                       {/* FK-Spalte für Führungskraft */}
                       <td className={`px-0.5 py-0.5 text-sm ${
                         actionItems[person]?.actionItem 

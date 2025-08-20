@@ -42,6 +42,7 @@ export interface PersonActionItem {
   actionItem: boolean;
   source: 'manual' | 'rule' | 'default';
   updatedAt: Date;
+  updatedBy?: string; // Name des Benutzers, der die Änderung vorgenommen hat
 }
 
 export interface PersonTravelReadiness {
@@ -113,7 +114,9 @@ export const COLLECTIONS = {
   PROJECTS: 'projects',
   SKILLS: 'skills',
   EMPLOYEE_SKILLS: 'employee_skills',
-  ASSIGNMENTS: 'assignments'
+  ASSIGNMENTS: 'assignments',
+  STANDARD_STATUSES: 'standard_statuses',
+  PERSON_STANDARD_STATUSES: 'person_standard_statuses'
 } as const;
 
 // Firestore Document IDs

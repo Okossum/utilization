@@ -224,7 +224,8 @@ export const personActionItemService = {
   async save(actionItem: PersonActionItem): Promise<string> {
     const docRef = await addDoc(collection(db, COLLECTIONS.PERSON_ACTION_ITEMS), {
       ...addFirestoreFields(actionItem),
-      updatedAt: new Date()
+      updatedAt: new Date(),
+      updatedBy: actionItem.updatedBy || null
     });
     return docRef.id;
   },
@@ -258,17 +259,18 @@ export const personActionItemService = {
     })) as FirestorePersonActionItem[];
   },
 
-  async update(person: string, actionItem: boolean, source: 'manual' | 'rule' | 'default' = 'manual'): Promise<void> {
+  async update(person: string, actionItem: boolean, source: 'manual' | 'rule' | 'default' = 'manual', updatedBy?: string): Promise<void> {
     const existing = await this.getByPerson(person);
     if (existing) {
       const docRef = doc(db, COLLECTIONS.PERSON_ACTION_ITEMS, existing.id);
       await updateDoc(docRef, { 
         actionItem, 
         source,
-        updatedAt: new Date() 
+        updatedAt: new Date(),
+        updatedBy: updatedBy || null
       });
     } else {
-      await this.save({ person, actionItem, source, updatedAt: new Date() });
+      await this.save({ person, actionItem, source, updatedAt: new Date(), updatedBy: updatedBy || null });
     }
   }
 };
@@ -695,6 +697,87 @@ export const employeeSkillService = {
     } else {
       // Create new
       return await this.save({ employeeName, skillId, skillName, level });
+    }
+  }
+};
+
+// ✅ NEU: Standardstatus Service
+export const standardStatusService = {
+  async save(status: { name: string }): Promise<string> {
+    const docRef = await addDoc(collection(db, COLLECTIONS.STANDARD_STATUSES), {
+      ...addFirestoreFields(status),
+      updatedAt: new Date()
+    });
+    return docRef.id;
+  },
+
+  async getAll(): Promise<{ id: string; name: string; createdAt: Date; updatedAt: Date }[]> {
+    const querySnapshot = await getDocs(collection(db, COLLECTIONS.STANDARD_STATUSES));
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      name: doc.data().name,
+      createdAt: convertTimestamp(doc.data().createdAt),
+      updatedAt: convertTimestamp(doc.data().updatedAt)
+    }));
+  },
+
+  async delete(id: string): Promise<void> {
+    const docRef = doc(db, COLLECTIONS.STANDARD_STATUSES, id);
+    await deleteDoc(docRef);
+  }
+};
+
+// ✅ NEU: Person Standardstatus Service
+export const personStandardStatusService = {
+  async save(status: { person: string; standardStatus: string }): Promise<string> {
+    const docRef = await addDoc(collection(db, COLLECTIONS.PERSON_STANDARD_STATUSES), {
+      ...addFirestoreFields(status),
+      updatedAt: new Date()
+    });
+    return docRef.id;
+  },
+
+  async getByPerson(person: string): Promise<{ id: string; person: string; standardStatus: string; createdAt: Date; updatedAt: Date } | null> {
+    const q = query(
+      collection(db, COLLECTIONS.PERSON_STANDARD_STATUSES),
+      where('person', '==', person)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    if (querySnapshot.empty) return null;
+    
+    const doc = querySnapshot.docs[0];
+    const data = doc.data();
+    return {
+      id: doc.id,
+      person: data.person,
+      standardStatus: data.standardStatus,
+      createdAt: convertTimestamp(data.createdAt),
+      updatedAt: convertTimestamp(data.updatedAt)
+    };
+  },
+
+  async getAll(): Promise<{ id: string; person: string; standardStatus: string; createdAt: Date; updatedAt: Date }[]> {
+    const querySnapshot = await getDocs(collection(db, COLLECTIONS.PERSON_STANDARD_STATUSES));
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      person: doc.data().person,
+      standardStatus: doc.data().standardStatus,
+      createdAt: convertTimestamp(doc.data().createdAt),
+      updatedAt: convertTimestamp(doc.data().updatedAt)
+    }));
+  },
+
+  async update(person: string, standardStatus: string): Promise<void> {
+    const existing = await this.getByPerson(person);
+    if (existing) {
+      const docRef = doc(db, COLLECTIONS.PERSON_STANDARD_STATUSES, existing.id);
+      await updateDoc(docRef, {
+        standardStatus,
+        updatedAt: new Date()
+      });
+    } else {
+      await this.save({ person, standardStatus });
     }
   }
 };
