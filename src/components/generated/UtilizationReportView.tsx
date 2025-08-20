@@ -115,6 +115,10 @@ export function UtilizationReportView({
       });
       setDataSource('database');
       
+      // ✅ KORRIGIERT: Lade Status und Action Items NUR beim initialen Laden der Daten
+      await loadPersonStatuses();
+      await loadActionItems();
+      
       console.log('✅ Database-Daten erfolgreich geladen');
       
     } catch (error) {
@@ -177,79 +181,72 @@ export function UtilizationReportView({
   // Status-Struktur mit Prioritäts-System (aus Datenbank)
   const [personStatus, setPersonStatus] = useState<Record<string, { status: string; source: 'manual' | 'rule' | 'default' }>>({});
   
-  // Lade Status aus der Datenbank
-  useEffect(() => {
-    const loadPersonStatuses = async () => {
-      try {
-        const { personStatusService } = await import('../../lib/firebase-services');
-        const statuses = await personStatusService.getAll();
-        const statusMap: Record<string, { status: string; source: 'manual' | 'rule' | 'default' }> = {};
-        
-        statuses.forEach(status => {
-          // WICHTIG: Manuelle Status werden NIE überschrieben
-          if (status.source === 'manual') {
+  // ✅ KORRIGIERT: Lade Status und Action Items aus der Datenbank beim initialen Laden
+  const loadPersonStatuses = async () => {
+    try {
+      const { personStatusService } = await import('../../lib/firebase-services');
+      const statuses = await personStatusService.getAll();
+      const statusMap: Record<string, { status: string; source: 'manual' | 'rule' | 'default' }> = {};
+      
+      statuses.forEach(status => {
+        // WICHTIG: Manuelle Status werden NIE überschrieben
+        if (status.source === 'manual') {
+          statusMap[status.person] = {
+            status: status.status,
+            source: 'manual'
+          };
+        } else {
+          // Regel-basierte Status nur setzen, wenn kein manueller Status existiert
+          if (!statusMap[status.person] || statusMap[status.person].source !== 'manual') {
             statusMap[status.person] = {
               status: status.status,
-              source: 'manual'
+              source: status.source || 'default'
             };
-          } else {
-            // Regel-basierte Status nur setzen, wenn kein manueller Status existiert
-            if (!statusMap[status.person] || statusMap[status.person].source !== 'manual') {
-              statusMap[status.person] = {
-                status: status.status,
-                source: status.source || 'default'
-              };
-            }
           }
-        });
-        
-        // Verwende protectedSetPersonStatus für alle geladenen Status
-        Object.entries(statusMap).forEach(([person, statusData]) => {
-          protectedSetPersonStatus(person, statusData.status, statusData.source);
-        });
-      } catch (error) {
-        console.warn('Fehler beim Laden der Person-Status:', error);
-      }
-    };
-    
-    // Lade Action Items aus der Datenbank
-    const loadActionItems = async () => {
-      try {
-        const { personActionItemService } = await import('../../lib/firebase-services');
-        const actionItemsData = await personActionItemService.getAll();
-        const actionItemsMap: Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }> = {};
-        
-        actionItemsData.forEach(item => {
-          // WICHTIG: Manuelle Action Items werden NIE überschrieben
-          if (item.source === 'manual') {
+        }
+      });
+      
+      // Verwende protectedSetPersonStatus für alle geladenen Status
+      Object.entries(statusMap).forEach(([person, statusData]) => {
+        protectedSetPersonStatus(person, statusData.status, statusData.source);
+      });
+    } catch (error) {
+      console.warn('Fehler beim Laden der Person-Status:', error);
+    }
+  };
+  
+  // ✅ KORRIGIERT: Lade Action Items aus der Datenbank
+  const loadActionItems = async () => {
+    try {
+      const { personActionItemService } = await import('../../lib/firebase-services');
+      const actionItemsData = await personActionItemService.getAll();
+      const actionItemsMap: Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }> = {};
+      
+      actionItemsData.forEach(item => {
+        // WICHTIG: Manuelle Action Items werden NIE überschrieben
+        if (item.source === 'manual') {
+          actionItemsMap[item.person] = {
+            actionItem: item.actionItem,
+            source: 'manual',
+            updatedBy: item.updatedBy
+          };
+        } else {
+          // Regel-basierte Action Items nur setzen, wenn kein manueller Status existiert
+          if (!actionItemsMap[item.person] || actionItemsMap[item.person].source !== 'manual') {
             actionItemsMap[item.person] = {
               actionItem: item.actionItem,
-              source: 'manual',
+              source: item.source || 'default',
               updatedBy: item.updatedBy
             };
-          } else {
-            // Regel-basierte Action Items nur setzen, wenn kein manueller Status existiert
-            if (!actionItemsMap[item.person] || actionItemsMap[item.person].source !== 'manual') {
-              actionItemsMap[item.person] = {
-                actionItem: item.actionItem,
-                source: item.source || 'default',
-                updatedBy: item.updatedBy
-              };
-            }
           }
-        });
-        
-        setActionItems(actionItemsMap);
-      } catch (error) {
-        console.warn('Fehler beim Laden der Action Items:', error);
-      }
-    };
-    
-    if (dataSource === 'database') {
-      loadPersonStatuses();
-      loadActionItems();
+        }
+      });
+      
+      setActionItems(actionItemsMap);
+    } catch (error) {
+      console.warn('Fehler beim Laden der Action Items:', error);
     }
-  }, [dataSource]);
+  };
 
 
   
