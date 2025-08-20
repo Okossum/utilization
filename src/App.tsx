@@ -3,7 +3,6 @@ import { Container, Theme } from './settings/types';
 import { UtilizationReportView } from './components/generated/UtilizationReportView';
 import { EmployeeListView } from './components/generated/EmployeeListView';
 import { CustomerProjectsManagerButton } from './components/generated/CustomerProjectsManagerButton';
-import { SkillManagementButton } from './components/generated/SkillManagementButton';
 import { KnowledgeTestPage } from './components/generated/KnowledgeTestPage';
 import RoleManagementButton from './components/generated/RoleManagementButton';
 import TechnicalSkillManagementButton from './components/generated/TechnicalSkillManagementButton';
@@ -169,8 +168,7 @@ function App() {
                 setActionItems={setActionItems}
               />
               <CustomerProjectsManagerButton />
-              <SkillManagementButton className="fixed bottom-4 right-44 z-40" label="Skills" />
-              <TechnicalSkillManagementButton className="fixed bottom-4 right-80 z-40" label="Tech Skills" />
+                      <TechnicalSkillManagementButton className="fixed bottom-4 right-44 z-40" label="Tech Skills" />
               <RoleManagementButton className="fixed bottom-4 right-[22rem] z-40" label="Rollen" />
             </>
           )}
