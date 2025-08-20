@@ -97,14 +97,20 @@ function parseBuAndBereich(raw) {
 async function authMiddleware(req, _res, next) {
   const authHeader = req.headers['authorization'] || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.substring('Bearer '.length) : null;
+  
   if (!token) {
+    console.log('🔒 authMiddleware: Kein Token im Header gefunden');
     req.user = null;
     return next();
   }
+  
   try {
+    console.log('🔍 authMiddleware: Verifiziere Token...');
     const decoded = await admin.auth().verifyIdToken(token);
     req.user = decoded;
-  } catch {
+    console.log('✅ authMiddleware: Token erfolgreich verifiziert für User:', decoded.uid);
+  } catch (error) {
+    console.log('❌ authMiddleware: Token-Verifikation fehlgeschlagen:', error.message);
     req.user = null;
   }
   next();
@@ -115,8 +121,10 @@ app.use(authMiddleware);
 // Require authenticated user
 function requireAuth(req, res, next) {
   if (!req.user?.uid) {
-    return res.status(401).json({ error: 'Nicht authentifiziert' });
+    console.log('🔒 requireAuth: Kein User gefunden, req.user:', req.user);
+    return res.status(401).json({ error: 'Authentifizierung fehlgeschlagen - bitte melden Sie sich erneut an' });
   }
+  console.log('✅ requireAuth: User authentifiziert:', req.user.uid);
   return next();
 }
 
@@ -251,6 +259,256 @@ function buildWeekValuesMap(row) {
   }
   return map;
 }
+
+// ===== KNOWLEDGE API ENDPOINTS =====
+
+// Mitarbeiter Knowledge speichern
+app.post('/api/knowledge/mitarbeiter', requireAuth, async (req, res) => {
+  try {
+    const { fileName, data } = req.body;
+    
+    if (!fileName || !data || !Array.isArray(data)) {
+      return res.status(400).json({ error: 'Ungültige Daten' });
+    }
+
+    console.log(`🔍 Speichere Mitarbeiter Knowledge: ${data.length} Einträge`);
+
+    // Upload-Historie speichern (unabhängig von Branchen Know-How)
+    const historyRef = await db.collection('knowledgeUploadHistory').add({
+      fileName,
+      fileType: 'mitarbeiter',
+      status: 'success',
+      rowCount: data.length,
+      uploadTimestamp: FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    // Lade bestehende Daten
+    const existingSnap = await db.collection('mitarbeiterKnowledge').get();
+    const existingData = new Map();
+    existingSnap.forEach(doc => {
+      const data = doc.data();
+      const key = `${data.kategorie || 'unknown'}__${data.knowledge || 'unknown'}`;
+      existingData.set(key, { id: doc.id, data });
+    });
+
+    const results = [];
+    const batch = db.batch();
+
+    for (const row of data) {
+      if (!row.kategorie || !row.knowledge) continue;
+      
+      const key = `${row.kategorie}__${row.knowledge}`;
+      const existing = existingData.get(key);
+      
+      if (existing) {
+        // Update bestehenden Eintrag
+        const docRef = db.collection('mitarbeiterKnowledge').doc(existing.id);
+        batch.update(docRef, {
+          fileName,
+          uploadDate: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        
+        results.push({ 
+          action: 'updated', 
+          kategorie: row.kategorie,
+          knowledge: row.knowledge,
+          id: existing.id
+        });
+      } else {
+        // Neuer Eintrag
+        const docRef = db.collection('mitarbeiterKnowledge').doc();
+        batch.set(docRef, {
+          fileName,
+          uploadDate: FieldValue.serverTimestamp(),
+          kategorie: row.kategorie,
+          knowledge: row.knowledge,
+          type: 'mitarbeiter',
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        
+        results.push({ 
+          action: 'created', 
+          kategorie: row.kategorie,
+          knowledge: row.knowledge,
+          id: docRef.id
+        });
+      }
+    }
+
+    await batch.commit();
+
+    console.log(`✅ Mitarbeiter Knowledge erfolgreich gespeichert: ${results.length} Einträge verarbeitet`);
+
+    res.json({
+      success: true,
+      message: 'Mitarbeiter Knowledge erfolgreich gespeichert',
+      results,
+      historyId: historyRef.id
+    });
+
+  } catch (error) {
+    console.error('❌ Fehler beim Speichern der Mitarbeiter Knowledge:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+// Branchen Know-How speichern
+app.post('/api/knowledge/branchen', requireAuth, async (req, res) => {
+  try {
+    const { fileName, data } = req.body;
+    
+    if (!fileName || !data || !Array.isArray(data)) {
+      return res.status(400).json({ error: 'Ungültige Daten' });
+    }
+
+    console.log(`🔍 Speichere Branchen Know-How: ${data.length} Einträge`);
+
+    // Upload-Historie speichern (unabhängig von Mitarbeiter Knowledge)
+    const historyRef = await db.collection('knowledgeUploadHistory').add({
+      fileName,
+      fileType: 'branchen',
+      status: 'success',
+      rowCount: data.length,
+      uploadTimestamp: FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    // Lade bestehende Daten
+    const existingSnap = await db.collection('branchenKnowHow').get();
+    const existingData = new Map();
+    existingSnap.forEach(doc => {
+      const data = doc.data();
+      const key = `${data.kategorie || 'unknown'}__${data.knowHow || 'unknown'}`;
+      existingData.set(key, { id: doc.id, data });
+    });
+
+    const results = [];
+    const batch = db.batch();
+
+    for (const row of data) {
+      if (!row.kategorie || !row.knowHow) continue;
+      
+      const key = `${row.kategorie}__${row.knowHow}`;
+      const existing = existingData.get(key);
+      
+      if (existing) {
+        // Update bestehenden Eintrag
+        const docRef = db.collection('branchenKnowHow').doc(existing.id);
+        batch.update(docRef, {
+          fileName,
+          uploadDate: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        
+        results.push({ 
+          action: 'updated', 
+          kategorie: row.kategorie,
+          knowHow: row.knowHow,
+          id: existing.id
+        });
+      } else {
+        // Neuer Eintrag
+        const docRef = db.collection('branchenKnowHow').doc();
+        batch.set(docRef, {
+          fileName,
+          uploadDate: FieldValue.serverTimestamp(),
+          kategorie: row.kategorie,
+          knowHow: row.knowHow,
+          type: 'branchen',
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        
+        results.push({ 
+          action: 'created', 
+          kategorie: row.kategorie,
+          knowHow: row.knowHow,
+          id: docRef.id
+        });
+      }
+    }
+
+    await batch.commit();
+
+    console.log(`✅ Branchen Know-How erfolgreich gespeichert: ${results.length} Einträge verarbeitet`);
+
+    res.json({
+      success: true,
+      message: 'Branchen Know-How erfolgreich gespeichert',
+      results,
+      historyId: historyRef.id
+    });
+
+  } catch (error) {
+    console.error('❌ Fehler beim Speichern des Branchen Know-How:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+// Alle Mitarbeiter Knowledge abrufen
+app.get('/api/knowledge/mitarbeiter', requireAuth, async (req, res) => {
+  try {
+    const snapshot = await db.collection('mitarbeiterKnowledge').get();
+    const data = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    res.json(data);
+  } catch (error) {
+    console.error('❌ Fehler beim Laden der Mitarbeiter Knowledge:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+// Alle Branchen Know-How abrufen
+app.get('/api/knowledge/branchen', requireAuth, async (req, res) => {
+  try {
+    const snapshot = await db.collection('branchenKnowHow').get();
+    const data = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    res.json(data);
+  } catch (error) {
+    console.error('❌ Fehler beim Laden des Branchen Know-How:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+// Alle Knowledge-Daten abrufen (beide Typen)
+app.get('/api/knowledge', requireAuth, async (req, res) => {
+  try {
+    const [mitarbeiterSnap, branchenSnap] = await Promise.all([
+      db.collection('mitarbeiterKnowledge').get(),
+      db.collection('branchenKnowHow').get()
+    ]);
+    
+    const mitarbeiter = mitarbeiterSnap.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    const branchen = branchenSnap.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    res.json({
+      mitarbeiter,
+      branchen
+    });
+  } catch (error) {
+    console.error('❌ Fehler beim Laden aller Knowledge-Daten:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+// ===== AUSLASTUNG API ENDPOINTS =====
 
 // Auslastung-Daten speichern oder aktualisieren (Firestore)
 app.post('/api/auslastung', requireAuth, async (req, res) => {

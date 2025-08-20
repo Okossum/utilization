@@ -4,13 +4,14 @@ import { UtilizationReportView } from './components/generated/UtilizationReportV
 import { EmployeeListView } from './components/generated/EmployeeListView';
 import { CustomerProjectsManagerButton } from './components/generated/CustomerProjectsManagerButton';
 import { SkillManagementButton } from './components/generated/SkillManagementButton';
+import { KnowledgeTestPage } from './components/generated/KnowledgeTestPage';
 import RoleManagementButton from './components/generated/RoleManagementButton';
 import TechnicalSkillManagementButton from './components/generated/TechnicalSkillManagementButton';
 import { CustomerProvider } from './contexts/CustomerContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './contexts/AuthContext';
 import { LoginForm } from './components/LoginForm';
-import { User as UserIcon, ChevronDown, LogOut, Users, BarChart3 } from 'lucide-react';
+import { User as UserIcon, ChevronDown, LogOut, Users, BarChart3, FileText } from 'lucide-react';
 import AdminUserManagementModal from './components/generated/AdminUserManagementModal';
 import { AssignmentsProvider } from './contexts/AssignmentsContext';
 import { RoleProvider } from './contexts/RoleContext';
@@ -44,7 +45,7 @@ function App() {
     const { user, loading, profile, logout } = useAuth();
     const [isAdminModalOpen, setAdminModalOpen] = useState(false);
     const [isMenuOpen, setMenuOpen] = useState(false);
-    const [currentView, setCurrentView] = useState<'utilization' | 'employees'>('utilization');
+    const [currentView, setCurrentView] = useState<'utilization' | 'employees' | 'knowledge'>('utilization');
     
     // ✅ NEU: Action-Items State für beide Views (Act-Toggle aus Auslastungs-Übersicht)
     const [actionItems, setActionItems] = useState<Record<string, boolean>>(() => {
@@ -110,6 +111,18 @@ function App() {
                 <Users className="w-4 h-4" />
                 Mitarbeiter
               </button>
+              <button
+                onClick={() => setCurrentView('knowledge')}
+                className={`inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  currentView === 'knowledge' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+                title="Knowledge Upload Test"
+              >
+                <FileText className="w-4 h-4" />
+                Knowledge
+              </button>
             </div>
             
             {/* Account Menu */}
@@ -166,6 +179,10 @@ function App() {
             <EmployeeListView 
               actionItems={actionItems}
             />
+          )}
+          
+          {currentView === 'knowledge' && (
+            <KnowledgeTestPage />
           )}
           
           <AdminUserManagementModal isOpen={isAdminModalOpen} onClose={() => setAdminModalOpen(false)} />
