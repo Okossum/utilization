@@ -6,6 +6,8 @@ import { X, Plus, Edit2, Trash2, User, Briefcase, MessageSquare, ArrowRight } fr
 import { PlanningModal } from './PlanningModal';
 import { AssignmentsList } from './AssignmentsList';
 import { AssignmentEditorModal } from './AssignmentEditorModal';
+import { ProjectHistorySection } from './ProjectHistorySection';
+import { ProjectHistoryEditorModal } from './ProjectHistoryEditorModal';
 import DatabaseService from '../../services/database';
 import { EmployeeSkillAssignment } from './EmployeeSkillAssignment';
 import EmployeeRoleAssignment from './EmployeeRoleAssignment';
@@ -21,6 +23,11 @@ export interface ProjectHistoryItem {
   role: string;           // Hauptrolle (aus zentralem Skill-Management)
   duration: string;
   activities: string[];   // Individuelle Tätigkeiten im Projekt
+  status: 'closed' | 'active';
+  startDate?: string;
+  endDate?: string;
+  plannedAllocationPct?: number;
+  comment?: string;
 }
 export interface ProjectOffer {
   id: string;
@@ -103,6 +110,8 @@ export function EmployeeDossierModal({
   const [planningComment, setPlanningComment] = useState<string>('');
   const [isAssignmentEditorOpen, setAssignmentEditorOpen] = useState(false);
   const [editingAssignment, setEditingAssignment] = useState<any | null>(null);
+  const [isProjectHistoryEditorOpen, setIsProjectHistoryEditorOpen] = useState(false);
+  const [editingHistoryProject, setEditingHistoryProject] = useState<ProjectHistoryItem | null>(null);
   const { getAssignmentsForEmployee, assignmentsByEmployee } = useAssignments();
 
   // Lade Employee Dossier aus der Datenbank und kombiniere mit Excel-Daten
@@ -132,6 +141,12 @@ export function EmployeeDossierModal({
               customer: String(p.customer ?? ''),
               role: String(p.role ?? ''),
               duration: String(p.duration ?? ''),
+              activities: Array.isArray(p.activities) ? p.activities : [],
+              status: p.status === 'active' ? 'active' : 'closed',
+              startDate: p.startDate || undefined,
+              endDate: p.endDate || undefined,
+              plannedAllocationPct: typeof p.plannedAllocationPct === 'number' ? p.plannedAllocationPct : undefined,
+              comment: p.comment || undefined,
             }))
           : undefined;
         
@@ -449,6 +464,19 @@ export function EmployeeDossierModal({
                 employeeName={formData.name}
               />
 
+              {/* Projektvergangenheit */}
+              <ProjectHistorySection
+                employeeName={formData.name}
+                projectHistory={formData.projectHistory || []}
+                onChange={(projects) => {
+                  setFormData(prev => ({ ...prev, projectHistory: projects }));
+                }}
+                onEdit={(project) => {
+                  setEditingHistoryProject(project);
+                  setIsProjectHistoryEditorOpen(true);
+                }}
+              />
+
               {/* Assignments */}
               <AssignmentsList 
                 employeeName={formData.name} 
@@ -531,6 +559,39 @@ export function EmployeeDossierModal({
           console.log('✅ Assignment erstellt, aktualisiere Liste...');
           // Force refresh der Assignments für diesen Mitarbeiter
           getAssignmentsForEmployee(formData.name, true);
+        }}
+      />
+
+      <ProjectHistoryEditorModal
+        isOpen={isProjectHistoryEditorOpen}
+        onClose={() => {
+          setIsProjectHistoryEditorOpen(false);
+          setEditingHistoryProject(null);
+        }}
+        project={editingHistoryProject}
+        onSave={(project) => {
+          // Projekt zur Historie hinzufügen oder aktualisieren
+          const updatedHistory = formData.projectHistory || [];
+          const existingIndex = updatedHistory.findIndex(p => p.id === project.id);
+          
+          if (existingIndex >= 0) {
+            // Update existing
+            updatedHistory[existingIndex] = project;
+          } else {
+            // Add new
+            updatedHistory.push(project);
+          }
+          
+          setFormData(prev => ({ ...prev, projectHistory: updatedHistory }));
+          setIsProjectHistoryEditorOpen(false);
+          setEditingHistoryProject(null);
+        }}
+        onDelete={(projectId) => {
+          // Projekt aus Historie entfernen
+          const updatedHistory = (formData.projectHistory || []).filter(p => p.id !== projectId);
+          setFormData(prev => ({ ...prev, projectHistory: updatedHistory }));
+          setIsProjectHistoryEditorOpen(false);
+          setEditingHistoryProject(null);
         }}
       />
     </>

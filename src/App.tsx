@@ -14,6 +14,7 @@ import { User as UserIcon, ChevronDown, LogOut, Users, BarChart3, FileText, X } 
 import AdminUserManagementModal from './components/generated/AdminUserManagementModal';
 import { AssignmentsProvider } from './contexts/AssignmentsContext';
 import { RoleProvider } from './contexts/RoleContext';
+import { ProjectHistoryProvider } from './contexts/ProjectHistoryContext';
 import { AppHeader } from './components/AppHeader';
 
 let theme: Theme = 'light';
@@ -95,6 +96,7 @@ function App() {
       <CustomerProvider>
         <AssignmentsProvider>
           <RoleProvider>
+            <ProjectHistoryProvider>
           {/* App Header - IMMER sichtbar */}
           <AppHeader
             currentView={currentView}
@@ -315,6 +317,7 @@ function App() {
           )}
 
           <AdminUserManagementModal isOpen={isAdminModalOpen} onClose={() => setAdminModalOpen(false)} />
+            </ProjectHistoryProvider>
           </RoleProvider>
         </AssignmentsProvider>
       </CustomerProvider>

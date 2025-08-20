@@ -962,23 +962,23 @@ export function UtilizationReportView({
     return base;
   }, [dataForUI, selectedPersons, filterCC, filterLBS, filterStatus, personMeta, personStatus, showWorkingStudents, showActionItems, actionItems, personSearchTerm, showAllData, profile, selectedLoB, selectedBereich, selectedCC, selectedTeam]);
   
-  // ✅ Ermittle verfügbare Wochen für Header - 8 Wochen ab der aktuellen KW
+  // ✅ Ermittle verfügbare Wochen für Header - 8 Wochen ab der Woche nach der aktuellen KW
   const availableWeeksFromData = useMemo(() => {
     // Berechne die aktuelle Kalenderwoche
     const today = new Date();
     const currentWeek = getISOWeek(today);
     const currentYear = getISOWeekYear(today);
     
-    // Generiere die nächsten 8 Wochen ab der aktuellen KW
+    // Generiere die nächsten 8 Wochen ab der Woche nach der aktuellen KW
     const forecastWeeks = Array.from({ length: 8 }, (_, i) => {
-      const weekNumber = currentWeek + i;
+      const weekNumber = currentWeek + 1 + i;
       const year = weekNumber > 52 ? currentYear + 1 : currentYear;
       const adjustedWeek = weekNumber > 52 ? weekNumber - 52 : weekNumber;
       const yy = String(year).slice(-2);
       return `${yy}/${String(adjustedWeek).padStart(2, '0')}`;
     });
     
-    console.log('🔍 Forecast Wochen (8 Wochen ab aktueller KW):', forecastWeeks);
+    console.log('🔍 Forecast Wochen (8 Wochen ab der Woche nach der aktuellen KW):', forecastWeeks);
     return forecastWeeks;
   }, []);
   
@@ -1409,7 +1409,7 @@ export function UtilizationReportView({
                     </div>
                   </th>
 
-                  {/* Forecast-Wochen aus dem Einsatzplan */}
+                  {/* Forecast-Wochen aus dem Einsatzplan (startet bei der Woche nach der aktuellen) */}
                   {visibleColumns.forecastWeeks && availableWeeksFromData.slice(0, forecastWeeks).map((week, i) => (
                     <th key={`forecast-${i}`} className="px-0.5 py-1 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-8">
                       {week}
@@ -1432,12 +1432,13 @@ export function UtilizationReportView({
                     const availableWeeks = personData.map(item => item.week).slice(0, 10);
                     console.log(`🔍 DEBUG Person "${person}" - Verfügbare Wochen:`, availableWeeks);
                     console.log(`🔍 DEBUG Header wird diese Wochen zeigen:`, availableWeeksFromData.slice(0, 10));
+                    console.log(`🔍 DEBUG Aktuelle Woche: ${getISOWeek(new Date())}, Einsatzplan startet bei: ${getISOWeek(new Date()) + 1}`);
                   }
                   return (
                     <tr key={person} className="hover:bg-gray-50">
-                      {/* 8 Wochen aus dem View (letzte 8 Wochen vor aktueller KW) */}
+                      {/* 8 Wochen Auslastung (endet bei aktueller Woche) */}
                       {Array.from({ length: 8 }, (_, i) => {
-                        const weekNumber = getISOWeek(new Date()) - 8 + i;
+                        const weekNumber = getISOWeek(new Date()) - 7 + i;
                         const year = weekNumber <= 0 ? getISOWeekYear(new Date()) - 1 : getISOWeekYear(new Date());
                         const adjustedWeek = weekNumber <= 0 ? weekNumber + 52 : weekNumber;
                         const yy = String(year).slice(-2);
@@ -1682,8 +1683,8 @@ export function UtilizationReportView({
                       {visibleColumns.forecastWeeks && availableWeeksFromData.slice(0, forecastWeeks).map((week, i) => {
                         const weekData = personData.find(item => item.week === week);
                         const utilization = weekData?.utilization;
-                        // Extrahiere Wochennummer aus dem week-String (z.B. "2025-KW33" -> 33)
-                        const weekNumber = parseInt(week.match(/KW(\d+)/)?.[1] || '0', 10);
+                        // Extrahiere Wochennummer aus dem week-String (z.B. "25/35" -> 35)
+                        const weekNumber = parseInt(week.match(/\/(\d+)/)?.[1] || '0', 10);
                         
                         let bgColor = 'bg-gray-100';
                         if (utilization !== null && utilization !== undefined) {
