@@ -1568,14 +1568,14 @@ export function UtilizationReportView({
                     </div>
                   </th>
 
-                  {/* Act-Spalte */}
-                  <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
-                    Act
-                  </th>
-
                   {/* STD-Status Spalte */}
                   <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
                     STD-Status
+                  </th>
+
+                  {/* Act-Spalte */}
+                  <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
+                    Act
                   </th>
 
                   {/* FK-Spalte für Führungskraft */}
@@ -1698,6 +1698,59 @@ export function UtilizationReportView({
                         </div>
                       </td>
 
+                      {/* STD-Status Spalte */}
+                      <td className={`px-0.5 py-0.5 text-sm ${
+                        actionItems[person]?.actionItem 
+                          ? 'bg-blue-100'
+                          : 'bg-gray-50'
+                      }`} style={{padding: '2px 2px'}}>
+                        <div className="flex items-center justify-center">
+                          <div className="relative group">
+                            <select
+                              value={personStandardStatuses[person] || ''}
+                              onChange={(e) => {
+                                const selectedStatus = e.target.value;
+                                if (selectedStatus) {
+                                  savePersonStandardStatus(person, selectedStatus);
+                                }
+                              }}
+                              className="text-xs border border-gray-300 rounded px-1 py-0.5 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                            >
+                              <option value="">-</option>
+                              {standardStatuses.map(status => (
+                                <option key={status} value={status}>
+                                  {status}
+                                </option>
+                              ))}
+                              <option value="__ADD_NEW__">+ Neuer Status</option>
+                            </select>
+                            {/* Inline-Edit für neue Status */}
+                            {personStandardStatuses[person] === '__ADD_NEW__' && (
+                              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded shadow-lg p-2 z-20 min-w-32">
+                                <input
+                                  type="text"
+                                  placeholder="Neuer Status..."
+                                  className="w-full text-xs border border-gray-300 rounded px-2 py-1 mb-2"
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      const newStatus = e.currentTarget.value.trim();
+                                      if (newStatus) {
+                                        addStandardStatus(newStatus);
+                                        savePersonStandardStatus(person, newStatus);
+                                      }
+                                    }
+                                  }}
+                                  autoFocus
+                                />
+                                <div className="text-xs text-gray-500">
+                                  Enter drücken zum Speichern
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
                       {/* Act-Spalte */}
                       <td className={`px-0.5 py-0.5 text-sm ${
                         actionItems[person]?.actionItem 
@@ -1740,59 +1793,6 @@ export function UtilizationReportView({
                             {actionItems[person]?.source === 'manual' && actionItems[person]?.updatedBy && (
                               <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-8 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-[10px] rounded px-2 py-1 whitespace-nowrap z-10">
                                 Status manuell geändert von: {actionItems[person]?.updatedBy}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* STD-Status Spalte */}
-                      <td className={`px-0.5 py-0.5 text-sm ${
-                        actionItems[person]?.actionItem 
-                          ? 'bg-blue-100'
-                          : 'bg-gray-50'
-                      }`} style={{padding: '2px 2px'}}>
-                        <div className="flex items-center justify-center">
-                          <div className="relative group">
-                            <select
-                              value={personStandardStatuses[person] || ''}
-                              onChange={(e) => {
-                                const selectedStatus = e.target.value;
-                                if (selectedStatus) {
-                                  savePersonStandardStatus(person, selectedStatus);
-                                }
-                              }}
-                              className="text-xs border border-gray-300 rounded px-1 py-0.5 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                            >
-                              <option value="">-</option>
-                              {standardStatuses.map(status => (
-                                <option key={status} value={status}>
-                                  {status}
-                                </option>
-                              ))}
-                              <option value="__ADD_NEW__">+ Neuer Status</option>
-                            </select>
-                            {/* Inline-Edit für neue Status */}
-                            {personStandardStatuses[person] === '__ADD_NEW__' && (
-                              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded shadow-lg p-2 z-20 min-w-32">
-                                <input
-                                  type="text"
-                                  placeholder="Neuer Status..."
-                                  className="w-full text-xs border border-gray-300 rounded px-2 py-1 mb-2"
-                                  onKeyDown={(e) => {
-                                                                      if (e.key === 'Enter') {
-                                    const newStatus = e.currentTarget.value.trim();
-                                    if (newStatus) {
-                                      addStandardStatus(newStatus);
-                                      savePersonStandardStatus(person, newStatus);
-                                    }
-                                  }
-                                  }}
-                                  autoFocus
-                                />
-                                <div className="text-xs text-gray-500">
-                                  Enter drücken zum Speichern
-                                </div>
                               </div>
                             )}
                           </div>
