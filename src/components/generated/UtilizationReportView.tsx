@@ -1677,10 +1677,11 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                           if (weekValue > 90) {
                             bgColor = 'bg-green-100';
                             textColor = 'text-green-700';
-                          } else if (weekValue > 80) {
+                          } else if (weekValue > 75) {
                             bgColor = 'bg-yellow-100';
                             textColor = 'text-yellow-700';
-                          } else if (weekValue > 0) {
+                          } else {
+                            // Alle Werte ≤ 75% (inkl. 0%) sind kritisch und werden rot markiert
                             bgColor = 'bg-red-100';
                             textColor = 'text-red-700';
                           }
@@ -1909,8 +1910,8 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
                         let bgColor = 'bg-gray-100';
                         if (utilization !== null && utilization !== undefined) {
                           if (utilization > 90) bgColor = 'bg-green-100';
-                          else if (utilization > 80) bgColor = 'bg-yellow-100';
-                          else bgColor = 'bg-red-100';
+                          else if (utilization > 75) bgColor = 'bg-yellow-100';
+                          else bgColor = 'bg-red-100'; // Alle Werte ≤ 75% (inkl. 0%) sind kritisch
                         }
                         return (
                           <td key={`r-${i}`} className={`px-0.5 py-0.5 text-center text-xs ${bgColor}`}>
