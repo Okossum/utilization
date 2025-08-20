@@ -878,31 +878,31 @@ export function UtilizationReportView({
         }
       });
 
-              // ✅ KORRIGIERT: Logik für regelbasierte Werte
-        if (Object.keys(newActionItems).length > 0) {
-          const updatedActionItems: Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }> = { ...actionItems };
+      // ✅ KORRIGIERT: Logik für regelbasierte Werte
+      if (Object.keys(newActionItems).length > 0) {
+        const updatedActionItems: Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }> = { ...actionItems };
+        
+        Object.entries(newActionItems).forEach(([person, actionItem]) => {
+          const current = actionItems[person];
           
-          Object.entries(newActionItems).forEach(([person, actionItem]) => {
-            const current = actionItems[person];
+          // ✅ NEUE LOGIK: Manuelle Werte NIEMALS überschreiben
+          if (current?.source === 'manual') {
+            // Manuelle Werte bleiben unverändert
+            console.log(`🔒 Manueller Wert für ${person} bleibt erhalten:`, current.actionItem);
+          } else {
+            // Regel-basierte oder Default-Werte können überschrieben werden
+            const shouldUpdate = !current || current.actionItem !== actionItem;
             
-                         // ✅ NEUE LOGIK: Manuelle Werte NIEMALS überschreiben
-             if (current?.source === 'manual') {
-               // Manuelle Werte bleiben unverändert
-               console.log(`🔒 Manueller Wert für ${person} bleibt erhalten:`, current.actionItem);
-             } else {
-               // Regel-basierte oder Default-Werte können überschrieben werden
-               const shouldUpdate = !current || current.actionItem !== actionItem;
-               
-               if (shouldUpdate) {
-                 console.log(`🔄 Aktualisiere ${person} von ${current?.actionItem} auf ${actionItem} (source: rule)`);
-                 updatedActionItems[person] = { actionItem, source: 'rule', updatedBy: undefined };
-               }
-             }
-          });
-          
-          // ✅ Aktualisiere globalen State
-          setActionItems(updatedActionItems);
-        }
+            if (shouldUpdate) {
+              console.log(`🔄 Aktualisiere ${person} von ${current?.actionItem} auf ${actionItem} (source: rule)`);
+              updatedActionItems[person] = { actionItem, source: 'rule', updatedBy: undefined };
+            }
+          }
+        });
+        
+        // ✅ Aktualisiere globalen State
+        setActionItems(updatedActionItems);
+      }
     };
 
     // ✅ NEU: autoSetActionItems() aufrufen wenn sich Daten ändern (ohne actionItems dependency)
@@ -910,6 +910,8 @@ export function UtilizationReportView({
       autoSetActionItems();
     }
   }, [dataForUI, forecastStartWeek, currentIsoYear, dataSource]);
+
+
 
   // ✅ NEU: Persistiere regelbasierte Werte in der Datenbank
   useEffect(() => {
@@ -1022,6 +1024,35 @@ export function UtilizationReportView({
 
     return meta;
   }, [uploadedFiles, databaseData, dataSource]);
+
+  // ✅ NEU: FK-Regel nach Auslastungs-Regel anwenden
+  useEffect(() => {
+    if (!personMeta || personMeta.size === 0 || dataSource !== 'database') return;
+
+    const applyFKRule = () => {
+      const updatedActionItems = { ...actionItems };
+      let hasChanges = false;
+
+      // Prüfe alle Personen mit regelbasierten Toggles
+      Object.entries(actionItems).forEach(([person, item]) => {
+        if (item.source === 'rule') {
+          const manager = personMeta.get(person)?.manager;
+          // Falls kein Manager (FK="X"), Toggle entfernen
+          if (!manager) {
+            updatedActionItems[person] = { actionItem: false, source: 'rule', updatedBy: undefined };
+            hasChanges = true;
+            console.log(`🔒 FK-Regel: Toggle für ${person} entfernt (keine Führungskraft)`);
+          }
+        }
+      });
+
+      if (hasChanges) {
+        setActionItems(updatedActionItems);
+      }
+    };
+
+    applyFKRule();
+  }, [personMeta, actionItems, dataSource]);
 
 
 
@@ -1682,6 +1713,12 @@ export function UtilizationReportView({
                   const isTerminated = getPersonStatus(person) === 'termination' || getPersonStatus(person) === 'Kündigung';
                   const personData = filteredData.filter(item => item.person === person);
                   
+                  // ✅ NEU: Bestimme Zeilenfarbe basierend auf FK-Information
+                  const manager = personMeta.get(person)?.manager;
+                  const hasNoManager = !manager;
+                  const rowBgColor = hasNoManager ? 'bg-yellow-100' : 
+                    (actionItems[person]?.actionItem ? 'bg-blue-100' : '');
+                  
                   // ✅ DEBUG: Zeige verfügbare Wochen für erste Person
                   if (person === visiblePersons[0]) {
                     const availableWeeks = personData.map(item => item.week).slice(0, 10);
@@ -1690,7 +1727,7 @@ export function UtilizationReportView({
                     console.log(`🔍 DEBUG Aktuelle Woche: ${getISOWeek(new Date())}, Einsatzplan startet bei: ${getISOWeek(new Date()) + 1}`);
                   }
                   return (
-                    <tr key={person} className="hover:bg-gray-50">
+                    <tr key={person} className={`hover:bg-gray-50 ${rowBgColor}`}>
                       {/* 8 Wochen Auslastung (endet bei aktueller Woche) */}
                       {Array.from({ length: 8 }, (_, i) => {
                         const weekNumber = getISOWeek(new Date()) - 7 + i;
@@ -1722,7 +1759,9 @@ export function UtilizationReportView({
                         }
                         
                         return (
-                          <td key={`view-week-${i}`} className={`px-0.5 py-1 text-center text-xs ${bgColor} ${isTerminated ? 'line-through opacity-60' : ''}`}>
+                          <td key={`view-week-${i}`} className={`px-0.5 py-1 text-center text-xs ${
+                            hasNoManager ? 'bg-yellow-100' : bgColor
+                          } ${isTerminated ? 'line-through opacity-60' : ''}`}>
                             {weekValue !== null && weekValue !== undefined ? (
                               <span className={`font-medium ${textColor}`}>
                                 {Math.round(weekValue * 10) / 10}%
@@ -1736,9 +1775,9 @@ export function UtilizationReportView({
 
                       {/* Utilization Comments Spalte */}
                       <td className={`px-0.5 py-0.5 text-sm ${
-                        actionItems[person]?.actionItem 
-                          ? 'bg-blue-100'
-                          : 'bg-gray-50'
+                        hasNoManager 
+                          ? 'bg-yellow-100'
+                          : (actionItems[person]?.actionItem ? 'bg-blue-100' : 'bg-gray-50')
                       }`} style={{padding: '2px 2px'}}>
                         <div className="flex items-center justify-center">
                           <button
@@ -1753,9 +1792,9 @@ export function UtilizationReportView({
 
                       {/* Auslastungserklärung Spalte */}
                       <td className={`px-0.5 py-0.5 text-sm ${
-                        actionItems[person]?.actionItem 
-                          ? 'bg-blue-100'
-                          : 'bg-gray-50'
+                        hasNoManager 
+                          ? 'bg-yellow-100'
+                          : (actionItems[person]?.actionItem ? 'bg-blue-100' : 'bg-gray-50')
                       }`} style={{padding: '2px 2px'}}>
                         <div className="flex items-center justify-center">
                           <div className="relative group">
@@ -1806,9 +1845,9 @@ export function UtilizationReportView({
 
                       {/* Act-Spalte */}
                       <td className={`px-0.5 py-0.5 text-sm ${
-                        actionItems[person]?.actionItem 
-                          ? 'bg-blue-100'
-                          : 'bg-gray-50'
+                        hasNoManager 
+                          ? 'bg-yellow-100'
+                          : (actionItems[person]?.actionItem ? 'bg-blue-100' : 'bg-gray-50')
                       }`} style={{padding: '2px 2px'}}>
                         <div className="flex items-center justify-center">
                           <div className="relative group">
@@ -1853,9 +1892,9 @@ export function UtilizationReportView({
 
                       {/* FK-Spalte für Führungskraft */}
                       <td className={`px-0.5 py-0.5 text-sm ${
-                        actionItems[person]?.actionItem 
-                          ? 'bg-blue-100'
-                          : 'bg-gray-50'
+                        hasNoManager 
+                          ? 'bg-yellow-100'
+                          : (actionItems[person]?.actionItem ? 'bg-blue-100' : 'bg-gray-50')
                       }`} style={{padding: '2px 2px'}}>
                         <div className="flex items-center justify-center">
                           {(() => {
@@ -1888,9 +1927,9 @@ export function UtilizationReportView({
                       </td>
                       {/* Info-Spalte für Career Level Icons */}
                       <td className={`px-0.5 py-0.5 text-sm ${
-                        actionItems[person]?.actionItem 
-                          ? 'bg-blue-100'
-                          : 'bg-gray-50'
+                        hasNoManager 
+                          ? 'bg-yellow-100'
+                          : (actionItems[person]?.actionItem ? 'bg-blue-100' : 'bg-gray-50')
                       }`} style={{padding: '2px 2px'}}>
                         <div className="flex items-center justify-center">
                           {(() => {
@@ -1951,17 +1990,17 @@ export function UtilizationReportView({
                       </td>
                       {/* Name-Spalte zwischen Auslastung und Einsatzplan */}
                       <td className={`px-0.5 py-0.5 text-sm ${
-                        actionItems[person]?.actionItem 
-                          ? 'bg-blue-100'
-                          : 'bg-gray-50'
+                        hasNoManager 
+                          ? 'bg-yellow-100'
+                          : (actionItems[person]?.actionItem ? 'bg-blue-100' : 'bg-gray-50')
                       } ${isTerminated ? 'line-through opacity-60' : ''}`} style={{padding: '2px 2px'}}>
                         <span className="font-medium text-gray-900">{person}</span>
                       </td>
                       {/* LBS-Spalte */}
                       <td className={`px-0.5 py-0.5 text-sm ${
-                        actionItems[person]?.actionItem 
-                          ? 'bg-blue-100'
-                          : 'bg-gray-50'
+                        hasNoManager 
+                          ? 'bg-yellow-100'
+                          : (actionItems[person]?.actionItem ? 'bg-blue-100' : 'bg-gray-50')
                       } ${isTerminated ? 'line-through opacity-60' : ''}`} style={{padding: '2px 2px'}}>
                         {personMeta.get(person)?.lbs ? (
                           <span className="text-xs text-gray-700">{personMeta.get(person)?.lbs}</span>
@@ -1971,9 +2010,9 @@ export function UtilizationReportView({
                       </td>
                       {/* Details-Spalte für Mitarbeiter-Dossier */}
                       <td className={`px-0.5 py-0.5 text-sm ${
-                        actionItems[person]?.actionItem 
-                          ? 'bg-blue-100'
-                          : 'bg-gray-50'
+                        hasNoManager 
+                          ? 'bg-yellow-100'
+                          : (actionItems[person]?.actionItem ? 'bg-blue-100' : 'bg-gray-50')
                       }`} style={{padding: '2px 2px'}}>
                         <div className="flex items-center justify-center">
                           <button
@@ -1987,9 +2026,9 @@ export function UtilizationReportView({
                       </td>
                       {/* Status-Spalte */}
                       <td className={`px-0.5 py-0.5 text-sm ${
-                        actionItems[person]?.actionItem 
-                          ? 'bg-blue-100'
-                          : 'bg-gray-50'
+                        hasNoManager 
+                          ? 'bg-yellow-100'
+                          : (actionItems[person]?.actionItem ? 'bg-blue-100' : 'bg-gray-50')
                       }`} style={{padding: '2px 2px'}}>
                         <div className="flex items-center justify-center">
                           <StatusLabelSelector
@@ -2013,9 +2052,9 @@ export function UtilizationReportView({
 
                       {/* Planning Comments Spalte */}
                       <td className={`px-0.5 py-0.5 text-sm ${
-                        actionItems[person]?.actionItem 
-                          ? 'bg-blue-100'
-                          : 'bg-gray-50'
+                        hasNoManager 
+                          ? 'bg-yellow-100'
+                          : (actionItems[person]?.actionItem ? 'bg-blue-100' : 'bg-gray-50')
                       }`} style={{padding: '2px 2px'}}>
                         <div className="flex items-center justify-center">
                           <button
@@ -2041,7 +2080,9 @@ export function UtilizationReportView({
                           else bgColor = 'bg-red-100'; // Alle Werte ≤ 75% (inkl. 0%) sind kritisch
                         }
                         return (
-                          <td key={`r-${i}`} className={`px-0.5 py-0.5 text-center text-xs ${bgColor}`}>
+                          <td key={`r-${i}`} className={`px-0.5 py-0.5 text-center text-xs ${
+                            hasNoManager ? 'bg-yellow-100' : bgColor
+                          }`}>
                             <div className={`flex flex-col items-center gap-1 ${isTerminated ? 'line-through opacity-60' : ''}`}>
                               {utilization !== null && utilization !== undefined ? (
                                 <span className={`flex items-center justify-center gap-1 ${isTerminated ? 'line-through opacity-60' : ''}`}>
@@ -2140,7 +2181,9 @@ export function UtilizationReportView({
                       })}
 
                       {/* Opportunities Spalte */}
-                      <td className="px-0.5 py-0.5 text-center text-xs bg-gray-100">
+                      <td className={`px-0.5 py-0.5 text-center text-xs ${
+                        hasNoManager ? 'bg-yellow-100' : 'bg-gray-100'
+                      }`}>
                         <div className="flex items-center justify-center gap-1">
 
                           <div className="relative group">
