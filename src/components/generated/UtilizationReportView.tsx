@@ -150,12 +150,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
     } catch {}
   }, []);
 
-  // Autosave to localStorage on change
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(uploadedFiles));
-    } catch {}
-  }, [uploadedFiles]);
+
 
   // Save working students toggle state - wird nach der Definition von showWorkingStudents definiert
 
@@ -257,8 +252,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
   const [forecastStartWeek, setForecastStartWeek] = useState(currentWeek);
   const [lookbackWeeks, setLookbackWeeks] = useState(8);
   const [forecastWeeks, setForecastWeeks] = useState(8);
-  const importJsonInputRef = useRef<HTMLInputElement>(null);
-  const STORAGE_KEY = 'utilization_uploaded_files_v1';
+
   // Removed planned engagements & customers local storage keys
 
   // Entferne automatische Basiswoche-Ausrichtung – Guardrail: keine Automatik
@@ -1126,70 +1120,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
   }, [filteredData, lookbackWeeks, forecastWeeks]);
   // ✅ VEREINFACHT: hasData hängt nur noch von verfügbaren Daten ab, nicht von Upload-Status
   const hasData = dataForUI.length > 0;
-  const handleExportCSV = () => {
-    
-  };
-  const handleExportExcel = () => {
-    
-  };
-  const handleSaveLocal = () => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(uploadedFiles));
-    } catch {}
-  };
-  const handleLoadLocal = () => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        setUploadedFiles(parsed || {});
-      }
-    } catch {}
-  };
-  const handleResetLocal = () => {
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {}
-    setUploadedFiles({});
-  };
-  const handleExportJSON = () => {
-    const payload = JSON.stringify({
-      exportedAt: new Date().toISOString(),
-      version: 1,
-      data: uploadedFiles
-    });
-    const blob = new Blob([payload], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `utilization-data-${currentIsoYear}-KW${forecastStartWeek}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  };
-  const handleImportJSONClick = () => {
-    importJsonInputRef.current?.click();
-  };
-  const handleImportJSON = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const text = String(reader.result || '');
-        const parsed = JSON.parse(text);
-        const files = parsed?.data || parsed; // accept plain structure as well
-        if (files && (files.auslastung || files.einsatzplan)) {
-          setUploadedFiles(files);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(files));
-        }
-      } catch {}
-    };
-    reader.readAsText(f);
-    // reset input value so same file can be chosen again later
-    e.currentTarget.value = '';
-  };
+
 
   // ✅ ENTFERNT: handleFilesChange ist nicht mehr nötig
   // Upload-Funktionalität läuft jetzt über AdminDataUploadModal
@@ -1287,14 +1218,7 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
               </label>
             </div>
 
-            <button onClick={handleExportCSV} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              <Download className="w-4 h-4" />
-              CSV
-            </button>
-            <button onClick={handleExportExcel} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              <FileSpreadsheet className="w-4 h-4" />
-              Excel
-            </button>
+
             <button 
               onClick={() => setIsAuslastungViewOpen(true)} 
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
@@ -1319,25 +1243,9 @@ export function UtilizationReportView({ actionItems, setActionItems }: Utilizati
               <Database className="w-4 h-4" />
               Admin Upload
             </button>
-            <button onClick={handleSaveLocal} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              Speichern
-            </button>
-            <button onClick={handleLoadLocal} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              Laden
-            </button>
-            <button onClick={handleResetLocal} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              Zurücksetzen
-            </button>
-            <button onClick={handleExportJSON} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              Export JSON
-            </button>
-            <button onClick={handleImportJSONClick} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-              Import JSON
-            </button>
             <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
               <Settings className="w-4 h-4" />
             </button>
-            <input ref={importJsonInputRef} type="file" accept="application/json" className="hidden" onChange={handleImportJSON} />
             <button onClick={() => setIsColumnsMenuOpen(v => !v)} className="p-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors" title="Spalten">
               <Columns className="w-4 h-4" />
             </button>
