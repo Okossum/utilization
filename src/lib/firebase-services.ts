@@ -701,31 +701,7 @@ export const employeeSkillService = {
   }
 };
 
-// ✅ NEU: Standardstatus Service
-export const standardStatusService = {
-  async save(status: { name: string }): Promise<string> {
-    const docRef = await addDoc(collection(db, COLLECTIONS.STANDARD_STATUSES), {
-      ...addFirestoreFields(status),
-      updatedAt: new Date()
-    });
-    return docRef.id;
-  },
 
-  async getAll(): Promise<{ id: string; name: string; createdAt: Date; updatedAt: Date }[]> {
-    const querySnapshot = await getDocs(collection(db, COLLECTIONS.STANDARD_STATUSES));
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      name: doc.data().name,
-      createdAt: convertTimestamp(doc.data().createdAt),
-      updatedAt: convertTimestamp(doc.data().updatedAt)
-    }));
-  },
-
-  async delete(id: string): Promise<void> {
-    const docRef = doc(db, COLLECTIONS.STANDARD_STATUSES, id);
-    await deleteDoc(docRef);
-  }
-};
 
 // ✅ NEU: Person Standardstatus Service
 export const personStandardStatusService = {

@@ -303,64 +303,34 @@ export function UtilizationReportView({
   // Action Items State mit Prioritäts-System (aus Datenbank) - erweitert um updatedBy
   const [actionItems, setActionItems] = useState<Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }>>({});
 
-  // STD-Status State: Gespeicherte Standardstatus und ausgewählte Status pro Person
-  const [standardStatuses, setStandardStatuses] = useState<string[]>([]);
+  // ✅ NEU: STD-Status als zusätzliche Spalte (einfach, ohne neue Collections)
+  const [standardStatuses, setStandardStatuses] = useState<string[]>(['Verfügbar', 'Urlaub', 'Krank', 'Schulung', 'Projekt']);
   const [personStandardStatuses, setPersonStandardStatuses] = useState<Record<string, string>>({});
 
-  // ✅ NEU: Standardstatus laden und speichern
-  const loadStandardStatuses = async () => {
-    try {
-      const { standardStatusService } = await import('../../lib/firebase-services');
-      const statuses = await standardStatusService.getAll();
-      setStandardStatuses(statuses.map(s => s.name));
-    } catch (error) {
-      console.warn('Fehler beim Laden der Standardstatus:', error);
-      // Fallback: Verwende Standard-Status
-      setStandardStatuses(['Verfügbar', 'Urlaub', 'Krank', 'Schulung', 'Projekt']);
-    }
-  };
-
-  const saveStandardStatus = async (newStatus: string) => {
-    try {
-      const { standardStatusService } = await import('../../lib/firebase-services');
-      await standardStatusService.save({ name: newStatus });
+  // ✅ NEU: Einfache Funktionen für STD-Status (lokaler State, keine DB)
+  const addStandardStatus = (newStatus: string) => {
+    if (!standardStatuses.includes(newStatus)) {
       setStandardStatuses(prev => [...prev, newStatus]);
-    } catch (error) {
-      console.error('Fehler beim Speichern des Standardstatus:', error);
     }
   };
 
-  const loadPersonStandardStatuses = async () => {
+  const savePersonStandardStatus = (person: string, status: string) => {
+    setPersonStandardStatuses(prev => ({ ...prev, [person]: status }));
+    // Optional: In localStorage speichern für Persistierung
     try {
-      const { personStandardStatusService } = await import('../../lib/firebase-services');
-      const statuses = await personStandardStatusService.getAll();
-      const statusMap: Record<string, string> = {};
-      statuses.forEach(s => {
-        statusMap[s.person] = s.standardStatus;
-      });
-      setPersonStandardStatuses(statusMap);
-    } catch (error) {
-      console.warn('Fehler beim Laden der Person-Standardstatus:', error);
-    }
+      const stored = JSON.parse(localStorage.getItem('utilization_person_std_statuses') || '{}');
+      stored[person] = status;
+      localStorage.setItem('utilization_person_std_statuses', JSON.stringify(stored));
+    } catch {}
   };
 
-  const savePersonStandardStatus = async (person: string, status: string) => {
-    try {
-      const { personStandardStatusService } = await import('../../lib/firebase-services');
-      await personStandardStatusService.save({ person, standardStatus: status });
-      setPersonStandardStatuses(prev => ({ ...prev, [person]: status }));
-    } catch (error) {
-      console.error('Fehler beim Speichern des Person-Standardstatus:', error);
-    }
-  };
-
-  // ✅ NEU: Standardstatus laden wenn Datenbank-Modus aktiviert wird
+  // ✅ NEU: STD-Status aus localStorage laden
   useEffect(() => {
-    if (dataSource === 'database') {
-      loadStandardStatuses();
-      loadPersonStandardStatuses();
-    }
-  }, [dataSource]);
+    try {
+      const stored = JSON.parse(localStorage.getItem('utilization_person_std_statuses') || '{}');
+      setPersonStandardStatuses(stored);
+    } catch {}
+  }, []);
   
 
 
@@ -1810,13 +1780,13 @@ export function UtilizationReportView({
                                   placeholder="Neuer Status..."
                                   className="w-full text-xs border border-gray-300 rounded px-2 py-1 mb-2"
                                   onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      const newStatus = e.currentTarget.value.trim();
-                                      if (newStatus) {
-                                        saveStandardStatus(newStatus);
-                                        savePersonStandardStatus(person, newStatus);
-                                      }
+                                                                      if (e.key === 'Enter') {
+                                    const newStatus = e.currentTarget.value.trim();
+                                    if (newStatus) {
+                                      addStandardStatus(newStatus);
+                                      savePersonStandardStatus(person, newStatus);
                                     }
+                                  }
                                   }}
                                   autoFocus
                                 />

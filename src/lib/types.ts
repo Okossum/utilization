@@ -115,8 +115,7 @@ export const COLLECTIONS = {
   SKILLS: 'skills',
   EMPLOYEE_SKILLS: 'employee_skills',
   ASSIGNMENTS: 'assignments',
-  STANDARD_STATUSES: 'standard_statuses',
-  PERSON_STANDARD_STATUSES: 'person_standard_statuses'
+
 } as const;
 
 // Firestore Document IDs
