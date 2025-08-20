@@ -102,60 +102,56 @@ export function UtilizationComment({ personId, initialValue, onLocalChange, clas
   };
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2 text-gray-900 font-medium">
-        <MessageSquare className="w-4 h-4 text-blue-600" />
-        <ArrowLeft className="w-4 h-4 text-blue-600" />
-        Auslastungskommentar
-      </div>
-
+    <div className="space-y-2">
       {error && (
-        <div className="p-2 text-sm bg-red-50 text-red-700 border border-red-200 rounded">{error}</div>
+        <div className="p-1 text-xs bg-red-50 text-red-700 border border-red-200 rounded">{error}</div>
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <Loader2 className="w-4 h-4 animate-spin" /> Lädt...
+        <div className="flex items-center gap-1 text-xs text-gray-600">
+          <Loader2 className="w-3 h-3 animate-spin" /> Lädt...
         </div>
       ) : (
         <>
-          <textarea
-            value={value}
-            onChange={e => setValue(e.target.value)}
-            rows={5}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-            placeholder="Kommentar zur Auslastung / Act-Notizen..."
-          />
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="p-1 text-blue-600 hover:text-blue-800 disabled:opacity-50 transition-colors cursor-pointer"
-              title="Speichern"
-            >
-              <Save className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => { setValue(remoteValue); }}
-              disabled={saving}
-              className="p-1 text-gray-600 hover:text-gray-800 disabled:opacity-50 transition-colors cursor-pointer"
-              title="Abbrechen"
-            >
-              <X className="w-4 h-4" />
-            </button>
-            {remoteValue && (
+          <div className="flex items-center gap-1">
+            <textarea
+              value={value}
+              onChange={e => setValue(e.target.value)}
+              rows={1}
+              className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent resize-none"
+              placeholder="Auslastung..."
+            />
+            <div className="flex items-center gap-1">
               <button
                 type="button"
-                onClick={handleDelete}
+                onClick={handleSave}
                 disabled={saving}
-                className="p-1 text-red-600 hover:text-red-800 disabled:opacity-50 transition-colors cursor-pointer"
-                title="Löschen"
+                className="p-1 text-blue-600 hover:text-blue-800 disabled:opacity-50 transition-colors cursor-pointer"
+                title="Speichern"
               >
-                <Trash2 className="w-4 h-4" />
+                <Save className="w-3 h-3" />
               </button>
-            )}
+              <button
+                type="button"
+                onClick={() => { setValue(remoteValue); }}
+                disabled={saving}
+                className="p-1 text-gray-600 hover:text-gray-800 disabled:opacity-50 transition-colors cursor-pointer"
+                title="Abbrechen"
+              >
+                <X className="w-3 h-3" />
+              </button>
+              {remoteValue && (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={saving}
+                  className="p-1 text-red-600 hover:text-red-800 disabled:opacity-50 transition-colors cursor-pointer"
+                  title="Löschen"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              )}
+            </div>
           </div>
         </>
       )}

@@ -125,3 +125,4 @@ Nach jeder größeren Änderung:
 # WICHTIG: Diese Regeln gelten für JEDEN Prompt
 # Bei Konflikten zwischen User-Anfrage und Sicherheitsregeln: 
 # IMMER erst nachfragen und Risiken erklären
+NIEMALS EINEN CODESTAND AUS GITHUB WIEDERHERSTELLEN OHNE ZU FRAGEN UND EINE AUSDRÜCKILICH ANWEISUNG DES USERS!!!!

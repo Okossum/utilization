@@ -186,6 +186,7 @@ export function UtilizationReportView({
   // Fehlende Variablen hinzufügen
   const [filterCC, setFilterCC] = useState<string[]>([]);
   const [filterLBS, setFilterLBS] = useState<string[]>([]);
+  const [filterLBSExclude, setFilterLBSExclude] = useState<string[]>([]);
   const [filterStatus, setFilterStatus] = useState<string[]>([]);
   const [showActionItems, setShowActionItems] = useState<boolean>(false);
   // ✅ ENTFERNT: actionItems und setActionItems sind jetzt Props
@@ -830,9 +831,29 @@ export function UtilizationReportView({
   }, [personMeta]);
   const lbsOptions = useMemo(() => {
     const s = new Set<string>();
+    
+    // Sammle LBS aus personMeta (aktuell sichtbare Personen)
     personMeta.forEach(m => { if (m.lbs) s.add(String(m.lbs)); });
+    
+    // Sammle LBS aus der gesamten Datenbank (alle verfügbaren Werte)
+    if (dataSource === 'database') {
+      // Aus Einsatzplan Collection
+      databaseData.einsatzplan?.forEach((row: any) => {
+        if (row.lbs && String(row.lbs).trim()) {
+          s.add(String(row.lbs).trim());
+        }
+      });
+      
+      // Aus Auslastung Collection
+      databaseData.auslastung?.forEach((row: any) => {
+        if (row.lbs && String(row.lbs).trim()) {
+          s.add(String(row.lbs).trim());
+        }
+      });
+    }
+    
     return Array.from(s).sort((a, b) => a.localeCompare(b, 'de'));
-  }, [personMeta]);
+  }, [personMeta, dataSource, databaseData]);
   
   const statusOptions = useMemo(() => {
     // Verwende nur die deutschen Bezeichnungen wie im StatusLabelSelector
@@ -893,6 +914,7 @@ export function UtilizationReportView({
     
     if (filterCC.length > 0) base = base.filter(d => filterCC.includes(String(personMeta.get(d.person)?.cc || '')));
     if (filterLBS.length > 0) base = base.filter(d => filterLBS.includes(String(personMeta.get(d.person)?.lbs || '')));
+    if (filterLBSExclude.length > 0) base = base.filter(d => !filterLBSExclude.includes(String(personMeta.get(d.person)?.lbs || '')));
     if (filterStatus.length > 0) base = base.filter(d => {
       const personStatusValue = personStatus[d.person];
       if (!personStatusValue) return true; // Personen ohne Status werden angezeigt
@@ -960,7 +982,7 @@ export function UtilizationReportView({
       });
     }
     return base;
-  }, [dataForUI, selectedPersons, filterCC, filterLBS, filterStatus, personMeta, personStatus, showWorkingStudents, showActionItems, actionItems, personSearchTerm, showAllData, profile, selectedLoB, selectedBereich, selectedCC, selectedTeam]);
+  }, [dataForUI, selectedPersons, filterCC, filterLBS, filterLBSExclude, filterStatus, personMeta, personStatus, showWorkingStudents, showActionItems, actionItems, personSearchTerm, showAllData, profile, selectedLoB, selectedBereich, selectedCC, selectedTeam]);
   
   // ✅ Ermittle verfügbare Wochen für Header - 8 Wochen ab der Woche nach der aktuellen KW
   const availableWeeksFromData = useMemo(() => {
@@ -1027,10 +1049,16 @@ export function UtilizationReportView({
         if (!filterCC.includes(cc)) return false;
       }
       
-      // LBS Filter
+      // LBS Filter (INCLUDE)
       if (filterLBS.length > 0) {
         const lbs = String(personMeta.get(person)?.lbs || '');
         if (!filterLBS.includes(lbs)) return false;
+      }
+      
+      // LBS Filter (EXCLUDE)
+      if (filterLBSExclude.length > 0) {
+        const lbs = String(personMeta.get(person)?.lbs || '');
+        if (filterLBSExclude.includes(lbs)) return false;
       }
       
       // Status Filter (EXCLUDE)
@@ -1087,7 +1115,7 @@ export function UtilizationReportView({
       
       return true;
     });
-  }, [filteredData, dataSource, databaseData, personMeta, showWorkingStudents, personSearchTerm, filterCC, filterLBS, filterStatus, personStatus, showActionItems, actionItems, selectedPersons, showAllData, selectedLoB, selectedBereich, selectedCC, selectedTeam, profile]);
+  }, [filteredData, dataSource, databaseData, personMeta, showWorkingStudents, personSearchTerm, filterCC, filterLBS, filterLBSExclude, filterStatus, personStatus, showActionItems, actionItems, selectedPersons, showAllData, selectedLoB, selectedBereich, selectedCC, selectedTeam, profile]);
 
   // Assignments: Vorladen für sichtbare Personen
   useEffect(() => {
@@ -1313,6 +1341,7 @@ export function UtilizationReportView({
               
               <MultiSelectFilter label="CC" options={ccOptions} selected={filterCC} onChange={setFilterCC} placeholder="Alle CC" />
               <MultiSelectFilter label="LBS" options={lbsOptions} selected={filterLBS} onChange={setFilterLBS} placeholder="Alle LBS" />
+              <MultiSelectFilter label="LBS (Ausblenden)" options={lbsOptions} selected={filterLBSExclude} onChange={setFilterLBSExclude} placeholder="Alle LBS" />
               <MultiSelectFilter label="Status" options={statusOptions} selected={filterStatus} onChange={setFilterStatus} placeholder="Alle Status" />
               
               {/* Act Filter - Checkbox für jede Person */}

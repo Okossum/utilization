@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings, Database, TrendingUp, Target, User, Ticket, BarChart3, Users, FileText, ChevronDown, LogOut, Minus, Plus } from 'lucide-react';
+import { Settings, Database, TrendingUp, Target, User, Ticket, BarChart3, Users, FileText, ChevronDown, LogOut, Minus, Plus, MessageSquare } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface AppHeaderProps {
-  currentView: 'utilization' | 'employees' | 'knowledge';
-  setCurrentView: (view: 'utilization' | 'employees' | 'knowledge') => void;
+  currentView: 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments';
+  setCurrentView: (view: 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments') => void;
   logout: () => Promise<void>;
   setAdminModalOpen: (open: boolean) => void;
   // UtilizationReportView spezifische Props (nur wenn currentView === 'utilization')
@@ -82,11 +82,13 @@ export function AppHeader({
             {currentView === 'utilization' && 'Auslastung & Vorblick'}
             {currentView === 'employees' && 'Mitarbeiter'}
             {currentView === 'knowledge' && 'Knowledge Library'}
+            {currentView === 'auslastung-comments' && 'Auslastung mit Kommentaren'}
           </h1>
           <p className="text-sm text-gray-600 mt-1">
             {currentView === 'utilization' && 'Rückblick & Vorblick · ISO-KW'}
             {currentView === 'employees' && 'Mitarbeiter-Verwaltung und Übersicht'}
             {currentView === 'knowledge' && 'Knowledge Upload und Verwaltung'}
+            {currentView === 'auslastung-comments' && 'Direkte Bearbeitung von Auslastung und Kommentaren'}
           </p>
         </div>
         
@@ -130,6 +132,19 @@ export function AppHeader({
           >
             <FileText className="w-4 h-4" />
             Knowledge
+          </button>
+          <button
+            onClick={() => setCurrentView('auslastung-comments')}
+            className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
+              currentView === 'auslastung-comments' 
+                ? 'text-blue-700 bg-blue-50 border-blue-200' 
+                : 'text-gray-700 bg-gray-50 border-gray-200 hover:bg-gray-100'
+            } border rounded-lg`}
+            style={{ zIndex: 40 }}
+            title="Auslastung mit direkten Kommentaren"
+          >
+            <MessageSquare className="w-4 h-4" />
+            Kommentare
           </button>
 
           {/* LoB als feststehender Chip - nur bei Utilization */}
