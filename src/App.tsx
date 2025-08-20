@@ -63,9 +63,28 @@ function App() {
     const [isAuslastungserklaerungManagementOpen, setIsAuslastungserklaerungManagementOpen] = useState(false);
     const [isGeneralSettingsOpen, setIsGeneralSettingsOpen] = useState(false);
     
-    // ✅ NEU: Action-Items State für beide Views (Act-Toggle aus Auslastungs-Übersicht)
-    const [actionItems, setActionItems] = useState<Record<string, boolean>>(() => {
-      try { return JSON.parse(localStorage.getItem('utilization_action_items') || '{}'); } catch { return {}; }
+    // ✅ KORRIGIERT: Action-Items State mit komplexer Struktur für beide Views
+    const [actionItems, setActionItems] = useState<Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }>>(() => {
+      try { 
+        const stored = localStorage.getItem('utilization_action_items');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          // Konvertiere alte boolean-Struktur zu neuer Objekt-Struktur
+          if (typeof Object.values(parsed)[0] === 'boolean') {
+            const converted: Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }> = {};
+            Object.entries(parsed).forEach(([person, actionItem]) => {
+              converted[person] = { 
+                actionItem: actionItem as boolean, 
+                source: 'default', 
+                updatedBy: undefined 
+              };
+            });
+            return converted;
+          }
+          return parsed;
+        }
+        return {};
+      } catch { return {}; }
     });
     
     // Speichere Action-Items im localStorage
@@ -137,9 +156,13 @@ function App() {
           )}
           
           {currentView === 'employees' && (
-            <EmployeeListView 
-              actionItems={actionItems}
-            />
+            <>
+              {console.log('🔍 DEBUG: App.tsx - actionItems vor EmployeeListView:', actionItems)}
+              {console.log('🔍 DEBUG: App.tsx - Anzahl actionItems:', Object.keys(actionItems).length)}
+              <EmployeeListView 
+                actionItems={actionItems}
+              />
+            </>
           )}
           
           {currentView === 'knowledge' && (

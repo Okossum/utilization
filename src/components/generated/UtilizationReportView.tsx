@@ -22,7 +22,7 @@ import { SalesOpportunities } from './SalesOpportunities';
 import { useAssignments } from '../../contexts/AssignmentsContext';
 import { AssignmentEditorModal } from './AssignmentEditorModal';
 import ScopeFilterDropdown from './ScopeFilterDropdown';
-import { auslastungserklaerungService, personAuslastungserklaerungService } from '../../lib/firebase-services';
+import { auslastungserklaerungService, personAuslastungserklaerungService, personActionItemService } from '../../lib/firebase-services';
 interface UtilizationData {
   person: string;
   week: string;
@@ -37,6 +37,8 @@ interface UploadedFile {
 }
 
 interface UtilizationReportViewProps {
+  actionItems: Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }>;
+  setActionItems: (actionItems: Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }>) => void;
   isSettingsModalOpen: boolean;
   setIsSettingsModalOpen: (open: boolean) => void;
   isAuslastungViewOpen: boolean;
@@ -48,6 +50,8 @@ interface UtilizationReportViewProps {
 }
 
 export function UtilizationReportView({ 
+  actionItems,
+  setActionItems,
   isSettingsModalOpen, 
   setIsSettingsModalOpen,
   isAuslastungViewOpen, 
@@ -242,7 +246,8 @@ export function UtilizationReportView({
         }
       });
       
-      setActionItems(actionItemsMap);
+              // ✅ KORRIGIERT: Aktualisiere globalen State
+        setActionItems(actionItemsMap);
     } catch (error) {
       console.warn('Fehler beim Laden der Action Items:', error);
     }
@@ -298,8 +303,7 @@ export function UtilizationReportView({
   const [showActionItems, setShowActionItems] = useState<boolean>(false);
   const [personSearchTerm, setPersonSearchTerm] = useState<string>('');
   
-  // Action Items State mit Prioritäts-System (aus Datenbank) - erweitert um updatedBy
-  const [actionItems, setActionItems] = useState<Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }>>({});
+  // ✅ KORRIGIERT: Verwende globalen actionItems State aus App.tsx
 
   // ✅ NEU: Auslastungserklärung als zusätzliche Spalte (aus Datenbank)
   const [auslastungserklaerungen, setAuslastungserklaerungen] = useState<{ id: string; name: string; isActive: boolean }[]>([]);
@@ -874,21 +878,31 @@ export function UtilizationReportView({
         }
       });
 
-      // Nur setzen wenn sich etwas geändert hat UND keine manuellen Einstellungen existieren
-      if (Object.keys(newActionItems).length > 0) {
-        const updatedActionItems: Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }> = { ...actionItems };
-        
-        Object.entries(newActionItems).forEach(([person, actionItem]) => {
-          const current = actionItems[person];
+              // ✅ KORRIGIERT: Logik für regelbasierte Werte
+        if (Object.keys(newActionItems).length > 0) {
+          const updatedActionItems: Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }> = { ...actionItems };
           
-          // Nur setzen wenn kein manueller Status existiert
-          if (!current || current.source !== 'manual') {
-            updatedActionItems[person] = { actionItem, source: 'rule', updatedBy: undefined };
-          }
-        });
-        
-        setActionItems(updatedActionItems);
-      }
+          Object.entries(newActionItems).forEach(([person, actionItem]) => {
+            const current = actionItems[person];
+            
+                         // ✅ NEUE LOGIK: Manuelle Werte NIEMALS überschreiben
+             if (current?.source === 'manual') {
+               // Manuelle Werte bleiben unverändert
+               console.log(`🔒 Manueller Wert für ${person} bleibt erhalten:`, current.actionItem);
+             } else {
+               // Regel-basierte oder Default-Werte können überschrieben werden
+               const shouldUpdate = !current || current.actionItem !== actionItem;
+               
+               if (shouldUpdate) {
+                 console.log(`🔄 Aktualisiere ${person} von ${current?.actionItem} auf ${actionItem} (source: rule)`);
+                 updatedActionItems[person] = { actionItem, source: 'rule', updatedBy: undefined };
+               }
+             }
+          });
+          
+          // ✅ Aktualisiere globalen State
+          setActionItems(updatedActionItems);
+        }
     };
 
     // ✅ NEU: autoSetActionItems() aufrufen wenn sich Daten ändern (ohne actionItems dependency)
@@ -896,6 +910,23 @@ export function UtilizationReportView({
       autoSetActionItems();
     }
   }, [dataForUI, forecastStartWeek, currentIsoYear, dataSource]);
+
+  // ✅ NEU: Persistiere regelbasierte Werte in der Datenbank
+  useEffect(() => {
+    if (dataSource === 'database' && Object.keys(actionItems).length > 0) {
+      // Speichere alle regelbasierten Werte in der Datenbank
+      Object.entries(actionItems).forEach(async ([person, item]) => {
+        if (item.source === 'rule') {
+          try {
+            await personActionItemService.update(person, item.actionItem, 'rule');
+            console.log(`💾 Regelbasierter Wert für ${person} in DB gespeichert:`, item.actionItem);
+          } catch (error) {
+            console.error(`❌ Fehler beim Speichern des regelbasierten Werts für ${person}:`, error);
+          }
+        }
+      });
+    }
+  }, [actionItems, dataSource]);
 
 
 
@@ -1792,15 +1823,14 @@ export function UtilizationReportView({
                                   const currentUser = profile?.displayName || user?.email || 'Unbekannt';
                                   await personActionItemService.update(person, checked, 'manual', currentUser);
                                   
-                                  // Aktualisiere lokalen State mit updatedBy Information
-                                  setActionItems(prev => ({
-                                    ...prev,
-                                    [person]: { 
-                                      actionItem: checked, 
-                                      source: 'manual',
-                                      updatedBy: currentUser
-                                    }
-                                  }));
+                                  // ✅ KORRIGIERT: Aktualisiere globalen State mit updatedBy Information
+                                  const updatedActionItems = { ...actionItems };
+                                  updatedActionItems[person] = { 
+                                    actionItem: checked, 
+                                    source: 'manual',
+                                    updatedBy: currentUser
+                                  };
+                                  setActionItems(updatedActionItems);
                                 } catch (error) {
                                   console.error('Fehler beim Speichern des Action Items:', error);
                                 }

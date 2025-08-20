@@ -6,9 +6,9 @@ import { EmployeeUploadModal } from './EmployeeUploadModal';
 import DatabaseService from '../../services/database';
 import { useAssignments } from '../../contexts/AssignmentsContext';
 
-// ✅ NEU: Props für Action-Items aus der Auslastungs-Übersicht
+// ✅ KORRIGIERT: Props für Action-Items aus der Auslastungs-Übersicht
 interface EmployeeListViewProps {
-  actionItems: Record<string, boolean>;
+  actionItems: Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }>;
 }
 interface Employee {
   id: string;
@@ -140,18 +140,13 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
   // Assignments Context für Projektzuordnungen
   const { getAssignmentsForEmployee } = useAssignments();
   
-  // Lade echte Dossier-Daten
+  // ✅ KORRIGIERT: Lade alle Mitarbeiter mit Act-Toggle, unabhängig von existierenden Dossiers
   useEffect(() => {
-    const loadEmployeeDossiers = async () => {
+    const loadEmployeesWithActToggle = async () => {
       try {
         setIsLoading(true);
-        const dossiers = await DatabaseService.getAllEmployeeDossiers();
         
-        console.log('🔍 DEBUG: Geladene Dossiers:', dossiers);
-        console.log('🔍 DEBUG: Anzahl Dossiers:', dossiers?.length || 0);
-        console.log('🔍 DEBUG: Erstes Dossier:', dossiers?.[0]);
-        
-        // Lade auch Einsatzplan-Daten für CC und Team
+        // Lade Einsatzplan-Daten für Metadaten (CC, Team, LBS)
         const einsatzplanData = await DatabaseService.getEinsatzplan();
         const einsatzplanMap = new Map();
         einsatzplanData?.forEach(entry => {
@@ -162,51 +157,61 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
         
         console.log('🔍 DEBUG: Einsatzplan geladen:', einsatzplanData?.length || 0, 'Einträge');
 
-        // Konvertiere Dossier-Daten zu Employee-Format
-        const enrichedEmployees: Employee[] = dossiers.map(dossier => {
-          const einsatzplanEntry = einsatzplanMap.get(dossier.name);
-          
-          return {
-            id: dossier.employeeId || dossier.id || dossier.name,
-            name: dossier.name || dossier.displayName || 'Unbekannt',
-            role: dossier.careerLevel || 'Keine Angabe',
-            department: dossier.team || dossier.competenceCenter || 'Keine Angabe',
-            skills: Array.isArray(dossier.skills) ? dossier.skills.map(s => typeof s === 'string' ? s : s.name || s.skillName || 'Unbekannt') : [],
-            experience: dossier.careerLevel || 'Keine Angabe',
-            availability: 'Available', // Standard, könnte später erweitert werden
-            comments: dossier.comments || dossier.utilizationComment || 'Keine Kommentare',
-            email: dossier.email || 'Keine E-Mail',
-            phone: dossier.phone || 'Kein Telefon',
-            isActive: dossier.isActive !== undefined ? dossier.isActive : true,
-            // Neue Dossier-Felder aus Mitarbeiter-Dossier
-            careerLevel: dossier.careerLevel || einsatzplanEntry?.lbs,
-            competenceCenter: einsatzplanEntry?.cc || dossier.competenceCenter,
-            team: einsatzplanEntry?.team || dossier.team,
-            strengths: dossier.strengths,
-            weaknesses: dossier.weaknesses,
-            roles: Array.isArray(dossier.roles) ? dossier.roles : [],
-            currentProjectAssignments: Array.isArray(dossier.currentProjectAssignments) ? dossier.currentProjectAssignments : [],
-            projectHistory: Array.isArray(dossier.projectHistory) ? dossier.projectHistory : [],
-            projectOffers: Array.isArray(dossier.projectOffers) ? dossier.projectOffers : [],
-          };
-        });
+        // ✅ NEUE LOGIK: Erstelle Employee-Objekte für alle Mitarbeiter mit Act-Toggle
+        const allEmployeesWithActToggle: Employee[] = Object.keys(actionItems)
+          .filter(name => actionItems[name]?.actionItem === true)
+          .map(name => {
+            const einsatzplanEntry = einsatzplanMap.get(name);
+            
+            return {
+              id: name, // Verwende den Namen als ID
+              name: name,
+              role: einsatzplanEntry?.lbs || 'Keine Angabe',
+              department: einsatzplanEntry?.team || einsatzplanEntry?.cc || 'Keine Angabe',
+              skills: [], // Wird später aus dem Dossier geladen
+              experience: einsatzplanEntry?.lbs || 'Keine Angabe',
+              availability: 'Available',
+              comments: 'Klicken Sie auf den Mitarbeiter, um das Dossier zu öffnen/erstellen',
+              email: 'Keine E-Mail',
+              phone: 'Kein Telefon',
+              isActive: true,
+              // Metadaten aus Einsatzplan
+              careerLevel: einsatzplanEntry?.lbs,
+              competenceCenter: einsatzplanEntry?.cc,
+              team: einsatzplanEntry?.team,
+              strengths: '',
+              weaknesses: '',
+              roles: [],
+              currentProjectAssignments: [],
+              projectHistory: [],
+              projectOffers: [],
+            };
+          });
         
-        console.log('🔍 DEBUG: Transformierte Employees:', enrichedEmployees);
-        console.log('🔍 DEBUG: Anzahl transformierte Employees:', enrichedEmployees.length);
-        console.log('🔍 DEBUG: Erster Employee:', enrichedEmployees[0]);
+        console.log('🔍 DEBUG: Alle Mitarbeiter mit Act-Toggle:', allEmployeesWithActToggle);
+        console.log('🔍 DEBUG: Anzahl Mitarbeiter mit Act-Toggle:', allEmployeesWithActToggle.length);
         
-        setEmployees(enrichedEmployees);
+        setEmployees(allEmployeesWithActToggle);
       } catch (error) {
-        console.error('Fehler beim Laden der Employee Dossiers:', error);
-        // Kein Fallback zu Mock-Daten - nur echte Dossier-Mitarbeiter
+        console.error('Fehler beim Laden der Mitarbeiter mit Act-Toggle:', error);
         setEmployees([]);
       } finally {
         setIsLoading(false);
       }
     };
     
-    loadEmployeeDossiers();
-  }, []);
+    // ✅ DEBUG: Prüfe actionItems
+    console.log('🔍 DEBUG: useEffect läuft mit actionItems:', actionItems);
+    console.log('🔍 DEBUG: actionItems Länge:', Object.keys(actionItems).length);
+    
+    // Nur laden wenn actionItems verfügbar sind
+    if (Object.keys(actionItems).length > 0) {
+      console.log('🔍 DEBUG: Starte loadEmployeesWithActToggle');
+      loadEmployeesWithActToggle();
+    } else {
+      console.log('🔍 DEBUG: Keine actionItems verfügbar');
+    }
+  }, [actionItems]);
   
   // Toggle ACT-Status für einen Mitarbeiter
   const handleToggleActive = async (employeeId: string) => {
@@ -249,10 +254,10 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
   
   const departments = ['All', ...Array.from(new Set(employees.map(emp => emp.department)))];
   
-  // ✅ NEU: Filtere nur Mitarbeiter, deren Act-Toggle in der Auslastungs-Übersicht aktiviert ist
-  const activeEmployees = employees.filter(emp => actionItems[emp.name] === true);
+  // ✅ KORRIGIERT: Alle geladenen Mitarbeiter haben bereits den Act-Toggle aktiviert
+  console.log('🔍 DEBUG: Alle Mitarbeiter mit Act-Toggle geladen:', employees.length);
   
-  const filteredEmployees = activeEmployees.filter(employee => {
+  const filteredEmployees = employees.filter(employee => {
     const matchesSearch = employee.name.toLowerCase().includes(searchTerm.toLowerCase()) || employee.role.toLowerCase().includes(searchTerm.toLowerCase()) || employee.skills.some(skill => skill.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesDepartment = selectedDepartment === 'All' || employee.department === selectedDepartment;
     return matchesSearch && matchesDepartment;
@@ -347,7 +352,7 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
                 </div>
                 <div>
                   <div className="text-xs font-medium text-slate-500">Mit Act-Toggle</div>
-                  <div className="text-lg font-bold text-green-600">{activeEmployees.length}</div>
+                  <div className="text-lg font-bold text-green-600">{employees.length}</div>
                 </div>
               </div>
               
@@ -379,7 +384,7 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
           ) : (
             <>
               {/* Info-Banner für Act-Toggle */}
-              {activeEmployees.length < employees.length && (
+              {false && (
                 <motion.div 
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -394,10 +399,7 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
                         Act-Toggle Filter aktiv
                       </h4>
                       <p className="text-xs text-blue-700">
-                        Es werden nur <span className="font-medium">{activeEmployees.length}</span> von 
-                        <span className="font-medium"> {employees.length}</span> Mitarbeitern angezeigt, 
-                        deren Act-Toggle in der Auslastungs-Übersicht aktiviert ist. 
-                        {employees.length - activeEmployees.length} Mitarbeiter sind ausgeblendet.
+                        Alle <span className="font-medium">{employees.length}</span> Mitarbeiter mit Act-Toggle werden angezeigt.
                       </p>
                     </div>
                   </div>
@@ -444,12 +446,12 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
               Keine Mitarbeiter gefunden
             </h3>
             <p className="text-slate-500 mb-6 max-w-md mx-auto">
-              {activeEmployees.length === 0 
+              {employees.length === 0 
                 ? "Keine Mitarbeiter haben das Act-Toggle in der Auslastungs-Übersicht aktiviert."
                 : "Versuchen Sie, Ihre Suchkriterien anzupassen oder wählen Sie eine andere Abteilung."
               }
             </p>
-            {activeEmployees.length === 0 && (
+                          {employees.length === 0 && (
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-md mx-auto">
                 <p className="text-sm text-blue-700">
                   💡 <strong>Tipp:</strong> Aktivieren Sie das Act-Toggle für Mitarbeiter in der Auslastungs-Übersicht, 
