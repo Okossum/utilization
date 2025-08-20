@@ -17,6 +17,7 @@ interface AppHeaderProps {
   onRoleManagement?: () => void;
   onTechnicalSkillManagement?: () => void;
   onCustomerProjectsManagement?: () => void;
+  onAuslastungserklaerungManagement?: () => void;
   onGeneralSettings?: () => void;
 }
 
@@ -33,6 +34,7 @@ export function AppHeader({
   onRoleManagement,
   onTechnicalSkillManagement,
   onCustomerProjectsManagement,
+  onAuslastungserklaerungManagement,
   onGeneralSettings
 }: AppHeaderProps) {
   const { user, profile } = useAuth();
@@ -229,7 +231,7 @@ export function AppHeader({
                 )}
 
                 {/* Management */}
-                {(onRoleManagement || onTechnicalSkillManagement || onCustomerProjectsManagement) && (
+                {(onRoleManagement || onTechnicalSkillManagement || onCustomerProjectsManagement || onAuslastungserklaerungManagement) && (
                   <div className="mb-3">
                     <button
                       onClick={() => toggleSection('management')}
@@ -262,6 +264,14 @@ export function AppHeader({
                             className="w-full px-3 py-2 text-sm text-orange-700 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 text-left font-medium"
                           >
                             🏢 Kunden & Projekte
+                          </button>
+                        )}
+                        {onAuslastungserklaerungManagement && (
+                          <button
+                            onClick={() => { onAuslastungserklaerungManagement(); setIsSettingsMenuOpen(false); }}
+                            className="w-full px-3 py-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 text-left font-medium"
+                          >
+                            📋 Auslastungserklärung
                           </button>
                         )}
                       </div>

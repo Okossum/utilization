@@ -22,6 +22,7 @@ import { SalesOpportunities } from './SalesOpportunities';
 import { useAssignments } from '../../contexts/AssignmentsContext';
 import { AssignmentEditorModal } from './AssignmentEditorModal';
 import ScopeFilterDropdown from './ScopeFilterDropdown';
+import { auslastungserklaerungService, personAuslastungserklaerungService } from '../../lib/firebase-services';
 interface UtilizationData {
   person: string;
   week: string;
@@ -303,33 +304,57 @@ export function UtilizationReportView({
   // Action Items State mit Prioritäts-System (aus Datenbank) - erweitert um updatedBy
   const [actionItems, setActionItems] = useState<Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }>>({});
 
-  // ✅ NEU: STD-Status als zusätzliche Spalte (einfach, ohne neue Collections)
-  const [standardStatuses, setStandardStatuses] = useState<string[]>(['Verfügbar', 'Urlaub', 'Krank', 'Schulung', 'Projekt']);
-  const [personStandardStatuses, setPersonStandardStatuses] = useState<Record<string, string>>({});
+  // ✅ NEU: Auslastungserklärung als zusätzliche Spalte (aus Datenbank)
+  const [auslastungserklaerungen, setAuslastungserklaerungen] = useState<{ id: string; name: string; isActive: boolean }[]>([]);
+  const [personAuslastungserklaerungen, setPersonAuslastungserklaerungen] = useState<Record<string, string>>({});
 
-  // ✅ NEU: Einfache Funktionen für STD-Status (lokaler State, keine DB)
-  const addStandardStatus = (newStatus: string) => {
-    if (!standardStatuses.includes(newStatus)) {
-      setStandardStatuses(prev => [...prev, newStatus]);
+  // ✅ NEU: Funktionen für Auslastungserklärung (mit Datenbank)
+  const addAuslastungserklaerung = async (newName: string) => {
+    try {
+      await auslastungserklaerungService.save({ name: newName.trim() });
+      await loadAuslastungserklaerungen();
+    } catch (error) {
+      console.error('Fehler beim Hinzufügen der Auslastungserklärung:', error);
     }
   };
 
-  const savePersonStandardStatus = (person: string, status: string) => {
-    setPersonStandardStatuses(prev => ({ ...prev, [person]: status }));
-    // Optional: In localStorage speichern für Persistierung
+  const savePersonAuslastungserklaerung = async (person: string, auslastungserklaerung: string) => {
     try {
-      const stored = JSON.parse(localStorage.getItem('utilization_person_std_statuses') || '{}');
-      stored[person] = status;
-      localStorage.setItem('utilization_person_std_statuses', JSON.stringify(stored));
-    } catch {}
+      await personAuslastungserklaerungService.update(person, auslastungserklaerung);
+      setPersonAuslastungserklaerungen(prev => ({ ...prev, [person]: auslastungserklaerung }));
+    } catch (error) {
+      console.error('Fehler beim Speichern der Person-Auslastungserklärung:', error);
+    }
   };
 
-  // ✅ NEU: STD-Status aus localStorage laden
-  useEffect(() => {
+  // ✅ NEU: Auslastungserklärungen aus Datenbank laden
+  const loadAuslastungserklaerungen = async () => {
     try {
-      const stored = JSON.parse(localStorage.getItem('utilization_person_std_statuses') || '{}');
-      setPersonStandardStatuses(stored);
-    } catch {}
+      const data = await auslastungserklaerungService.getActive();
+      setAuslastungserklaerungen(data);
+    } catch (error) {
+      console.error('Fehler beim Laden der Auslastungserklärungen:', error);
+    }
+  };
+
+  // ✅ NEU: Person-Auslastungserklärungen aus Datenbank laden
+  const loadPersonAuslastungserklaerungen = async () => {
+    try {
+      const data = await personAuslastungserklaerungService.getAll();
+      const personMap: Record<string, string> = {};
+      data.forEach(item => {
+        personMap[item.person] = item.auslastungserklaerung;
+      });
+      setPersonAuslastungserklaerungen(personMap);
+    } catch (error) {
+      console.error('Fehler beim Laden der Person-Auslastungserklärungen:', error);
+    }
+  };
+
+  // ✅ NEU: Auslastungserklärungen beim Laden der Daten laden
+  useEffect(() => {
+    loadAuslastungserklaerungen();
+    loadPersonAuslastungserklaerungen();
   }, []);
   
 
@@ -1568,9 +1593,9 @@ export function UtilizationReportView({
                     </div>
                   </th>
 
-                  {/* STD-Status Spalte */}
+                  {/* Auslastungserklärung Spalte */}
                   <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
-                    STD-Status
+                    Auslastungserklärung
                   </th>
 
                   {/* Act-Spalte */}
@@ -1698,7 +1723,7 @@ export function UtilizationReportView({
                         </div>
                       </td>
 
-                      {/* STD-Status Spalte */}
+                      {/* Auslastungserklärung Spalte */}
                       <td className={`px-0.5 py-0.5 text-sm ${
                         actionItems[person]?.actionItem 
                           ? 'bg-blue-100'
@@ -1707,25 +1732,25 @@ export function UtilizationReportView({
                         <div className="flex items-center justify-center">
                           <div className="relative group">
                             <select
-                              value={personStandardStatuses[person] || ''}
+                              value={personAuslastungserklaerungen[person] || ''}
                               onChange={(e) => {
                                 const selectedStatus = e.target.value;
                                 if (selectedStatus) {
-                                  savePersonStandardStatus(person, selectedStatus);
+                                  savePersonAuslastungserklaerung(person, selectedStatus);
                                 }
                               }}
                               className="text-xs border border-gray-300 rounded px-1 py-0.5 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                             >
                               <option value="">-</option>
-                              {standardStatuses.map(status => (
-                                <option key={status} value={status}>
-                                  {status}
+                              {auslastungserklaerungen.map(status => (
+                                <option key={status.id} value={status.name}>
+                                  {status.name}
                                 </option>
                               ))}
                               <option value="__ADD_NEW__">+ Neuer Status</option>
                             </select>
                             {/* Inline-Edit für neue Status */}
-                            {personStandardStatuses[person] === '__ADD_NEW__' && (
+                            {personAuslastungserklaerungen[person] === '__ADD_NEW__' && (
                               <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded shadow-lg p-2 z-20 min-w-32">
                                 <input
                                   type="text"
@@ -1735,8 +1760,8 @@ export function UtilizationReportView({
                                     if (e.key === 'Enter') {
                                       const newStatus = e.currentTarget.value.trim();
                                       if (newStatus) {
-                                        addStandardStatus(newStatus);
-                                        savePersonStandardStatus(person, newStatus);
+                                        addAuslastungserklaerung(newStatus);
+                                        savePersonAuslastungserklaerung(person, newStatus);
                                       }
                                     }
                                   }}

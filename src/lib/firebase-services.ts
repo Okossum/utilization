@@ -701,6 +701,120 @@ export const employeeSkillService = {
   }
 };
 
+// ✅ NEU: Auslastungserklärung Service
+export const auslastungserklaerungService = {
+  async save(status: { name: string; isActive?: boolean }): Promise<string> {
+    const docRef = await addDoc(collection(db, COLLECTIONS.AUSLASTUNGSERKLAERUNGEN), {
+      ...addFirestoreFields(status),
+      isActive: status.isActive !== false, // Standard: true
+      updatedAt: new Date()
+    });
+    return docRef.id;
+  },
+
+  async getAll(): Promise<{ id: string; name: string; isActive: boolean; createdAt: Date; updatedAt: Date }[]> {
+    const querySnapshot = await getDocs(collection(db, COLLECTIONS.AUSLASTUNGSERKLAERUNGEN));
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      name: doc.data().name,
+      isActive: doc.data().isActive !== false,
+      createdAt: convertTimestamp(doc.data().createdAt),
+      updatedAt: convertTimestamp(doc.data().updatedAt)
+    }));
+  },
+
+  async getActive(): Promise<{ id: string; name: string; isActive: boolean; createdAt: Date; updatedAt: Date }[]> {
+    const q = query(
+      collection(db, COLLECTIONS.AUSLASTUNGSERKLAERUNGEN),
+      where('isActive', '==', true)
+    );
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      name: doc.data().name,
+      isActive: true,
+      createdAt: convertTimestamp(doc.data().createdAt),
+      updatedAt: convertTimestamp(doc.data().updatedAt)
+    }));
+  },
+
+  async update(id: string, updates: { name?: string; isActive?: boolean }): Promise<void> {
+    const docRef = doc(db, COLLECTIONS.AUSLASTUNGSERKLAERUNGEN, id);
+    await updateDoc(docRef, {
+      ...updates,
+      updatedAt: new Date()
+    });
+  },
+
+  async softDelete(id: string): Promise<void> {
+    const docRef = doc(db, COLLECTIONS.AUSLASTUNGSERKLAERUNGEN, id);
+    await updateDoc(docRef, {
+      isActive: false,
+      updatedAt: new Date()
+    });
+  },
+
+  async delete(id: string): Promise<void> {
+    const docRef = doc(db, COLLECTIONS.AUSLASTUNGSERKLAERUNGEN, id);
+    await deleteDoc(docRef);
+  }
+};
+
+// ✅ NEU: Person Auslastungserklärung Service
+export const personAuslastungserklaerungService = {
+  async save(status: { person: string; auslastungserklaerung: string }): Promise<string> {
+    const docRef = await addDoc(collection(db, COLLECTIONS.PERSON_AUSLASTUNGSERKLAERUNGEN), {
+      ...addFirestoreFields(status),
+      updatedAt: new Date()
+    });
+    return docRef.id;
+  },
+
+  async getByPerson(person: string): Promise<{ id: string; person: string; auslastungserklaerung: string; createdAt: Date; updatedAt: Date } | null> {
+    const q = query(
+      collection(db, COLLECTIONS.PERSON_AUSLASTUNGSERKLAERUNGEN),
+      where('person', '==', person)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    if (querySnapshot.empty) return null;
+    
+    const doc = querySnapshot.docs[0];
+    const data = doc.data();
+    return {
+      id: doc.id,
+      person: data.person,
+      auslastungserklaerung: data.auslastungserklaerung,
+      createdAt: convertTimestamp(data.createdAt),
+      updatedAt: convertTimestamp(data.updatedAt)
+    };
+  },
+
+  async getAll(): Promise<{ id: string; person: string; auslastungserklaerung: string; createdAt: Date; updatedAt: Date }[]> {
+    const querySnapshot = await getDocs(collection(db, COLLECTIONS.PERSON_AUSLASTUNGSERKLAERUNGEN));
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      person: doc.data().person,
+      auslastungserklaerung: doc.data().auslastungserklaerung,
+      createdAt: convertTimestamp(doc.data().createdAt),
+      updatedAt: convertTimestamp(doc.data().updatedAt)
+    }));
+  },
+
+  async update(person: string, auslastungserklaerung: string): Promise<void> {
+    const existing = await this.getByPerson(person);
+    if (existing) {
+      const docRef = doc(db, COLLECTIONS.PERSON_AUSLASTUNGSERKLAERUNGEN, existing.id);
+      await updateDoc(docRef, {
+        auslastungserklaerung,
+        updatedAt: new Date()
+      });
+    } else {
+      await this.save({ person, auslastungserklaerung });
+    }
+  }
+};
+
 
 
 // ✅ NEU: Person Standardstatus Service

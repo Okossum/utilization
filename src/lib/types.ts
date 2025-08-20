@@ -115,6 +115,8 @@ export const COLLECTIONS = {
   SKILLS: 'skills',
   EMPLOYEE_SKILLS: 'employee_skills',
   ASSIGNMENTS: 'assignments',
+  AUSLASTUNGSERKLAERUNGEN: 'auslastungserklaerungen',
+  PERSON_AUSLASTUNGSERKLAERUNGEN: 'person_auslastungserklaerungen'
 
 } as const;
 
