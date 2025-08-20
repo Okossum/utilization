@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings, Database, TrendingUp, Target, User, Ticket, Columns, BarChart3, Users, FileText, ChevronDown, LogOut } from 'lucide-react';
+import { Settings, Database, TrendingUp, Target, User, Ticket, BarChart3, Users, FileText, ChevronDown, LogOut, Minus, Plus } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface AppHeaderProps {
@@ -12,9 +12,12 @@ interface AppHeaderProps {
   onAuslastungView?: () => void;
   onEinsatzplanView?: () => void;
   onSettings?: () => void;
-  onColumnsMenu?: () => void;
-  isColumnsMenuOpen?: boolean;
   lobOptions?: string[];
+  // Management Buttons
+  onRoleManagement?: () => void;
+  onTechnicalSkillManagement?: () => void;
+  onCustomerProjectsManagement?: () => void;
+  onGeneralSettings?: () => void;
 }
 
 export function AppHeader({
@@ -26,12 +29,50 @@ export function AppHeader({
   onAuslastungView,
   onEinsatzplanView,
   onSettings,
-  onColumnsMenu,
-  isColumnsMenuOpen,
-  lobOptions = []
+  lobOptions = [],
+  onRoleManagement,
+  onTechnicalSkillManagement,
+  onCustomerProjectsManagement,
+  onGeneralSettings
 }: AppHeaderProps) {
   const { user, profile } = useAuth();
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({
+    dataUpload: false,
+    controlViews: false,
+    management: false,
+    settings: false
+  });
+  const accountMenuRef = useRef<HTMLDivElement>(null);
+  const settingsMenuRef = useRef<HTMLDivElement>(null);
+
+  // Click outside to close menus
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target as Node)) {
+        setIsAccountMenuOpen(false);
+      }
+      if (settingsMenuRef.current && !settingsMenuRef.current.contains(event.target as Node)) {
+        setIsSettingsMenuOpen(false);
+      }
+    }
+
+    if (isAccountMenuOpen || isSettingsMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isAccountMenuOpen, isSettingsMenuOpen]);
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
 
   return (
     <header className="bg-white border-b border-gray-200 px-4 py-6">
@@ -98,69 +139,157 @@ export function AppHeader({
             </span>
           )}
 
-          {/* View-spezifische Buttons - nur bei Utilization */}
-          {currentView === 'utilization' && (
-            <>
-              {onAdminUpload && (
-                <button 
-                  onClick={onAdminUpload}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
-                  style={{ zIndex: 40 }}
-                  title="Neue Daten hochladen (Admin)"
-                >
-                  <Database className="w-4 h-4" />
-                  Admin Upload
-                </button>
-              )}
-              {onAuslastungView && (
-                <button 
-                  onClick={onAuslastungView}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
-                  style={{ zIndex: 40 }}
-                  title="Auslastung-Übersicht öffnen"
-                >
-                  <TrendingUp className="w-4 h-4" />
-                  Auslastung
-                </button>
-              )}
-              {onEinsatzplanView && (
-                <button 
-                  onClick={onEinsatzplanView}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
-                  style={{ zIndex: 40 }}
-                  title="Einsatzplan-Übersicht öffnen"
-                >
-                  <Target className="w-4 h-4" />
-                  Einsatzplan
-                </button>
-              )}
 
-              {onColumnsMenu && (
-                <button 
-                  onClick={onColumnsMenu}
-                  className="p-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors" 
-                  style={{ zIndex: 40 }} 
-                  title="Spalten"
-                >
-                  <Columns className="w-4 h-4" />
-                </button>
-              )}
-            </>
-          )}
 
-          {/* Settings Button - IMMER sichtbar */}
-          <button 
-            onClick={onSettings || (() => {})}
-            className="p-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors" 
-            style={{ zIndex: 40 }}
-            title="Settings"
-            disabled={!onSettings}
-          >
-            <Settings className="w-4 h-4" />
-          </button>
+          {/* Settings Menu - IMMER sichtbar */}
+          <div className="relative" ref={settingsMenuRef}>
+            <button 
+              onClick={() => setIsSettingsMenuOpen(v => !v)}
+              className="inline-flex items-center gap-2 p-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors" 
+              style={{ zIndex: 40 }}
+              title="Settings"
+            >
+              <Settings className="w-4 h-4" />
+              <ChevronDown className="w-3 h-3" />
+            </button>
+            {isSettingsMenuOpen && (
+              <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg p-3" style={{ zIndex: 50 }}>
+                
+                {/* Daten & Upload */}
+                {(onAdminUpload || currentView === 'utilization') && (
+                  <div className="mb-3">
+                    <button
+                      onClick={() => toggleSection('dataUpload')}
+                      className="w-full flex items-center justify-between text-xs text-gray-500 uppercase tracking-wider font-semibold hover:text-gray-700 transition-colors py-2"
+                    >
+                      Daten & Upload
+                      <ChevronDown className={`w-3 h-3 transition-transform ${expandedSections.dataUpload ? 'rotate-180' : ''}`} />
+                    </button>
+                    {expandedSections.dataUpload && (
+                      <div className="space-y-2 mt-2">
+                        {onAdminUpload && (
+                          <button
+                            onClick={() => { onAdminUpload(); setIsSettingsMenuOpen(false); }}
+                            className="w-full px-3 py-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 text-left font-medium"
+                          >
+                            📊 Excel Upload
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Control Views - nur bei Utilization */}
+                {currentView === 'utilization' && (onAuslastungView || onEinsatzplanView) && (
+                  <div className="mb-3">
+                    <button
+                      onClick={() => toggleSection('controlViews')}
+                      className="w-full flex items-center justify-between text-xs text-gray-500 uppercase tracking-wider font-semibold hover:text-gray-700 transition-colors py-2"
+                    >
+                      Control Views
+                      <ChevronDown className={`w-3 h-3 transition-transform ${expandedSections.controlViews ? 'rotate-180' : ''}`} />
+                    </button>
+                    {expandedSections.controlViews && (
+                      <div className="space-y-2 mt-2">
+                        {onAuslastungView && (
+                          <button
+                            onClick={() => { onAuslastungView(); setIsSettingsMenuOpen(false); }}
+                            className="w-full px-3 py-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 text-left font-medium"
+                          >
+                            📈 Auslastung-Übersicht
+                          </button>
+                        )}
+                        {onEinsatzplanView && (
+                          <button
+                            onClick={() => { onEinsatzplanView(); setIsSettingsMenuOpen(false); }}
+                            className="w-full px-3 py-2 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 text-left font-medium"
+                          >
+                            🎯 Einsatzplan-Übersicht
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Management */}
+                {(onRoleManagement || onTechnicalSkillManagement || onCustomerProjectsManagement) && (
+                  <div className="mb-3">
+                    <button
+                      onClick={() => toggleSection('management')}
+                      className="w-full flex items-center justify-between text-xs text-gray-500 uppercase tracking-wider font-semibold hover:text-gray-700 transition-colors py-2"
+                    >
+                      Management
+                      <ChevronDown className={`w-3 h-3 transition-transform ${expandedSections.management ? 'rotate-180' : ''}`} />
+                    </button>
+                    {expandedSections.management && (
+                      <div className="space-y-2 mt-2">
+                        {onRoleManagement && (
+                          <button
+                            onClick={() => { onRoleManagement(); setIsSettingsMenuOpen(false); }}
+                            className="w-full px-3 py-2 text-sm text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 text-left font-medium"
+                          >
+                            👥 Rollen-Verwaltung
+                          </button>
+                        )}
+                        {onTechnicalSkillManagement && (
+                          <button
+                            onClick={() => { onTechnicalSkillManagement(); setIsSettingsMenuOpen(false); }}
+                            className="w-full px-3 py-2 text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 text-left font-medium"
+                          >
+                            🛠️ Tech Skills
+                          </button>
+                        )}
+                        {onCustomerProjectsManagement && (
+                          <button
+                            onClick={() => { onCustomerProjectsManagement(); setIsSettingsMenuOpen(false); }}
+                            className="w-full px-3 py-2 text-sm text-orange-700 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 text-left font-medium"
+                          >
+                            🏢 Kunden & Projekte
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Allgemeine Einstellungen */}
+                <div>
+                  <button
+                    onClick={() => toggleSection('settings')}
+                    className="w-full flex items-center justify-between text-xs text-gray-500 uppercase tracking-wider font-semibold hover:text-gray-700 transition-colors py-2"
+                  >
+                    Einstellungen
+                    <ChevronDown className={`w-3 h-3 transition-transform ${expandedSections.settings ? 'rotate-180' : ''}`} />
+                  </button>
+                  {expandedSections.settings && (
+                    <div className="space-y-2 mt-2">
+                      {currentView === 'utilization' && onSettings && (
+                        <button
+                          onClick={() => { onSettings(); setIsSettingsMenuOpen(false); }}
+                          className="w-full px-3 py-2 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 text-left font-medium"
+                        >
+                          📊 Zeitraum-Einstellungen
+                        </button>
+                      )}
+                      {onGeneralSettings && (
+                        <button
+                          onClick={() => { onGeneralSettings(); setIsSettingsMenuOpen(false); }}
+                          className="w-full px-3 py-2 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 text-left font-medium"
+                        >
+                          ⚙️ Allgemeine Einstellungen
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Account Menu - IMMER sichtbar */}
-          <div className="relative">
+          <div className="relative" ref={accountMenuRef}>
             <button
               onClick={() => setIsAccountMenuOpen(v => !v)}
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
