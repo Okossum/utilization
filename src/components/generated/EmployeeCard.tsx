@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Phone, MapPin, Clock, ChevronDown, ChevronUp, User, Briefcase } from 'lucide-react';
+import { Mail, Phone, MapPin, Clock, ChevronDown, ChevronUp, User, Briefcase, Target, Award, TrendingUp, Calendar, Building } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAssignments } from '../../contexts/AssignmentsContext';
 import { AssignmentEditorModal } from './AssignmentEditorModal';
@@ -124,432 +124,421 @@ export const EmployeeCard = ({
 
   // @return
   return <motion.div whileHover={{
-    y: -4,
-    scale: 1.02
+    y: -1,
+    scale: 1.005
   }} transition={{
     duration: 0.2
-  }} className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden hover:shadow-xl transition-all duration-300">
-      <div className="p-6">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg">
-              {employee.profileImage ? <img src={employee.profileImage} alt={`${employee.name} profile`} className="w-full h-full rounded-xl object-cover" /> : <User className="w-7 h-7" />}
+  }} className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden hover:shadow-lg transition-all duration-300">
+      
+      {/* Kompakter horizontaler Header */}
+      <div className="bg-gradient-to-r from-slate-50 to-blue-50 p-4 border-b border-slate-100">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4 flex-1">
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg flex-shrink-0">
+              {employee.profileImage ? 
+                <img src={employee.profileImage} alt={`${employee.name} profile`} className="w-full h-full rounded-xl object-cover" /> : 
+                <User className="w-6 h-6" />
+              }
             </div>
-            <div>
-              <h3 className="text-xl font-bold text-slate-800 mb-1">
-                <span>{employee.name}</span>
+            
+            <div className="flex-1 min-w-0">
+              <h3 className="text-xl font-bold text-slate-800 mb-1 truncate">
+                {employee.name}
               </h3>
-              <p className="text-slate-600 font-medium">
-                <span>{employee.role}</span>
-              </p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-1">
+                  <Award className="w-3 h-3 text-blue-600" />
+                  <span className="text-xs text-slate-600">{employee.role}</span>
+                </div>
+                <div className={`px-2 py-1 rounded-full text-xs font-medium border ${getAvailabilityColor(employee.availability)}`}>
+                  {getAvailabilityText(employee.availability)}
+                </div>
+              </div>
+            </div>
+            
+            {/* Kompakte Grundinformationen im Header */}
+            <div className="hidden lg:flex items-center gap-4 text-xs text-slate-600">
+              {employee.department && (
+                <div className="flex items-center gap-1">
+                  <MapPin className="w-3 h-3 text-blue-500" />
+                  <span>{employee.department}</span>
+                </div>
+              )}
+              {employee.careerLevel && (
+                <div className="flex items-center gap-1">
+                  <Award className="w-3 h-3 text-purple-500" />
+                  <span>LBS: {employee.careerLevel}</span>
+                </div>
+              )}
+              {employee.competenceCenter && (
+                <div className="flex items-center gap-1">
+                  <Building className="w-3 h-3 text-green-500" />
+                  <span>CC: {employee.competenceCenter}</span>
+                </div>
+              )}
             </div>
           </div>
           
-          <motion.button whileHover={{
-          scale: 1.05
-        }} whileTap={{
-          scale: 0.95
-        }} onClick={() => onToggleActive(employee.id)} className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${employee.isActive ? 'bg-blue-600' : 'bg-slate-300'}`}>
-            <motion.span animate={{
-            x: employee.isActive ? 24 : 4
-          }} transition={{
-            duration: 0.2
-          }} className="inline-block h-6 w-6 transform rounded-full bg-white shadow-lg" />
+          <motion.button 
+            whileHover={{ scale: 1.05 }} 
+            whileTap={{ scale: 0.95 }} 
+            onClick={() => onToggleActive(employee.id)} 
+            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ml-4 flex-shrink-0 ${employee.isActive ? 'bg-blue-600' : 'bg-slate-300'}`}
+          >
+            <motion.span 
+              animate={{ x: employee.isActive ? 20 : 3 }} 
+              transition={{ duration: 0.2 }} 
+              className="inline-block h-5 w-5 transform rounded-full bg-white shadow-lg" 
+            />
             <span className={`absolute text-xs font-bold ${employee.isActive ? 'left-1 text-white' : 'right-1 text-slate-600'}`}>
-              <span>ACT</span>
+              ACT
             </span>
           </motion.button>
         </div>
+      </div>
 
-        <div className="space-y-3 mb-4">
-          <div className="flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-slate-400" />
-            <span className="text-slate-600 text-sm">{employee.department}</span>
-          </div>
-          
-          {/* LBS (Career Level) */}
-          {employee.careerLevel && (
-            <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-slate-400" />
-              <span className="text-slate-600 text-sm">
-                <span className="font-medium">LBS:</span> {employee.careerLevel}
-              </span>
-            </div>
-          )}
-
-          {/* Competence Center */}
-          {employee.competenceCenter && (
-            <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-slate-400" />
-              <span className="text-slate-600 text-sm">
-                <span className="font-medium">CC:</span> {employee.competenceCenter}
-              </span>
-            </div>
-          )}
-
-          {/* Team */}
-          {employee.team && (
-            <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-slate-400" />
-              <span className="text-slate-600 text-sm">
-                <span className="font-medium">Team:</span> {employee.team}
-              </span>
-            </div>
-          )}
-          
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-slate-400" />
-            <span className="text-slate-600 text-sm">{employee.experience}</span>
-            <div className={`ml-auto px-3 py-1 rounded-full text-xs font-medium border ${getAvailabilityColor(employee.availability)}`}>
-              <span>{getAvailabilityText(employee.availability)}</span>
+      {/* Kompakter Main Content */}
+      <div className="p-4">
+        {/* Kompakte Zusatzinformationen nur auf Mobile */}
+        <div className="lg:hidden bg-slate-50 rounded-lg p-3 mb-4">
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            {employee.team && (
+              <div className="flex items-center gap-1">
+                <User className="w-3 h-3 text-orange-500" />
+                <span className="text-slate-600">Team: {employee.team}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-1">
+              <Clock className="w-3 h-3 text-indigo-500" />
+              <span className="text-slate-600">{employee.experience}</span>
             </div>
           </div>
         </div>
 
-        {/* Stärken und Schwächen */}
-        {(employee.strengths || employee.weaknesses) && (
-          <div className="mb-4 space-y-3">
-            {employee.strengths && (
-              <div>
-                <h4 className="text-sm font-semibold text-emerald-700 mb-2 flex items-center gap-2">
-                  <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
-                  Stärken
-                </h4>
-                <p className="text-sm text-slate-600 leading-relaxed">{employee.strengths}</p>
-              </div>
-            )}
+        {/* Horizontale Kachel-Ansicht für bessere Raumnutzung */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          
+          {/* Linke Spalte */}
+          <div className="space-y-4">
             
-            {employee.weaknesses && (
-              <div>
-                <h4 className="text-sm font-semibold text-amber-700 mb-2 flex items-center gap-2">
-                  <span className="w-2 h-2 bg-amber-500 rounded-full"></span>
-                  Schwächen
+            {/* Kompakte Fähigkeiten */}
+            <div className="bg-slate-50 rounded-lg p-3">
+              <h4 className="text-xs font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                <Award className="w-3 h-3 text-slate-600" />
+                Fähigkeiten
+                <span className="bg-slate-200 text-slate-700 text-xs px-2 py-0.5 rounded-full">
+                  {employee.skills.length}
+                </span>
+              </h4>
+              <div className="flex flex-wrap gap-1">
+                {employee.skills.slice(0, 6).map(skill => (
+                  <span key={skill} className="px-2 py-1 bg-white text-slate-700 rounded text-xs font-medium border border-slate-200 hover:bg-slate-100 transition-colors">
+                    {skill}
+                  </span>
+                ))}
+                {employee.skills.length > 6 && (
+                  <span className="px-2 py-1 bg-slate-200 text-slate-600 rounded text-xs font-medium">
+                    +{employee.skills.length - 6}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Kompakte Stärken und Schwächen in einer Zeile */}
+            {(employee.strengths || employee.weaknesses) && (
+              <div className="bg-gradient-to-r from-emerald-50 to-amber-50 rounded-lg p-3">
+                <div className="flex items-start gap-4">
+                  {employee.strengths && (
+                    <div className="flex-1">
+                      <h5 className="text-xs font-semibold text-emerald-700 mb-1 flex items-center gap-1">
+                        <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                        Stärken
+                      </h5>
+                      <p className="text-xs text-emerald-800 leading-relaxed line-clamp-2">{employee.strengths}</p>
+                    </div>
+                  )}
+                  {employee.weaknesses && (
+                    <div className="flex-1">
+                      <h5 className="text-xs font-semibold text-amber-700 mb-1 flex items-center gap-1">
+                        <span className="w-2 h-2 bg-amber-500 rounded-full"></span>
+                        Verbesserungsbereiche
+                      </h5>
+                      <p className="text-xs text-amber-800 leading-relaxed line-clamp-2">{employee.weaknesses}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Kompakte Rollen */}
+            {employee.roles && employee.roles.length > 0 && (
+              <div className="bg-cyan-50 rounded-lg p-3">
+                <h4 className="text-xs font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                  <User className="w-3 h-3 text-cyan-600" />
+                  Rollen
+                  <span className="bg-cyan-100 text-cyan-700 text-xs px-2 py-0.5 rounded-full">
+                    {employee.roles.length}
+                  </span>
                 </h4>
-                <p className="text-sm text-slate-600 leading-relaxed">{employee.weaknesses}</p>
+                <div className="flex flex-wrap gap-1">
+                  {employee.roles.slice(0, 4).map(role => (
+                    <span key={role} className="px-2 py-1 bg-white text-cyan-700 rounded text-xs font-medium border border-cyan-200">
+                      {role}
+                    </span>
+                  ))}
+                  {employee.roles.length > 4 && (
+                    <span className="px-2 py-1 bg-cyan-100 text-cyan-600 rounded text-xs font-medium">
+                      +{employee.roles.length - 4}
+                    </span>
+                  )}
+                </div>
               </div>
             )}
           </div>
-        )}
 
-        {/* Projektangebote */}
-        {employee.projectOffers && employee.projectOffers.length > 0 && (
-          <div className="mb-4">
-            <h4 className="text-sm font-semibold text-blue-700 mb-2 flex items-center gap-2">
-              <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-              Angebotene Projekte ({employee.projectOffers.length})
-            </h4>
-            <div className="space-y-2">
-              {employee.projectOffers.slice(0, 3).map((offer, index) => (
-                <div key={offer.id} className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium text-blue-900">{offer.customerName}</span>
-                    <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
-                      {offer.probability}% Wahrscheinlichkeit
+          {/* Rechte Spalte */}
+          <div className="space-y-4">
+            
+            {/* Kompakte Aktuelle Projektzuordnungen */}
+            {(assignments.length > 0 || assignmentsLoading) && (
+              <div className="bg-indigo-50 rounded-lg p-3">
+                <h4 className="text-xs font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                  <Briefcase className="w-3 h-3 text-indigo-600" />
+                  {assignmentsLoading ? 'Lade...' : 'Aktuell'}
+                  {!assignmentsLoading && assignments.length > 0 && (
+                    <span className="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">
+                      {assignments.length}
                     </span>
-                  </div>
-                  {offer.startWeek && offer.endWeek && (
-                    <div className="text-xs text-blue-700">
-                      {offer.startWeek} - {offer.endWeek}
-                    </div>
                   )}
-                </div>
-              ))}
-              {employee.projectOffers.length > 3 && (
-                <div className="text-xs text-blue-600 text-center py-2">
-                  +{employee.projectOffers.length - 3} weitere Projekte
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Projekt Kurzlebenslauf */}
-        {employee.projectHistory && employee.projectHistory.length > 0 && (
-          <div className="mb-4">
-            <h4 className="text-sm font-semibold text-purple-700 mb-2 flex items-center gap-2">
-              <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
-              Projekt Kurzlebenslauf ({employee.projectHistory.length})
-            </h4>
-            <div className="space-y-2">
-              {employee.projectHistory.slice(0, 3).map((project, index) => (
-                <div key={project.id} className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium text-purple-900">{project.projectName}</span>
-                    <span className="text-xs text-purple-600 bg-purple-100 px-2 py-1 rounded-full">
-                      {project.role}
-                    </span>
+                </h4>
+                {assignmentsLoading ? (
+                  <div className="bg-white border border-indigo-200 rounded p-2 text-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600 mx-auto mb-1"></div>
+                    <span className="text-xs text-indigo-600">Lade...</span>
                   </div>
-                  <div className="text-xs text-purple-700 mb-1">{project.customer}</div>
-                  {project.duration && (
-                    <div className="text-xs text-purple-600">{project.duration}</div>
-                  )}
-                </div>
-              ))}
-              {employee.projectHistory.length > 3 && (
-                <div className="text-xs text-purple-600 text-center py-2">
-                  +{employee.projectHistory.length - 3} weitere Projekte
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Rollen */}
-        {employee.roles && employee.roles.length > 0 && (
-          <div className="mb-4">
-            <h4 className="text-sm font-semibold text-cyan-700 mb-2 flex items-center gap-2">
-              <span className="w-2 h-2 bg-cyan-500 rounded-full"></span>
-              Rollen
-            </h4>
-            <div className="flex flex-wrap gap-2">
-              {employee.roles.slice(0, 4).map(role => (
-                <span key={role} className="px-3 py-1 bg-cyan-100 text-cyan-700 rounded-lg text-sm font-medium border border-cyan-200">
-                  {role}
-                </span>
-              ))}
-              {employee.roles.length > 4 && (
-                <span className="px-3 py-1 bg-cyan-50 text-cyan-600 rounded-lg text-sm">
-                  +{employee.roles.length - 4} weitere
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Aktuelle Projektzuordnungen aus AssignmentsContext */}
-        {(assignments.length > 0 || assignmentsLoading) && (
-          <div className="mb-4">
-            <h4 className="text-sm font-semibold text-indigo-700 mb-2 flex items-center gap-2">
-              <Briefcase className="w-4 h-4 text-indigo-600" />
-              {assignmentsLoading ? 'Lade Projektzuordnungen...' : `Projektzuordnungen (${assignments.length})`}
-            </h4>
-            {assignmentsLoading ? (
-              <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600 mx-auto mb-2"></div>
-                <span className="text-xs text-indigo-600">Lade...</span>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {assignments.slice(0, 3).map((assignment) => (
-                  <div 
-                    key={assignment.id} 
-                    className="p-3 bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-lg hover:from-purple-100 hover:to-violet-100 transition-colors cursor-pointer"
-                    onClick={() => {
-                      console.log('CLICK DETECTED!', assignment);
-                      handleAssignmentClick(assignment);
-                    }}
-                    title="Klicken zum Bearbeiten"
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-purple-900">
-                        {assignment.projectName || assignment.projectId}
-                      </span>
-                      {assignment.plannedAllocationPct && (
-                        <span className="text-xs text-purple-700 bg-purple-100 px-2 py-1 rounded-full">
-                          {assignment.plannedAllocationPct}% Auslastung
-                        </span>
-                      )}
-                    </div>
-                    {assignment.customer && (
-                      <div className="text-xs text-purple-700 mb-1">{assignment.customer}</div>
-                    )}
-                    {/* Projekt-Details in kompakter Form */}
-                    <div className="space-y-1 mt-2">
-                      {/* Rolle und Status in einer Zeile */}
-                      <div className="flex items-center justify-between">
-                        {assignment.role && (
-                          <span className="text-xs text-purple-700 bg-purple-100 px-2 py-1 rounded">
-                            Rolle: {assignment.role}
-                          </span>
-                        )}
-                        {assignment.status && (
-                          <span className={`text-xs px-2 py-1 rounded-full ${
-                            assignment.status === 'active' ? 'bg-green-100 text-green-700' :
-                            assignment.status === 'planned' ? 'bg-blue-100 text-blue-700' :
-                            assignment.status === 'proposed' ? 'bg-orange-100 text-orange-700' :
-                            assignment.status === 'prospect' ? 'bg-yellow-100 text-yellow-700' :
-                            assignment.status === 'onHold' ? 'bg-amber-100 text-amber-700' :
-                            assignment.status === 'closed' ? 'bg-gray-100 text-gray-700' :
-                            'bg-gray-100 text-gray-700'
-                          }`}>
-                          {assignment.status}
-                        </span>
-                        )}
-                      </div>
-                      
-                      {/* Wahrscheinlichkeit und Auslastung in einer Zeile */}
-                      <div className="flex items-center justify-between text-xs text-purple-700">
-                        <div className="flex items-center gap-1">
-                          <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                          <span>Wahrscheinlichkeit: {
-                            assignment.status === 'prospect' ? '25%' : 
-                            assignment.status === 'proposed' ? '50%' : 
-                            assignment.status === 'planned' ? '75%' : 
-                            assignment.status === 'active' ? '100%' : 
-                            assignment.status === 'onHold' ? '50%' : 
-                            assignment.status === 'closed' ? '0%' : '—'
-                          }</span>
-                        </div>
-                        {assignment.plannedAllocationPct && (
-                          <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                            <span>Auslastung: {assignment.plannedAllocationPct}%</span>
+                ) : (
+                  <div className="space-y-2">
+                    {assignments.slice(0, 2).map((assignment) => (
+                      <div 
+                        key={assignment.id} 
+                        className="bg-white border border-indigo-200 rounded p-2 hover:bg-indigo-25 transition-all cursor-pointer"
+                        onClick={() => {
+                          console.log('CLICK DETECTED!', assignment);
+                          handleAssignmentClick(assignment);
+                        }}
+                        title="Klicken zum Bearbeiten"
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="text-xs font-medium text-indigo-900 truncate">
+                            {assignment.projectName || assignment.projectId}
                           </div>
-                        )}
+                          {assignment.plannedAllocationPct && (
+                            <span className="text-xs text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded ml-2">
+                              {assignment.plannedAllocationPct}%
+                            </span>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center justify-between text-xs text-slate-600">
+                          <div className="flex items-center gap-2">
+                            {assignment.customer && (
+                              <span className="truncate">{assignment.customer}</span>
+                            )}
+                            {assignment.role && (
+                              <span className="text-indigo-600">• {assignment.role}</span>
+                            )}
+                          </div>
+                          {assignment.status && (
+                            <div className="flex items-center gap-1">
+                              <div className={`w-2 h-2 rounded-full ${
+                                assignment.status === 'active' ? 'bg-green-500' :
+                                assignment.status === 'planned' ? 'bg-blue-500' :
+                                assignment.status === 'proposed' ? 'bg-orange-500' :
+                                assignment.status === 'prospect' ? 'bg-yellow-500' :
+                                assignment.status === 'onHold' ? 'bg-amber-500' :
+                                assignment.status === 'closed' ? 'bg-gray-500' :
+                                'bg-gray-500'
+                              }`}></div>
+                              <span>{assignment.status}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      
-                      {/* Kommentar (falls vorhanden) */}
-                      {assignment.comment && (
-                        <div className="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded border-l-2 border-purple-200">
-                          💬 {assignment.comment}
-                        </div>
-                      )}
-                    </div>
-                    {/* Zeitraum und Due Date */}
-                    <div className="flex items-center justify-between text-xs text-purple-700 mt-1">
-                      {(assignment.startDate || assignment.endDate) && (
-                        <div>
-                          {assignment.startDate || '—'} → {assignment.endDate || '—'}
-                        </div>
-                      )}
-                      {assignment.dueDate && (
-                        <div className="flex items-center gap-1">
-                          <span className="text-purple-600">📅 Due: {assignment.dueDate}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {assignments.length > 3 && (
-                  <div className="text-xs text-purple-600 text-center py-2">
-                    +{assignments.length - 3} weitere Zuordnungen
+                    ))}
+                    {assignments.length > 2 && (
+                      <div className="text-xs text-indigo-600 text-center py-1">
+                        +{assignments.length - 2} weitere
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             )}
-          </div>
-        )}
 
-        {/* Legacy: Aktuelle Projektzuordnungen (falls aus Dossier-Daten) */}
-        {employee.currentProjectAssignments && employee.currentProjectAssignments.length > 0 && assignments.length === 0 && (
-          <div className="mb-4">
-            <h4 className="text-sm font-semibold text-green-700 mb-2 flex items-center gap-2">
-              <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-              Aktuelle Projektzuordnungen ({employee.currentProjectAssignments.length})
-            </h4>
-            <div className="space-y-2">
-              {employee.currentProjectAssignments.slice(0, 3).map((assignment, index) => (
-                <div key={assignment.id} className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium text-green-900">{assignment.projectName}</span>
-                    {assignment.workload && (
-                      <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full">
-                        {assignment.workload}% Auslastung
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-xs text-green-700 mb-1">{assignment.customer}</div>
-                                      {/* Projekt-Details in kompakter Form */}
-                    <div className="space-y-1 mt-2">
-                      {/* Rolle und Zeitraum in einer Zeile */}
+            {/* Kompakte Projektangebote */}
+            {employee.projectOffers && employee.projectOffers.length > 0 && (
+              <div className="bg-blue-50 rounded-lg p-3">
+                <h4 className="text-xs font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                  <Target className="w-3 h-3 text-blue-600" />
+                  Projektangebote
+                  <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full">
+                    {employee.projectOffers.length}
+                  </span>
+                </h4>
+                <div className="space-y-2">
+                  {employee.projectOffers.slice(0, 2).map((offer, index) => (
+                    <div key={offer.id} className="bg-white border border-blue-200 rounded p-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
-                          Rolle: {assignment.role}
+                        <div className="text-xs font-medium text-blue-900 truncate">{offer.customerName}</div>
+                        <span className="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full ml-2">
+                          {offer.probability}%
                         </span>
-                        {assignment.startDate && assignment.endDate && (
-                          <span className="text-xs text-green-600">
-                            {assignment.startDate} - {assignment.endDate}
-                          </span>
-                        )}
                       </div>
-                      
-
-                      
-                      {/* Auslastung (falls vorhanden) */}
-                      {assignment.workload && (
-                        <div className="flex items-center gap-1 text-xs text-green-700">
-                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                          <span>Auslastung: {assignment.workload}%</span>
+                      {offer.startWeek && offer.endWeek && (
+                        <div className="text-xs text-slate-600 mt-1">
+                          {offer.startWeek} - {offer.endWeek}
                         </div>
                       )}
                     </div>
+                  ))}
+                  {employee.projectOffers.length > 2 && (
+                    <div className="text-xs text-blue-600 text-center py-1">
+                      +{employee.projectOffers.length - 2} weitere
+                    </div>
+                  )}
                 </div>
-              ))}
-              {employee.currentProjectAssignments.length > 3 && (
-                <div className="text-xs text-green-600 text-center py-2">
-                  +{employee.currentProjectAssignments.length - 3} weitere Zuordnungen
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+              </div>
+            )}
 
-        {/* Fähigkeiten */}
-        <div className="mb-4">
-          <h4 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
-            <span className="w-2 h-2 bg-slate-500 rounded-full"></span>
-            Fähigkeiten & Kompetenzen
-          </h4>
-          <div className="flex flex-wrap gap-2">
-            {employee.skills.slice(0, 6).map(skill => (
-              <span key={skill} className="px-3 py-1 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium border border-slate-200">
-                {skill}
-              </span>
-            ))}
-            {employee.skills.length > 6 && (
-              <span className="px-3 py-1 bg-slate-50 text-slate-500 rounded-lg text-sm">
-                +{employee.skills.length - 6} weitere
-              </span>
+            {/* Kompakter Projekt Kurzlebenslauf */}
+            {employee.projectHistory && employee.projectHistory.length > 0 && (
+              <div className="bg-purple-50 rounded-lg p-3">
+                <h4 className="text-xs font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                  <Briefcase className="w-3 h-3 text-purple-600" />
+                  Projekt-Historie
+                  <span className="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full">
+                    {employee.projectHistory.length}
+                  </span>
+                </h4>
+                <div className="space-y-2">
+                  {employee.projectHistory.slice(0, 2).map((project, index) => (
+                    <div key={project.id} className="bg-white border border-purple-200 rounded p-2">
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs font-medium text-purple-900 truncate">{project.projectName}</div>
+                        <span className="text-xs text-purple-600 bg-purple-100 px-2 py-0.5 rounded ml-2">
+                          {project.role}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-600 mt-1">
+                        {project.customer} • {project.duration}
+                      </div>
+                    </div>
+                  ))}
+                  {employee.projectHistory.length > 2 && (
+                    <div className="text-xs text-purple-600 text-center py-1">
+                      +{employee.projectHistory.length - 2} weitere
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Kompakte Legacy Projektzuordnungen */}
+            {employee.currentProjectAssignments && employee.currentProjectAssignments.length > 0 && assignments.length === 0 && (
+              <div className="bg-green-50 rounded-lg p-3">
+                <h4 className="text-xs font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                  <Briefcase className="w-3 h-3 text-green-600" />
+                  Dossier-Projekte
+                  <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">
+                    {employee.currentProjectAssignments.length}
+                  </span>
+                </h4>
+                <div className="space-y-2">
+                  {employee.currentProjectAssignments.slice(0, 2).map((assignment, index) => (
+                    <div key={assignment.id} className="bg-white border border-green-200 rounded p-2">
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs font-medium text-green-900 truncate">{assignment.projectName}</div>
+                        {assignment.workload && (
+                          <span className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded ml-2">
+                            {assignment.workload}%
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-slate-600 mt-1">
+                        {assignment.customer} • {assignment.role}
+                      </div>
+                    </div>
+                  ))}
+                  {employee.currentProjectAssignments.length > 2 && (
+                    <div className="text-xs text-green-600 text-center py-1">
+                      +{employee.currentProjectAssignments.length - 2} weitere
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         </div>
 
-        <div className="border-t border-slate-200 pt-4">
-          <button onClick={() => setIsExpanded(!isExpanded)} className="flex items-center justify-between w-full text-left">
-            <h4 className="text-sm font-semibold text-slate-700">
-              <span>Kommentare & Kontakt</span>
+        {/* Kompakte Kommentare & Kontakt - Expandierbar */}
+        <div className="border-t border-slate-200 pt-3">
+          <button 
+            onClick={() => setIsExpanded(!isExpanded)} 
+            className="flex items-center justify-between w-full text-left p-2 bg-slate-50 rounded hover:bg-slate-100 transition-colors"
+          >
+            <h4 className="text-xs font-semibold text-slate-700 flex items-center gap-2">
+              <Mail className="w-3 h-3 text-slate-600" />
+              Kontakt & Details
             </h4>
-            {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+            {isExpanded ? 
+              <ChevronUp className="w-3 h-3 text-slate-400" /> : 
+              <ChevronDown className="w-3 h-3 text-slate-400" />
+            }
           </button>
           
           <AnimatePresence>
-            {isExpanded && <motion.div initial={{
-            opacity: 0,
-            height: 0
-          }} animate={{
-            opacity: 1,
-            height: 'auto'
-          }} exit={{
-            opacity: 0,
-            height: 0
-          }} transition={{
-            duration: 0.3
-          }} className="mt-3 space-y-3">
-                <p className="text-sm text-slate-600 leading-relaxed">
-                  <span>{employee.comments}</span>
-                </p>
-                
-                <div className="space-y-2 pt-2 border-t border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-slate-400" />
-                    <a href={`mailto:${employee.email}`} className="text-sm text-blue-600 hover:text-blue-700 transition-colors">
-                      <span>{employee.email}</span>
-                    </a>
+            {isExpanded && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }} 
+                animate={{ opacity: 1, height: 'auto' }} 
+                exit={{ opacity: 0, height: 0 }} 
+                transition={{ duration: 0.2 }}
+                className="mt-2 bg-slate-50 rounded p-3 space-y-3"
+              >
+                {/* Kompakte Kontaktinformationen */}
+                <div className="grid grid-cols-1 gap-2">
+                  <div className="flex items-center gap-2 bg-white p-2 rounded border border-slate-200">
+                    <Mail className="w-3 h-3 text-blue-500" />
+                    <div className="flex-1">
+                      <a href={`mailto:${employee.email}`} className="text-xs text-blue-600 hover:text-blue-700 transition-colors font-medium truncate">
+                        {employee.email}
+                      </a>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Phone className="w-4 h-4 text-slate-400" />
-                    <a href={`tel:${employee.phone}`} className="text-sm text-blue-600 hover:text-blue-700 transition-colors">
-                      <span>{employee.phone}</span>
-                    </a>
+                  <div className="flex items-center gap-2 bg-white p-2 rounded border border-slate-200">
+                    <Phone className="w-3 h-3 text-green-500" />
+                    <div className="flex-1">
+                      <a href={`tel:${employee.phone}`} className="text-xs text-green-600 hover:text-green-700 transition-colors font-medium">
+                        {employee.phone}
+                      </a>
+                    </div>
                   </div>
                 </div>
-              </motion.div>}
+                
+                {/* Kompakte Kommentare */}
+                <div className="bg-white p-2 rounded border border-slate-200">
+                  <div className="text-xs font-medium text-slate-500 mb-1">Kommentare</div>
+                  <p className="text-xs text-slate-700 leading-relaxed line-clamp-3">
+                    {employee.comments}
+                  </p>
+                </div>
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
       </div>
       
       {/* Assignment Editor Modal */}
-      
       {showEditModal && (
         <AssignmentEditorModal
           isOpen={showEditModal}

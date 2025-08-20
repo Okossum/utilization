@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Users, Upload } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Search, Filter, Users, Upload, UserCheck, UserX, BarChart3 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { EmployeeCard } from './EmployeeCard';
 import { EmployeeUploadModal } from './EmployeeUploadModal';
 import DatabaseService from '../../services/database';
@@ -259,125 +259,206 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
   });
 
   // @return
-  return <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+  return <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4 lg:p-6">
       <div className="max-w-7xl mx-auto">
-        <motion.div initial={{
-        opacity: 0,
-        y: -20
-      }} animate={{
-        opacity: 1,
-        y: 0
-      }} transition={{
-        duration: 0.6
-      }} className="mb-8">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-3">
-              <Users className="w-8 h-8 text-blue-600" />
-              <h1 className="text-4xl font-bold text-slate-800">
-                <span>Mitarbeiter für Projekte</span>
-              </h1>
+        {/* Header Section */}
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          transition={{ duration: 0.6 }} 
+          className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 lg:p-8 mb-8"
+        >
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 lg:w-16 lg:h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center">
+                <Users className="w-6 h-6 lg:w-8 lg:h-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl lg:text-4xl font-bold text-slate-800 mb-1">
+                  Mitarbeiter für Projekte
+                </h1>
+                <p className="text-slate-600 text-sm lg:text-lg">
+                  Identifizieren und vorschlagen Sie Mitarbeiter für Kundenprojekte
+                </p>
+              </div>
             </div>
             <button
               onClick={() => setIsUploadModalOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all duration-200 shadow-lg hover:shadow-xl"
               title="Mitarbeiter-Excel hochladen"
             >
               <Upload className="w-4 h-4" />
-              Excel Upload
+              <span className="font-medium">Excel Upload</span>
             </button>
           </div>
-          <p className="text-slate-600 text-lg">
-            <span>Identifizieren und vorschlagen Sie Mitarbeiter für Kundenprojekte</span>
-          </p>
         </motion.div>
 
-        <motion.div initial={{
-        opacity: 0,
-        y: 20
-      }} animate={{
-        opacity: 1,
-        y: 0
-      }} transition={{
-        duration: 0.6,
-        delay: 0.2
-      }} className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 mb-8">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-              <input type="text" placeholder="Suche nach Name, Rolle oder Fähigkeiten..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" />
+        {/* Filter & Search Section */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          transition={{ duration: 0.6, delay: 0.2 }} 
+          className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 mb-8"
+        >
+          <div className="flex flex-col gap-6">
+            {/* Search and Filter Row */}
+            <div className="flex flex-col lg:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                <input 
+                  type="text" 
+                  placeholder="Suche nach Name, Rolle oder Fähigkeiten..." 
+                  value={searchTerm} 
+                  onChange={e => setSearchTerm(e.target.value)} 
+                  className="w-full pl-12 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm" 
+                />
+              </div>
+              <div className="relative">
+                <Filter className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+                <select 
+                  value={selectedDepartment} 
+                  onChange={e => setSelectedDepartment(e.target.value)} 
+                  className="pl-12 pr-8 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white min-w-48 text-sm"
+                >
+                  {departments.map(dept => (
+                    <option key={dept} value={dept}>
+                      {dept === 'All' ? 'Alle Abteilungen' : dept}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div className="relative">
-              <Filter className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
-              <select value={selectedDepartment} onChange={e => setSelectedDepartment(e.target.value)} className="pl-12 pr-8 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white min-w-48">
-                {departments.map(dept => <option key={dept} value={dept}>
-                    {dept === 'All' ? 'Alle Abteilungen' : dept}
-                  </option>)}
-              </select>
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div initial={{
-        opacity: 0
-      }} animate={{
-        opacity: 1
-      }} transition={{
-        duration: 0.6,
-        delay: 0.4
-      }} className="grid grid-cols-1 gap-6">
-          {isLoading ? (
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-slate-600">Lade Mitarbeiter-Dossiers...</p>
-            </div>
-          ) : (
-            <>
-              {/* Status-Übersicht */}
-              <div className="bg-slate-50 rounded-lg p-4 mb-4">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-600">
-                    <span className="font-medium">{activeEmployees.length}</span> Mitarbeiter mit aktiviertem Act-Toggle
-                  </span>
-                  <span className="text-slate-500">
-                    {employees.length - activeEmployees.length} Mitarbeiter ohne Act-Toggle
-                  </span>
+            
+            {/* Statistics Row */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
+              <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl">
+                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <Users className="w-5 h-5 text-blue-600" />
                 </div>
-                <div className="mt-2 text-xs text-slate-500">
-                  Nur Mitarbeiter mit aktiviertem Act-Toggle aus der Auslastungs-Übersicht werden angezeigt
+                <div>
+                  <div className="text-xs font-medium text-slate-500">Gesamt Mitarbeiter</div>
+                  <div className="text-lg font-bold text-blue-600">{employees.length}</div>
                 </div>
               </div>
               
-              {filteredEmployees.map((employee, index) => <motion.div key={employee.id} initial={{
-                opacity: 0,
-                y: 20
-              }} animate={{
-                opacity: 1,
-                y: 0
-              }} transition={{
-                duration: 0.4,
-                delay: index * 0.1
-              }}>
-                  <EmployeeCard employee={employee} onToggleActive={handleToggleActive} />
-                </motion.div>)}
+              <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl">
+                <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
+                  <UserCheck className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <div className="text-xs font-medium text-slate-500">Mit Act-Toggle</div>
+                  <div className="text-lg font-bold text-green-600">{activeEmployees.length}</div>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl">
+                <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+                  <BarChart3 className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <div className="text-xs font-medium text-slate-500">Gefilterte Ergebnisse</div>
+                  <div className="text-lg font-bold text-amber-600">{filteredEmployees.length}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Employee Cards Section */}
+        <motion.div 
+          initial={{ opacity: 0 }} 
+          animate={{ opacity: 1 }} 
+          transition={{ duration: 0.6, delay: 0.4 }}
+        >
+          {isLoading ? (
+            <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-6"></div>
+              <h3 className="text-xl font-semibold text-slate-700 mb-2">Lade Mitarbeiter-Dossiers</h3>
+              <p className="text-slate-500">Bitte warten Sie einen Moment...</p>
+            </div>
+          ) : (
+            <>
+              {/* Info-Banner für Act-Toggle */}
+              {activeEmployees.length < employees.length && (
+                <motion.div 
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 mb-6"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <UserX className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-semibold text-blue-800 mb-1">
+                        Act-Toggle Filter aktiv
+                      </h4>
+                      <p className="text-xs text-blue-700">
+                        Es werden nur <span className="font-medium">{activeEmployees.length}</span> von 
+                        <span className="font-medium"> {employees.length}</span> Mitarbeitern angezeigt, 
+                        deren Act-Toggle in der Auslastungs-Übersicht aktiviert ist. 
+                        {employees.length - activeEmployees.length} Mitarbeiter sind ausgeblendet.
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+              
+              {/* Employee Cards Grid - Single Column für bessere Listendarstellung */}
+              <div className="grid grid-cols-1 gap-4">
+                <AnimatePresence>
+                  {filteredEmployees.map((employee, index) => (
+                    <motion.div 
+                      key={employee.id} 
+                      initial={{ opacity: 0, y: 20, scale: 0.95 }} 
+                      animate={{ opacity: 1, y: 0, scale: 1 }} 
+                      exit={{ opacity: 0, y: -20, scale: 0.95 }}
+                      transition={{ 
+                        duration: 0.4, 
+                        delay: index * 0.05,
+                        ease: "easeOut"
+                      }}
+                      layout
+                    >
+                      <EmployeeCard employee={employee} onToggleActive={handleToggleActive} />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
             </>
           )}
         </motion.div>
 
-        {filteredEmployees.length === 0 && <motion.div initial={{
-        opacity: 0
-      }} animate={{
-        opacity: 1
-      }} transition={{
-        duration: 0.4
-      }} className="text-center py-12">
-            <Users className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-slate-600 mb-2">
-              <span>Keine Mitarbeiter gefunden</span>
+        {/* Empty State */}
+        {!isLoading && filteredEmployees.length === 0 && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            transition={{ duration: 0.4 }}
+            className="bg-white rounded-2xl shadow-lg border border-slate-200 p-12 text-center"
+          >
+            <div className="w-20 h-20 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <Users className="w-10 h-10 text-slate-400" />
+            </div>
+            <h3 className="text-2xl font-bold text-slate-700 mb-3">
+              Keine Mitarbeiter gefunden
             </h3>
-            <p className="text-slate-500">
-              <span>Versuchen Sie, Ihre Suchkriterien anzupassen</span>
+            <p className="text-slate-500 mb-6 max-w-md mx-auto">
+              {activeEmployees.length === 0 
+                ? "Keine Mitarbeiter haben das Act-Toggle in der Auslastungs-Übersicht aktiviert."
+                : "Versuchen Sie, Ihre Suchkriterien anzupassen oder wählen Sie eine andere Abteilung."
+              }
             </p>
-          </motion.div>}
+            {activeEmployees.length === 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-md mx-auto">
+                <p className="text-sm text-blue-700">
+                  💡 <strong>Tipp:</strong> Aktivieren Sie das Act-Toggle für Mitarbeiter in der Auslastungs-Übersicht, 
+                  um sie hier anzuzeigen.
+                </p>
+              </div>
+            )}
+          </motion.div>
+        )}
       </div>
       
       {/* Upload Modal */}
