@@ -829,6 +829,131 @@ app.get('/api/einsatzplan', requireAuth, async (req, res) => {
   }
 });
 
+// Mitarbeiter-Daten speichern oder aktualisieren (Firestore)
+app.post('/api/mitarbeiter', requireAuth, async (req, res) => {
+  console.log('🚀 === MITARBEITER UPLOAD START ===');
+  console.log('📨 Request Body erhalten:', JSON.stringify(req.body, null, 2));
+  
+  try {
+    const { fileName, data } = req.body;
+    
+    if (!fileName || !data || !Array.isArray(data)) {
+      return res.status(400).json({ error: 'Ungültige Daten' });
+    }
+
+    // Upload-Historie speichern
+    const historyRef = await db.collection('uploadHistory').add({
+      fileName,
+      fileType: 'mitarbeiter',
+      status: 'success',
+      rowCount: data.length,
+      createdAt: FieldValue.serverTimestamp(),
+      uploadedBy: req.user.uid,
+    });
+
+    // Lade bestehende Mitarbeiter-Daten (nur die neuesten pro Name)
+    const latestSnap = await db.collection('mitarbeiter').where('isLatest', '==', true).get();
+    const existingData = new Map();
+    latestSnap.forEach(doc => {
+      const data = doc.data();
+      const nameKey = data.name?.toLowerCase().trim() || 'unknown';
+      existingData.set(nameKey, { id: doc.id, data });
+    });
+
+    // Neue Versionsnummer ermitteln
+    const maxVerSnap = await db.collection('mitarbeiter').orderBy('uploadVersion', 'desc').limit(1).get();
+    const newVersion = maxVerSnap.empty ? 1 : ((maxVerSnap.docs[0].data().uploadVersion || 0) + 1);
+
+    const results = [];
+    const batch = db.batch();
+
+    // Mitarbeiter-basiertes Update
+    for (const row of data) {
+      if (!row.name) continue;
+      
+      const nameKey = row.name.toLowerCase().trim();
+      const existing = existingData.get(nameKey);
+      
+      if (existing) {
+        // Update bestehenden Mitarbeiter
+        const docRef = db.collection('mitarbeiter').doc(existing.id);
+        
+        batch.update(docRef, {
+          fileName,
+          uploadDate: FieldValue.serverTimestamp(),
+          uploadVersion: newVersion,
+          name: row.name,
+          email: row.email ?? existing.data.email ?? null,
+          phone: row.phone ?? existing.data.phone ?? null,
+          position: row.position ?? existing.data.position ?? null,
+          department: row.department ?? existing.data.department ?? null,
+          team: row.team ?? existing.data.team ?? null,
+          skills: row.skills ?? existing.data.skills ?? null,
+          experience: row.experience ?? existing.data.experience ?? null,
+          updatedBy: req.user.uid,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        
+        results.push({ 
+          action: 'updated', 
+          name: row.name,
+          id: existing.id
+        });
+      } else {
+        // Neuen Mitarbeiter erstellen
+        const docRef = db.collection('mitarbeiter').doc();
+        batch.set(docRef, {
+          fileName,
+          uploadDate: FieldValue.serverTimestamp(),
+          uploadVersion: newVersion,
+          name: row.name,
+          email: row.email ?? null,
+          phone: row.phone ?? null,
+          position: row.position ?? null,
+          department: row.department ?? null,
+          team: row.team ?? null,
+          skills: row.skills ?? null,
+          experience: row.experience ?? null,
+          isLatest: true,
+          createdBy: req.user.uid,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        
+        results.push({ 
+          action: 'created', 
+          name: row.name,
+          id: docRef.id
+        });
+      }
+    }
+
+    // Alle Änderungen in einem Batch commit
+    await batch.commit();
+
+    // Statistiken für Response
+    const updatedCount = results.filter(r => r.action === 'updated').length;
+    const createdCount = results.filter(r => r.action === 'created').length;
+
+    console.log(`✅ ${results.length} Mitarbeiter verarbeitet (${updatedCount} aktualisiert, ${createdCount} neu erstellt)`);
+    console.log('🎯 === MITARBEITER UPLOAD ERFOLGREICH ===');
+    
+    res.json({ 
+      success: true, 
+      historyId: historyRef.id, 
+      version: newVersion,
+      results,
+      message: `${results.length} Mitarbeiter verarbeitet (${updatedCount} aktualisiert, ${createdCount} neu erstellt)`
+    });
+
+  } catch (error) {
+    console.error('❌ Fehler beim Mitarbeiter-Upload:', error);
+    console.log('💥 === MITARBEITER UPLOAD FEHLGESCHLAGEN ===');
+    
+    res.status(500).json({ error: 'Interner Server-Fehler', details: error.message });
+  }
+});
+
 // Upload-Historie abrufen
 app.get('/api/upload-history', requireAuth, async (req, res) => {
   try {

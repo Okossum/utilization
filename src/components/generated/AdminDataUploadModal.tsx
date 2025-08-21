@@ -22,13 +22,11 @@ export function AdminDataUploadModal({ isOpen, onClose, onDatabaseRefresh }: Adm
   const [uploadedFiles, setUploadedFiles] = useState<{
     auslastung?: UploadedFile;
     einsatzplan?: UploadedFile;
-    mitarbeiter?: UploadedFile;
   }>({});
 
   const handleFilesChange = (files: {
     auslastung?: UploadedFile;
     einsatzplan?: UploadedFile;
-    mitarbeiter?: UploadedFile;
   }) => {
     setUploadedFiles(files);
   };
@@ -102,7 +100,7 @@ export function AdminDataUploadModal({ isOpen, onClose, onDatabaseRefresh }: Adm
                 onDatabaseRefresh={onDatabaseRefresh}
               />
 
-              {(uploadedFiles.auslastung?.isValid || uploadedFiles.einsatzplan?.isValid || uploadedFiles.mitarbeiter?.isValid) && (
+              {(uploadedFiles.auslastung?.isValid || uploadedFiles.einsatzplan?.isValid) && (
                 <div className="mt-6 flex justify-end gap-3">
                   <button
                     onClick={onClose}

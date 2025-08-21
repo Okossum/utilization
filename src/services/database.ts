@@ -169,6 +169,17 @@ export class DatabaseService {
     }
   }
 
+  // Mitarbeiter-Daten speichern oder aktualisieren
+  static async saveMitarbeiter(fileName: string, data: GenericDataArray) {
+    try {
+      const result = await ApiService.post('/mitarbeiter', { fileName, data });
+      return result;
+    } catch (error) {
+
+      throw error;
+    }
+  }
+
   // Alle Auslastung-Daten abrufen (nur neueste Version)
   static async getAuslastung() {
     try {

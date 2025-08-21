@@ -15,12 +15,10 @@ interface UploadPanelProps {
   uploadedFiles: {
     auslastung?: UploadedFile;
     einsatzplan?: UploadedFile;
-    mitarbeiter?: UploadedFile;
   };
   onFilesChange: (files: {
     auslastung?: UploadedFile;
     einsatzplan?: UploadedFile;
-    mitarbeiter?: UploadedFile;
   }) => void;
   onDatabaseRefresh?: () => void;
 }
@@ -78,7 +76,7 @@ export function UploadPanel({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
-  const handleFileSelect = async (type: 'auslastung' | 'einsatzplan' | 'mitarbeiter', file: File) => {
+  const handleFileSelect = async (type: 'auslastung' | 'einsatzplan', file: File) => {
     setIsProcessing(type);
 
     const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
@@ -157,8 +155,10 @@ export function UploadPanel({
           // Speichere die aktuelle Datei in der Datenbank
           if (type === 'auslastung') {
             await DatabaseService.saveAuslastung(file.name, parsed.rows);
-          } else {
+          } else if (type === 'einsatzplan') {
             await DatabaseService.saveEinsatzplan(file.name, parsed.rows);
+          } else if (type === 'mitarbeiter') {
+            await DatabaseService.saveMitarbeiter(file.name, parsed.rows);
           }
           
           // Prüfe nach dem Speichern, ob beide Dateien in der Datenbank vorhanden sind
@@ -236,7 +236,7 @@ export function UploadPanel({
       setIsProcessing(null);
     }
   };
-  const handleDrop = (e: React.DragEvent, type: 'auslastung' | 'einsatzplan' | 'mitarbeiter') => {
+  const handleDrop = (e: React.DragEvent, type: 'auslastung' | 'einsatzplan') => {
     e.preventDefault();
     setDragOver(null);
     const files = Array.from(e.dataTransfer.files);
@@ -251,7 +251,7 @@ export function UploadPanel({
   const handleDragLeave = () => {
     setDragOver(null);
   };
-  const removeFile = (type: 'auslastung' | 'einsatzplan' | 'mitarbeiter') => {
+  const removeFile = (type: 'auslastung' | 'einsatzplan') => {
     const newFiles = {
       ...uploadedFiles
     };
@@ -259,8 +259,8 @@ export function UploadPanel({
     onFilesChange(newFiles);
     setShowPreview(null);
   };
-  const retryUpload = (type: 'auslastung' | 'einsatzplan' | 'mitarbeiter') => {
-    const inputRef = type === 'auslastung' ? auslastungRef : type === 'einsatzplan' ? einsatzplanRef : mitarbeiterRef;
+  const retryUpload = (type: 'auslastung' | 'einsatzplan') => {
+    const inputRef = type === 'auslastung' ? auslastungRef : einsatzplanRef;
     inputRef.current?.click();
   };
 
@@ -346,7 +346,20 @@ export function UploadPanel({
   // Parser Auslastung: Personen-Spalte = Spalte E (Index 4), Header in Zeile 4; KW-Header wie "KW33(2025)"; Subheader enthält u. a. "NKV (%)"
   async function parseAuslastungWorkbook(file: File): Promise<{ isValid: boolean; error?: string; preview?: string[][]; rows: any[]; }> {
     const arrayBuffer = await file.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    // ✅ FIX: Verhindere automatischen Browser-Download durch XLSX.read()
+    const workbook = XLSX.read(arrayBuffer, { 
+      type: 'array',
+      bookVBA: false,
+      bookSheets: false,
+      cellStyles: false,
+      cellNF: false,
+      cellHTML: false,
+      cellDates: false,
+      sheetStubs: false,
+      bookDeps: false,
+      bookFiles: false,
+      bookProps: false
+    });
     const sheetName = workbook.SheetNames[0];
     if (!sheetName) return { isValid: false, error: 'Keine Sheets gefunden', rows: [] };
     const sheet = workbook.Sheets[sheetName];
@@ -507,7 +520,20 @@ export function UploadPanel({
   // Parser Einsatzplan: Feste Struktur - Zeile 2: KW-Triplets, Zeile 3: Proj|NKV(%)|Ort, Zeile 4+: Daten
   async function parseEinsatzplanWorkbook(file: File): Promise<{ isValid: boolean; error?: string; preview?: string[][]; rows: any[]; }> {
     const arrayBuffer = await file.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    // ✅ FIX: Verhindere automatischen Browser-Download durch XLSX.read()
+    const workbook = XLSX.read(arrayBuffer, { 
+      type: 'array',
+      bookVBA: false,
+      bookSheets: false,
+      cellStyles: false,
+      cellNF: false,
+      cellHTML: false,
+      cellDates: false,
+      sheetStubs: false,
+      bookDeps: false,
+      bookFiles: false,
+      bookProps: false
+    });
     const sheetName = workbook.SheetNames[0];
     if (!sheetName) return { isValid: false, error: 'Keine Sheets gefunden', rows: [] };
     const sheet = workbook.Sheets[sheetName];
@@ -638,7 +664,20 @@ export function UploadPanel({
   // Parser Mitarbeiter: Einfache Struktur - Zeile 1: Header, Zeile 2+: Daten
   async function parseMitarbeiterWorkbook(file: File): Promise<{ isValid: boolean; error?: string; preview?: string[][]; rows: any[]; }> {
     const arrayBuffer = await file.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    // ✅ FIX: Verhindere automatischen Browser-Download durch XLSX.read()
+    const workbook = XLSX.read(arrayBuffer, { 
+      type: 'array',
+      bookVBA: false,
+      bookSheets: false,
+      cellStyles: false,
+      cellNF: false,
+      cellHTML: false,
+      cellDates: false,
+      sheetStubs: false,
+      bookDeps: false,
+      bookFiles: false,
+      bookProps: false
+    });
     const sheetName = workbook.SheetNames[0];
     if (!sheetName) return { isValid: false, error: 'Keine Sheets gefunden', rows: [] };
     const sheet = workbook.Sheets[sheetName];
@@ -706,7 +745,7 @@ export function UploadPanel({
     title,
     description
   }: {
-    type: 'auslastung' | 'einsatzplan' | 'mitarbeiter';
+    type: 'auslastung' | 'einsatzplan';
     title: string;
     description: string;
   }) => {
@@ -872,7 +911,6 @@ export function UploadPanel({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <UploadSlot type="auslastung" title="Auslastung.xlsx" description="Historische Auslastungsdaten der letzten 8 Wochen" />
         <UploadSlot type="einsatzplan" title="Einsatzplan.xlsx" description="Geplante Einsätze für die nächsten 4 Wochen" />
-        <UploadSlot type="mitarbeiter" title="Mitarbeiter.xlsx" description="Mitarbeiterdaten mit Kontakten und Fähigkeiten" />
       </div>
 
       {/* Status Messages */}

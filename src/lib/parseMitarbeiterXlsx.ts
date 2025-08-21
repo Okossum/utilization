@@ -36,7 +36,20 @@ export async function parseMitarbeiterXlsx(bucketName: string, filePath: string)
     logger.info(`Downloaded file, size: ${buffer.length} bytes`);
     
     // XLSX parsen
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    // ✅ FIX: Verhindere automatischen Browser-Download durch XLSX.read()
+    const workbook = XLSX.read(buffer, { 
+      type: 'buffer',
+      bookVBA: false,
+      bookSheets: false,
+      cellStyles: false,
+      cellNF: false,
+      cellHTML: false,
+      cellDates: false,
+      sheetStubs: false,
+      bookDeps: false,
+      bookFiles: false,
+      bookProps: false
+    });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
     
@@ -71,8 +84,22 @@ export async function parseMitarbeiterXlsx(bucketName: string, filePath: string)
             let value = cell.v;
             
             // Hyperlink-URL extrahieren falls vorhanden
-            if (header === 'Link zum Profil' && cell.l) {
-              value = cell.l.Target || cell.v;
+            if (header === 'Link zum Profil') {
+              // Versuche zuerst den Hyperlink aus worksheet['!links'] zu extrahieren
+              if (worksheet['!links'] && worksheet['!links'][cellAddress]) {
+                value = worksheet['!links'][cellAddress];
+                logger.info(`🔗 Hyperlink gefunden für ${cellAddress}: ${value}`);
+              }
+              // Fallback: Verwende cell.l.Target falls vorhanden
+              else if (cell.l && cell.l.Target) {
+                value = cell.l.Target;
+                logger.info(`🔗 Hyperlink aus cell.l.Target: ${value}`);
+              }
+              // Fallback: Verwende den Zelleninhalt
+              else {
+                value = cell.v;
+                logger.info(`⚠️ Fallback - Zelleninhalt: ${value}`);
+              }
             }
             
             rowData[header] = value;

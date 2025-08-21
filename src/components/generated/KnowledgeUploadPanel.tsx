@@ -398,7 +398,20 @@ export function KnowledgeUploadPanel({
 // Parser für Mitarbeiter Knowledge: Spalte A = Kategorien, Spalte B = Knowledge
 async function parseMitarbeiterKnowledgeWorkbook(file: File): Promise<{ isValid: boolean; error?: string; preview?: string[][]; rows: any[]; debug?: string[]; }> {
   const arrayBuffer = await file.arrayBuffer();
-  const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+  // ✅ FIX: Verhindere automatischen Browser-Download durch XLSX.read()
+  const workbook = XLSX.read(arrayBuffer, { 
+    type: 'array',
+    bookVBA: false,
+    bookSheets: false,
+    cellStyles: false,
+    cellNF: false,
+    cellHTML: false,
+    cellDates: false,
+    sheetStubs: false,
+    bookDeps: false,
+    bookFiles: false,
+    bookProps: false
+  });
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) return { isValid: false, error: 'Keine Sheets gefunden', rows: [], debug: ['Keine Sheets gefunden'] };
   
@@ -470,7 +483,20 @@ async function parseMitarbeiterKnowledgeWorkbook(file: File): Promise<{ isValid:
 // Parser für Branchen Know-How: Spalte A = Kategorien, Spalte B = Know-How
 async function parseBranchenKnowledgeWorkbook(file: File): Promise<{ isValid: boolean; error?: string; preview?: string[][]; rows: any[]; debug?: string[]; }> {
   const arrayBuffer = await file.arrayBuffer();
-  const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+  // ✅ FIX: Verhindere automatischen Browser-Download durch XLSX.read()
+  const workbook = XLSX.read(arrayBuffer, { 
+    type: 'array',
+    bookVBA: false,
+    bookSheets: false,
+    cellStyles: false,
+    cellNF: false,
+    cellHTML: false,
+    cellDates: false,
+    sheetStubs: false,
+    bookDeps: false,
+    bookFiles: false,
+    bookProps: false
+  });
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) return { isValid: false, error: 'Keine Sheets gefunden', rows: [], debug: ['Keine Sheets gefunden'] };
   

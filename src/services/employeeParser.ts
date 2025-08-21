@@ -199,7 +199,20 @@ export class EmployeeExcelParser {
     try {
       // Datei lesen
       const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: 'array' });
+      // ✅ FIX: Verhindere automatischen Browser-Download durch XLSX.read()
+      const workbook = XLSX.read(buffer, { 
+        type: 'array',
+        bookVBA: false,
+        bookSheets: false,
+        cellStyles: false,
+        cellNF: false,
+        cellHTML: false,
+        cellDates: false,
+        sheetStubs: false,
+        bookDeps: false,
+        bookFiles: false,
+        bookProps: false
+      });
       
       // Sheet "Search Results" finden
       let worksheet: XLSX.WorkSheet;

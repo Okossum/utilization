@@ -15,6 +15,7 @@ import { LoginForm } from './components/LoginForm';
 import { User as UserIcon, ChevronDown, LogOut, Users, BarChart3, FileText, X } from 'lucide-react';
 import AdminUserManagementModal from './components/generated/AdminUserManagementModal';
 import { AdminDataUploadModal } from './components/generated/AdminDataUploadModal';
+import { EmployeeUploadModal } from './components/generated/EmployeeUploadModal';
 import { AssignmentsProvider } from './contexts/AssignmentsContext';
 import { RoleProvider } from './contexts/RoleContext';
 import { ProjectHistoryProvider } from './contexts/ProjectHistoryContext';
@@ -67,6 +68,7 @@ function App() {
     
     // State für Upload Panel
     const [isUploadPanelOpen, setIsUploadPanelOpen] = useState(false);
+    const [isEmployeeUploadModalOpen, setIsEmployeeUploadModalOpen] = useState(false);
     
     // ✅ KORRIGIERT: Action-Items State mit komplexer Struktur für beide Views
     const [actionItems, setActionItems] = useState<Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }>>(() => {
@@ -132,6 +134,7 @@ function App() {
             setAdminModalOpen={setAdminModalOpen}
             onSettings={() => setIsSettingsModalOpen(true)}
             onAdminUpload={() => setIsUploadPanelOpen(true)}
+            onEmployeeUpload={() => setIsEmployeeUploadModalOpen(true)}
             onAuslastungView={() => setIsAuslastungViewOpen(true)}
             onEinsatzplanView={() => setIsEinsatzplanViewOpen(true)}
             onRoleManagement={() => setIsRoleManagementOpen(true)}
@@ -372,6 +375,40 @@ function App() {
           )}
 
                     <AdminUserManagementModal isOpen={isAdminModalOpen} onClose={() => setAdminModalOpen(false)} />
+
+          {/* Employee Upload Modal */}
+          {isEmployeeUploadModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="fixed inset-0 bg-black/20 backdrop-blur-sm" onClick={() => setIsEmployeeUploadModalOpen(false)} />
+              <div className="relative w-full max-w-4xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+                <header className="flex items-center justify-between p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Users className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h1 className="text-xl font-semibold text-gray-900">Mitarbeiter-Upload Administration</h1>
+                      <p className="text-sm text-gray-600">Excel-Dateien mit Mitarbeiterdaten hochladen und in der Datenbank speichern</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setIsEmployeeUploadModalOpen(false)} 
+                    className="p-2 hover:bg-white/50 rounded-lg transition-colors" 
+                    aria-label="Schließen"
+                  >
+                    <X className="w-5 h-5 text-gray-500" />
+                  </button>
+                </header>
+
+                <div className="flex-1 overflow-y-auto p-6">
+                  <EmployeeUploadModal 
+                    isOpen={true}
+                    onClose={() => setIsEmployeeUploadModalOpen(false)}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Upload Panel Modal */}
           {isUploadPanelOpen && (

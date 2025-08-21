@@ -114,7 +114,20 @@ async function parseXLSXFile(file: File): Promise<ImportRow[]> {
       reader.onload = (event) => {
         try {
           const data = new Uint8Array(event.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
+          // ✅ FIX: Verhindere automatischen Browser-Download durch XLSX.read()
+          const workbook = XLSX.read(data, { 
+            type: 'array',
+            bookVBA: false,
+            bookSheets: false,
+            cellStyles: false,
+            cellNF: false,
+            cellHTML: false,
+            cellDates: false,
+            sheetStubs: false,
+            bookDeps: false,
+            bookFiles: false,
+            bookProps: false
+          });
           
           // Get first sheet
           const sheetName = workbook.SheetNames[0];
