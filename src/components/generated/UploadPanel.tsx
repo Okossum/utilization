@@ -10,16 +10,17 @@ interface UploadedFile {
   isValid: boolean;
   error?: string;
   preview?: string[][];
-  debug?: string[];
 }
 interface UploadPanelProps {
   uploadedFiles: {
     auslastung?: UploadedFile;
     einsatzplan?: UploadedFile;
+    mitarbeiter?: UploadedFile;
   };
   onFilesChange: (files: {
     auslastung?: UploadedFile;
     einsatzplan?: UploadedFile;
+    mitarbeiter?: UploadedFile;
   }) => void;
   onDatabaseRefresh?: () => void;
 }
@@ -58,6 +59,7 @@ export function UploadPanel({
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const auslastungRef = useRef<HTMLInputElement>(null);
   const einsatzplanRef = useRef<HTMLInputElement>(null);
+  const mitarbeiterRef = useRef<HTMLInputElement>(null);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const infoContainerRef = useRef<HTMLDivElement>(null);
   
@@ -76,7 +78,7 @@ export function UploadPanel({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
-  const handleFileSelect = async (type: 'auslastung' | 'einsatzplan', file: File) => {
+  const handleFileSelect = async (type: 'auslastung' | 'einsatzplan' | 'mitarbeiter', file: File) => {
     setIsProcessing(type);
 
     const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
@@ -104,13 +106,12 @@ export function UploadPanel({
           isValid: parsed.isValid,
           error: parsed.error,
           preview: parsed.preview,
-          debug: parsed.debug,
         };
         onFilesChange({
           ...uploadedFiles,
           auslastung: uploaded
         });
-      } else {
+      } else if (type === 'einsatzplan') {
         parsed = await parseEinsatzplanWorkbook(file);
         const uploaded: UploadedFile = {
           name: file.name,
@@ -118,11 +119,23 @@ export function UploadPanel({
           isValid: parsed.isValid,
           error: parsed.error,
           preview: parsed.preview,
-          debug: parsed.debug,
         };
         onFilesChange({
           ...uploadedFiles,
           einsatzplan: uploaded
+        });
+      } else if (type === 'mitarbeiter') {
+        parsed = await parseMitarbeiterWorkbook(file);
+        const uploaded: UploadedFile = {
+          name: file.name,
+          data: parsed.rows,
+          isValid: parsed.isValid,
+          error: parsed.error,
+          preview: parsed.preview,
+        };
+        onFilesChange({
+          ...uploadedFiles,
+          [type]: uploaded
         });
       }
 
@@ -135,7 +148,6 @@ export function UploadPanel({
           isValid: parsed.isValid,
           error: parsed.error,
           preview: parsed.preview,
-          debug: parsed.debug,
         }
       };
 
@@ -159,21 +171,17 @@ export function UploadPanel({
               isValid: parsed.isValid,
               error: parsed.error,
               preview: parsed.preview,
-              debug: parsed.debug,
             }
           };
           
           // Starte Konsolidierung mit Daten aus der Datenbank (robuste Lösung)
           try {
-            console.log('🔍 Starte Konsolidierung mit Daten aus der Datenbank...');
+    
             
             const consolidationResult = await DatabaseService.consolidateFromDatabase();
             
-            console.log('✅ Konsolidierung abgeschlossen:', consolidationResult);
-            
             // Zeige Status-Nachricht an den Benutzer
             if (consolidationResult.message) {
-              console.log('📊 Status:', consolidationResult.message);
               
               // Benutzerbenachrichtigung anzeigen
               if (consolidationResult.canConsolidate) {
@@ -194,10 +202,9 @@ export function UploadPanel({
             }
 
             // ✅ KRITISCHER FIX: Aktualisiere Datenbank-Ansicht NACH erfolgreicher Konsolidierung
-            console.log('🔄 Lade Datenbank neu nach Konsolidierung...');
             if (onDatabaseRefresh) {
               await onDatabaseRefresh();
-              console.log('✅ Datenbank-Refresh abgeschlossen');
+
             }
 
           } catch (dbError) {
@@ -205,7 +212,6 @@ export function UploadPanel({
             
             // Auch bei Fehlern versuchen, die Datenbank zu aktualisieren
             if (onDatabaseRefresh) {
-              console.log('🔄 Lade Datenbank trotz Konsolidierungs-Fehler...');
               await onDatabaseRefresh();
             }
           }
@@ -223,14 +229,14 @@ export function UploadPanel({
           data: [],
           isValid: false,
           error: `Fehler beim Verarbeiten: ${e?.message || e}`,
-          debug: [String(e?.stack || e)],
+  
         }
       });
     } finally {
       setIsProcessing(null);
     }
   };
-  const handleDrop = (e: React.DragEvent, type: 'auslastung' | 'einsatzplan') => {
+  const handleDrop = (e: React.DragEvent, type: 'auslastung' | 'einsatzplan' | 'mitarbeiter') => {
     e.preventDefault();
     setDragOver(null);
     const files = Array.from(e.dataTransfer.files);
@@ -245,7 +251,7 @@ export function UploadPanel({
   const handleDragLeave = () => {
     setDragOver(null);
   };
-  const removeFile = (type: 'auslastung' | 'einsatzplan') => {
+  const removeFile = (type: 'auslastung' | 'einsatzplan' | 'mitarbeiter') => {
     const newFiles = {
       ...uploadedFiles
     };
@@ -253,12 +259,32 @@ export function UploadPanel({
     onFilesChange(newFiles);
     setShowPreview(null);
   };
-  const retryUpload = (type: 'auslastung' | 'einsatzplan') => {
-    const inputRef = type === 'auslastung' ? auslastungRef : einsatzplanRef;
+  const retryUpload = (type: 'auslastung' | 'einsatzplan' | 'mitarbeiter') => {
+    const inputRef = type === 'auslastung' ? auslastungRef : type === 'einsatzplan' ? einsatzplanRef : mitarbeiterRef;
     inputRef.current?.click();
   };
 
   // ---- Excel Parsing Helpers ----
+  
+  // ✅ NEU: Trenne Mitarbeiter-Name und ID aus "Name (ID)" Format
+  const parsePersonNameAndId = (personRaw: string): { name: string; personId?: string } => {
+    console.log(`🔍 parsePersonNameAndId - Input: "${personRaw}"`);
+    
+    const match = personRaw.match(/^(.+?)\s*\((\d+)\)$/);
+    if (match) {
+      console.log(`🔍 parsePersonNameAndId - Match gefunden: Name="${match[1].trim()}", ID="${match[2].trim()}"`);
+      return {
+        name: match[1].trim(),
+        personId: match[2].trim()
+      };
+    }
+    
+    console.log(`🔍 parsePersonNameAndId - Kein Match, verwende gesamten Text als Name`);
+    return {
+      name: personRaw.trim()
+    };
+  };
+  
   const toKwKey = (week: number, year4?: number): string => {
     const yy = year4 ? String(year4).slice(-2) : String(new Date().getFullYear()).slice(-2);
     const nn = String(week).padStart(2, '0');
@@ -318,15 +344,14 @@ export function UploadPanel({
   };
 
   // Parser Auslastung: Personen-Spalte = Spalte E (Index 4), Header in Zeile 4; KW-Header wie "KW33(2025)"; Subheader enthält u. a. "NKV (%)"
-  async function parseAuslastungWorkbook(file: File): Promise<{ isValid: boolean; error?: string; preview?: string[][]; rows: any[]; debug?: string[]; }> {
+  async function parseAuslastungWorkbook(file: File): Promise<{ isValid: boolean; error?: string; preview?: string[][]; rows: any[]; }> {
     const arrayBuffer = await file.arrayBuffer();
     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
     const sheetName = workbook.SheetNames[0];
-    if (!sheetName) return { isValid: false, error: 'Keine Sheets gefunden', rows: [], debug: ['Keine Sheets gefunden'] };
+    if (!sheetName) return { isValid: false, error: 'Keine Sheets gefunden', rows: [] };
     const sheet = workbook.Sheets[sheetName];
     const data = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1, raw: true });
-    if (!data || data.length === 0) return { isValid: false, error: 'Leeres Sheet', rows: [], debug: ['Leeres Sheet'] };
-    const debug: string[] = [];
+    if (!data || data.length === 0) return { isValid: false, error: 'Leeres Sheet', rows: [] };
 
     // KW-Header: Zeile finden, die mehrere "KWxx(YYYY)" enthält
     let kwHeaderRowIdx = -1;
@@ -334,11 +359,9 @@ export function UploadPanel({
       const row = data[i];
       if (!Array.isArray(row)) continue;
       const count = row.reduce((acc, c) => acc + (extractWeekYear(String(c || '')) ? 1 : 0), 0);
-      debug.push(`Zeile ${i + 1}: gefundene KW-Header = ${count}`);
       if (count >= 3) { kwHeaderRowIdx = i; break; }
     }
-    if (kwHeaderRowIdx === -1 || kwHeaderRowIdx + 1 >= data.length) return { isValid: false, error: 'KW-Header nicht gefunden', rows: [], debug: [...debug, 'KW-Header nicht gefunden'] };
-    debug.push(`KW-Header-Zeile: ${kwHeaderRowIdx + 1}, Subheader: ${kwHeaderRowIdx + 2}, Personen-Header: ${kwHeaderRowIdx + 3}`);
+          if (kwHeaderRowIdx === -1 || kwHeaderRowIdx + 1 >= data.length) return { isValid: false, error: 'KW-Header nicht gefunden', rows: [] };
 
     // Subheader ist nächste Zeile (mit Proj | NKV (%) | Ort)
     const kwRow = data[kwHeaderRowIdx] as any[];
@@ -349,7 +372,7 @@ export function UploadPanel({
     const headerIdx = 3; // Zeile 4 (0-basiert) - Header-Definitionen
     const dataStartIdx = 8; // Zeile 9 (0-basiert) - Erste Datenzeile
     
-    if (headerIdx >= data.length) return { isValid: false, error: 'Header-Zeile 4 nicht verfügbar', rows: [], debug: [...debug, 'Header-Zeile 4 nicht verfügbar'] };
+    if (headerIdx >= data.length) return { isValid: false, error: 'Header-Zeile 4 nicht verfügbar', rows: [] };
     
     const headerRow = data[headerIdx] as any[];
     
@@ -363,12 +386,8 @@ export function UploadPanel({
     // Überprüfen ob Spalte E den erwarteten Header hat
     const expectedHeader = String(headerRow[nameCol] || '').trim().toLowerCase();
     if (!expectedHeader.includes('mitarbeiter') && !expectedHeader.includes('id')) {
-      debug.push(`⚠️ Warnung: Spalte E (Index 4) enthält "${headerRow[nameCol]}" statt erwartetem "Mitarbeiter (ID)"`);
+      // Warnung: Spalte E enthält nicht den erwarteten Header
     }
-    
-    debug.push(`Struktur: Header-Zeile ${headerIdx + 1}, Daten ab Zeile ${dataStartIdx + 1}`);
-    debug.push(`Spalten: A=LoB, B=Bereich, C=CC, D=Team, E=Person`);
-    debug.push(`Header-Inhalt Spalte E: "${headerRow[nameCol]}"`);
 
     // KW → Auslastungs-Spalte ermitteln und Ziel-Key in YY/WW normieren
     const weeks: { key: string; nkvCol: number }[] = [];
@@ -381,29 +400,23 @@ export function UploadPanel({
       // Erweiterte Suche nach Auslastungs-Spalten
       for (let off = 0; off <= 3; off++) {
         const lbl = String(subRow[j + off] || '').toLowerCase();
-        debug.push(`${toKwKey(w, y)}: Subheader[${j + off}] = "${lbl}"`);
         if (/nkv|auslastung|ausl\.|kapazität|utilization|operativ/.test(lbl)) { 
           nkvCol = j + off; 
-          debug.push(`✓ Auslastungs-Spalte gefunden: ${j + off} mit Label "${lbl}"`);
           break; 
         }
       }
       
       // Fallback: Wenn keine NKV-Spalte, nehmen wir die Woche trotzdem
       if (nkvCol === -1) {
-        debug.push(`⚠️ Keine NKV-Spalte für ${toKwKey(w, y)} gefunden, verwende Spalte ${j}`);
         nkvCol = j;
       }
       
       weeks.push({ key: toKwKey(w, y), nkvCol });
     }
-    debug.push(`Erkannte KWs (Auslastung): ${weeks.map(w => w.key).slice(0, 8).join(', ')}${weeks.length > 8 ? '…' : ''}`);
-    debug.push(`Subheader-Inhalt: ${subRow.slice(0, 20).map(c => String(c || '').trim()).join(' | ')}`);
-    if (weeks.length === 0) return { isValid: false, error: 'Keine passenden KW/Spalten gefunden', rows: [], debug };
+          if (weeks.length === 0) return { isValid: false, error: 'Keine passenden KW/Spalten gefunden', rows: [] };
 
     // Datenzeilen (ab Zeile 9)
     const rowsOut: any[] = [];
-    debug.push(`Starte Datenverarbeitung ab Zeile ${dataStartIdx + 1} (${data.length - dataStartIdx} Zeilen verfügbar)`);
     
     for (let r = dataStartIdx; r < data.length; r++) {
       const row = data[r]; if (!Array.isArray(row)) continue;
@@ -411,26 +424,26 @@ export function UploadPanel({
       // Prüfe Team-Spalte (D) auf "Total" - diese Zeilen ignorieren
       const teamCell = row[colTeam];
       if (teamCell && String(teamCell).trim().toLowerCase() === 'total') {
-        debug.push(`Zeile ${r + 1}: Überspringe Total-Zeile (Team="${teamCell}")`);
         continue;
       }
       
       const nameCell = row[nameCol]; if (!nameCell) continue;
       const personRaw = String(nameCell).trim();
       if (isSummaryRow(personRaw)) {
-        debug.push(`Zeile ${r + 1}: Überspringe Zusammenfassungszeile "${personRaw}"`);
         continue;
       }
       
-      const person = personRaw; // Anzeige
-      const personKey = normalizePersonKey(personRaw);
-      debug.push(`Verarbeite Zeile ${r + 1}: "${personRaw}" → Key: "${personKey}" (normalisiert)`);
+      // ✅ NEU: Trenne Name und ID
+      const { name: person, personId } = parsePersonNameAndId(personRaw);
+      const personKey = normalizePersonKey(person);
+      
+      // Debug: Zeige personId-Extraktion
+      console.log(`🔍 Frontend - Person: "${personRaw}" → Name: "${person}", ID: "${personId}", Typ: ${typeof personId}`);
 
       const values: Record<string, number> = {};
       for (const w of weeks) {
         const rawValue = row[w.nkvCol];
         const parsed = parsePercent(rawValue);
-        debug.push(`  ${w.key}: Spalte ${w.nkvCol} = "${rawValue}" → geparst: ${parsed}`);
         
         if (parsed === null) continue;
         // Prüfe ob es sich um NKV oder bereits um KV/Auslastung handelt
@@ -448,7 +461,6 @@ export function UploadPanel({
         }
         
         values[w.key] = kv;
-        debug.push(`    → Finaler Wert: ${kv}% (${isNkv ? 'NKV→KV' : isAuslastung ? 'Auslastung' : 'Unbekannt'})`);
       }
       
       if (Object.keys(values).length > 0) {
@@ -456,54 +468,60 @@ export function UploadPanel({
         const flatRow = { 
           person: personKey, 
           personDisplay: person,
+          personId: personId, // ✅ NEU: Mitarbeiter-ID hinzugefügt
           lob: row[colLoB] ? String(row[colLoB]).trim() : undefined,
           bereich: row[colBereich] ? String(row[colBereich]).trim() : undefined,
           cc: row[colCC] ? String(row[colCC]).trim() : undefined,
           team: row[colTeam] ? String(row[colTeam]).trim() : undefined,
           ...values  // Wochen-Werte direkt als Eigenschaften
         };
+        
+        // Debug: Zeige die finale Zeile vor dem Hinzufügen
+        console.log(`🔍 Frontend - Finale Zeile:`, {
+          person: flatRow.person,
+          personId: flatRow.personId,
+          personIdType: typeof flatRow.personId,
+          hasPersonId: flatRow.personId !== undefined && flatRow.personId !== null
+        });
+        
         rowsOut.push(flatRow);
-        debug.push(`  ✓ Zeile verarbeitet: LoB="${flatRow.lob}", Bereich="${flatRow.bereich}", CC="${flatRow.cc}", Team="${flatRow.team}", ${Object.keys(values).length} Wochen-Werte`);
       } else {
-        debug.push(`  ⚠️ Zeile übersprungen - keine gültigen Werte`);
+        continue;
       }
     }
 
-    const previewHeader = ['Person', 'LoB', 'Bereich', 'CC', 'Team', ...weeks.map(w => w.key).slice(0, 5)];
+    const previewHeader = ['Person', 'ID', 'LoB', 'Bereich', 'CC', 'Team', ...weeks.map(w => w.key).slice(0, 5)];
     const previewBody: string[][] = rowsOut.slice(0, 5).map(r => [
       r.person,
+      r.personId || '',
       r.lob || '',
       r.bereich || '',
       r.cc || '',
       r.team || '',
       ...weeks.slice(0, 5).map(w => (r[w.key] === undefined ? '' : `${r[w.key]}%`))
     ]);
-    debug.push(`Beispiel Person: ${rowsOut[0]?.personDisplay || '-'} → LoB: "${rowsOut[0]?.lob}", Bereich: "${rowsOut[0]?.bereich}", CC: "${rowsOut[0]?.cc}", Team: "${rowsOut[0]?.team}"`);
 
-    return { isValid: rowsOut.length > 0, error: rowsOut.length === 0 ? 'Keine Personenzeilen erkannt' : undefined, preview: [previewHeader, ...previewBody], rows: rowsOut, debug };
+          return { isValid: rowsOut.length > 0, error: rowsOut.length === 0 ? 'Keine Personenzeilen erkannt' : undefined, preview: [previewHeader, ...previewBody], rows: rowsOut };
   }
 
   // Parser Einsatzplan: Feste Struktur - Zeile 2: KW-Triplets, Zeile 3: Proj|NKV(%)|Ort, Zeile 4+: Daten
-  async function parseEinsatzplanWorkbook(file: File): Promise<{ isValid: boolean; error?: string; preview?: string[][]; rows: any[]; debug?: string[]; }> {
+  async function parseEinsatzplanWorkbook(file: File): Promise<{ isValid: boolean; error?: string; preview?: string[][]; rows: any[]; }> {
     const arrayBuffer = await file.arrayBuffer();
     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
     const sheetName = workbook.SheetNames[0];
-    if (!sheetName) return { isValid: false, error: 'Keine Sheets gefunden', rows: [], debug: ['Keine Sheets gefunden'] };
+    if (!sheetName) return { isValid: false, error: 'Keine Sheets gefunden', rows: [] };
     const sheet = workbook.Sheets[sheetName];
     const data = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1, raw: true });
-    if (!data || data.length < 4) return { isValid: false, error: 'Zu wenige Zeilen (mindestens 4 benötigt)', rows: [], debug: ['Zu wenige Zeilen'] };
-    const debug: string[] = [];
+    if (!data || data.length < 4) return { isValid: false, error: 'Zu wenige Zeilen (mindestens 4 benötigt)', rows: [] };
 
     // Feste Zeilen-Struktur entsprechend der Spezifikation
     const kwHeaderRowIdx = 1;      // Zeile 2 (0-basiert): KW-Triplets
     const subHeaderIdx = 2;        // Zeile 3 (0-basiert): Proj|NKV(%)|Ort Header
     const dataStartIdx = 3;        // Zeile 4 (0-basiert): Daten-Start
 
-    debug.push(`Feste Struktur: KW-Header=Zeile ${kwHeaderRowIdx + 1}, Subheader=Zeile ${subHeaderIdx + 1}, Daten ab Zeile ${dataStartIdx + 1}`);
-
-    if (data.length <= dataStartIdx) {
-      return { isValid: false, error: 'Keine Datenzeilen gefunden', rows: [], debug: [...debug, 'Keine Datenzeilen gefunden'] };
-    }
+          if (data.length <= dataStartIdx) {
+        return { isValid: false, error: 'Keine Datenzeilen gefunden', rows: [] };
+      }
 
     const kwRow = data[kwHeaderRowIdx] as any[];
     const subRow = data[subHeaderIdx] as any[];
@@ -520,8 +538,7 @@ export function UploadPanel({
     const colVG = lowered.indexOf('vg');
     const colPerson = lowered.indexOf('name');
     
-    if (colPerson === -1) return { isValid: false, error: 'Spalte "Name" nicht gefunden', rows: [], debug: [...debug, 'Spalte "Name" nicht gefunden'] };
-    debug.push(`Personen-Spalten: Name=${colPerson}, LoB=${colLoB}, Team=${colTeam}, CC=${colCC}, LBS=${colLBS}, VG=${colVG}`);
+          if (colPerson === -1) return { isValid: false, error: 'Spalte "Name" nicht gefunden', rows: [] };
 
     // KW-Triplets verarbeiten: Jede KW spannt 3 Spalten (Proj|NKV(%)|Ort)
     const weeks: { key: string; nkvCol: number }[] = [];
@@ -537,22 +554,18 @@ export function UploadPanel({
 
       // Validiere NKV-Spalte
       const nkvLabel = String(subRow[nkvCol] || '').toLowerCase();
-      debug.push(`KW ${kwCell}: Triplet [${projCol}|${nkvCol}|${ortCol}] = ["${subRow[projCol] || ''}" | "${subRow[nkvCol] || ''}" | "${subRow[ortCol] || ''}"]`);
       
       if (/nkv.*%|nkv/.test(nkvLabel)) {
         weeks.push({ key: toKwKey(wy.week, wy.year), nkvCol });
-        debug.push(`✓ KW${wy.week}(${wy.year}) → NKV-Spalte ${nkvCol} ("${nkvLabel}")`);
         j += 2; // Springe über das komplette Triplet (3 Spalten)
       } else {
-        debug.push(`⚠️ KW ${kwCell}: Keine gültige NKV-Spalte in Position ${nkvCol} ("${nkvLabel}")`);
+        continue;
       }
     }
 
     if (weeks.length === 0) {
-      return { isValid: false, error: 'Keine gültigen KW-Triplets gefunden', rows: [], debug: [...debug, 'Keine KW-Triplets mit NKV-Spalten gefunden'] };
+              return { isValid: false, error: 'Keine gültigen KW-Triplets gefunden', rows: [] };
     }
-
-    debug.push(`Erkannte Wochen: ${weeks.map(w => w.key).join(', ')}`);
 
     // Daten verarbeiten (ab Zeile 4)
     const rowsOut: any[] = [];
@@ -582,7 +595,6 @@ export function UploadPanel({
         const auslastung = Math.max(0, Math.min(100, Math.round((100 - parsedNkv) * 10) / 10));
         values[w.key] = auslastung;
         
-        debug.push(`Person "${personDisplay}" KW ${w.key}: NKV=${parsedNkv}% → Auslastung=${auslastung}%`);
       }
 
       // Nur Personen mit mindestens einem gültigen Wert hinzufügen
@@ -615,23 +627,86 @@ export function UploadPanel({
       ...weeks.slice(0, 5).map(w => (r[w.key] === undefined ? '' : `${r[w.key]}%`))
     ]);
 
-    debug.push(`Verarbeitete Personen: ${rowsOut.length}`);
-    debug.push(`Beispiel: ${rowsOut[0]?.personDisplay || 'Keine'} → Wochen: ${Object.keys(rowsOut[0] || {}).filter(k => k.match(/^\d{2}\/\d{2}$/)).slice(0, 3).join(', ')}`);
-
     return { 
       isValid: rowsOut.length > 0, 
       error: rowsOut.length === 0 ? 'Keine gültigen Personenzeilen erkannt' : undefined, 
       preview: [previewHeader, ...previewBody], 
-      rows: rowsOut, 
-      debug 
+      rows: rowsOut
     };
+  }
+
+  // Parser Mitarbeiter: Einfache Struktur - Zeile 1: Header, Zeile 2+: Daten
+  async function parseMitarbeiterWorkbook(file: File): Promise<{ isValid: boolean; error?: string; preview?: string[][]; rows: any[]; }> {
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) return { isValid: false, error: 'Keine Sheets gefunden', rows: [] };
+    const sheet = workbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1, raw: true });
+    if (!data || data.length < 2) return { isValid: false, error: 'Zu wenige Zeilen (mindestens 2 benötigt)', rows: [] };
+
+    // Header-Zeile (Zeile 1, 0-basiert)
+    const headerRow = data[0] as any[];
+    const dataStartIdx = 1; // Daten-Start (Zeile 2, 0-basiert)
+
+    // Spalten-Indizes finden
+    const lowered = headerRow.map(c => String(c || '').trim().toLowerCase());
+    const colName = lowered.indexOf('name') !== -1 ? lowered.indexOf('name') : lowered.indexOf('name');
+    const colEmail = lowered.indexOf('email') !== -1 ? lowered.indexOf('email') : lowered.indexOf('e-mail');
+    const colPhone = lowered.indexOf('phone') !== -1 ? lowered.indexOf('phone') : lowered.indexOf('telefon');
+    const colPosition = lowered.indexOf('position') !== -1 ? lowered.indexOf('position') : lowered.indexOf('stelle');
+    const colDepartment = lowered.indexOf('department') !== -1 ? lowered.indexOf('department') : lowered.indexOf('abteilung');
+    const colTeam = lowered.indexOf('team') !== -1 ? lowered.indexOf('team') : lowered.indexOf('team');
+    const colSkills = lowered.indexOf('skills') !== -1 ? lowered.indexOf('skills') : lowered.indexOf('fähigkeiten');
+    const colExperience = lowered.indexOf('experience') !== -1 ? lowered.indexOf('experience') : lowered.indexOf('erfahrung');
+
+    if (colName === -1) return { isValid: false, error: 'Spalte "Name" nicht gefunden', rows: [] };
+
+    // Daten verarbeiten (ab Zeile 2)
+    const rowsOut: any[] = [];
+    for (let r = dataStartIdx; r < data.length; r++) {
+      const row = data[r]; 
+      if (!Array.isArray(row)) continue;
+      
+      const nameCell = row[colName]; 
+      if (!nameCell) continue;
+      
+      const nameRaw = String(nameCell).trim();
+      if (isSummaryRow(nameRaw)) continue;
+
+      // Mitarbeiter-Daten extrahieren
+      const employeeData = {
+        name: nameRaw,
+        email: colEmail !== -1 && row[colEmail] ? String(row[colEmail]).trim() : undefined,
+        phone: colPhone !== -1 && row[colPhone] ? String(row[colPhone]).trim() : undefined,
+        position: colPosition !== -1 && row[colPosition] ? String(row[colPosition]).trim() : undefined,
+        department: colDepartment !== -1 && row[colDepartment] ? String(row[colDepartment]).trim() : undefined,
+        team: colTeam !== -1 && row[colTeam] ? String(row[colTeam]).trim() : undefined,
+        skills: colSkills !== -1 && row[colSkills] ? String(row[colSkills]).trim() : undefined,
+        experience: colExperience !== -1 && row[colExperience] ? String(row[colExperience]).trim() : undefined,
+      };
+
+      rowsOut.push(employeeData);
+    }
+
+    const previewHeader = ['Name', 'Email', 'Position', 'Department', 'Team', 'Skills'];
+    const previewBody: string[][] = rowsOut.slice(0, 5).map(r => [
+      r.name,
+      r.email || '',
+      r.position || '',
+      r.department || '',
+      r.team || '',
+      r.skills || ''
+    ]);
+
+    return { isValid: rowsOut.length > 0, error: rowsOut.length === 0 ? 'Keine Mitarbeiterzeilen erkannt' : undefined, preview: [previewHeader, ...previewBody], rows: rowsOut };
   }
   const UploadSlot = ({
     type,
     title,
     description
   }: {
-    type: 'auslastung' | 'einsatzplan';
+    type: 'auslastung' | 'einsatzplan' | 'mitarbeiter';
     title: string;
     description: string;
   }) => {
@@ -732,13 +807,11 @@ export function UploadPanel({
                 </div>
               </motion.div>}
 
-            {file.debug && file.debug.length > 0 && (
-              <details className="mt-3 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded p-2">
-                <summary className="cursor-pointer select-none text-gray-800">Debug</summary>
-                <pre className="whitespace-pre-wrap break-words">{file.debug.join('\n')}</pre>
-              </details>
-            )}
-          </div> : <div className="text-center cursor-pointer" onClick={() => inputRef.current?.click()}>
+
+          </div> : <div className="text-center cursor-pointer" onClick={() => {
+            
+            inputRef.current?.click();
+          }}>
             <div className="mx-auto w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
               <FileSpreadsheet className="w-6 h-6 text-blue-600" />
             </div>
@@ -799,6 +872,7 @@ export function UploadPanel({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <UploadSlot type="auslastung" title="Auslastung.xlsx" description="Historische Auslastungsdaten der letzten 8 Wochen" />
         <UploadSlot type="einsatzplan" title="Einsatzplan.xlsx" description="Geplante Einsätze für die nächsten 4 Wochen" />
+        <UploadSlot type="mitarbeiter" title="Mitarbeiter.xlsx" description="Mitarbeiterdaten mit Kontakten und Fähigkeiten" />
       </div>
 
       {/* Status Messages */}

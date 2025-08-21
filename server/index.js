@@ -248,6 +248,7 @@ function buildWeekValuesMap(row) {
   for (const [key, value] of Object.entries(row)) {
     if (
       key !== 'person' &&
+      key !== 'personId' &&
       key !== 'lob' &&
       key !== 'bereich' &&
       key !== 'cc' &&
@@ -512,8 +513,16 @@ app.get('/api/knowledge', requireAuth, async (req, res) => {
 
 // Auslastung-Daten speichern oder aktualisieren (Firestore)
 app.post('/api/auslastung', requireAuth, async (req, res) => {
+  console.log('🚀 === AUSLASTUNG UPLOAD START ===');
+  console.log('📨 Request Body erhalten:', JSON.stringify(req.body, null, 2));
+  
   try {
-    const { fileName, data } = req.body;
+    // 🔍 DEBUG: Zeige alle empfangenen Daten
+    console.log('🔍 DEBUG - Empfangene Daten:', JSON.stringify(req.body, null, 2));
+    console.log('🔍 DEBUG - Erste Zeile:', req.body[0]);
+    console.log('🔍 DEBUG - Erste Zeile Keys:', Object.keys(req.body[0] || {}));
+    
+    const { data, fileName } = req.body;
     
     if (!fileName || !data || !Array.isArray(data)) {
       return res.status(400).json({ error: 'Ungültige Daten' });
@@ -549,6 +558,9 @@ app.post('/api/auslastung', requireAuth, async (req, res) => {
     for (const row of data) {
       if (!row.person) continue;
       
+      // Debug: Zeige personId-Informationen
+      console.log(`🔍 AUSLASTUNG - Verarbeite Person: ${row.person}, personId: ${row.personId}, Typ: ${typeof row.personId}`);
+      
       const newWeekValues = buildWeekValuesMap(row);
       // Composite Key: Person + Team + CC für eindeutige Identifikation
       const compositeKey = `${row.person || 'unknown'}__${row.team || 'unknown'}__${row.cc || 'unknown'}`;
@@ -563,11 +575,13 @@ app.post('/api/auslastung', requireAuth, async (req, res) => {
           fileName,
           uploadDate: FieldValue.serverTimestamp(),
           uploadVersion: newVersion,
+          personId: row.personId && row.personId.trim() ? row.personId.trim() : (existing.data.personId || null),
           lob: row.lob ?? existing.data.lob ?? null,
           bereich: row.bereich ?? existing.data.bereich ?? null,
           cc: row.cc ?? existing.data.cc ?? null,
           team: row.team ?? existing.data.team ?? null,
           values: mergedValues,
+          updatedBy: req.user.uid,
           updatedAt: FieldValue.serverTimestamp(),
         });
         
@@ -589,12 +603,14 @@ app.post('/api/auslastung', requireAuth, async (req, res) => {
           uploadDate: FieldValue.serverTimestamp(),
           uploadVersion: newVersion,
           person: row.person,
+          personId: row.personId && row.personId.trim() ? row.personId.trim() : null,
           lob: row.lob ?? null,
-          bereich: row.bereich ?? null,
-          cc: row.cc ?? null,
           team: row.team ?? null,
+          cc: row.cc ?? null,
+          bereich: row.bereich ?? null,
           values: newWeekValues,
           isLatest: true,
+          createdBy: req.user.uid,
           createdAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
         });
@@ -619,6 +635,9 @@ app.post('/api/auslastung', requireAuth, async (req, res) => {
     const createdCount = results.filter(r => r.action === 'created').length;
     const totalNewWeeks = results.reduce((sum, r) => sum + r.newWeeks, 0);
 
+    console.log(`✅ ${results.length} Personen verarbeitet (${updatedCount} aktualisiert, ${createdCount} neu erstellt, ${totalNewWeeks} KW-Werte hinzugefügt)`);
+    console.log('🎯 === AUSLASTUNG UPLOAD ERFOLGREICH ===');
+    
     res.json({ 
       success: true, 
       historyId: historyRef.id, 
@@ -628,6 +647,8 @@ app.post('/api/auslastung', requireAuth, async (req, res) => {
     });
 
   } catch (error) {
+    console.error('❌ Fehler beim Auslastung-Upload:', error);
+    console.log('💥 === AUSLASTUNG UPLOAD FEHLGESCHLAGEN ===');
     
     res.status(500).json({ error: 'Interner Server-Fehler', details: error.message });
   }
@@ -669,7 +690,7 @@ app.post('/api/einsatzplan', requireAuth, async (req, res) => {
     function buildWeekValuesMap(row) {
       const weekValues = {};
       for (const [key, value] of Object.entries(row)) {
-        if (key !== 'person' && key !== 'lbs' && key !== 'vg' && key !== 'VG' && 
+        if (key !== 'person' && key !== 'personId' && key !== 'lbs' && key !== 'vg' && key !== 'VG' && 
             key !== 'lob' && key !== 'cc' && key !== 'team' && key !== 'bereich' &&
             typeof value === 'number' && Number.isFinite(value)) {
           weekValues[key] = value;
@@ -685,6 +706,9 @@ app.post('/api/einsatzplan', requireAuth, async (req, res) => {
     for (const row of data) {
       if (!row.person) continue;
       
+      // Debug: Zeige personId-Informationen
+      console.log(`🔍 EINSATZPLAN - Verarbeite Person: ${row.person}, personId: ${row.personId}, Typ: ${typeof row.personId}`);
+      
       const newWeekValues = buildWeekValuesMap(row);
       // Composite Key: Person + Team + CC für eindeutige Identifikation
       const compositeKey = `${row.person || 'unknown'}__${row.team || 'unknown'}__${row.cc || 'unknown'}`;
@@ -699,6 +723,7 @@ app.post('/api/einsatzplan', requireAuth, async (req, res) => {
           fileName,
           uploadDate: FieldValue.serverTimestamp(),
           uploadVersion: newVersion,
+          personId: row.personId && row.personId.trim() ? row.personId.trim() : (existing.data.personId || null),
           lob: row.lob ?? existing.data.lob ?? null,
           bereich: row.bereich ?? existing.data.bereich ?? null,
           cc: row.cc ?? existing.data.cc ?? null,
@@ -727,6 +752,7 @@ app.post('/api/einsatzplan', requireAuth, async (req, res) => {
           uploadDate: FieldValue.serverTimestamp(),
           uploadVersion: newVersion,
           person: row.person,
+          personId: row.personId && row.personId.trim() ? row.personId.trim() : null,
           lbs: row.lbs ?? null,
           vg: pickField(row, ['VG', 'vg']) ?? null,
           cc: row.cc ?? null,
@@ -947,6 +973,7 @@ app.post('/api/consolidate', requireAuth, async (req, res) => {
             
             consolidatedData.push({
               person,
+              personId: ausRow?.personId || einRow?.personId,
               lob: ausRow?.lob || einRow?.lob,
               bereich: ausRow?.bereich || einRow?.bereich,
               cc: cc !== 'unknown' ? cc : (ausRow?.cc || einRow?.cc),
@@ -1467,7 +1494,11 @@ app.put('/api/users/:uid', requireAdmin, async (req, res) => {
 
 // ✅ Employee Stammdaten Endpunkte
 app.post('/api/employees/bulk', authMiddleware, async (req, res) => {
+  console.log('🚀 === EMPLOYEE UPLOAD START ===');
+  console.log('📨 Request Body erhalten:', JSON.stringify(req.body, null, 2));
+  
   if (!req.user) {
+    console.log('❌ Keine Autorisierung');
     return res.status(401).json({ error: 'Nicht autorisiert' });
   }
   
@@ -1475,6 +1506,7 @@ app.post('/api/employees/bulk', authMiddleware, async (req, res) => {
     const { employees } = req.body;
     
     if (!Array.isArray(employees) || employees.length === 0) {
+      console.log('❌ Keine Employee-Daten im Request Body');
       return res.status(400).json({ error: 'Keine Employee-Daten erhalten' });
     }
     
@@ -1507,6 +1539,7 @@ app.post('/api/employees/bulk', authMiddleware, async (req, res) => {
     await batch.commit();
     
     console.log(`✅ ${count} Employee-Stammdaten erfolgreich gespeichert`);
+    console.log('🎯 === EMPLOYEE UPLOAD ERFOLGREICH ===');
     res.json({ 
       success: true, 
       message: `${count} Mitarbeiter erfolgreich gespeichert`,
@@ -1515,6 +1548,7 @@ app.post('/api/employees/bulk', authMiddleware, async (req, res) => {
     
   } catch (error) {
     console.error('❌ Fehler beim Speichern der Employee-Stammdaten:', error);
+    console.log('💥 === EMPLOYEE UPLOAD FEHLGESCHLAGEN ===');
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });

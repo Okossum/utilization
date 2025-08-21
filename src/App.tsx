@@ -14,10 +14,12 @@ import { useAuth } from './contexts/AuthContext';
 import { LoginForm } from './components/LoginForm';
 import { User as UserIcon, ChevronDown, LogOut, Users, BarChart3, FileText, X } from 'lucide-react';
 import AdminUserManagementModal from './components/generated/AdminUserManagementModal';
+import { AdminDataUploadModal } from './components/generated/AdminDataUploadModal';
 import { AssignmentsProvider } from './contexts/AssignmentsContext';
 import { RoleProvider } from './contexts/RoleContext';
 import { ProjectHistoryProvider } from './contexts/ProjectHistoryContext';
 import { AppHeader } from './components/AppHeader';
+import { UploadPanel } from './components/generated/UploadPanel';
 
 let theme: Theme = 'light';
 // only use 'centered' container for standalone components, never for full page apps or websites.
@@ -62,6 +64,9 @@ function App() {
     const [isCustomerProjectsManagementOpen, setIsCustomerProjectsManagementOpen] = useState(false);
     const [isAuslastungserklaerungManagementOpen, setIsAuslastungserklaerungManagementOpen] = useState(false);
     const [isGeneralSettingsOpen, setIsGeneralSettingsOpen] = useState(false);
+    
+    // State für Upload Panel
+    const [isUploadPanelOpen, setIsUploadPanelOpen] = useState(false);
     
     // ✅ KORRIGIERT: Action-Items State mit komplexer Struktur für beide Views
     const [actionItems, setActionItems] = useState<Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }>>(() => {
@@ -126,7 +131,7 @@ function App() {
             logout={logout}
             setAdminModalOpen={setAdminModalOpen}
             onSettings={() => setIsSettingsModalOpen(true)}
-            onAdminUpload={() => setAdminModalOpen(true)}
+            onAdminUpload={() => setIsUploadPanelOpen(true)}
             onAuslastungView={() => setIsAuslastungViewOpen(true)}
             onEinsatzplanView={() => setIsEinsatzplanViewOpen(true)}
             onRoleManagement={() => setIsRoleManagementOpen(true)}
@@ -366,8 +371,36 @@ function App() {
             </div>
           )}
 
-          <AdminUserManagementModal isOpen={isAdminModalOpen} onClose={() => setAdminModalOpen(false)} />
-            </ProjectHistoryProvider>
+                    <AdminUserManagementModal isOpen={isAdminModalOpen} onClose={() => setAdminModalOpen(false)} />
+
+          {/* Upload Panel Modal */}
+          {isUploadPanelOpen && (
+            <div className="fixed inset-0 z-50 overflow-y-auto">
+              <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
+                <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+                  <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-medium text-gray-900">Excel Upload</h3>
+                      <button
+                        onClick={() => setIsUploadPanelOpen(false)}
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <UploadPanel 
+                      uploadedFiles={{}}
+                      onFilesChange={() => {}}
+                      onDatabaseRefresh={() => {}}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          </ProjectHistoryProvider>
           </RoleProvider>
         </AssignmentsProvider>
       </CustomerProvider>

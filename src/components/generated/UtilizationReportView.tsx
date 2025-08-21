@@ -1025,7 +1025,7 @@ export function UtilizationReportView({
     return meta;
   }, [uploadedFiles, databaseData, dataSource]);
 
-  // ✅ NEU: FK-Regel nach Auslastungs-Regel anwenden
+  // ✅ FK-Regel nur einmal beim Laden anwenden (keine Endlosschleife!)
   useEffect(() => {
     if (!personMeta || personMeta.size === 0 || dataSource !== 'database') return;
 
@@ -1052,7 +1052,7 @@ export function UtilizationReportView({
     };
 
     applyFKRule();
-  }, [personMeta, actionItems, dataSource]);
+  }, [personMeta, dataSource]); // actionItems entfernt - verhindert Endlosschleife!
 
 
 

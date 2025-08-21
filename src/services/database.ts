@@ -284,6 +284,7 @@ export class DatabaseService {
           if (finalValue !== undefined) {
             consolidatedData.push({
               person,
+              personId: ausRow?.personId || einRow?.personId,
               week: uiLabel,
               year: currentYear,
               weekNumber: weekNum,
@@ -318,6 +319,7 @@ export class DatabaseService {
           if (finalValue !== undefined) {
             consolidatedData.push({
               person,
+              personId: ausRow?.personId || einRow?.personId,
               week: uiLabel,
               year: currentYear,
               weekNumber: weekNum,
@@ -509,6 +511,7 @@ export class DatabaseService {
       // Erstelle Basis-Struktur mit verfügbaren Metadaten
       const baseEntry = {
         person: row.person,
+        personId: row.personId,
         lob: row.lob,
         bereich: row.bereich,
         cc: row.cc,
