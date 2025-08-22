@@ -5,6 +5,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { logger } from "./logger";
+import { triggerConsolidationAfterUpload } from "./consolidation";
 
 /* -------------------- Shared helpers -------------------- */
 
@@ -262,6 +263,16 @@ export async function uploadMitarbeiter(file: File, sheetName = "Search Results"
   }
 
   logger.info("uploaders.mitarbeiter", "Upload abgeschlossen", { written, headerRow0, dataStart0 });
+  
+  // ✅ Konsolidierung nach erfolgreichem Upload triggern
+  try {
+    await triggerConsolidationAfterUpload('mitarbeiter');
+    logger.info("uploaders.mitarbeiter", "Konsolidierung erfolgreich getriggert");
+  } catch (error) {
+    logger.error("uploaders.mitarbeiter", "Fehler bei Konsolidierung", error);
+    // Konsolidierungs-Fehler sollen Upload nicht zum Scheitern bringen
+  }
+  
   return { written, headerRow0, dataStart0 };
 }
 
@@ -380,6 +391,15 @@ export async function uploadAuslastung(file: File, targetCollection = "auslastun
   logger.info("uploaders.auslastung", "Upload abgeschlossen", { 
     matched, ambiguous, unmatched, written, weekColumns: weekColumns.length 
   });
+
+  // ✅ Konsolidierung nach erfolgreichem Upload triggern
+  try {
+    await triggerConsolidationAfterUpload('auslastung');
+    logger.info("uploaders.auslastung", "Konsolidierung erfolgreich getriggert");
+  } catch (error) {
+    logger.error("uploaders.auslastung", "Fehler bei Konsolidierung", error);
+    // Konsolidierungs-Fehler sollen Upload nicht zum Scheitern bringen
+  }
 
   return { matched, ambiguous, unmatched, written };
 }
@@ -641,6 +661,15 @@ export async function uploadEinsatzplan(file: File, sheetName = "Einsatzplan", t
   logger.info("uploaders.einsatzplan", "Upload abgeschlossen", { 
     matched, ambiguous, unmatched, written, triplesCount: triples.length 
   });
+  
+  // ✅ Konsolidierung nach erfolgreichem Upload triggern
+  try {
+    await triggerConsolidationAfterUpload('einsatzplan');
+    logger.info("uploaders.einsatzplan", "Konsolidierung erfolgreich getriggert");
+  } catch (error) {
+    logger.error("uploaders.einsatzplan", "Fehler bei Konsolidierung", error);
+    // Konsolidierungs-Fehler sollen Upload nicht zum Scheitern bringen
+  }
   
   return { matched, ambiguous, unmatched, written, triplesCount: triples.length };
 }
