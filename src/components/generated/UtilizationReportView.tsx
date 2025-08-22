@@ -9,6 +9,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { MultiSelectFilter } from './MultiSelectFilter';
 import { PersonFilterBar } from './PersonFilterBar';
 import DatabaseService from '../../services/database';
+import { db } from '../../lib/firebase';
+import { collection, getDocs, doc } from 'firebase/firestore';
 import { KpiCardsGrid } from './KpiCardsGrid';
 // import { UtilizationChartSection } from './UtilizationChartSection'; // Ausgeblendet
 import { UtilizationTrendChart } from './UtilizationTrendChart';
@@ -73,11 +75,23 @@ export function UtilizationReportView({
   //   auslastung?: UploadedFile;
   //   einsatzplan?: UploadedFile;
   // }>({});
-  // ✅ VEREINFACHT: Direkte Collections statt Konsolidierung
+  // 🚀 PHASE 2: Neue State-Struktur für konsolidierte Daten
   const [databaseData, setDatabaseData] = useState<{
     auslastung?: any[];
     einsatzplan?: any[];
+    // Zusätzlich: Rohe konsolidierte Daten für erweiterte Features
+    utilizationData?: any[];
   }>({});
+  
+  // ✅ DEBUG: Überwache databaseData Änderungen
+  useEffect(() => {
+    console.log('🔍 databaseData wurde geändert:', {
+      auslastungCount: databaseData.auslastung?.length || 0,
+      einsatzplanCount: databaseData.einsatzplan?.length || 0,
+      utilizationDataCount: databaseData.utilizationData?.length || 0,
+      timestamp: new Date().toLocaleTimeString()
+    });
+  }, [databaseData]);
   const [dataSource, setDataSource] = useState<'upload' | 'database'>('upload');
   const [selectedPersons, setSelectedPersons] = useState<string[]>([]);
   const [planningForPerson, setPlanningForPerson] = useState<string | null>(null);
@@ -96,27 +110,88 @@ export function UtilizationReportView({
   // ✅ VEREINFACHT: Nur noch eine Datenquelle - Database (Firebase)
   // Upload-Funktionalität ist jetzt nur noch über Admin-Modal verfügbar
 
-  // Load data from database function
-  // ✅ VEREINFACHT: Lade direkt Auslastung und Einsatzplan Collections
+  // 🚀 PHASE 2: Lade direkt aus der konsolidierten utilizationData Collection
   const loadDatabaseData = async () => {
     try {
-      console.log('🔍 loadDatabaseData() - Lade Auslastung und Einsatzplan...');
+      console.log('🚀 loadDatabaseData() - Lade aus konsolidierter utilizationData Collection...');
 
-      // Paralleles Laden beider Collections
-      const [auslastungData, einsatzplanData] = await Promise.all([
-        DatabaseService.getAuslastung(),
-        DatabaseService.getEinsatzplan()
-      ]);
-      
-      console.log('🔍 Collections geladen:', {
-        auslastung: auslastungData?.length || 0,
-        einsatzplan: einsatzplanData?.length || 0
+      // ✅ SINGLE SOURCE: Lade nur noch die konsolidierte Collection
+      const utilizationSnapshot = await getDocs(collection(db, 'utilizationData'));
+      const utilizationData = utilizationSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as any[];
+
+      console.log('✅ Konsolidierte Daten geladen:', {
+        totalRecords: utilizationData.length,
+        sampleRecord: utilizationData[0]
       });
 
-      // Setze beide Collections direkt
-      setDatabaseData({ 
-        auslastung: auslastungData || [],
-        einsatzplan: einsatzplanData || []
+      // ✅ DEBUG: Zeige Struktur der konsolidierten Daten
+      if (utilizationData.length > 0) {
+        const sample = utilizationData[0];
+        console.log('🔍 DEBUG: Konsolidierte Datenstruktur:', {
+          person: sample.person,
+          nachname: sample.nachname,
+          vorname: sample.vorname,
+          hasAuslastung: Object.keys(sample.auslastung || {}).length > 0,
+          hasEinsatzplan: Object.keys(sample.einsatzplan || {}).length > 0,
+          auslastungWeeks: Object.keys(sample.auslastung || {}),
+          einsatzplanWeeks: Object.keys(sample.einsatzplan || {}),
+          dataCompleteness: sample.dataCompleteness
+        });
+      }
+
+      // ✅ TRANSFORMED: Transformiere konsolidierte Daten für bestehende UI-Logik
+      // Für Kompatibilität mit bestehender UI, simuliere separate auslastung/einsatzplan Arrays
+      const transformedData = {
+        utilizationData: utilizationData,
+        // Backward compatibility: Erstelle separate Arrays für bestehende UI-Logik
+        auslastung: utilizationData.map(record => ({
+          id: record.id,
+          person: record.person,
+          personId: record.id,
+          lob: record.lob,
+          bereich: record.bereich,
+          cc: record.cc,
+          team: record.team,
+          lbs: record.lbs,
+          vg: record.vg,
+          values: record.auslastung || {}
+        })),
+        einsatzplan: utilizationData.map(record => ({
+          id: record.id,
+          person: record.person,
+          personId: record.id,
+          lob: record.lob,
+          bereich: record.bereich,
+          cc: record.cc,
+          team: record.team,
+          vg: record.vg,
+          // Transformiere einsatzplan zu flachen values für UI-Kompatibilität
+          values: Object.entries(record.einsatzplan || {}).reduce((acc, [week, entries]) => {
+            if (Array.isArray(entries) && entries.length > 0) {
+              // Summiere auslastungProzent aller Projekte für diese Woche
+              const totalUtilization = entries.reduce((sum, entry) => sum + (entry.auslastungProzent || 0), 0);
+              acc[week] = totalUtilization;
+            }
+            return acc;
+          }, {} as Record<string, number>)
+        }))
+      };
+
+      console.log('🔍 DEBUG: Transformierte Daten für UI:', {
+        auslastungCount: transformedData.auslastung.length,
+        einsatzplanCount: transformedData.einsatzplan.length,
+        sampleAuslastung: transformedData.auslastung[0],
+        sampleEinsatzplan: transformedData.einsatzplan[0]
+      });
+      
+      // ✅ Setze transformierte Daten für UI-Kompatibilität + rohe konsolidierte Daten
+      setDatabaseData({
+        auslastung: transformedData.auslastung,
+        einsatzplan: transformedData.einsatzplan,
+        utilizationData: transformedData.utilizationData
       });
       setDataSource('database');
       
@@ -124,12 +199,14 @@ export function UtilizationReportView({
       await loadPersonStatuses();
       await loadActionItems();
       
-      console.log('✅ Database-Daten erfolgreich geladen');
+      console.log('✅ Firebase-Daten direkt erfolgreich geladen');
       
     } catch (error) {
-      console.error('❌ Fehler in loadDatabaseData:', error);
-      setDatabaseData({});
-      setDataSource('upload');
+      console.error('❌ Fehler beim direkten Firebase-Laden:', error);
+      console.error('❌ Fehler-Details:', error);
+      // ✅ KORRIGIERT: Nicht die Daten zurücksetzen bei Fehlern
+      // setDatabaseData({});
+      // setDataSource('upload');
     }
   };
 
@@ -566,7 +643,7 @@ export function UtilizationReportView({
       if (personData) {
         excelData = {
           name: person,
-          manager: '', // VG nicht in UtilizationData verfügbar
+          manager: String((personData as any).vg || ''), // ✅ VG jetzt verfügbar
           team: String(personData.team || ''),
           competenceCenter: String(personData.cc || ''),
           lineOfBusiness: String(personData.bereich || ''),
@@ -687,8 +764,26 @@ export function UtilizationReportView({
 
   // ✅ VEREINFACHT: Erstelle View-Daten direkt aus Auslastung und Einsatzplan
   const dataForUI: UtilizationData[] = useMemo(() => {
+    console.log('🔍 dataForUI useMemo ausgeführt:', {
+      dataSource,
+      hasAuslastung: !!databaseData.auslastung,
+      hasEinsatzplan: !!databaseData.einsatzplan,
+      auslastungCount: databaseData.auslastung?.length || 0,
+      einsatzplanCount: databaseData.einsatzplan?.length || 0
+    });
+    
     if (dataSource === 'database' && databaseData.auslastung && databaseData.einsatzplan) {
       console.log('🔍 Erstelle UI-Daten aus Auslastung + Einsatzplan Collections');
+      console.log('🔍 DEBUG: Auslastung Collection (direkt aus Firebase):', {
+        count: databaseData.auslastung.length,
+        sample: databaseData.auslastung[0],
+        sampleValues: databaseData.auslastung[0]?.values
+      });
+      console.log('🔍 DEBUG: Einsatzplan Collection (direkt aus Firebase):', {
+        count: databaseData.einsatzplan.length,
+        sample: databaseData.einsatzplan[0],
+        sampleValues: databaseData.einsatzplan[0]?.values
+      });
       
       const combinedData: UtilizationData[] = [];
       
@@ -728,13 +823,20 @@ export function UtilizationReportView({
       // ✅ Ermittle verfügbare Wochen aus echten Daten
       const allWeeks = [...new Set(combinedData.map(item => item.week))].sort();
       
-      console.log('✅ UI-Daten erstellt:', {
+      console.log('✅ UI-Daten erstellt (direkt aus Firebase):', {
         auslastungRows: databaseData.auslastung.length,
         einsatzplanRows: databaseData.einsatzplan.length,
         totalDataPoints: combinedData.length,
         availableWeeks: allWeeks,
         sampleData: combinedData.slice(0, 3)
       });
+      
+      // ✅ DEBUG: Prüfe ob Daten erstellt wurden
+      if (combinedData.length === 0) {
+        console.warn('⚠️ PROBLEM: Keine combinedData erstellt! Prüfe Datenstruktur.');
+        console.log('🔍 Erste Auslastung Row Details:', databaseData.auslastung[0]);
+        console.log('🔍 Erste Einsatzplan Row Details:', databaseData.einsatzplan[0]);
+      }
       
       return combinedData;
     }
@@ -1167,25 +1269,26 @@ export function UtilizationReportView({
     return base;
   }, [dataForUI, selectedPersons, filterCC, filterLBS, filterLBSExclude, filterStatus, personMeta, personStatus, showWorkingStudents, showActionItems, actionItems, personSearchTerm, showAllData, profile, selectedLoB, selectedBereich, selectedCC, selectedTeam]);
   
-  // ✅ Ermittle verfügbare Wochen für Header - 8 Wochen ab der Woche nach der aktuellen KW
+  // ✅ Ermittle verfügbare Forecast-Wochen direkt aus den echten Einsatzplan-Daten
   const availableWeeksFromData = useMemo(() => {
-    // Berechne die aktuelle Kalenderwoche
-    const today = new Date();
-    const currentWeek = getISOWeek(today);
-    const currentYear = getISOWeekYear(today);
+    if (dataForUI.length === 0) return [];
     
-    // Generiere die nächsten 8 Wochen ab der Woche nach der aktuellen KW
-    const forecastWeeks = Array.from({ length: 8 }, (_, i) => {
-      const weekNumber = currentWeek + 1 + i;
-      const year = weekNumber > 52 ? currentYear + 1 : currentYear;
-      const adjustedWeek = weekNumber > 52 ? weekNumber - 52 : weekNumber;
-      const yy = String(year).slice(-2);
-      return `${yy}/${String(adjustedWeek).padStart(2, '0')}`;
+    // Sammle alle Wochen aus den Einsatzplan-Daten (isHistorical: false)
+    const forecastWeeks = dataForUI
+      .filter(item => !item.isHistorical) // Nur Forecast-Daten
+      .map(item => item.week)
+      .filter((week, index, arr) => arr.indexOf(week) === index) // Unique
+      .sort();
+    
+    // ✅ DEBUG: Zeige echte vs generierte Wochen
+    console.log('🔍 DEBUG availableWeeksFromData (aus echten Daten):', {
+      forecastWochen: forecastWeeks,
+      anzahl: forecastWeeks.length,
+      sample: forecastWeeks.slice(0, 5)
     });
-    
 
     return forecastWeeks;
-  }, []);
+  }, [dataForUI]);
   
   const visiblePersons = useMemo(() => {
     // ✅ ALLE Personen aus Collections berücksichtigen, nicht nur die mit Wochen-Daten
@@ -1996,6 +2099,17 @@ export function UtilizationReportView({
                       {visibleColumns.forecastWeeks && availableWeeksFromData.slice(0, forecastWeeks).map((week, i) => {
                         const weekData = personData.find(item => item.week === week);
                         const utilization = weekData?.utilization;
+                        
+                        // ✅ DEBUG: Prüfe warum keine Forecast-Werte angezeigt werden (vereinfacht)
+                        if (i === 0 && person === visiblePersons[0]) {
+                          console.log('🔍 DEBUG Forecast-Werte:', {
+                            person: person,
+                            suchWoche: week,
+                            hatMatch: !!weekData,
+                            utilization: utilization
+                          });
+                        }
+                        
                         // Extrahiere Wochennummer aus dem week-String (z.B. "25/35" -> 35)
                         const weekNumber = parseInt(week.match(/\/(\d+)/)?.[1] || '0', 10);
                         
