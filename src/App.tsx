@@ -4,6 +4,7 @@ import { UtilizationReportView } from './components/generated/UtilizationReportV
 import { EmployeeListView } from './components/generated/EmployeeListView';
 import { KnowledgeTestPage } from './components/generated/KnowledgeTestPage';
 import { AuslastungCommentView } from './components/generated/AuslastungCommentView';
+import { SalesView } from './components/generated/SalesView';
 import RoleManagement from './components/generated/RoleManagement';
 import TechnicalSkillManagement from './components/generated/TechnicalSkillManagement';
 import { CustomerProjectsManager } from './components/generated/CustomerProjectsManager';
@@ -53,7 +54,7 @@ function App() {
     const { user, loading, profile, logout } = useAuth();
     const [isAdminModalOpen, setAdminModalOpen] = useState(false);
     const [isMenuOpen, setMenuOpen] = useState(false);
-    const [currentView, setCurrentView] = useState<'utilization' | 'employees' | 'knowledge' | 'auslastung-comments'>('utilization');
+    const [currentView, setCurrentView] = useState<'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales'>('utilization');
     
     // States für UtilizationReportView spezifische Modals
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -183,6 +184,10 @@ function App() {
           
           {currentView === 'auslastung-comments' && (
             <AuslastungCommentView />
+          )}
+          
+          {currentView === 'sales' && (
+            <SalesView />
           )}
           
           {/* General Settings Modal */}

@@ -3,8 +3,8 @@ import { Settings, Database, TrendingUp, Target, User, Ticket, BarChart3, Users,
 import { useAuth } from '../contexts/AuthContext';
 
 interface AppHeaderProps {
-  currentView: 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments';
-  setCurrentView: (view: 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments') => void;
+  currentView: 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales';
+  setCurrentView: (view: 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales') => void;
   logout: () => Promise<void>;
   setAdminModalOpen: (open: boolean) => void;
   // UtilizationReportView spezifische Props (nur wenn currentView === 'utilization')
@@ -89,12 +89,14 @@ export function AppHeader({
             {currentView === 'employees' && 'Mitarbeiter'}
             {currentView === 'knowledge' && 'Knowledge Library'}
             {currentView === 'auslastung-comments' && 'Auslastung mit Kommentaren'}
+            {currentView === 'sales' && 'Sales Team Overview'}
           </h1>
           <p className="text-sm text-gray-600 mt-1">
             {currentView === 'utilization' && 'Rückblick & Vorblick · ISO-KW'}
             {currentView === 'employees' && 'Mitarbeiter-Verwaltung und Übersicht'}
             {currentView === 'knowledge' && 'Knowledge Upload und Verwaltung'}
             {currentView === 'auslastung-comments' && 'Direkte Bearbeitung von Auslastung und Kommentaren'}
+            {currentView === 'sales' && 'Freelance Sales Team · Skills & Projekte'}
           </p>
         </div>
         
@@ -151,6 +153,19 @@ export function AppHeader({
           >
             <MessageSquare className="w-4 h-4" />
             Kommentare
+          </button>
+          <button
+            onClick={() => setCurrentView('sales')}
+            className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
+              currentView === 'sales' 
+                ? 'text-blue-700 bg-blue-50 border-blue-200' 
+                : 'text-gray-700 bg-gray-50 border-gray-200 hover:bg-gray-100'
+            } border rounded-lg`}
+            style={{ zIndex: 40 }}
+            title="Sales Team Overview"
+          >
+            <Target className="w-4 h-4" />
+            Sales View
           </button>
 
           {/* LoB als feststehender Chip - nur bei Utilization */}
