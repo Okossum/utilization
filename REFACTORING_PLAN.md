@@ -366,14 +366,55 @@ git checkout -b refactoring/cleanup-legacy-components
 - ❓ KnowledgeTestPage.tsx - Aktiv in App.tsx importiert (Zeile 5, 182)
 - ❓ CustomerDemo.tsx, EmployeeDataUpload.tsx, AuslastungPreviewExplorer.tsx - Keine externen Imports gefunden
 
-### **Phase 2: Sichere Löschungen** (IN PROGRESS)
-- 🔄 Legacy Upload-Komponenten entfernen (GESTARTET)
-- ⏳ Test-Komponenten entfernen  
-- ⏳ Veraltete Dokumentation entfernen
+### **Phase 2: Sichere Löschungen** (ABGESCHLOSSEN)
+- ✅ Legacy Upload-Komponenten entfernt (12 Dateien gelöscht)
+- ✅ Test-Komponenten entfernt (3 Dateien gelöscht)  
+- ✅ Veraltete Dokumentation entfernt (4 MD-Dateien gelöscht)
+- ✅ Backup-Dateien entfernt (1 Datei gelöscht)
 
-### **Phase 3: Database-Migration** (Nach Phase 2)
-- ⏳ DatabaseService-Abhängigkeiten ersetzen
+#### **🗑️ Erfolgreich gelöschte Dateien (15 total):**
+**Legacy Upload System (6):**
+- ✅ src/components/generated/UploadPanel.tsx
+- ✅ src/components/generated/DataUploadSection.tsx  
+- ✅ src/utils/xlsxEinsatzplan.ts
+- ✅ src/utils/xlsxUploadProcessors.ts
+- ✅ src/lib/parseMitarbeiterXlsx.ts
+- ✅ src/lib/resolveDuplicates.ts
+
+**Test-Komponenten (3):**
+- ✅ src/components/FirebaseApp.tsx
+- ✅ src/components/FirebaseTest.tsx
+- ✅ src/components/SimpleFirebaseApp.tsx
+
+**Veraltete Dokumentation (4):**
+- ✅ src/components/# Dokumentation: Upload des Excel-Einsat.md
+- ✅ src/components/# Excel File Structure.md
+- ✅ src/components/# Firestore Database Schema.md
+- ✅ src/components/## Cursor Prompt: Fix für Excel-Datum "V.md
+
+**Backup-Dateien (1):**
+- ✅ src/services/database.ts.backup
+
+**Commit**: `2e2328f` - 15 Dateien entfernt, 4082 Zeilen Code reduziert ✅
+
+### **Phase 3: Database-Migration** (IN PROGRESS)
+- 🔄 DatabaseService-Abhängigkeiten ersetzen (GESTARTET)
+  - ✅ UtilizationReportView.tsx bereinigt (DatabaseService entfernt, direkte Firebase-Calls)
+  - ⏳ 6 weitere Komponenten mit DatabaseService.saveEmployeeDossier migrieren
 - ⏳ Legacy Database-Services entfernen
+
+#### **🗄️ Verbleibende DatabaseService-Abhängigkeiten:**
+- `src/components/generated/EmployeeListView.tsx`
+- `src/components/generated/EmployeeDossierModal.tsx` 
+- `src/components/generated/PlanningComment.tsx`
+- `src/components/generated/UtilizationComment.tsx`
+- `src/components/generated/PlanningModal.tsx`
+- `src/components/generated/PlanningCommentModal.tsx`
+- `src/components/generated/SalesView.tsx`
+- `src/components/generated/AuslastungCommentView.tsx`
+- `src/components/generated/AuslastungView.tsx`
+- `src/components/generated/EinsatzplanView.tsx`
+- `src/contexts/AuthContext.tsx`
 
 ### **Phase 4: Code-Bereinigung** (Nach Phase 3)
 - ⏳ DISABLED-Imports bereinigen
@@ -417,8 +458,9 @@ time npm run build
 
 ---
 
-**Status**: 🔄 Phase 2 - Sichere Löschungen (IN PROGRESS)  
-**Aktueller Schritt**: Legacy Upload-Komponenten entfernen  
+**Status**: 🔄 Phase 3 - DatabaseService-Migration (IN PROGRESS)  
+**Aktueller Schritt**: DatabaseService-Abhängigkeiten in kritischen Komponenten ersetzen  
+**Erfolg Phase 2**: 15 Legacy-Dateien entfernt, 4082 Zeilen Code reduziert  
 **Verantwortlich**: Assistant + User-Freigaben für Breaking Changes  
 
 ---

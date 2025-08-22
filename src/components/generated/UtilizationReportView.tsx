@@ -8,7 +8,7 @@ import { AuslastungView } from './AuslastungView';
 import { useAuth } from '../../contexts/AuthContext';
 import { MultiSelectFilter } from './MultiSelectFilter';
 import { PersonFilterBar } from './PersonFilterBar';
-import DatabaseService from '../../services/database';
+// DatabaseService removed - using direct Firebase calls and consolidation.ts
 import { db } from '../../lib/firebase';
 import { collection, getDocs, doc } from 'firebase/firestore';
 import { KpiCardsGrid } from './KpiCardsGrid';
@@ -31,12 +31,7 @@ interface UtilizationData {
   utilization: number | null;
   isHistorical: boolean;
 }
-interface UploadedFile {
-  name: string;
-  data: any[];
-  isValid: boolean;
-  error?: string;
-}
+// UploadedFile interface removed - using consolidated utilizationData collection
 
 interface UtilizationReportViewProps {
   actionItems: Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }>;
@@ -1419,7 +1414,11 @@ export function UtilizationReportView({
   const refreshPersonDossier = async (person: string | null) => {
     if (!person) return;
     try {
-      const dossier = await DatabaseService.getEmployeeDossier(person);
+      // Direct Firebase call instead of DatabaseService
+      const dossierSnapshot = await getDocs(collection(db, 'employee_dossiers'));
+      const dossierDoc = dossierSnapshot.docs.find(doc => doc.data().name === person || doc.id === person);
+      const dossier = dossierDoc?.data();
+      
       setDossiersByPerson(prev => ({
         ...prev,
         [person]: {
@@ -1429,7 +1428,9 @@ export function UtilizationReportView({
           planningComment: String(dossier?.planningComment || ''),
         }
       }));
-    } catch {}
+    } catch (error) {
+      console.error('❌ Fehler beim Laden des Dossiers:', error);
+    }
   };
   const allPersons = useMemo(() => {
     return Array.from(new Set(dataForUI.map(item => item.person)));
@@ -1521,26 +1522,7 @@ export function UtilizationReportView({
                 </button>
               ) : (
                 <button
-                  onClick={async () => {
-                    console.log('🔍 DEBUG: Lade Daten direkt aus der Datenbank...');
-                    try {
-                      const utilData = await DatabaseService.getUtilizationData();
-                      console.log('🔍 Direkte Datenbank-Abfrage Ergebnis:', {
-                        count: utilData?.length || 0,
-                        sample: utilData?.[0],
-                        first5: utilData?.slice(0, 5)
-                      });
-                      
-                      const ausData = await DatabaseService.getAuslastung();
-                      const einData = await DatabaseService.getEinsatzplan();
-                      console.log('🔍 Ursprüngliche Daten:', {
-                        auslastung: ausData?.length || 0,
-                        einsatzplan: einData?.length || 0
-                      });
-                    } catch (error) {
-                      console.error('❌ Debug-Fehler:', error);
-                    }
-                  }}
+                  onClick={() => loadDatabaseData()}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   <Database className="w-4 h-4" />
