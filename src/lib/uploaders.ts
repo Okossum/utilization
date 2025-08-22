@@ -230,51 +230,109 @@ export async function uploadMitarbeiter(file: File, sheetName = "Search Results"
    - schreibt in Collection "auslastung", Doc-ID = personId, merge
 ========================================================= */
 export async function uploadAuslastung(file: File, targetCollection = "auslastung") {
+  logger.info("uploaders.auslastung", `Starte Upload für Datei: ${file.name}`);
+  
   const ab = await file.arrayBuffer();
-  const wb = XLSX.read(ab, { type: "array" });
-  const rows = XLSX.utils.sheet_to_json<Record<string, any>>(wb.Sheets[wb.SheetNames[0]], { raw:false, defval:"" });
+  const wb = XLSX.read(ab, { type: "array", cellDates: true });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const range = rangeOf(ws);
+  
+  logger.debug("uploaders.auslastung", "Workbook gelesen", { 
+    sheetName: wb.SheetNames[0], 
+    range: range 
+  });
+
+  // Erkenne Wochen-Header aus Zeile 3 (0-basiert = Zeile 2)
+  const weekColumns: { col: number; week: string }[] = [];
+  for (let c = 0; c <= range.e.c; c++) {
+    const cell = (ws as any)[A1(2, c)]; // Zeile 3 (0-basiert)
+    const value = String(cell?.v ?? "").trim();
+    
+    // Erkenne "KW 25/01" Format
+    const match = value.match(/KW\s*(\d{2})\/(\d{2})/i);
+    if (match) {
+      const week = `${match[1]}/${match[2]}`;
+      weekColumns.push({ col: c, week });
+    }
+  }
+  
+  logger.info("uploaders.auslastung", "Wochen-Spalten erkannt", { 
+    count: weekColumns.length, 
+    weeks: weekColumns.slice(0, 5).map(w => w.week) 
+  });
 
   const ix = await buildPersonIndexFromDB();
   let matched = 0, ambiguous = 0, unmatched = 0, written = 0;
 
+  // Verarbeite Daten ab Zeile 5 (0-basiert = Zeile 4)
+  const dataStartRow = 4;
   const chunk = 400;
-  for (let i=0; i<rows.length; i+=chunk) {
+  
+  const personDataList: any[] = [];
+  
+  for (let r = dataStartRow; r <= range.e.r; r++) {
+    const person = String((ws as any)[A1(r, 4)]?.v ?? "").trim() // Spalte E: "Mitarbeiter (ID)"
+      .replace(/\([^)]*\)\s*$/, "").trim();
+    if (!person) continue;
+    
+    const cc = String((ws as any)[A1(r, 2)]?.v ?? "").trim(); // Spalte C: "Hierarchie Slicer - CC"
+
+    const res = matchPerson(person, cc, ix);
+    if (res.status !== "matched") {
+      (res.status === "ambiguous") ? ambiguous++ : unmatched++;
+      continue;
+    }
+    matched++;
+
+    // Sammle Auslastungswerte für alle erkannten Wochen
+    const values: Record<string, number> = {};
+    for (const { col, week } of weekColumns) {
+      const cell = (ws as any)[A1(r, col)];
+      const value = cell?.v;
+      const num = toNumberOrUndef(value);
+      if (num !== undefined) {
+        // Konvertiere Dezimalwerte (0.75) zu Prozentwerten (75)
+        const percentValue = num < 1 && num > 0 ? num * 100 : num;
+        values[week] = percentValue;
+        
+        // Debug: Zeige Konvertierung für erste paar Einträge
+        if (written < 3 && num !== percentValue) {
+          logger.info("uploaders.auslastung", `Dezimal→Prozent Konvertierung für ${person}`, {
+            week,
+            originalValue: num,
+            convertedValue: percentValue
+          });
+        }
+      }
+    }
+
+    // Sammle Personendaten für Batch-Verarbeitung
+    personDataList.push({
+      person,
+      personId: res.personId,
+      cc,
+      values,
+      fileName: file.name,
+      updatedAt: new Date(),
+      matchStatus: "matched"
+    });
+  }
+
+  // Batch-Verarbeitung
+  for (let i = 0; i < personDataList.length; i += chunk) {
     const batch = writeBatch(db);
-    for (let j=0; j<Math.min(chunk, rows.length - i); j++) {
-      const row = rows[i+j];
-      const person = String(row["Mitarbeiter (ID)"] ?? row["person"] ?? row["Name"] ?? "")
-        .replace(/\([^)]*\)\s*$/, "").trim();
-      if (!person) continue;
-      const cc = String(row["Hierarchie Slicer - CC"] ?? row["cc"] ?? "").trim();
-
-      const res = matchPerson(person, cc, ix);
-      if (res.status !== "matched") {
-        (res.status === "ambiguous") ? ambiguous++ : unmatched++;
-        continue;
-      }
-      matched++;
-
-      const values: Record<string, number> = {};
-      for (const [k,v] of Object.entries(row)) {
-        const m = String(k).match(/(\d{2})\s*\/\s*(\d{2})/); // "JJ/WW"
-        if (!m) continue;
-        const key = `${m[1]}/${m[2]}`;
-        const num = toNumberOrUndef(v);
-        if (num !== undefined) values[key] = num;
-      }
-
-      const ref = doc(collection(db, targetCollection), res.personId);
-      batch.set(ref, {
-        person, personId: res.personId, cc,
-        values,
-        fileName: file.name,
-        updatedAt: new Date(),
-        matchStatus: "matched"
-      }, { merge: true });
+    for (let j = 0; j < Math.min(chunk, personDataList.length - i); j++) {
+      const personData = personDataList[i + j];
+      const ref = doc(collection(db, targetCollection), personData.personId);
+      batch.set(ref, personData, { merge: true });
       written++;
     }
     await batch.commit();
   }
+
+  logger.info("uploaders.auslastung", "Upload abgeschlossen", { 
+    matched, ambiguous, unmatched, written, weekColumns: weekColumns.length 
+  });
 
   return { matched, ambiguous, unmatched, written };
 }
