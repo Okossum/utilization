@@ -526,6 +526,7 @@ export async function uploadEinsatzplan(file: File, sheetName = "Einsatzplan", t
   const teamCol0 = findCol("team");
   const lobCol0 = findCol("lob");
   const bereichCol0 = findCol("bereich");
+  const vgCol0 = findCol("vg");
 
   let matched=0, ambiguous=0, unmatched=0, written=0;
 
@@ -562,6 +563,7 @@ export async function uploadEinsatzplan(file: File, sheetName = "Einsatzplan", t
     const team = teamCol0>=0 ? String((ws as any)[A1(r, teamCol0)]?.v ?? "").trim() || undefined : undefined;
     const lob  = lobCol0 >=0 ? String((ws as any)[A1(r, lobCol0 )]?.v ?? "").trim() || undefined : undefined;
     const bereich = bereichCol0>=0 ? String((ws as any)[A1(r, bereichCol0)]?.v ?? "").trim() || undefined : undefined;
+    const vg = vgCol0>=0 ? String((ws as any)[A1(r, vgCol0)]?.v ?? "").trim() || undefined : undefined;
 
     // Sammle alle Wochen-Daten für diese Person
     const values: Record<string, any[]> = {};
@@ -616,6 +618,7 @@ export async function uploadEinsatzplan(file: File, sheetName = "Einsatzplan", t
       if (team) personData.team = team;
       if (lob) personData.lob = lob;
       if (bereich) personData.bereich = bereich;
+      if (vg) personData.vg = vg;
       
       personDataMap.set(res.personId, personData);
     }
