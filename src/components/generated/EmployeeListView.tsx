@@ -4,7 +4,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { EmployeeCard } from './EmployeeCard';
 // import { EmployeeUploadModal } from './EmployeeUploadModal'; // DISABLED
 import { EmployeeDossierModal } from './EmployeeDossierModal';
-import DatabaseService from '../../services/database';
+// DatabaseService removed - using direct Firebase calls
+import { db } from '../../lib/firebase';
+import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
 import { useAssignments } from '../../contexts/AssignmentsContext';
 import { MultiSelectFilter } from './MultiSelectFilter';
 import { useAuth } from '../../contexts/AuthContext';
@@ -165,7 +167,9 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
         setIsLoading(true);
         
         // Lade Einsatzplan-Daten für Metadaten (CC, Team, LBS)
-        const einsatzplanData = await DatabaseService.getEinsatzplan();
+        // Direct Firebase call instead of DatabaseService
+        const einsatzplanSnapshot = await getDocs(collection(db, 'einsatzplan'));
+        const einsatzplanData = einsatzplanSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         const einsatzplanMap = new Map();
         einsatzplanData?.forEach(entry => {
           if (entry.person) {
@@ -249,7 +253,9 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
       ));
       
       // Speichere den neuen Status in der Datenbank
-      await DatabaseService.saveEmployeeDossier(employeeId, {
+      // Direct Firebase call instead of DatabaseService
+      const docRef = doc(db, 'employee_dossiers', employeeId);
+      await setDoc(docRef, {
         uid: employeeId,
         displayName: employee.name,
         email: employee.email,

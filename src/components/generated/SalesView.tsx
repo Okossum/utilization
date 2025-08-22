@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { EmployeeOverview } from './EmployeeOverview';
-import DatabaseService from '../../services/database';
+// DatabaseService removed - using direct Firebase calls
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 
@@ -155,8 +155,8 @@ export const SalesView = () => {
       // Parallel laden aller benötigten Daten
       const [mitarbeiterSnap, auslastungData, einsatzplanData] = await Promise.all([
         getDocs(collection(db, 'mitarbeiter')),
-        DatabaseService.getAuslastung().catch(() => []),
-        DatabaseService.getEinsatzplan().catch(() => [])
+        getDocs(collection(db, 'auslastung')).then(snap => snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))).catch(() => []),
+        getDocs(collection(db, 'einsatzplan')).then(snap => snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))).catch(() => [])
       ]);
 
       console.log('🔍 Sales View - Geladene Daten:', {

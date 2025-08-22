@@ -385,7 +385,7 @@ function App() {
                     <AdminUserManagementModal isOpen={isAdminModalOpen} onClose={() => setAdminModalOpen(false)} />
 
 
-          {/* DISABLED: Employee Upload Modal
+
           {isEmployeeUploadModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <div className="fixed inset-0 bg-black/20 backdrop-blur-sm" onClick={() => setIsEmployeeUploadModalOpen(false)} />
@@ -418,7 +418,6 @@ function App() {
               </div>
             </div>
           )}
-          */}
 
           {/* Excel Upload Modal */}
           <ExcelUploadModal 

@@ -2,7 +2,9 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import app from '../lib/firebase';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, User } from 'firebase/auth';
 import { setAuthTokenProvider } from '../services/database';
-import DatabaseService from '../services/database';
+// DatabaseService removed - using direct Firebase calls
+import { db } from '../lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 type UserRole = 'bereichsleiter' | 'cc' | 'teamleiter' | 'sales' | 'unknown';
 
@@ -69,7 +71,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           
           // Load server-side user profile
           try {
-            const me = await DatabaseService.getMe();
+            // Direct Firebase call instead of DatabaseService
+            const userDoc = await getDoc(doc(db, 'users', user.uid));
+            const me = userDoc.exists() ? { id: userDoc.id, ...userDoc.data() } : null;
             setProfile(me || null);
           } catch {
             setProfile(null);
@@ -90,7 +94,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [auth]);
   const refreshProfile = useCallback(async () => {
     try {
-      const me = await DatabaseService.getMe();
+      // Direct Firebase call instead of DatabaseService
+      if (!user) return;
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      const me = userDoc.exists() ? { id: userDoc.id, ...userDoc.data() } : null;
       setProfile(me || null);
     } catch {
       setProfile(null);
@@ -98,7 +105,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateProfile = useCallback(async (data: Partial<UserProfile & { canViewAll: boolean }>) => {
-    await DatabaseService.updateMe(data);
+    // Direct Firebase call instead of DatabaseService
+    if (!user) return;
+    const userDocRef = doc(db, 'users', user.uid);
+    await setDoc(userDocRef, data, { merge: true });
     await refreshProfile();
   }, [refreshProfile]);
 
