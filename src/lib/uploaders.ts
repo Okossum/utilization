@@ -59,6 +59,34 @@ function toNumberOrUndef(v: any): number | undefined {
   return Number.isNaN(num) ? undefined : num;
 }
 
+function parsePersonName(fullName: string): { nachname: string; vorname: string } {
+  const trimmed = fullName.trim();
+  
+  // Format: "Nachname, Vorname" oder "Nachname,Vorname"
+  const commaMatch = trimmed.match(/^([^,]+),\s*(.+)$/);
+  if (commaMatch) {
+    return {
+      nachname: commaMatch[1].trim(),
+      vorname: commaMatch[2].trim()
+    };
+  }
+  
+  // Format: "Vorname Nachname" (Fallback)
+  const spaceMatch = trimmed.match(/^(.+)\s+([^\s]+)$/);
+  if (spaceMatch) {
+    return {
+      nachname: spaceMatch[2].trim(),
+      vorname: spaceMatch[1].trim()
+    };
+  }
+  
+  // Fallback: Alles als Nachname
+  return {
+    nachname: trimmed,
+    vorname: ""
+  };
+}
+
 function cellToIsoDate(cell: any, wb: XLSX.WorkBook): string | undefined {
   if (!cell) return undefined;
 
@@ -169,6 +197,18 @@ export async function uploadMitarbeiter(file: File, sheetName = "Search Results"
 
     const personDisplay = `${nach}, ${vor}`.trim();
     const id = await sid(`mitarbeiter|${normName(personDisplay)}|${normCc(cc)}`);
+    
+    // Parse Name in Nachname/Vorname
+    const { nachname, vorname } = parsePersonName(personDisplay);
+    
+    // Debug: Zeige Namens-Aufteilung für erste paar Einträge
+    if (written < 3) {
+      logger.info("uploaders.mitarbeiter", `Namens-Aufteilung`, {
+        original: personDisplay,
+        nachname,
+        vorname
+      });
+    }
 
     // Hyperlink-URL statt Text
     let linkZumProfilUrl = "";
@@ -196,7 +236,9 @@ export async function uploadMitarbeiter(file: File, sheetName = "Search Results"
 
     const payload: any = {
       person: personDisplay,
-      vorname: vor, nachname: nach, cc, email: mail,
+      nachname, // ✅ Aufgeteilter Nachname
+      vorname, // ✅ Aufgeteilter Vorname
+      cc, email: mail,
       firma: COL.FIRMA>=0? String(ws[A1(r,COL.FIRMA)]?.v ?? "").trim() : "",
       lob: COL.LOB>=0? String(ws[A1(r,COL.LOB)]?.v ?? "").trim() : "",
       bereich: "",
@@ -276,6 +318,9 @@ export async function uploadAuslastung(file: File, targetCollection = "auslastun
     if (!person) continue;
     
     const cc = String((ws as any)[A1(r, 2)]?.v ?? "").trim(); // Spalte C: "Hierarchie Slicer - CC"
+    
+    // Parse Name in Nachname/Vorname
+    const { nachname, vorname } = parsePersonName(person);
 
     const res = matchPerson(person, cc, ix);
     if (res.status !== "matched") {
@@ -309,6 +354,8 @@ export async function uploadAuslastung(file: File, targetCollection = "auslastun
     // Sammle Personendaten für Batch-Verarbeitung
     personDataList.push({
       person,
+      nachname, // ✅ Aufgeteilter Nachname
+      vorname, // ✅ Aufgeteilter Vorname
       personId: res.personId,
       cc,
       values,
@@ -501,6 +548,9 @@ export async function uploadEinsatzplan(file: File, sheetName = "Einsatzplan", t
     const person = String((ws as any)[A1(r, det.nameCol0)]?.v ?? "").trim();
     if (!person) continue;
     const cc = String((ws as any)[A1(r, det.ccCol0)]?.v ?? "").trim();
+    
+    // Parse Name in Nachname/Vorname
+    const { nachname, vorname } = parsePersonName(person);
 
     const res = matchPerson(person, cc, ix);
     if (res.status !== "matched") {
@@ -552,6 +602,8 @@ export async function uploadEinsatzplan(file: File, sheetName = "Einsatzplan", t
     if (Object.keys(values).length > 0) {
       const personData: any = {
         person,
+        nachname, // ✅ Aufgeteilter Nachname
+        vorname, // ✅ Aufgeteilter Vorname
         personId: res.personId,
         cc,
         values,
