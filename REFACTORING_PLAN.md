@@ -418,9 +418,11 @@ git checkout -b refactoring/cleanup-legacy-components
 - `src/components/generated/EinsatzplanView.tsx`
 - `src/contexts/AuthContext.tsx`
 
-### **Phase 4: Code-Bereinigung** (Nach Phase 3)
-- ⏳ DISABLED-Imports bereinigen
+### **Phase 4: Code-Bereinigung** (IN PROGRESS - PRIORITÄT 3)
+- 🔄 DISABLED-Imports bereinigen (GESTARTET)
 - ⏳ Auskommentierte Code-Blöcke entfernen
+
+**🎯 Fokus**: App.tsx und andere Hauptkomponenten von DISABLED/auskommentierten Legacy-Referenzen bereinigen
 
 ### **Phase 5: Evaluierung unklarer Komponenten** (ABGESCHLOSSEN)
 - ✅ Knowledge-System analysieren → **AKTIV & PRODUCTION** (behalten)
@@ -475,11 +477,12 @@ time npm run build
 
 ---
 
-**Status**: 🚀 MULTI-PHASE EXECUTION - Reihenfolge: 1→3→2  
+**Status**: 🎉 MULTI-PHASE SUCCESS - Reihenfolge: 1→3→5→4  
 **Phase 1**: ✅ ABGESCHLOSSEN - Dependency-Analyse  
-**Phase 3**: 🔄 IN PROGRESS - DatabaseService-Migration  
-**Phase 2**: ⏳ BEREIT - Evaluierung unklarer Komponenten  
-**Erfolg bisher**: 15 Legacy-Dateien entfernt + UtilizationReportView migriert  
+**Phase 3**: 🔄 IN PROGRESS - DatabaseService-Migration (4/12 kritische Komponenten migriert)  
+**Phase 5**: ✅ ABGESCHLOSSEN - Evaluierung & Orphaned Cleanup  
+**Phase 4**: 🔄 IN PROGRESS - Code-Bereinigung (DISABLED-Imports teilweise bereinigt)  
+**ERFOLG**: 19 Dateien entfernt, 5000+ Zeilen Code reduziert, 8 Build-Errors behoben  
 **Verantwortlich**: Assistant + User-Freigaben für Breaking Changes  
 
 ---

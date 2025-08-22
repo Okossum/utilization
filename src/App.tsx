@@ -17,12 +17,12 @@ import { User as UserIcon, ChevronDown, LogOut, Users, BarChart3, FileText, X } 
 import AdminUserManagementModal from './components/generated/AdminUserManagementModal';
 import { AdminDataUploadModal } from './components/generated/AdminDataUploadModal';
 import { ExcelUploadModal } from './components/generated/ExcelUploadModal';
-// import { EmployeeUploadModal } from './components/generated/EmployeeUploadModal'; // DISABLED
+
 import { AssignmentsProvider } from './contexts/AssignmentsContext';
 import { RoleProvider } from './contexts/RoleContext';
 import { ProjectHistoryProvider } from './contexts/ProjectHistoryContext';
 import { AppHeader } from './components/AppHeader';
-// import { UploadPanel } from './components/generated/UploadPanel'; // DISABLED
+
 import DebugPanel from './components/DebugPanel';
 
 let theme: Theme = 'light';
@@ -70,8 +70,7 @@ function App() {
     const [isGeneralSettingsOpen, setIsGeneralSettingsOpen] = useState(false);
     
     // State für Upload Panel
-    // const [isUploadPanelOpen, setIsUploadPanelOpen] = useState(false); // DISABLED
-    // const [isEmployeeUploadModalOpen, setIsEmployeeUploadModalOpen] = useState(false); // DISABLED
+
     const [isExcelUploadModalOpen, setIsExcelUploadModalOpen] = useState(false);
     
     // ✅ KORRIGIERT: Action-Items State mit komplexer Struktur für beide Views
@@ -137,8 +136,8 @@ function App() {
             logout={logout}
             setAdminModalOpen={setAdminModalOpen}
             onSettings={() => setIsSettingsModalOpen(true)}
-            onAdminUpload={() => {}} // DISABLED: setIsUploadPanelOpen(true)
-            onEmployeeUpload={() => {}} // DISABLED: setIsEmployeeUploadModalOpen(true)
+            onAdminUpload={() => {}}
+            onEmployeeUpload={() => {}}
             onExcelUpload={() => setIsExcelUploadModalOpen(true)}
             onAuslastungView={() => setIsAuslastungViewOpen(true)}
             onEinsatzplanView={() => setIsEinsatzplanViewOpen(true)}
@@ -385,7 +384,7 @@ function App() {
 
                     <AdminUserManagementModal isOpen={isAdminModalOpen} onClose={() => setAdminModalOpen(false)} />
 
-          {/* Employee Upload Modal */}
+
           {/* DISABLED: Employee Upload Modal
           {isEmployeeUploadModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
