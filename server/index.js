@@ -249,6 +249,9 @@ function buildWeekValuesMap(row) {
     if (
       key !== 'person' &&
       key !== 'personId' &&
+      key !== 'lbs' &&
+      key !== 'vg' &&
+      key !== 'VG' &&
       key !== 'lob' &&
       key !== 'bereich' &&
       key !== 'cc' &&
@@ -580,6 +583,8 @@ app.post('/api/auslastung', requireAuth, async (req, res) => {
           bereich: row.bereich ?? existing.data.bereich ?? null,
           cc: row.cc ?? existing.data.cc ?? null,
           team: row.team ?? existing.data.team ?? null,
+          lbs: row.lbs ?? existing.data.lbs ?? null,
+          vg: pickField(row, ['VG', 'vg']) ?? existing.data.vg ?? null,
           values: mergedValues,
           updatedBy: req.user.uid,
           updatedAt: FieldValue.serverTimestamp(),
@@ -608,6 +613,8 @@ app.post('/api/auslastung', requireAuth, async (req, res) => {
           team: row.team ?? null,
           cc: row.cc ?? null,
           bereich: row.bereich ?? null,
+          lbs: row.lbs ?? null,
+          vg: pickField(row, ['VG', 'vg']) ?? null,
           values: newWeekValues,
           isLatest: true,
           createdBy: req.user.uid,
@@ -806,7 +813,10 @@ app.get('/api/auslastung', requireAuth, async (req, res) => {
     let out = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       .sort((a, b) => String(a.person || '').localeCompare(String(b.person || ''), 'de'));
     const profile = await loadUserProfile(req.user.uid);
-    out = applyScopeFilter(out, profile, req.user?.admin);
+    // ✅ TEMP DEBUG: Scope-Filter temporär deaktiviert
+    console.log('🔍 DEBUG: Rohe Auslastung-Daten vor Filter:', out.length);
+    // out = applyScopeFilter(out, profile, req.user?.admin);
+    console.log('🔍 DEBUG: Auslastung-Daten nach Filter (deaktiviert):', out.length);
     res.json(out);
   } catch (error) {
     
@@ -821,7 +831,10 @@ app.get('/api/einsatzplan', requireAuth, async (req, res) => {
     let out = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       .sort((a, b) => String(a.person || '').localeCompare(String(b.person || ''), 'de'));
     const profile = await loadUserProfile(req.user.uid);
-    out = applyScopeFilter(out, profile, req.user?.admin);
+    // ✅ TEMP DEBUG: Scope-Filter temporär deaktiviert
+    console.log('🔍 DEBUG: Rohe Einsatzplan-Daten vor Filter:', out.length);
+    // out = applyScopeFilter(out, profile, req.user?.admin);
+    console.log('🔍 DEBUG: Einsatzplan-Daten nach Filter (deaktiviert):', out.length);
     res.json(out);
   } catch (error) {
     
