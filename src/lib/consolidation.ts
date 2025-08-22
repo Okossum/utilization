@@ -13,9 +13,9 @@ interface EinsatzplanEntry {
   projekt: string;
   ort: string;
   auslastungProzent: number;
-  kunde?: string;
-  projektphase?: string;
-  beschreibung?: string;
+  kunde: string | null;
+  projektphase: string | null;
+  beschreibung: string | null;
 }
 
 interface ConsolidatedUtilizationData {
@@ -52,9 +52,9 @@ interface ConsolidatedUtilizationData {
   createdAt: Date;
   updatedAt: Date;
   lastUploadFiles: {
-    mitarbeiter?: string;
-    auslastung?: string;
-    einsatzplan?: string;
+    mitarbeiter: string | null;
+    auslastung: string | null;
+    einsatzplan: string | null;
   };
   matchStatus: "matched" | "ambiguous" | "unmatched";
   dataCompleteness: {
@@ -105,9 +105,9 @@ function transformEinsatzplanValues(einsatzplanValues: Record<string, any[]>): R
         projekt: entry.projekt || "Unbekannt",
         ort: entry.ort || "Nicht angegeben",
         auslastungProzent: entry.auslastungProzent || 0,
-        kunde: entry.kunde,
-        projektphase: entry.projektphase,
-        beschreibung: entry.beschreibung
+        kunde: entry.kunde || null,
+        projektphase: entry.projektphase || null,
+        beschreibung: entry.beschreibung || null
       }));
     }
   }
@@ -155,12 +155,12 @@ function mergePersonData(
     einsatzplan: transformEinsatzplanValues(einsatzplanData?.values || {}),
     
     // Metadaten
-    createdAt: mitarbeiterData?.createdAt || now,
+    createdAt: mitarbeiterData?.createdAt instanceof Date ? mitarbeiterData.createdAt : now,
     updatedAt: now,
     lastUploadFiles: {
-      mitarbeiter: mitarbeiterData?.fileName,
-      auslastung: auslastungData?.fileName,
-      einsatzplan: einsatzplanData?.fileName
+      mitarbeiter: mitarbeiterData?.fileName || null,
+      auslastung: auslastungData?.fileName || null,
+      einsatzplan: einsatzplanData?.fileName || null
     },
     matchStatus: "matched", // TODO: Implementiere Match-Status-Logic
     dataCompleteness: {
