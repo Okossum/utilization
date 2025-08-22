@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X, MessageSquare, ArrowRight, Check, Trash2, Loader2 } from 'lucide-react';
-import DatabaseService from '../../services/database';
+// DatabaseService removed - using direct Firebase calls
+import { db } from '../../lib/firebase';
+import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
 
 interface PlanningCommentModalProps {
   isOpen: boolean;
@@ -23,7 +25,10 @@ export function PlanningCommentModal({ isOpen, onClose, personId }: PlanningComm
       setLoading(true);
       setError(null);
       try {
-        const dossier = await DatabaseService.getEmployeeDossier(personId);
+        // Direct Firebase call instead of DatabaseService
+        const dossierSnapshot = await getDocs(collection(db, 'employee_dossiers'));
+        const dossierDoc = dossierSnapshot.docs.find(doc => doc.data().name === personId || doc.id === personId);
+        const dossier = dossierDoc?.data();
         if (!cancelled && dossier) {
           const v = String(dossier.planningComment || '');
           setValue(v);
@@ -43,7 +48,11 @@ export function PlanningCommentModal({ isOpen, onClose, personId }: PlanningComm
     setSaving(true);
     setError(null);
     try {
-      const existing = await DatabaseService.getEmployeeDossier(personId);
+      // Direct Firebase call instead of DatabaseService
+      const dossierSnapshot = await getDocs(collection(db, 'employee_dossiers'));
+      const existingDoc = dossierSnapshot.docs.find(doc => doc.data().name === personId || doc.id === personId);
+      const existing = existingDoc?.data();
+      
       const payload = {
         id: existing?.employeeId || personId,
         name: existing?.name || '',
@@ -60,8 +69,13 @@ export function PlanningCommentModal({ isOpen, onClose, personId }: PlanningComm
         jiraTickets: existing?.jiraTickets || [],
         skills: existing?.skills || [],
         excelData: existing?.excelData || {},
+        uid: existing?.uid || personId,
+        displayName: existing?.displayName || existing?.name || '',
+        experience: existing?.experience || '',
       };
-      await DatabaseService.saveEmployeeDossier(personId, payload);
+      
+      const docRef = existingDoc ? doc(db, 'employee_dossiers', existingDoc.id) : doc(db, 'employee_dossiers', personId);
+      await setDoc(docRef, payload, { merge: true });
       setRemoteValue(value);
       onClose();
     } catch (e) {
@@ -75,7 +89,11 @@ export function PlanningCommentModal({ isOpen, onClose, personId }: PlanningComm
     setSaving(true);
     setError(null);
     try {
-      const existing = await DatabaseService.getEmployeeDossier(personId);
+      // Direct Firebase call instead of DatabaseService
+      const dossierSnapshot = await getDocs(collection(db, 'employee_dossiers'));
+      const existingDoc = dossierSnapshot.docs.find(doc => doc.data().name === personId || doc.id === personId);
+      const existing = existingDoc?.data();
+      
       const payload = {
         id: existing?.employeeId || personId,
         name: existing?.name || '',
@@ -92,8 +110,13 @@ export function PlanningCommentModal({ isOpen, onClose, personId }: PlanningComm
         jiraTickets: existing?.jiraTickets || [],
         skills: existing?.skills || [],
         excelData: existing?.excelData || {},
+        uid: existing?.uid || personId,
+        displayName: existing?.displayName || existing?.name || '',
+        experience: existing?.experience || '',
       };
-      await DatabaseService.saveEmployeeDossier(personId, payload);
+      
+      const docRef = existingDoc ? doc(db, 'employee_dossiers', existingDoc.id) : doc(db, 'employee_dossiers', personId);
+      await setDoc(docRef, payload, { merge: true });
       setValue('');
       setRemoteValue('');
       onClose();

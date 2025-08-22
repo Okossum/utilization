@@ -397,11 +397,13 @@ git checkout -b refactoring/cleanup-legacy-components
 
 **Commit**: `2e2328f` - 15 Dateien entfernt, 4082 Zeilen Code reduziert ✅
 
-### **Phase 3: Database-Migration** (IN PROGRESS)
+### **Phase 3: Database-Migration** (IN PROGRESS - PRIORITÄT 1)
 - 🔄 DatabaseService-Abhängigkeiten ersetzen (GESTARTET)
   - ✅ UtilizationReportView.tsx bereinigt (DatabaseService entfernt, direkte Firebase-Calls)
-  - ⏳ 6 weitere Komponenten mit DatabaseService.saveEmployeeDossier migrieren
-- ⏳ Legacy Database-Services entfernen
+  - 🔄 Weitere Komponenten mit DatabaseService.saveEmployeeDossier migrieren (AKTIV)
+- ⏳ Legacy Database-Services entfernen (nach Migration aller Komponenten)
+
+**📊 Migration Progress**: 1/12 Komponenten migriert ✅
 
 #### **🗄️ Verbleibende DatabaseService-Abhängigkeiten:**
 - `src/components/generated/EmployeeListView.tsx`
@@ -420,10 +422,12 @@ git checkout -b refactoring/cleanup-legacy-components
 - ⏳ DISABLED-Imports bereinigen
 - ⏳ Auskommentierte Code-Blöcke entfernen
 
-### **Phase 5: Evaluierung** (Parallel zu Phase 2-4)
-- ⏳ Knowledge-System analysieren
-- ⏳ Unklare Komponenten bewerten
-- ⏳ Production-Nutzung verifizieren
+### **Phase 5: Evaluierung unklarer Komponenten** (PRIORITÄT 2 - Nach Phase 3)
+- ⏳ Knowledge-System analysieren (KnowledgeTestPage aktiv in App.tsx?)
+- ⏳ Unklare Komponenten bewerten (CustomerDemo, EmployeeDataUpload, AuslastungPreviewExplorer)
+- ⏳ Production-Nutzung verifizieren (ExcelUpload.tsx - Fallback oder deprecated?)
+
+**🎯 Reihenfolge**: Phase 1 ✅ → Phase 3 🔄 → Phase 5 ⏳ → Phase 4 ⏳
 
 ---
 
@@ -458,9 +462,11 @@ time npm run build
 
 ---
 
-**Status**: 🔄 Phase 3 - DatabaseService-Migration (IN PROGRESS)  
-**Aktueller Schritt**: DatabaseService-Abhängigkeiten in kritischen Komponenten ersetzen  
-**Erfolg Phase 2**: 15 Legacy-Dateien entfernt, 4082 Zeilen Code reduziert  
+**Status**: 🚀 MULTI-PHASE EXECUTION - Reihenfolge: 1→3→2  
+**Phase 1**: ✅ ABGESCHLOSSEN - Dependency-Analyse  
+**Phase 3**: 🔄 IN PROGRESS - DatabaseService-Migration  
+**Phase 2**: ⏳ BEREIT - Evaluierung unklarer Komponenten  
+**Erfolg bisher**: 15 Legacy-Dateien entfernt + UtilizationReportView migriert  
 **Verantwortlich**: Assistant + User-Freigaben für Breaking Changes  
 
 ---
