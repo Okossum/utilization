@@ -11,7 +11,8 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { db } from '../../lib/firebase';
-import { collection, addDoc, getDocs, query, where, updateDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, updateDoc, doc, Timestamp } from 'firebase/firestore';
+import { logger } from '../../lib/logger';
 
 interface EmployeeUploadModalProps {
   isOpen: boolean;
@@ -38,7 +39,7 @@ interface MitarbeiterExcelRow {
   standort: string;
   lbs: string; // Karrierestufe → LBS
   erfahrungSeitJahr: string;
-  verfuegbarAb: string;
+  verfuegbarAb: string | undefined; // ✅ Geändert: ISO-String "YYYY-MM-DD" oder undefined
   verfuegbarFuerStaffing: string;
   linkZumProfil: string;
 }
@@ -54,24 +55,67 @@ export const EmployeeUploadModal: React.FC<EmployeeUploadModalProps> = ({
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // ✅ NEUE FUNKTION: Excel-Zelle -> ISO-YYYY-MM-DD
+  function cellToIsoDate(cell: any, wb: XLSX.WorkBook): string | undefined {
+    if (!cell) return undefined;
+
+    // A) Wenn cellDates:true und Zelle wirklich als Datum vorliegt
+    if (cell.t === "d" && cell.v instanceof Date) {
+      const d = cell.v as Date;
+      // Datum OHNE Zeitzone persistieren:
+      return d.toISOString().slice(0, 10);  // "YYYY-MM-DD"
+    }
+
+    // B) Wenn Excel-Datum als Zahl kam (Seriennummer)
+    if (cell.t === "n" && typeof cell.v === "number") {
+      const date1904 = !!(wb.Workbook && wb.Workbook.WBProps && wb.Workbook.WBProps.date1904);
+      const o = XLSX.SSF.parse_date_code(cell.v, { date1904 });
+      if (o) {
+        const y = o.y, m = o.m, d = o.d;
+        // ISO ohne TZ:
+        const iso = new Date(Date.UTC(y, m - 1, d)).toISOString().slice(0, 10);
+        return iso; // z.B. "2026-01-01" für 46023
+      }
+    }
+
+    // C) Fallback: Text wie "01.01.2026" o.ä. parsen
+    if (cell.t === "s" && typeof cell.v === "string") {
+      const s = cell.v.trim();
+      // dd.mm.yyyy
+      const m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
+      if (m) {
+        const dd = +m[1], MM = +m[2], yyyy = m[3].length === 2 ? 2000 + +m[3] : +m[3];
+        return new Date(Date.UTC(yyyy, MM - 1, dd)).toISOString().slice(0, 10);
+      }
+      // ISO bereits vorhanden
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    }
+
+    return undefined;
+  }
+
   // ✅ NEUE FUNKTION: Parser für die Excel-Struktur (Header in Zeile 9)
   async function parseMitarbeiterExcelWorkbook(file: File): Promise<{ name: string; isValid: boolean; error?: string; preview?: string[][]; data: MitarbeiterExcelRow[] }> {
     try {
+      logger.info("mitarbeiter.upload", `Starte Upload für Datei: ${file.name}`);
       const arrayBuffer = await file.arrayBuffer();
-      // ✅ FIX: Verhindere automatischen Browser-Download durch XLSX.read()
+      logger.debug("mitarbeiter.upload", `ArrayBuffer erstellt, Größe: ${arrayBuffer.byteLength}`);
+      
+      // ✅ WICHTIG: cellDates:true für korrekte Datum-Erkennung!
       const workbook = XLSX.read(arrayBuffer, { 
         type: 'array',
+        cellDates: true, // ✅ Aktiviert für korrekte Datum-Erkennung
+        cellStyles: true, // ✅ Aktiviert für Zellentyp-Erkennung
         bookVBA: false,
         bookSheets: false,
-        cellStyles: false,
         cellNF: false,
         cellHTML: false,
-        cellDates: false,
         sheetStubs: false,
         bookDeps: false,
         bookFiles: false,
         bookProps: false
       });
+      logger.debug("mitarbeiter.upload", `Workbook gelesen, Sheets: ${workbook.SheetNames.join(', ')}`);
 
       const sheetName = workbook.SheetNames[0];
       if (!sheetName) {
@@ -80,13 +124,13 @@ export const EmployeeUploadModal: React.FC<EmployeeUploadModalProps> = ({
 
       const worksheet = workbook.Sheets[sheetName];
       // ✅ Hyperlinks direkt aus dem Worksheet extrahieren
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false }); // ✅ raw: false für automatische Excel-Konvertierung
       
       // ✅ Debug: Zeige Hyperlinks aus dem Worksheet
-      console.log('🔍 Worksheet Hyperlinks:', worksheet['!links'] || 'Keine Hyperlinks gefunden');
+      logger.debug("mitarbeiter.upload", "Worksheet Hyperlinks", worksheet['!links'] || 'Keine Hyperlinks gefunden');
       if (worksheet['!links']) {
         Object.entries(worksheet['!links']).forEach(([cell, link]) => {
-          console.log(`🔗 Hyperlink in Zelle ${cell}:`, link);
+          logger.debug("mitarbeiter.upload", `Hyperlink in Zelle ${cell}`, link);
         });
       }
 
@@ -113,6 +157,13 @@ export const EmployeeUploadModal: React.FC<EmployeeUploadModalProps> = ({
       const verfuegbarFuerStaffingIndex = headers.findIndex(h => h === 'Verfügbar für Staffing');
       const linkZumProfilIndex = headers.findIndex(h => h === 'Link zum Profil');
 
+      logger.debug("mitarbeiter.upload", "Spalten-Indizes gefunden", {
+        vorname: vornameIndex,
+        nachname: nachnameIndex,
+        verfuegbarAb: verfuegbarAbIndex,
+        verfuegbarFuerStaffing: verfuegbarFuerStaffingIndex,
+        headers: headers
+      });
 
 
       if (vornameIndex === -1 || nachnameIndex === -1) {
@@ -156,16 +207,16 @@ export const EmployeeUploadModal: React.FC<EmployeeUploadModalProps> = ({
           // ✅ Prüfe ob es einen Hyperlink für diese Zelle gibt
           if (worksheet['!links'] && worksheet['!links'][cellAddress]) {
             linkZumProfil = worksheet['!links'][cellAddress];
-            console.log(`🔗 Hyperlink aus Worksheet gefunden für ${cellAddress}: ${linkZumProfil}`);
+            logger.info(`🔗 Hyperlink aus Worksheet gefunden für ${cellAddress}: ${linkZumProfil}`);
           } else {
             // ✅ Fallback: Verwende den Zelleninhalt
             const cellValue = row[linkZumProfilIndex];
             if (cellValue && typeof cellValue === 'string' && cellValue.startsWith('http')) {
               linkZumProfil = cellValue;
-              console.log(`🔗 Direkte URL gefunden: ${linkZumProfil}`);
+              logger.info(`🔗 Direkte URL gefunden: ${linkZumProfil}`);
             } else if (cellValue) {
               linkZumProfil = cellValue;
-              console.log(`⚠️ Fallback - Zelleninhalt: ${linkZumProfil} (Zelle: ${cellAddress})`);
+              logger.warn(`⚠️ Fallback - Zelleninhalt: ${linkZumProfil} (Zelle: ${cellAddress})`);
             }
           }
         }
@@ -182,10 +233,16 @@ export const EmployeeUploadModal: React.FC<EmployeeUploadModalProps> = ({
           standort: row[standortIndex] || '',
           lbs: row[karrierestufeIndex] || '', // Karrierestufe → LBS
           erfahrungSeitJahr: row[erfahrungSeitJahrIndex] || '',
-          verfuegbarAb: row[verfuegbarAbIndex] || '',
+          verfuegbarAb: verfuegbarAbIndex !== -1 ? cellToIsoDate(worksheet[XLSX.utils.encode_cell({ r: i + 9, c: verfuegbarAbIndex })], workbook) : undefined, // ✅ Korrekte Zellenreferenz
           verfuegbarFuerStaffing: row[verfuegbarFuerStaffingIndex] || '',
           linkZumProfil: linkZumProfil // ✅ Jetzt wird die echte URL aus dem Hyperlink extrahiert
         };
+
+        // ✅ Debug: Zeige was für "verfügbar ab" gelesen und geparst wurde
+        logger.debug("mitarbeiter.row", `Mitarbeiter ${mitarbeiterRow.person} verarbeitet`, {
+          verfuegbarAbIndex,
+          verfuegbarAb: mitarbeiterRow.verfuegbarAb
+        });
 
         rowsOut.push(mitarbeiterRow);
 
@@ -196,13 +253,14 @@ export const EmployeeUploadModal: React.FC<EmployeeUploadModalProps> = ({
             mitarbeiterRow.email,
             mitarbeiterRow.firma,
             mitarbeiterRow.lob,
-            mitarbeiterRow.cc
+            mitarbeiterRow.cc,
+            mitarbeiterRow.verfuegbarAb || '' // ✅ Verfügbar ab hinzugefügt
           ]);
         }
       }
 
       // ✅ Vorschau-Header
-      const previewHeader = ['Person', 'E-Mail', 'Firma', 'Lob', 'CC'];
+      const previewHeader = ['Person', 'E-Mail', 'Firma', 'Lob', 'CC', 'Verfügbar ab'];
 
       return { 
         name: file.name,
@@ -212,7 +270,7 @@ export const EmployeeUploadModal: React.FC<EmployeeUploadModalProps> = ({
         data: rowsOut 
       };
     } catch (error) {
-      console.error('Fehler beim Parsen der Excel-Datei:', error);
+      logger.error('Fehler beim Parsen der Excel-Datei:', error);
       return { 
         name: file.name,
         isValid: false, 
@@ -247,29 +305,31 @@ export const EmployeeUploadModal: React.FC<EmployeeUploadModalProps> = ({
           
           const existingDocs = await getDocs(existingQuery);
           
+          // ✅ Daten für Firebase vorbereiten - verfuegbarAb als Timestamp konvertieren
+          const firebaseData = {
+            ...row,
+            verfuegbarAb: row.verfuegbarAb ? Timestamp.fromDate(new Date(row.verfuegbarAb)) : undefined,
+            updatedAt: new Date(),
+            uploadVersion: existingDocs.empty ? 1 : (existingDocs.docs[0].data().uploadVersion || 0) + 1
+          };
+          
           if (!existingDocs.empty) {
             // ✅ Mitarbeiter existiert bereits → UPDATE
             const existingDoc = existingDocs.docs[0];
-            await updateDoc(doc(db, 'mitarbeiterExcel', existingDoc.id), {
-              ...row,
-              updatedAt: new Date(),
-              uploadVersion: (existingDoc.data().uploadVersion || 0) + 1
-            });
+            await updateDoc(doc(db, 'mitarbeiterExcel', existingDoc.id), firebaseData);
             updateCount++;
-            console.log(`✅ Mitarbeiter aktualisiert: ${row.person} (${row.cc}, ${row.lbs})`);
+            logger.info(`✅ Mitarbeiter aktualisiert: ${row.person} (${row.cc}, ${row.lbs})`);
           } else {
             // ✅ Neuer Mitarbeiter → INSERT
             await addDoc(mitarbeiterCollection, {
-              ...row,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-              uploadVersion: 1
+              ...firebaseData,
+              createdAt: new Date()
             });
             insertCount++;
-            console.log(`➕ Neuer Mitarbeiter hinzugefügt: ${row.person} (${row.cc}, ${row.lbs})`);
+            logger.info(`➕ Neuer Mitarbeiter hinzugefügt: ${row.person} (${row.cc}, ${row.lbs})`);
           }
         } catch (err) {
-          console.error('Fehler beim Upsert von Mitarbeiter:', row.person, err);
+          logger.error('Fehler beim Upsert von Mitarbeiter:', row.person, err);
           errorCount++;
         }
       }
@@ -277,12 +337,12 @@ export const EmployeeUploadModal: React.FC<EmployeeUploadModalProps> = ({
       if (errorCount === 0) {
         setUploadComplete(true);
         setUploadedFile({ ...uploadedFile!, data: data, isValid: true });
-        console.log(`✅ Upsert erfolgreich: ${insertCount} neu, ${updateCount} aktualisiert`);
+        logger.info(`✅ Upsert erfolgreich: ${insertCount} neu, ${updateCount} aktualisiert`);
       } else {
         setError(`${insertCount} neu, ${updateCount} aktualisiert, ${errorCount} Fehler`);
       }
     } catch (error) {
-      console.error('Fehler beim Upsert in Firebase:', error);
+      logger.error('Fehler beim Upsert in Firebase:', error);
       setError(`Fehler beim Upsert: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
     } finally {
       setIsUploading(false);
@@ -305,7 +365,7 @@ export const EmployeeUploadModal: React.FC<EmployeeUploadModalProps> = ({
         await upsertToFirebase(result.data);
       }
     } catch (error) {
-      console.error('Fehler beim Verarbeiten der Datei:', error);
+      logger.error('Fehler beim Verarbeiten der Datei:', error);
       setError(`Fehler beim Verarbeiten: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
     }
   };

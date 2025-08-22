@@ -68,10 +68,11 @@ export function UtilizationReportView({
   useEffect(() => {
     try { localStorage.setItem('utilization_show_all_data', JSON.stringify(showAllData)); } catch {}
   }, [showAllData]);
-  const [uploadedFiles, setUploadedFiles] = useState<{
-    auslastung?: UploadedFile;
-    einsatzplan?: UploadedFile;
-  }>({});
+  // DISABLED: uploadedFiles State
+  // const [uploadedFiles, setUploadedFiles] = useState<{
+  //   auslastung?: UploadedFile;
+  //   einsatzplan?: UploadedFile;
+  // }>({});
   // ✅ VEREINFACHT: Direkte Collections statt Konsolidierung
   const [databaseData, setDatabaseData] = useState<{
     auslastung?: any[];
@@ -676,83 +677,13 @@ export function UtilizationReportView({
       return transformed;
     }
 
-    // Upload-Modus: Verarbeite Upload-Dateien (Original-Logik beibehalten für Upload)
-    if (dataSource === 'upload') {
-      const aus = uploadedFiles.auslastung?.data as any[] | null;
-      const ein = uploadedFiles.einsatzplan?.data as any[] | null;
-      
-      if (!aus && !ein) return null;
-
-      const normalizePersonKey = (s: string) => {
-        const cleaned = s.replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
-        if (cleaned === 'Leisen, Wie') return 'Leisen, Wei';
-        if (cleaned === 'Leisen, Wei') return 'Leisen, Wei';
-        return cleaned;
-      };
-
-      const leftStart = forecastStartWeek - lookbackWeeks + 1;
-      const leftWeeksArr = Array.from({ length: lookbackWeeks }, (_, i) => leftStart + i);
-      const rightWeeksArr = Array.from({ length: forecastWeeks }, (_, i) => forecastStartWeek + 1 + i);
-      const currentYear = currentIsoYear;
-
-      const ausMap = new Map<string, any>();
-      const einMap = new Map<string, any>();
-      aus?.forEach(r => ausMap.set(normalizePersonKey(r.person), r));
-      ein?.forEach(r => einMap.set(normalizePersonKey(r.person), r));
-      
-      const allNames = Array.from(new Set([
-        ...(aus || []).map(r => normalizePersonKey(r.person)),
-        ...(ein || []).map(r => normalizePersonKey(r.person))
-      ])).sort((a, b) => a.split(',')[0].localeCompare(b.split(',')[0], 'de'));
-
-      const out: UtilizationData[] = [];
-      for (const personKey of allNames) {
-        // Historical weeks
-        for (const weekNum of leftWeeksArr) {
-          const uiLabel = `${currentYear}-KW${weekNum}`;
-          const aRow = ausMap.get(personKey);
-          const eRow = einMap.get(personKey);
-          let val: number | null = null;
-          const fromAus = getWeekValue(aRow, weekNum, currentYear);
-          const fromEin = getWeekValue(eRow, weekNum, currentYear);
-          if (fromAus !== undefined) val = fromAus;
-          else if (fromEin !== undefined) val = fromEin;
-          if (val !== null) {
-            out.push({ 
-              person: personKey, 
-              week: uiLabel, 
-              utilization: Math.round(val * 10) / 10, 
-              isHistorical: true 
-            });
-          }
-        }
-        // Forecast weeks
-        for (const weekNum of rightWeeksArr) {
-          const uiLabel = `${currentYear}-KW${weekNum}`;
-          const aRow = ausMap.get(personKey);
-          const eRow = einMap.get(personKey);
-          let val: number | null = null;
-          const fromAus = getWeekValue(aRow, weekNum, currentYear);
-          const fromEin = getWeekValue(eRow, weekNum, currentYear);
-          if (fromAus !== undefined) val = fromAus;
-          else if (fromEin !== undefined) val = fromEin;
-          if (val !== null) {
-            out.push({ 
-              person: personKey, 
-              week: uiLabel, 
-              utilization: Math.round(val * 10) / 10, 
-              isHistorical: false 
-            });
-          }
-        }
-      }
-      return out;
-    }
+    // DISABLED: Upload-Modus komplett entfernt
+    // Der Upload-Modus wurde deaktiviert, da eine neue Upload-Funktion implementiert wird
 
     // ✅ ROBUSTER FALLBACK: Wenn weder DB noch Upload-Daten da sind
     console.log('⚠️ Keine Daten verfügbar - weder Database noch Upload');
     return [];
-  }, [uploadedFiles, databaseData, dataSource, forecastStartWeek, lookbackWeeks, forecastWeeks, currentIsoYear]);
+  }, [databaseData, dataSource, forecastStartWeek, lookbackWeeks, forecastWeeks, currentIsoYear]);
 
   // ✅ VEREINFACHT: Erstelle View-Daten direkt aus Auslastung und Einsatzplan
   const dataForUI: UtilizationData[] = useMemo(() => {
@@ -978,10 +909,10 @@ export function UtilizationReportView({
       return personMetaMap;
     }
 
-    // Upload-Modus: Verarbeite Upload-Dateien mit Original-Logik
-    if (dataSource === 'upload') {
-      const aus = uploadedFiles.auslastung?.data as any[] | null;
-      const ein = uploadedFiles.einsatzplan?.data as any[] | null;
+    // DISABLED: Upload-Modus
+    // if (dataSource === 'upload') {
+    //   const aus = uploadedFiles.auslastung?.data as any[] | null;
+    //   const ein = uploadedFiles.einsatzplan?.data as any[] | null;
 
       const getField = (row: any, candidates: string[]): string | undefined => {
         for (const key of candidates) {
@@ -1018,12 +949,13 @@ export function UtilizationReportView({
         });
       };
       
-      fill(aus || undefined);
-      fill(ein || undefined);
-    }
+      // DISABLED: Upload-Daten-Verarbeitung
+      // fill(aus || undefined);
+      // fill(ein || undefined);
+    // }
 
     return meta;
-  }, [uploadedFiles, databaseData, dataSource]);
+  }, [databaseData, dataSource]);
 
   // ✅ FK-Regel nur einmal beim Laden anwenden (keine Endlosschleife!)
   useEffect(() => {
@@ -1251,7 +1183,7 @@ export function UtilizationReportView({
       return `${yy}/${String(adjustedWeek).padStart(2, '0')}`;
     });
     
-    console.log('🔍 Forecast Wochen (8 Wochen ab der Woche nach der aktuellen KW):', forecastWeeks);
+
     return forecastWeeks;
   }, []);
   
@@ -1719,13 +1651,7 @@ export function UtilizationReportView({
                   const rowBgColor = hasNoManager ? 'bg-yellow-100' : 
                     (actionItems[person]?.actionItem ? 'bg-blue-100' : '');
                   
-                  // ✅ DEBUG: Zeige verfügbare Wochen für erste Person
-                  if (person === visiblePersons[0]) {
-                    const availableWeeks = personData.map(item => item.week).slice(0, 10);
-                    console.log(`🔍 DEBUG Person "${person}" - Verfügbare Wochen:`, availableWeeks);
-                    console.log(`🔍 DEBUG Header wird diese Wochen zeigen:`, availableWeeksFromData.slice(0, 10));
-                    console.log(`🔍 DEBUG Aktuelle Woche: ${getISOWeek(new Date())}, Einsatzplan startet bei: ${getISOWeek(new Date()) + 1}`);
-                  }
+
                   return (
                     <tr key={person} className={`hover:bg-gray-50 ${rowBgColor}`}>
                       {/* 8 Wochen Auslastung (endet bei aktueller Woche) */}

@@ -11,6 +11,14 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    terserOptions: { 
+      compress: { 
+        drop_console: false, 
+        drop_debugger: false 
+      } 
+    }
+  },
   server: {
     proxy: {
       '/api': {

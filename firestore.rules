@@ -1,0 +1,49 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if request is from Cloud Functions
+    function isFunction() {
+      return request.auth != null && request.auth.token.function == true;
+    }
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Auslastung collection
+    match /auslastung/{document} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      // personId can only be set by Cloud Functions
+      allow update: if isAuthenticated() && 
+        (!('personId' in request.resource.data) || 
+         resource.data.personId == request.resource.data.personId);
+    }
+
+    // Einsatzplan collection
+    match /einsatzplan/{document} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      // personId can only be set by Cloud Functions
+      allow update: if isAuthenticated() && 
+        (!('personId' in request.resource.data) || 
+         resource.data.personId == request.resource.data.personId);
+    }
+
+    // Mitarbeiter collection
+match /mitarbeiter/{document} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      // personId can only be set by Cloud Functions
+      allow update: if isAuthenticated() && 
+        (!('personId' in request.resource.data) || 
+         resource.data.personId == request.resource.data.personId);
+    }
+
+    // Other collections
+    match /{document=**} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}

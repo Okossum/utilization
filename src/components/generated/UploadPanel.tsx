@@ -22,6 +22,7 @@ interface UploadPanelProps {
   }) => void;
   onDatabaseRefresh?: () => void;
 }
+// DISABLED: UploadPanel komplett deaktiviert
 export function UploadPanel({
   uploadedFiles,
   onFilesChange,

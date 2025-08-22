@@ -15,12 +15,14 @@ import { LoginForm } from './components/LoginForm';
 import { User as UserIcon, ChevronDown, LogOut, Users, BarChart3, FileText, X } from 'lucide-react';
 import AdminUserManagementModal from './components/generated/AdminUserManagementModal';
 import { AdminDataUploadModal } from './components/generated/AdminDataUploadModal';
-import { EmployeeUploadModal } from './components/generated/EmployeeUploadModal';
+import { ExcelUploadModal } from './components/generated/ExcelUploadModal';
+// import { EmployeeUploadModal } from './components/generated/EmployeeUploadModal'; // DISABLED
 import { AssignmentsProvider } from './contexts/AssignmentsContext';
 import { RoleProvider } from './contexts/RoleContext';
 import { ProjectHistoryProvider } from './contexts/ProjectHistoryContext';
 import { AppHeader } from './components/AppHeader';
-import { UploadPanel } from './components/generated/UploadPanel';
+// import { UploadPanel } from './components/generated/UploadPanel'; // DISABLED
+import DebugPanel from './components/DebugPanel';
 
 let theme: Theme = 'light';
 // only use 'centered' container for standalone components, never for full page apps or websites.
@@ -67,8 +69,9 @@ function App() {
     const [isGeneralSettingsOpen, setIsGeneralSettingsOpen] = useState(false);
     
     // State für Upload Panel
-    const [isUploadPanelOpen, setIsUploadPanelOpen] = useState(false);
-    const [isEmployeeUploadModalOpen, setIsEmployeeUploadModalOpen] = useState(false);
+    // const [isUploadPanelOpen, setIsUploadPanelOpen] = useState(false); // DISABLED
+    // const [isEmployeeUploadModalOpen, setIsEmployeeUploadModalOpen] = useState(false); // DISABLED
+    const [isExcelUploadModalOpen, setIsExcelUploadModalOpen] = useState(false);
     
     // ✅ KORRIGIERT: Action-Items State mit komplexer Struktur für beide Views
     const [actionItems, setActionItems] = useState<Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }>>(() => {
@@ -133,8 +136,9 @@ function App() {
             logout={logout}
             setAdminModalOpen={setAdminModalOpen}
             onSettings={() => setIsSettingsModalOpen(true)}
-            onAdminUpload={() => setIsUploadPanelOpen(true)}
-            onEmployeeUpload={() => setIsEmployeeUploadModalOpen(true)}
+            onAdminUpload={() => {}} // DISABLED: setIsUploadPanelOpen(true)
+            onEmployeeUpload={() => {}} // DISABLED: setIsEmployeeUploadModalOpen(true)
+            onExcelUpload={() => setIsExcelUploadModalOpen(true)}
             onAuslastungView={() => setIsAuslastungViewOpen(true)}
             onEinsatzplanView={() => setIsEinsatzplanViewOpen(true)}
             onRoleManagement={() => setIsRoleManagementOpen(true)}
@@ -377,6 +381,7 @@ function App() {
                     <AdminUserManagementModal isOpen={isAdminModalOpen} onClose={() => setAdminModalOpen(false)} />
 
           {/* Employee Upload Modal */}
+          {/* DISABLED: Employee Upload Modal
           {isEmployeeUploadModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <div className="fixed inset-0 bg-black/20 backdrop-blur-sm" onClick={() => setIsEmployeeUploadModalOpen(false)} />
@@ -409,8 +414,44 @@ function App() {
               </div>
             </div>
           )}
+          */}
+
+          {/* Excel Upload Modal */}
+          <ExcelUploadModal 
+            isOpen={isExcelUploadModalOpen}
+            onClose={() => setIsExcelUploadModalOpen(false)}
+          />
+
+          {/* Debug Panel für besseres Logging */}
+          <DebugPanel />
+
+          {/* Test Button für Logger */}
+          <button 
+            onClick={() => {
+              console.log("Test Button geklickt!");
+              // @ts-ignore
+              if (window.logger) {
+                // @ts-ignore
+                window.logger.info("test", "Test Button geklickt!");
+              }
+            }}
+            style={{
+              position: "fixed",
+              left: 12,
+              bottom: 12,
+              zIndex: 99999,
+              padding: "8px 16px",
+              background: "red",
+              color: "white",
+              border: "none",
+              borderRadius: "8px"
+            }}
+          >
+            Test Logger
+          </button>
 
           {/* Upload Panel Modal */}
+          {/* DISABLED: UploadPanel Modal
           {isUploadPanelOpen && (
             <div className="fixed inset-0 z-50 overflow-y-auto">
               <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
@@ -436,6 +477,7 @@ function App() {
               </div>
             </div>
           )}
+          */}
 
           </ProjectHistoryProvider>
           </RoleProvider>

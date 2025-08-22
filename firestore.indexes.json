@@ -1,0 +1,59 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "auslastung",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "cc",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "person",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "isLatest",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "einsatzplan",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "cc",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "person",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "isLatest",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+              "collectionGroup": "mitarbeiter",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "cc",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "person",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "isLatest",
+          "order": "ASCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

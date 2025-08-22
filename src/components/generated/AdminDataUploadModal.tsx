@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Database, X, Upload } from 'lucide-react';
-import { UploadPanel } from './UploadPanel';
+// import { UploadPanel } from './UploadPanel'; // DISABLED
 
 interface UploadedFile {
   name: string;
@@ -19,17 +19,19 @@ interface AdminDataUploadModalProps {
 }
 
 export function AdminDataUploadModal({ isOpen, onClose, onDatabaseRefresh }: AdminDataUploadModalProps) {
-  const [uploadedFiles, setUploadedFiles] = useState<{
-    auslastung?: UploadedFile;
-    einsatzplan?: UploadedFile;
-  }>({});
+  // DISABLED: uploadedFiles State
+  // const [uploadedFiles, setUploadedFiles] = useState<{
+  //   auslastung?: UploadedFile;
+  //   einsatzplan?: UploadedFile;
+  // }>({});
 
-  const handleFilesChange = (files: {
-    auslastung?: UploadedFile;
-    einsatzplan?: UploadedFile;
-  }) => {
-    setUploadedFiles(files);
-  };
+  // DISABLED: handleFilesChange
+  // const handleFilesChange = (files: {
+  //   auslastung?: UploadedFile;
+  //   einsatzplan?: UploadedFile;
+  // }) => {
+  //   setUploadedFiles(files);
+  // };
 
   const handleDatabaseRefreshAndClose = async () => {
     // Erst Database refresh, dann Modal schließen
@@ -37,8 +39,8 @@ export function AdminDataUploadModal({ isOpen, onClose, onDatabaseRefresh }: Adm
       await onDatabaseRefresh();
     }
     
-    // Upload-Dateien zurücksetzen nach erfolgreichem Upload
-    setUploadedFiles({});
+    // DISABLED: Upload-Dateien zurücksetzen
+    // setUploadedFiles({});
     
     onClose();
   };
@@ -94,13 +96,20 @@ export function AdminDataUploadModal({ isOpen, onClose, onDatabaseRefresh }: Adm
                 </div>
               </div>
 
-              <UploadPanel
-                uploadedFiles={uploadedFiles}
-                onFilesChange={handleFilesChange}
-                onDatabaseRefresh={onDatabaseRefresh}
-              />
+                          {/* DISABLED: UploadPanel
+            <UploadPanel
+              uploadedFiles={{}}
+              onFilesChange={() => {}}
+              onDatabaseRefresh={onDatabaseRefresh}
+            />
+            */}
+            <div className="text-center py-8 text-gray-500">
+              <p>Upload-Funktionalität ist deaktiviert</p>
+              <p className="text-sm">Neue Upload-Funktion wird implementiert</p>
+            </div>
 
-              {(uploadedFiles.auslastung?.isValid || uploadedFiles.einsatzplan?.isValid) && (
+              {/* DISABLED: Upload-Status-Buttons
+              {(false) && (
                 <div className="mt-6 flex justify-end gap-3">
                   <button
                     onClick={onClose}
@@ -116,6 +125,7 @@ export function AdminDataUploadModal({ isOpen, onClose, onDatabaseRefresh }: Adm
                   </button>
                 </div>
               )}
+              */}
             </div>
           </motion.div>
         </div>

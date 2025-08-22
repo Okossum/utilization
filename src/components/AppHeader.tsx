@@ -10,6 +10,7 @@ interface AppHeaderProps {
   // UtilizationReportView spezifische Props (nur wenn currentView === 'utilization')
   onAdminUpload?: () => void;
   onEmployeeUpload?: () => void;
+  onExcelUpload?: () => void;
   onAuslastungView?: () => void;
   onEinsatzplanView?: () => void;
   onSettings?: () => void;
@@ -29,6 +30,7 @@ export function AppHeader({
   setAdminModalOpen,
   onAdminUpload,
   onEmployeeUpload,
+  onExcelUpload,
   onAuslastungView,
   onEinsatzplanView,
   onSettings,
@@ -194,12 +196,24 @@ export function AppHeader({
                             📊 Excel Upload
                           </button>
                         )}
+                        {/* DISABLED: Employee Upload
                         {onEmployeeUpload && (
                           <button
                             onClick={() => { onEmployeeUpload(); setIsSettingsMenuOpen(false); }}
                             className="w-full px-3 py-2 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 text-left font-medium"
                           >
                             👥 Mitarbeiter Upload
+                          </button>
+                        )}
+                        */}
+                        
+                        {/* Excel Upload */}
+                        {onExcelUpload && (
+                          <button
+                            onClick={() => { onExcelUpload(); setIsSettingsMenuOpen(false); }}
+                            className="w-full px-3 py-2 text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 text-left font-medium"
+                          >
+                            📊 Excel Upload
                           </button>
                         )}
                       </div>
