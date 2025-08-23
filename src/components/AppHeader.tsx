@@ -3,8 +3,8 @@ import { Settings, Database, TrendingUp, Target, User, Ticket, BarChart3, Users,
 import { useAuth } from '../contexts/AuthContext';
 
 interface AppHeaderProps {
-  currentView: 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo';
-  setCurrentView: (view: 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo') => void;
+  currentView: 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail';
+  setCurrentView: (view: 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail') => void;
   logout: () => Promise<void>;
   setAdminModalOpen: (open: boolean) => void;
   // UtilizationReportView spezifische Props (nur wenn currentView === 'utilization')
@@ -98,6 +98,7 @@ export function AppHeader({
             {currentView === 'knowledge' && 'Knowledge Library'}
             {currentView === 'auslastung-comments' && 'Auslastung mit Kommentaren'}
             {currentView === 'sales' && 'Sales Team Overview'}
+            {currentView === 'employee-detail' && 'Mitarbeiter Detail'}
           </h1>
           <p className="text-sm text-gray-600 mt-1">
             {currentView === 'utilization' && 'Rückblick & Vorblick · ISO-KW'}
@@ -105,6 +106,7 @@ export function AppHeader({
             {currentView === 'knowledge' && 'Knowledge Upload und Verwaltung'}
             {currentView === 'auslastung-comments' && 'Direkte Bearbeitung von Auslastung und Kommentaren'}
             {currentView === 'sales' && 'Freelance Sales Team · Skills & Projekte'}
+            {currentView === 'employee-detail' && 'Detailansicht eines Mitarbeiters'}
           </p>
         </div>
         
@@ -135,6 +137,19 @@ export function AppHeader({
           >
             <Users className="w-4 h-4" />
             Mitarbeiter
+          </button>
+          <button
+            onClick={() => setCurrentView('employee-detail')}
+            className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
+              currentView === 'employee-detail' 
+                ? 'text-blue-700 bg-blue-50 border-blue-200' 
+                : 'text-gray-700 bg-gray-50 border-gray-200 hover:bg-gray-100'
+            } border rounded-lg`}
+            style={{ zIndex: 40 }}
+            title="Mitarbeiter Detailansicht"
+          >
+            <User className="w-4 h-4" />
+            Detail
           </button>
           <button
             onClick={() => setCurrentView('knowledge')}

@@ -38,12 +38,18 @@ interface Employee {
 interface EmployeeCardProps {
   employee: Employee;
   isCompact?: boolean;
+  onToggleActive?: (employeeId: string) => void;
+  onAvatarClick?: (employee: Employee) => void;
+  onOpenDetail?: () => void;
 }
 
 // @component: EmployeeCard
 export const EmployeeCard = ({
   employee,
-  isCompact = false
+  isCompact = false,
+  onToggleActive,
+  onAvatarClick,
+  onOpenDetail
 }: EmployeeCardProps) => {
   const [showProjects, setShowProjects] = useState(false);
 
@@ -158,6 +164,19 @@ export const EmployeeCard = ({
                 </div>}
             </motion.div>}
         </AnimatePresence>
+
+        {/* Detail öffnen Button */}
+        {onOpenDetail && (
+          <div className="mt-4 pt-4 border-t border-slate-200">
+            <button
+              onClick={onOpenDetail}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <ExternalLink className="w-4 h-4" />
+              <span>Detail öffnen</span>
+            </button>
+          </div>
+        )}
       </div>
     </motion.div>;
 };

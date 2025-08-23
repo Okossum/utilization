@@ -905,6 +905,7 @@ app.post('/api/mitarbeiter', requireAuth, async (req, res) => {
           experience: row.experience ?? existing.data.experience ?? null,
           updatedBy: req.user.uid,
           updatedAt: FieldValue.serverTimestamp(),
+          isLatest: true, // ✅ Wichtig: isLatest Flag setzen
         });
         
         results.push({ 
@@ -927,7 +928,7 @@ app.post('/api/mitarbeiter', requireAuth, async (req, res) => {
           team: row.team ?? null,
           skills: row.skills ?? null,
           experience: row.experience ?? null,
-          isLatest: true,
+          isLatest: true, // ✅ Wichtig: isLatest Flag setzen
           createdBy: req.user.uid,
           createdAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
@@ -1697,23 +1698,47 @@ app.get('/api/employees', authMiddleware, async (req, res) => {
   }
   
   try {
-    // console.log entfernt
+    console.log('🔍 Loading employees from mitarbeiter collection...');
     
-    const snapshot = await db.collection('employeeStammdaten').get();
+    // Erst prüfen, was überhaupt in der Collection ist
+    const allSnapshot = await db.collection('mitarbeiter').limit(5).get();
+    console.log(`📊 Total documents in mitarbeiter collection: ${allSnapshot.size}`);
+    
+    if (allSnapshot.size > 0) {
+      allSnapshot.forEach(doc => {
+        console.log(`📄 Sample doc ${doc.id}:`, doc.data());
+      });
+    }
+    
+    // Lade nur die neuesten Mitarbeiter-Versionen
+    const snapshot = await db.collection('mitarbeiter').where('isLatest', '==', true).get();
+    console.log(`📊 Latest documents loaded: ${snapshot.size}`);
+    
     const employees = [];
     
     snapshot.forEach(doc => {
+      const data = doc.data();
       employees.push({
         id: doc.id,
-        ...doc.data()
+        personId: data.personId || doc.id,
+        name: data.name || data.person || data.displayName,
+        displayName: data.displayName || data.name || data.person,
+        email: data.email || data.mail || data.e_mail,
+        location: data.location || data.standort || data.ort || data.office,
+        startDate: data.startDate || data.eintrittsdatum || data.start_date,
+        lbs: data.lbs || data.careerLevel || data.career_level,
+        department: data.department || data.abteilung || data.lob,
+        team: data.team,
+        status: data.status || 'active',
+        ...data // Include all original fields
       });
     });
     
-    // console.log entfernt
+    console.log(`✅ Loaded ${employees.length} employees from mitarbeiter collection`);
     res.json(employees);
     
   } catch (error) {
-    // console.error entfernt
+    console.error('❌ Error loading employees:', error);
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });

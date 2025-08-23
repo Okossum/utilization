@@ -14,6 +14,7 @@ import { useAuth } from '../../contexts/AuthContext';
 // ✅ KORRIGIERT: Props für Action-Items aus der Auslastungs-Übersicht
 interface EmployeeListViewProps {
   actionItems: Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }>;
+  onOpenEmployeeDetail?: (personId: string) => void;
 }
 interface Employee {
   id: string;
@@ -135,7 +136,7 @@ const employeeData: Employee[] = [{
 }];
 
 // @component: EmployeeListView
-export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
+export const EmployeeListView = ({ actionItems, onOpenEmployeeDetail }: EmployeeListViewProps) => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('All');
@@ -186,7 +187,7 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
             const einsatzplanEntry = einsatzplanMap.get(name);
             
             return {
-              id: name, // Verwende den Namen als ID
+              id: einsatzplanEntry?.personId || name, // Verwende personId falls verfügbar, sonst Name als Fallback
               name: name,
               role: einsatzplanEntry?.lbs || 'Keine Angabe',
               department: einsatzplanEntry?.team || einsatzplanEntry?.cc || 'Keine Angabe',
@@ -558,6 +559,7 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
                   employee={employee} 
                   onToggleActive={handleToggleActive}
                   onAvatarClick={handleAvatarClick}
+                  onOpenDetail={onOpenEmployeeDetail ? () => onOpenEmployeeDetail(employee.id) : undefined}
                 />
                     </motion.div>
                   ))}

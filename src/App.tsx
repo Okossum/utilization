@@ -1,9 +1,11 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { Container, Theme } from './settings/types';
 import { UtilizationReportView } from './components/generated/UtilizationReportView';
-import { EmployeeListView } from './components/generated/EmployeeListView';
+import EmployeeOverviewDashboard from './components/generated/EmployeeOverviewDashboard';
 import { AuslastungCommentView } from './components/generated/AuslastungCommentView';
 import { SalesView } from './components/generated/SalesView';
+import EmployeeSelectionModal from './components/generated/EmployeeSelectionModal';
+import EmployeeDetailView from './components/generated/EmployeeDetailView';
 import RoleManagement from './components/generated/RoleManagement';
 import TechnicalSkillManagement from './components/generated/TechnicalSkillManagement';
 import TechnicalSkillBulkUploadModal from './components/generated/TechnicalSkillBulkUploadModal';
@@ -58,7 +60,9 @@ function App() {
     const { user, loading, profile, logout } = useAuth();
     const [isAdminModalOpen, setAdminModalOpen] = useState(false);
     const [isMenuOpen, setMenuOpen] = useState(false);
-    const [currentView, setCurrentView] = useState<'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo'>('utilization');
+    const [currentView, setCurrentView] = useState<'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail'>('utilization');
+    const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+    const [isEmployeeSelectionOpen, setIsEmployeeSelectionOpen] = useState(false);
     
     // States für UtilizationReportView spezifische Modals
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -130,6 +134,16 @@ function App() {
       return <LoginForm />;
     }
     
+    // Handle employee detail navigation - now goes to overview first
+    const handleEmployeeDetailNavigation = () => {
+      setCurrentView('employees'); // Go to employee overview instead of selection modal
+    };
+
+    const handleEmployeeSelected = (personId: string) => {
+      setSelectedPersonId(personId);
+      setCurrentView('employee-detail');
+    };
+
     return (
       <GlobalModalProvider>
         <CustomerProvider>
@@ -140,7 +154,13 @@ function App() {
           {/* App Header - IMMER sichtbar */}
           <AppHeader
             currentView={currentView}
-            setCurrentView={setCurrentView}
+            setCurrentView={(view) => {
+              if (view === 'employee-detail') {
+                handleEmployeeDetailNavigation();
+              } else {
+                setCurrentView(view);
+              }
+            }}
             logout={logout}
             setAdminModalOpen={setAdminModalOpen}
             onSettings={() => setIsSettingsModalOpen(true)}
@@ -180,27 +200,10 @@ function App() {
           )}
           
           {currentView === 'employees' && (
-            <>
-              {/* Action Items für EmployeeListView */}
-              {Object.keys(actionItems).length > 0 && (
-                <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <h3 className="text-lg font-semibold text-blue-800 mb-2">
-                    ⚠️ Action Items für EmployeeListView
-                  </h3>
-                  <div className="space-y-2">
-                    {Object.entries(actionItems).map(([person, actionItem]) => (
-                      <div key={person} className="flex items-center justify-between p-2 bg-white rounded border">
-                        <span className="font-medium text-gray-700">{person}</span>
-                        <span className="text-sm text-gray-600">{actionItem.actionItem}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <EmployeeListView 
-                actionItems={actionItems}
-              />
-            </>
+            <EmployeeOverviewDashboard 
+              onEmployeeClick={handleEmployeeSelected}
+              onBackToOverview={() => setCurrentView('utilization')}
+            />
           )}
           
           {currentView === 'knowledge' && (
@@ -221,6 +224,33 @@ function App() {
 
           {currentView === 'project-skills-demo' && (
             <ProjectSkillSelectorDemo />
+          )}
+
+          {currentView === 'employee-detail' && (
+            <>
+              {selectedPersonId ? (
+                <EmployeeDetailView
+                  employeeId={selectedPersonId}
+                  onBack={() => setCurrentView('employees')}
+                />
+              ) : (
+                <div className="p-6">
+                  <div className="max-w-2xl mx-auto bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <div className="text-sm text-yellow-800">Kein Mitarbeiter ausgewählt. Bitte wählen Sie in der Mitarbeiterliste einen Mitarbeiter aus oder klicken Sie auf "Detail" im Header.</div>
+                    <div className="mt-3">
+                      <button
+                        className="px-4 py-2 text-sm bg-blue-600 text-white rounded mr-2"
+                        onClick={() => setCurrentView('employees')}
+                      >Zur Mitarbeiterliste</button>
+                      <button
+                        className="px-4 py-2 text-sm bg-green-600 text-white rounded"
+                        onClick={() => setIsEmployeeSelectionOpen(true)}
+                      >Mitarbeiter auswählen</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
           
           {/* General Settings Modal */}
@@ -443,6 +473,14 @@ function App() {
             onImportComplete={() => {
               // Refresh any relevant data if needed
             }}
+          />
+
+          {/* Employee Selection Modal */}
+          <EmployeeSelectionModal
+            isOpen={isEmployeeSelectionOpen}
+            onClose={() => setIsEmployeeSelectionOpen(false)}
+            onSelect={handleEmployeeSelected}
+            actionItems={actionItems}
           />
 
           {/* Upload Panel Modal */}
