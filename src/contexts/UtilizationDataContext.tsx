@@ -1,6 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { personActionItemService, auslastungserklaerungService, personAuslastungserklaerungService } from '../lib/firebase-services';
+
+interface OptimisticUpdateResult {
+  success: boolean;
+  error?: string;
+  reverted?: boolean;
+}
 
 interface UtilizationDataContextType {
   databaseData: {
@@ -13,6 +20,23 @@ interface UtilizationDataContextType {
   isInitialized: boolean;
   refreshData: () => Promise<void>;
   clearCache: () => void;
+  
+  // Optimistic Update Functions
+  updateActionItemOptimistic: (
+    person: string, 
+    actionItem: boolean, 
+    source: 'manual' | 'rule', 
+    updatedBy?: string
+  ) => Promise<OptimisticUpdateResult>;
+  
+  updateAuslastungserklaerungOptimistic: (
+    person: string, 
+    auslastungserklaerung: string
+  ) => Promise<OptimisticUpdateResult>;
+  
+  createAuslastungserklaerungOptimistic: (
+    name: string
+  ) => Promise<OptimisticUpdateResult>;
 }
 
 const UtilizationDataContext = createContext<UtilizationDataContextType | undefined>(undefined);
@@ -193,13 +217,105 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
     await loadDatabaseData(false);
   };
 
+  // Optimistic Update für Action Items
+  const updateActionItemOptimistic = async (
+    person: string, 
+    actionItem: boolean, 
+    source: 'manual' | 'rule', 
+    updatedBy?: string
+  ): Promise<OptimisticUpdateResult> => {
+    console.log(`🔄 Optimistic Update: Action Item für ${person} → ${actionItem} (${source})`);
+    
+    try {
+      // 1. Sofortiges UI-Update (optimistic)
+      // Hier würden wir normalerweise lokalen State aktualisieren
+      // Da Action Items nicht im Cache sind, überspringen wir das
+      
+      // 2. Firebase-Update im Hintergrund
+      await personActionItemService.update(person, actionItem, source, updatedBy);
+      
+      console.log(`✅ Action Item für ${person} erfolgreich gespeichert`);
+      return { success: true };
+      
+    } catch (error) {
+      console.error(`❌ Fehler beim Speichern des Action Items für ${person}:`, error);
+      
+      // 3. Bei Fehler: Revert (hier nicht nötig, da kein lokaler State)
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unbekannter Fehler',
+        reverted: false
+      };
+    }
+  };
+
+  // Optimistic Update für Auslastungserklaerungen
+  const updateAuslastungserklaerungOptimistic = async (
+    person: string, 
+    auslastungserklaerung: string
+  ): Promise<OptimisticUpdateResult> => {
+    console.log(`🔄 Optimistic Update: Auslastungserklaerung für ${person} → ${auslastungserklaerung}`);
+    
+    try {
+      // 1. Sofortiges UI-Update (optimistic)
+      // Hier würden wir normalerweise lokalen State aktualisieren
+      
+      // 2. Firebase-Update im Hintergrund
+      await personAuslastungserklaerungService.update(person, auslastungserklaerung);
+      
+      console.log(`✅ Auslastungserklaerung für ${person} erfolgreich gespeichert`);
+      return { success: true };
+      
+    } catch (error) {
+      console.error(`❌ Fehler beim Speichern der Auslastungserklaerung für ${person}:`, error);
+      
+      // 3. Bei Fehler: Revert
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unbekannter Fehler',
+        reverted: false
+      };
+    }
+  };
+
+  // Optimistic Update für neue Auslastungserklaerungen
+  const createAuslastungserklaerungOptimistic = async (
+    name: string
+  ): Promise<OptimisticUpdateResult> => {
+    console.log(`🔄 Optimistic Update: Neue Auslastungserklaerung → ${name}`);
+    
+    try {
+      // 1. Sofortiges UI-Update (optimistic)
+      // Hier würden wir normalerweise lokalen State aktualisieren
+      
+      // 2. Firebase-Update im Hintergrund
+      await auslastungserklaerungService.save({ name: name.trim() });
+      
+      console.log(`✅ Neue Auslastungserklaerung "${name}" erfolgreich erstellt`);
+      return { success: true };
+      
+    } catch (error) {
+      console.error(`❌ Fehler beim Erstellen der Auslastungserklaerung "${name}":`, error);
+      
+      // 3. Bei Fehler: Revert
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unbekannter Fehler',
+        reverted: false
+      };
+    }
+  };
+
   const contextValue: UtilizationDataContextType = {
     databaseData,
     personMeta,
     isLoading,
     isInitialized,
     refreshData,
-    clearCache
+    clearCache,
+    updateActionItemOptimistic,
+    updateAuslastungserklaerungOptimistic,
+    createAuslastungserklaerungOptimistic
   };
 
   return (

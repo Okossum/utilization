@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { getISOWeek, getISOWeekYear } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, ChefHat, Database, Target, User, Ticket, Columns, ArrowLeft, MessageSquare, X, ArrowRight, Building2, Link2, Banknote, Dog, Coffee, BarChart3, FileText, ChevronDown, LogOut } from 'lucide-react';
+import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, ChefHat, Database, Target, User, Ticket, Columns, ArrowLeft, MessageSquare, X, ArrowRight, Building2, Link2, Banknote, Dog, Coffee, BarChart3, FileText, ChevronDown, LogOut, CheckCircle, XCircle } from 'lucide-react';
 import { AdminDataUploadModal } from './AdminDataUploadModal';
 import { EinsatzplanView } from './EinsatzplanView';
 import { AuslastungView } from './AuslastungView';
@@ -47,6 +47,14 @@ interface UtilizationReportViewProps {
   setIsColumnsMenuOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
 }
 
+// Toast-Notification Interface
+interface Toast {
+  id: string;
+  type: 'success' | 'error' | 'info';
+  message: string;
+  duration?: number;
+}
+
 export function UtilizationReportView({ 
   actionItems,
   setActionItems,
@@ -60,7 +68,36 @@ export function UtilizationReportView({
   setIsColumnsMenuOpen 
 }: UtilizationReportViewProps) {
   const { user, loading, profile, updateProfile } = useAuth();
-  const { databaseData, personMeta, isLoading: dataLoading, refreshData } = useUtilizationData();
+  const { 
+    databaseData, 
+    personMeta, 
+    isLoading: dataLoading, 
+    refreshData,
+    updateActionItemOptimistic,
+    updateAuslastungserklaerungOptimistic,
+    createAuslastungserklaerungOptimistic
+  } = useUtilizationData();
+  
+  // Toast-System
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  
+  const showToast = (type: 'success' | 'error' | 'info', message: string, duration = 5000) => {
+    const id = Date.now().toString();
+    const newToast: Toast = { id, type, message, duration };
+    
+    setToasts(prev => [...prev, newToast]);
+    
+    if (duration > 0) {
+      setTimeout(() => {
+        setToasts(prev => prev.filter(toast => toast.id !== id));
+      }, duration);
+    }
+  };
+  
+  const removeToast = (id: string) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+  };
+  
   const [showAllData, setShowAllData] = useState<boolean>(() => {
     try { return JSON.parse(localStorage.getItem('utilization_show_all_data') || 'false'); } catch { return false; }
   });
@@ -257,20 +294,54 @@ export function UtilizationReportView({
 
   // ✅ NEU: Funktionen für Auslastungserklärung (mit Datenbank)
   const addAuslastungserklaerung = async (newName: string) => {
+    // 1. Optimistic UI-Update (sofort)
+    const trimmedName = newName.trim();
+    const tempId = `temp_${Date.now()}`;
+    const previousAuslastungserklaerungen = [...auslastungserklaerungen];
+    setAuslastungserklaerungen(prev => [...prev, { id: tempId, name: trimmedName, isActive: true }]);
+    
+    // 2. Firebase-Update im Hintergrund mit Error-Handling
     try {
-      await auslastungserklaerungService.save({ name: newName.trim() });
-      await loadAuslastungserklaerungen();
+      const result = await createAuslastungserklaerungOptimistic(trimmedName);
+      
+      if (result.success) {
+        // Lade die aktuellen Daten neu, um die echte ID zu bekommen
+        await loadAuslastungserklaerungen();
+        showToast('success', `Auslastungserklaerung "${trimmedName}" erstellt`, 3000);
+      } else {
+        // Revert bei Fehler
+        setAuslastungserklaerungen(previousAuslastungserklaerungen);
+        showToast('error', `Fehler beim Erstellen: ${result.error}`, 7000);
+      }
     } catch (error) {
-      console.error('Fehler beim Hinzufügen der Auslastungserklärung:', error);
+      // Revert bei unerwarteten Fehlern
+      setAuslastungserklaerungen(previousAuslastungserklaerungen);
+      showToast('error', 'Unerwarteter Fehler beim Erstellen der Auslastungserklaerung', 7000);
+      console.error('Unerwarteter Fehler beim Erstellen der Auslastungserklaerung:', error);
     }
   };
 
   const savePersonAuslastungserklaerung = async (person: string, auslastungserklaerung: string) => {
+    // 1. Optimistic UI-Update (sofort)
+    const previousValue = personAuslastungserklaerungen[person];
+    setPersonAuslastungserklaerungen(prev => ({ ...prev, [person]: auslastungserklaerung }));
+    
+    // 2. Firebase-Update im Hintergrund mit Error-Handling
     try {
-      await personAuslastungserklaerungService.update(person, auslastungserklaerung);
-      setPersonAuslastungserklaerungen(prev => ({ ...prev, [person]: auslastungserklaerung }));
+      const result = await updateAuslastungserklaerungOptimistic(person, auslastungserklaerung);
+      
+      if (result.success) {
+        showToast('success', `Auslastungserklaerung für ${person} gespeichert`, 3000);
+      } else {
+        // Revert bei Fehler
+        setPersonAuslastungserklaerungen(prev => ({ ...prev, [person]: previousValue }));
+        showToast('error', `Fehler beim Speichern: ${result.error}`, 7000);
+      }
     } catch (error) {
-      console.error('Fehler beim Speichern der Person-Auslastungserklärung:', error);
+      // Revert bei unerwarteten Fehlern
+      setPersonAuslastungserklaerungen(prev => ({ ...prev, [person]: previousValue }));
+      showToast('error', 'Unerwarteter Fehler beim Speichern der Auslastungserklaerung', 7000);
+      console.error('Unerwarteter Fehler beim Auslastungserklaerung Update:', error);
     }
   };
 
@@ -1748,24 +1819,39 @@ export function UtilizationReportView({
                             <input
                               type="checkbox"
                               checked={actionItems[person]?.actionItem || false}
-                              onChange={async (e) => {
+                                                              onChange={async (e) => {
                                 const checked = e.target.checked;
+                                const currentUser = profile?.displayName || user?.email || 'Unbekannt';
+                                
+                                // 1. Optimistic UI-Update (sofort)
+                                const updatedActionItems = { ...actionItems };
+                                updatedActionItems[person] = { 
+                                  actionItem: checked,
+                                  source: 'manual',
+                                  updatedBy: currentUser
+                                };
+                                setActionItems(updatedActionItems);
+                                
+                                // 2. Firebase-Update im Hintergrund mit Error-Handling
                                 try {
-                                  const { personActionItemService } = await import('../../lib/firebase-services');
-                                  // Speichere den aktuellen Benutzernamen
-                                  const currentUser = profile?.displayName || user?.email || 'Unbekannt';
-                                  await personActionItemService.update(person, checked, 'manual', currentUser);
+                                  const result = await updateActionItemOptimistic(person, checked, 'manual', currentUser);
                                   
-                                  // ✅ KORRIGIERT: Aktualisiere globalen State mit updatedBy Information
-                                  const updatedActionItems = { ...actionItems };
-                                  updatedActionItems[person] = { 
-                                    actionItem: checked, 
-                                    source: 'manual',
-                                    updatedBy: currentUser
-                                  };
-                                  setActionItems(updatedActionItems);
+                                  if (result.success) {
+                                    showToast('success', `Action Item für ${person} gespeichert`, 3000);
+                                  } else {
+                                    // Revert bei Fehler
+                                    const revertedActionItems = { ...actionItems };
+                                    revertedActionItems[person] = actionItems[person]; // Zurück zum ursprünglichen Wert
+                                    setActionItems(revertedActionItems);
+                                    showToast('error', `Fehler beim Speichern: ${result.error}`, 7000);
+                                  }
                                 } catch (error) {
-                                  console.error('Fehler beim Speichern des Action Items:', error);
+                                  // Revert bei unerwarteten Fehlern
+                                  const revertedActionItems = { ...actionItems };
+                                  revertedActionItems[person] = actionItems[person];
+                                  setActionItems(revertedActionItems);
+                                  showToast('error', 'Unerwarteter Fehler beim Speichern', 7000);
+                                  console.error('Unerwarteter Fehler beim Action Item Update:', error);
                                 }
                               }}
                               className="rounded border-2 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all"
@@ -2374,6 +2460,41 @@ export function UtilizationReportView({
       />
 
       {/* Scope Settings Modal entfernt: Es gibt nur noch EIN Dropdown für alle Filter */}
+      
+      {/* Toast-Notifications */}
+      <div className="fixed top-4 right-4 z-50 space-y-2">
+        <AnimatePresence>
+          {toasts.map((toast) => (
+            <motion.div
+              key={toast.id}
+              initial={{ opacity: 0, x: 300, scale: 0.8 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 300, scale: 0.8 }}
+              className={`
+                flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border-l-4 min-w-[300px] max-w-[400px]
+                ${toast.type === 'success' ? 'bg-green-50 border-green-500 text-green-800' : ''}
+                ${toast.type === 'error' ? 'bg-red-50 border-red-500 text-red-800' : ''}
+                ${toast.type === 'info' ? 'bg-blue-50 border-blue-500 text-blue-800' : ''}
+              `}
+            >
+              <div className="flex-shrink-0">
+                {toast.type === 'success' && <CheckCircle className="w-5 h-5 text-green-600" />}
+                {toast.type === 'error' && <XCircle className="w-5 h-5 text-red-600" />}
+                {toast.type === 'info' && <Info className="w-5 h-5 text-blue-600" />}
+              </div>
+              <div className="flex-1 text-sm font-medium">
+                {toast.message}
+              </div>
+              <button
+                onClick={() => removeToast(toast.id)}
+                className="flex-shrink-0 p-1 rounded hover:bg-black/10 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
