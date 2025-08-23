@@ -27,7 +27,7 @@ const TechnicalSkillManagementButton: React.FC<TechnicalSkillManagementButtonPro
         <div className="fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/30" onClick={() => setIsOpen(false)} />
           <div className="absolute inset-0 p-4 overflow-auto">
-            <div className="relative max-w-6xl mx-auto bg-white rounded-lg shadow-lg border border-gray-200">
+            <div className="relative max-w-7xl mx-auto bg-white rounded-lg shadow-lg border border-gray-200 min-h-[80vh]">
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
                 <div className="flex items-center gap-2 text-gray-900 font-medium">
                   <Code className="w-5 h-5" />
@@ -40,7 +40,7 @@ const TechnicalSkillManagementButton: React.FC<TechnicalSkillManagementButtonPro
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              <div className="p-4">
+              <div className="p-6 min-h-[70vh]">
                 <TechnicalSkillManagement />
               </div>
             </div>
