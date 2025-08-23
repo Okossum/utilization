@@ -3,8 +3,8 @@ import { Settings, Database, TrendingUp, Target, User, Ticket, BarChart3, Users,
 import { useAuth } from '../contexts/AuthContext';
 
 interface AppHeaderProps {
-  currentView: 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales';
-  setCurrentView: (view: 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales') => void;
+  currentView: 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo';
+  setCurrentView: (view: 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo') => void;
   logout: () => Promise<void>;
   setAdminModalOpen: (open: boolean) => void;
   // UtilizationReportView spezifische Props (nur wenn currentView === 'utilization')
@@ -20,6 +20,7 @@ interface AppHeaderProps {
   onTechnicalSkillManagement?: () => void;
   onTechnicalSkillImport?: () => void;
   onRoleTaskImport?: () => void;
+  onProjectRolesDemo?: () => void;
   onCustomerProjectsManagement?: () => void;
   onAuslastungserklaerungManagement?: () => void;
   onGeneralSettings?: () => void;
@@ -41,6 +42,7 @@ export function AppHeader({
   onTechnicalSkillManagement,
   onTechnicalSkillImport,
   onRoleTaskImport,
+  onProjectRolesDemo,
   onCustomerProjectsManagement,
   onAuslastungserklaerungManagement,
   onGeneralSettings
@@ -274,7 +276,7 @@ export function AppHeader({
                 )}
 
                 {/* Management */}
-                {(onRoleManagement || onTechnicalSkillManagement || onTechnicalSkillImport || onRoleTaskImport || onCustomerProjectsManagement || onAuslastungserklaerungManagement) && (
+                {(onRoleManagement || onTechnicalSkillManagement || onTechnicalSkillImport || onRoleTaskImport || onProjectRolesDemo || onCustomerProjectsManagement || onAuslastungserklaerungManagement) && (
                   <div className="mb-3">
                     <button
                       onClick={() => toggleSection('management')}
@@ -315,6 +317,14 @@ export function AppHeader({
                             className="w-full px-3 py-2 text-sm text-pink-700 bg-pink-50 border border-pink-200 rounded-lg hover:bg-pink-100 text-left font-medium"
                           >
                             📋 Rollen & Tätigkeiten Import
+                          </button>
+                        )}
+                        {onProjectRolesDemo && (
+                          <button
+                            onClick={() => { onProjectRolesDemo(); setIsSettingsMenuOpen(false); }}
+                            className="w-full px-3 py-2 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 text-left font-medium"
+                          >
+                            🧪 Projektrollen Demo
                           </button>
                         )}
                         {onCustomerProjectsManagement && (

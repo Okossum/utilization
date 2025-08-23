@@ -2711,13 +2711,23 @@ app.delete('/api/roles/:id', requireAuth, async (req, res) => {
 // ROLE TASKS API ENDPOINTS
 // ==========================================
 
-// GET /api/role-tasks - Alle Rollen-Tätigkeiten laden
+// GET /api/role-tasks - Alle Rollen-Tätigkeiten laden (optional gefiltert nach roleId)
 app.get('/api/role-tasks', requireAuth, async (req, res) => {
   try {
-    const tasksSnap = await db.collection('roleTasks')
-      .where('isActive', '==', true)
-      .orderBy('createdAt', 'desc')
-      .get();
+    const { roleId } = req.query;
+    
+    let query = db.collection('roleTasks')
+      .where('isActive', '==', true);
+    
+    // Filter by roleId if provided
+    if (roleId) {
+      query = query.where('roleId', '==', roleId);
+    } else {
+      // Only add orderBy when not filtering by roleId to avoid index issues
+      query = query.orderBy('createdAt', 'desc');
+    }
+    
+    const tasksSnap = await query.get();
     
     const tasks = [];
     tasksSnap.forEach(doc => {
@@ -2727,9 +2737,19 @@ app.get('/api/role-tasks', requireAuth, async (req, res) => {
       });
     });
     
+    // Sort manually if we filtered by roleId
+    if (roleId) {
+      tasks.sort((a, b) => {
+        const aTime = a.createdAt?.toDate?.() || new Date(a.createdAt || 0);
+        const bTime = b.createdAt?.toDate?.() || new Date(b.createdAt || 0);
+        return bTime.getTime() - aTime.getTime();
+      });
+    }
+    
     res.json(tasks);
   } catch (error) {
-    res.status(500).json({ error: 'Fehler beim Laden der Rollen-Tätigkeiten' });
+    console.error('Error loading role tasks:', error);
+    res.status(500).json({ error: 'Fehler beim Laden der Rollen-Tätigkeiten: ' + error.message });
   }
 });
 

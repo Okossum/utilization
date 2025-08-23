@@ -8,6 +8,7 @@ import RoleManagement from './components/generated/RoleManagement';
 import TechnicalSkillManagement from './components/generated/TechnicalSkillManagement';
 import TechnicalSkillBulkUploadModal from './components/generated/TechnicalSkillBulkUploadModal';
 import RoleTaskBulkUploadModal from './components/generated/RoleTaskBulkUploadModal';
+import ProjectRoleTaskSelectorDemo from './components/generated/ProjectRoleTaskSelectorDemo';
 import { CustomerProjectsManager } from './components/generated/CustomerProjectsManager';
 import AuslastungserklaerungManagement from './components/generated/AuslastungserklaerungManagement';
 import { CustomerProvider } from './contexts/CustomerContext';
@@ -56,7 +57,7 @@ function App() {
     const { user, loading, profile, logout } = useAuth();
     const [isAdminModalOpen, setAdminModalOpen] = useState(false);
     const [isMenuOpen, setMenuOpen] = useState(false);
-    const [currentView, setCurrentView] = useState<'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales'>('utilization');
+    const [currentView, setCurrentView] = useState<'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo'>('utilization');
     
     // States für UtilizationReportView spezifische Modals
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -154,6 +155,7 @@ function App() {
             onCustomerProjectsManagement={() => setIsCustomerProjectsManagementOpen(true)}
             onAuslastungserklaerungManagement={() => setIsAuslastungserklaerungManagementOpen(true)}
             onGeneralSettings={() => setIsGeneralSettingsOpen(true)}
+            onProjectRolesDemo={() => setCurrentView('project-roles-demo')}
             lobOptions={[]} // TODO: von UtilizationReportView holen
           />
 
@@ -209,6 +211,10 @@ function App() {
           
           {currentView === 'sales' && (
             <SalesView />
+          )}
+
+          {currentView === 'project-roles-demo' && (
+            <ProjectRoleTaskSelectorDemo />
           )}
           
           {/* General Settings Modal */}
