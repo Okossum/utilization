@@ -6,11 +6,14 @@ import { AuslastungCommentView } from './components/generated/AuslastungCommentV
 import { SalesView } from './components/generated/SalesView';
 import RoleManagement from './components/generated/RoleManagement';
 import TechnicalSkillManagement from './components/generated/TechnicalSkillManagement';
+import TechnicalSkillBulkUploadModal from './components/generated/TechnicalSkillBulkUploadModal';
+import RoleTaskBulkUploadModal from './components/generated/RoleTaskBulkUploadModal';
 import { CustomerProjectsManager } from './components/generated/CustomerProjectsManager';
 import AuslastungserklaerungManagement from './components/generated/AuslastungserklaerungManagement';
 import { CustomerProvider } from './contexts/CustomerContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './contexts/AuthContext';
+import { GlobalModalProvider } from './contexts/GlobalModalContext';
 import { LoginForm } from './components/LoginForm';
 import { User as UserIcon, ChevronDown, LogOut, Users, BarChart3, FileText, X } from 'lucide-react';
 import AdminUserManagementModal from './components/generated/AdminUserManagementModal';
@@ -64,6 +67,8 @@ function App() {
     // States für Management Modals
     const [isRoleManagementOpen, setIsRoleManagementOpen] = useState(false);
     const [isTechnicalSkillManagementOpen, setIsTechnicalSkillManagementOpen] = useState(false);
+    const [isTechnicalSkillImportOpen, setIsTechnicalSkillImportOpen] = useState(false);
+  const [isRoleTaskImportOpen, setIsRoleTaskImportOpen] = useState(false);
     const [isCustomerProjectsManagementOpen, setIsCustomerProjectsManagementOpen] = useState(false);
     const [isAuslastungserklaerungManagementOpen, setIsAuslastungserklaerungManagementOpen] = useState(false);
     const [isGeneralSettingsOpen, setIsGeneralSettingsOpen] = useState(false);
@@ -124,11 +129,12 @@ function App() {
     }
     
     return (
-      <CustomerProvider>
-        <UtilizationDataProvider>
-          <AssignmentsProvider>
-            <RoleProvider>
-              <ProjectHistoryProvider>
+      <GlobalModalProvider>
+        <CustomerProvider>
+          <UtilizationDataProvider>
+            <AssignmentsProvider>
+              <RoleProvider>
+                <ProjectHistoryProvider>
           {/* App Header - IMMER sichtbar */}
           <AppHeader
             currentView={currentView}
@@ -143,6 +149,8 @@ function App() {
             onEinsatzplanView={() => setIsEinsatzplanViewOpen(true)}
             onRoleManagement={() => setIsRoleManagementOpen(true)}
             onTechnicalSkillManagement={() => setIsTechnicalSkillManagementOpen(true)}
+                          onTechnicalSkillImport={() => setIsTechnicalSkillImportOpen(true)}
+              onRoleTaskImport={() => setIsRoleTaskImportOpen(true)}
             onCustomerProjectsManagement={() => setIsCustomerProjectsManagementOpen(true)}
             onAuslastungserklaerungManagement={() => setIsAuslastungserklaerungManagementOpen(true)}
             onGeneralSettings={() => setIsGeneralSettingsOpen(true)}
@@ -408,6 +416,23 @@ function App() {
             onClose={() => setIsExcelUploadModalOpen(false)}
           />
 
+          {/* Technical Skills Import Modal */}
+          <TechnicalSkillBulkUploadModal
+            isOpen={isTechnicalSkillImportOpen}
+            onClose={() => setIsTechnicalSkillImportOpen(false)}
+            onImportComplete={() => {
+              // Refresh any relevant data if needed
+            }}
+          />
+
+          <RoleTaskBulkUploadModal
+            isOpen={isRoleTaskImportOpen}
+            onClose={() => setIsRoleTaskImportOpen(false)}
+            onImportComplete={() => {
+              // Refresh any relevant data if needed
+            }}
+          />
+
           {/* Upload Panel Modal */}
           {/* DISABLED: UploadPanel Modal
           {isUploadPanelOpen && (
@@ -437,11 +462,12 @@ function App() {
           )}
           */}
 
-              </ProjectHistoryProvider>
-            </RoleProvider>
-          </AssignmentsProvider>
-        </UtilizationDataProvider>
-      </CustomerProvider>
+                </ProjectHistoryProvider>
+              </RoleProvider>
+            </AssignmentsProvider>
+          </UtilizationDataProvider>
+        </CustomerProvider>
+      </GlobalModalProvider>
     );
   }
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useGlobalModal } from '@/contexts/GlobalModalContext';
 import CreateEditSkillModal from './CreateEditSkillModal';
 
 interface TechnicalSkill {
@@ -16,10 +17,9 @@ interface TechnicalSkill {
 
 const TechnicalSkillManagement: React.FC = () => {
   const { token } = useAuth();
+  const { openModal, closeModal } = useGlobalModal();
   const [skills, setSkills] = useState<TechnicalSkill[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingSkill, setEditingSkill] = useState<TechnicalSkill | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Skills laden
@@ -52,28 +52,44 @@ const TechnicalSkillManagement: React.FC = () => {
 
   // Modal für neuen Skill öffnen
   const openCreateModal = () => {
-    setEditingSkill(null);
-    setIsModalOpen(true);
+    const modalId = 'create-skill-modal';
+    openModal({
+      id: modalId,
+      component: (
+        <CreateEditSkillModal
+          isOpen={true}
+          onClose={() => closeModal(modalId)}
+          editingSkill={null}
+          onSkillSaved={() => {
+            loadSkills();
+            closeModal(modalId);
+          }}
+          availableCategories={availableCategories}
+        />
+      ),
+    });
     setError(null);
   };
 
   // Modal für Skill-Bearbeitung öffnen
   const openEditModal = (skill: TechnicalSkill) => {
-    setEditingSkill(skill);
-    setIsModalOpen(true);
+    const modalId = 'edit-skill-modal';
+    openModal({
+      id: modalId,
+      component: (
+        <CreateEditSkillModal
+          isOpen={true}
+          onClose={() => closeModal(modalId)}
+          editingSkill={skill}
+          onSkillSaved={() => {
+            loadSkills();
+            closeModal(modalId);
+          }}
+          availableCategories={availableCategories}
+        />
+      ),
+    });
     setError(null);
-  };
-
-  // Modal schließen
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setEditingSkill(null);
-    setError(null);
-  };
-
-  // Callback wenn ein Skill gespeichert wurde
-  const handleSkillSaved = () => {
-    loadSkills(); // Skills neu laden
   };
 
   // Skill löschen
@@ -248,14 +264,7 @@ const TechnicalSkillManagement: React.FC = () => {
         )}
       </div>
 
-      {/* Separates Modal für Skill erstellen/bearbeiten */}
-      <CreateEditSkillModal
-        isOpen={isModalOpen}
-        onClose={closeModal}
-        editingSkill={editingSkill}
-        onSkillSaved={handleSkillSaved}
-        availableCategories={availableCategories}
-      />
+
     </div>
   );
 };

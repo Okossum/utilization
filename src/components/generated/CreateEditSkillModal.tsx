@@ -15,7 +15,8 @@ interface TechnicalSkill {
 interface SkillFormData {
   name: string;
   description: string;
-  category: string;
+  category: string; // Legacy field for backward compatibility
+  categoryId: string; // New field for category reference
 }
 
 interface CreateEditSkillModalProps {
@@ -37,10 +38,31 @@ const CreateEditSkillModal: React.FC<CreateEditSkillModalProps> = ({
   const [formData, setFormData] = useState<SkillFormData>({
     name: '',
     description: '',
-    category: ''
+    category: '', // Legacy field
+    categoryId: '' // New field
   });
+  const [categories, setCategories] = useState<{id: string, name: string}[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Kategorien laden
+  const loadCategories = async () => {
+    try {
+      const response = await fetch('/api/technical-skill-categories', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const categoriesData = await response.json();
+        setCategories(categoriesData);
+      }
+    } catch (error) {
+      // Ignore errors - categories are optional
+    }
+  };
 
   // Form mit editingSkill-Daten füllen
   useEffect(() => {
@@ -48,13 +70,26 @@ const CreateEditSkillModal: React.FC<CreateEditSkillModalProps> = ({
       setFormData({
         name: editingSkill.name,
         description: editingSkill.description,
-        category: editingSkill.category
+        category: editingSkill.category || '', // Legacy field
+        categoryId: (editingSkill as any).categoryId || '' // New field
       });
     } else {
-      setFormData({ name: '', description: '', category: '' });
+      setFormData({ 
+        name: '', 
+        description: '', 
+        category: '', // Legacy field
+        categoryId: '' // New field
+      });
     }
     setError(null);
   }, [editingSkill, isOpen]);
+
+  // Kategorien laden beim Öffnen
+  useEffect(() => {
+    if (isOpen && token) {
+      loadCategories();
+    }
+  }, [isOpen, token]);
 
   // Skill erstellen
   const createSkill = async (skillData: SkillFormData) => {
@@ -68,7 +103,12 @@ const CreateEditSkillModal: React.FC<CreateEditSkillModalProps> = ({
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(skillData)
+        body: JSON.stringify({
+          name: skillData.name,
+          description: skillData.description,
+          category: skillData.category, // Legacy field
+          categoryId: skillData.categoryId // New field
+        })
       });
 
       if (!response.ok) {
@@ -101,7 +141,12 @@ const CreateEditSkillModal: React.FC<CreateEditSkillModalProps> = ({
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(skillData)
+        body: JSON.stringify({
+          name: skillData.name,
+          description: skillData.description,
+          category: skillData.category, // Legacy field
+          categoryId: skillData.categoryId // New field
+        })
       });
 
       if (!response.ok) {
@@ -133,7 +178,12 @@ const CreateEditSkillModal: React.FC<CreateEditSkillModalProps> = ({
 
   // Dialog schließen
   const handleClose = () => {
-    setFormData({ name: '', description: '', category: '' });
+    setFormData({ 
+      name: '', 
+      description: '', 
+      category: '', // Legacy field
+      categoryId: '' // New field
+    });
     setError(null);
     onClose();
   };
@@ -141,7 +191,7 @@ const CreateEditSkillModal: React.FC<CreateEditSkillModalProps> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+        <div className="fixed inset-0 flex items-center justify-center p-4">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -226,42 +276,29 @@ const CreateEditSkillModal: React.FC<CreateEditSkillModalProps> = ({
                     Kategorie
                   </label>
                   
-                  {/* Dropdown für bestehende Kategorien */}
+                  {/* Dropdown für Firebase-Kategorien */}
                   <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors mb-3"
+                    value={formData.categoryId}
+                    onChange={(e) => {
+                      const selectedCategory = categories.find(cat => cat.id === e.target.value);
+                      setFormData({ 
+                        ...formData, 
+                        categoryId: e.target.value,
+                        category: selectedCategory?.name || '' // Legacy field
+                      });
+                    }}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                   >
-                    <option value="">Kategorie auswählen...</option>
-                    {availableCategories.map(category => (
-                      <option key={category} value={category}>
-                        {category}
+                    <option value="">Keine Kategorie</option>
+                    {categories.map(category => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
                       </option>
                     ))}
-                    <option value="Programming Languages">Programming Languages</option>
-                    <option value="Frameworks">Frameworks</option>
-                    <option value="Cloud Platforms">Cloud Platforms</option>
-                    <option value="Databases">Databases</option>
-                    <option value="DevOps">DevOps</option>
-                    <option value="Testing">Testing</option>
-                    <option value="Mobile Development">Mobile Development</option>
-                    <option value="Data Science">Data Science</option>
-                    <option value="Security">Security</option>
-                    <option value="Other">Other</option>
                   </select>
                   
-                  {/* Eingabefeld für neue Kategorie */}
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                      placeholder="Oder neue Kategorie eingeben..."
-                    />
-                  </div>
                   <p className="mt-1 text-xs text-gray-500">
-                    Wählen Sie eine bestehende Kategorie oder erstellen Sie eine neue
+                    Wählen Sie eine Kategorie aus oder lassen Sie das Feld leer
                   </p>
                 </div>
 
@@ -274,9 +311,9 @@ const CreateEditSkillModal: React.FC<CreateEditSkillModalProps> = ({
                       {formData.description && (
                         <p className="text-sm text-gray-600 mb-2">{formData.description}</p>
                       )}
-                      {formData.category && (
+                      {formData.categoryId && (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          {formData.category}
+                          {categories.find(cat => cat.id === formData.categoryId)?.name || formData.category}
                         </span>
                       )}
                     </div>

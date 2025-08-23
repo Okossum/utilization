@@ -18,6 +18,8 @@ interface AppHeaderProps {
   // Management Buttons
   onRoleManagement?: () => void;
   onTechnicalSkillManagement?: () => void;
+  onTechnicalSkillImport?: () => void;
+  onRoleTaskImport?: () => void;
   onCustomerProjectsManagement?: () => void;
   onAuslastungserklaerungManagement?: () => void;
   onGeneralSettings?: () => void;
@@ -37,6 +39,8 @@ export function AppHeader({
   lobOptions = [],
   onRoleManagement,
   onTechnicalSkillManagement,
+  onTechnicalSkillImport,
+  onRoleTaskImport,
   onCustomerProjectsManagement,
   onAuslastungserklaerungManagement,
   onGeneralSettings
@@ -270,7 +274,7 @@ export function AppHeader({
                 )}
 
                 {/* Management */}
-                {(onRoleManagement || onTechnicalSkillManagement || onCustomerProjectsManagement || onAuslastungserklaerungManagement) && (
+                {(onRoleManagement || onTechnicalSkillManagement || onTechnicalSkillImport || onRoleTaskImport || onCustomerProjectsManagement || onAuslastungserklaerungManagement) && (
                   <div className="mb-3">
                     <button
                       onClick={() => toggleSection('management')}
@@ -295,6 +299,22 @@ export function AppHeader({
                             className="w-full px-3 py-2 text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 text-left font-medium"
                           >
                             🛠️ Tech Skills
+                          </button>
+                        )}
+                        {onTechnicalSkillImport && (
+                          <button
+                            onClick={() => { onTechnicalSkillImport(); setIsSettingsMenuOpen(false); }}
+                            className="w-full px-3 py-2 text-sm text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 text-left font-medium"
+                          >
+                            📊 Tech Skills Import
+                          </button>
+                        )}
+                        {onRoleTaskImport && (
+                          <button
+                            onClick={() => { onRoleTaskImport(); setIsSettingsMenuOpen(false); }}
+                            className="w-full px-3 py-2 text-sm text-pink-700 bg-pink-50 border border-pink-200 rounded-lg hover:bg-pink-100 text-left font-medium"
+                          >
+                            📋 Rollen & Tätigkeiten Import
                           </button>
                         )}
                         {onCustomerProjectsManagement && (

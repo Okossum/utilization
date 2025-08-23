@@ -2166,7 +2166,7 @@ app.get('/api/technical-skills', requireAuth, async (req, res) => {
 // POST /api/technical-skills - Neuen Technical Skill erstellen
 app.post('/api/technical-skills', requireAuth, async (req, res) => {
   try {
-    const { name, description, category } = req.body;
+    const { name, description, category, categoryId } = req.body;
     
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Skill-Name ist erforderlich' });
@@ -2188,7 +2188,8 @@ app.post('/api/technical-skills', requireAuth, async (req, res) => {
     const newSkill = {
       name: name.trim(),
       description: description?.trim() || '',
-      category: category?.trim() || '',
+      category: category?.trim() || '', // Legacy field - keep for backward compatibility
+      categoryId: categoryId?.trim() || null, // New field for category reference
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
@@ -2212,7 +2213,7 @@ app.post('/api/technical-skills', requireAuth, async (req, res) => {
 app.put('/api/technical-skills/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, category } = req.body;
+    const { name, description, category, categoryId } = req.body;
     
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Skill-Name ist erforderlich' });
@@ -2241,7 +2242,8 @@ app.put('/api/technical-skills/:id', requireAuth, async (req, res) => {
     const updatedSkill = {
       name: name.trim(),
       description: description?.trim() || '',
-      category: category?.trim() || '',
+      category: category?.trim() || '', // Legacy field - keep for backward compatibility
+      categoryId: categoryId?.trim() || null, // New field for category reference
       updatedAt: new Date()
     };
     
@@ -2289,6 +2291,662 @@ app.delete('/api/technical-skills/:id', requireAuth, async (req, res) => {
   } catch (error) {
     // console.error entfernt
     res.status(500).json({ error: 'Fehler beim Löschen des Technical Skills' });
+  }
+});
+
+// ==========================================
+// TECHNICAL SKILL CATEGORIES API ENDPOINTS
+// ==========================================
+
+// GET /api/technical-skill-categories - Alle Kategorien laden
+app.get('/api/technical-skill-categories', requireAuth, async (req, res) => {
+  try {
+    const categoriesSnap = await db.collection('technicalSkillCategories')
+      .where('isActive', '==', true)
+      .orderBy('name')
+      .get();
+    
+    const categories = [];
+    categoriesSnap.forEach(doc => {
+      categories.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+    
+    res.json(categories);
+  } catch (error) {
+    res.status(500).json({ error: 'Fehler beim Laden der Kategorien' });
+  }
+});
+
+// POST /api/technical-skill-categories - Neue Kategorie erstellen
+app.post('/api/technical-skill-categories', requireAuth, async (req, res) => {
+  try {
+    const { name } = req.body;
+    
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Kategorie-Name ist erforderlich' });
+    }
+    
+    // Prüfen ob Kategorie bereits existiert
+    const existingSnap = await db.collection('technicalSkillCategories')
+      .where('name', '==', name.trim())
+      .where('isActive', '==', true)
+      .get();
+    
+    if (!existingSnap.empty) {
+      return res.status(409).json({ error: 'Eine Kategorie mit diesem Namen existiert bereits' });
+    }
+    
+    const categoryData = {
+      name: name.trim(),
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    const docRef = await db.collection('technicalSkillCategories').add(categoryData);
+    
+    res.json({
+      success: true,
+      category: {
+        id: docRef.id,
+        ...categoryData
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Fehler beim Erstellen der Kategorie' });
+  }
+});
+
+// PUT /api/technical-skill-categories/:id - Kategorie bearbeiten
+app.put('/api/technical-skill-categories/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+    
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Kategorie-Name ist erforderlich' });
+    }
+    
+    // Prüfen ob Kategorie existiert
+    const categoryDoc = await db.collection('technicalSkillCategories').doc(id).get();
+    if (!categoryDoc.exists) {
+      return res.status(404).json({ error: 'Kategorie nicht gefunden' });
+    }
+    
+    // Prüfen ob Name bereits von anderer Kategorie verwendet wird
+    const existingSnap = await db.collection('technicalSkillCategories')
+      .where('name', '==', name.trim())
+      .where('isActive', '==', true)
+      .get();
+    
+    const duplicateExists = existingSnap.docs.some(doc => doc.id !== id);
+    if (duplicateExists) {
+      return res.status(409).json({ error: 'Eine andere Kategorie mit diesem Namen existiert bereits' });
+    }
+    
+    const updateData = {
+      name: name.trim(),
+      updatedAt: new Date()
+    };
+    
+    await db.collection('technicalSkillCategories').doc(id).update(updateData);
+    
+    res.json({
+      success: true,
+      message: 'Kategorie wurde erfolgreich aktualisiert'
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Fehler beim Bearbeiten der Kategorie' });
+  }
+});
+
+// DELETE /api/technical-skill-categories/:id - Kategorie löschen (soft delete)
+app.delete('/api/technical-skill-categories/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Prüfen ob Kategorie existiert
+    const categoryDoc = await db.collection('technicalSkillCategories').doc(id).get();
+    if (!categoryDoc.exists) {
+      return res.status(404).json({ error: 'Kategorie nicht gefunden' });
+    }
+    
+    const categoryData = categoryDoc.data();
+    const categoryName = categoryData.name;
+    
+    // Prüfen ob Skills diese Kategorie verwenden
+    const skillsSnap = await db.collection('technicalSkills')
+      .where('categoryId', '==', id)
+      .where('isActive', '==', true)
+      .get();
+    
+    if (!skillsSnap.empty) {
+      return res.status(409).json({ 
+        error: `Kategorie "${categoryName}" kann nicht gelöscht werden, da sie von ${skillsSnap.size} Skills verwendet wird` 
+      });
+    }
+    
+    // Soft delete
+    await db.collection('technicalSkillCategories').doc(id).update({
+      isActive: false,
+      deletedAt: new Date()
+    });
+    
+    res.json({
+      success: true,
+      message: `Kategorie "${categoryName}" wurde gelöscht`
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Fehler beim Löschen der Kategorie' });
+  }
+});
+
+// ==========================================
+// TECHNICAL SKILLS BULK IMPORT API ENDPOINTS
+// ==========================================
+
+// POST /api/technical-skills/bulk-import - Excel-Import für Skills und Kategorien
+app.post('/api/technical-skills/bulk-import', requireAuth, async (req, res) => {
+  try {
+    const { data } = req.body; // Array von { category: string, skill: string }
+    
+    if (!Array.isArray(data) || data.length === 0) {
+      return res.status(400).json({ error: 'Keine gültigen Daten zum Import gefunden' });
+    }
+    
+    const results = {
+      categoriesCreated: 0,
+      skillsCreated: 0,
+      skillsIgnored: 0,
+      errors: []
+    };
+    
+    // Batch für bessere Performance
+    const batch = db.batch();
+    const processedCategories = new Map(); // name -> id
+    const processedSkills = new Set(); // categoryId:skillName
+    
+    // Bestehende Kategorien laden
+    const existingCategoriesSnap = await db.collection('technicalSkillCategories')
+      .where('isActive', '==', true)
+      .get();
+    
+    existingCategoriesSnap.forEach(doc => {
+      processedCategories.set(doc.data().name, doc.id);
+    });
+    
+    // Bestehende Skills laden
+    const existingSkillsSnap = await db.collection('technicalSkills')
+      .where('isActive', '==', true)
+      .get();
+    
+    existingSkillsSnap.forEach(doc => {
+      const skillData = doc.data();
+      if (skillData.categoryId) {
+        processedSkills.add(`${skillData.categoryId}:${skillData.name}`);
+      }
+    });
+    
+    for (const item of data) {
+      try {
+        const categoryName = item.category?.trim();
+        const skillName = item.skill?.trim();
+        
+        // Validierung
+        if (!categoryName || !skillName) {
+          results.errors.push(`Ungültige Daten: Kategorie="${categoryName}", Skill="${skillName}"`);
+          continue;
+        }
+        
+        // Kategorie erstellen oder ID holen
+        let categoryId = processedCategories.get(categoryName);
+        if (!categoryId) {
+          // Neue Kategorie erstellen
+          const categoryRef = db.collection('technicalSkillCategories').doc();
+          categoryId = categoryRef.id;
+          
+          batch.set(categoryRef, {
+            name: categoryName,
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          });
+          
+          processedCategories.set(categoryName, categoryId);
+          results.categoriesCreated++;
+        }
+        
+        // Skill erstellen (nur wenn nicht bereits in dieser Kategorie vorhanden)
+        const skillKey = `${categoryId}:${skillName}`;
+        if (processedSkills.has(skillKey)) {
+          results.skillsIgnored++;
+          continue;
+        }
+        
+        // Neuen Skill erstellen
+        const skillRef = db.collection('technicalSkills').doc();
+        batch.set(skillRef, {
+          name: skillName,
+          categoryId: categoryId,
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+        
+        processedSkills.add(skillKey);
+        results.skillsCreated++;
+        
+      } catch (itemError) {
+        results.errors.push(`Fehler bei Item: ${JSON.stringify(item)} - ${itemError.message}`);
+      }
+    }
+    
+    // Batch ausführen
+    await batch.commit();
+    
+    res.json({
+      success: true,
+      results: results
+    });
+    
+  } catch (error) {
+    res.status(500).json({ error: 'Fehler beim Bulk-Import der Technical Skills' });
+  }
+});
+
+// ==========================================
+// ROLES API ENDPOINTS
+// ==========================================
+
+// GET /api/roles - Alle Rollen laden
+app.get('/api/roles', requireAuth, async (req, res) => {
+  try {
+    const rolesSnap = await db.collection('roles')
+      .where('isActive', '==', true)
+      .orderBy('name')
+      .get();
+    
+    const roles = [];
+    rolesSnap.forEach(doc => {
+      roles.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+    
+    res.json(roles);
+  } catch (error) {
+    res.status(500).json({ error: 'Fehler beim Laden der Rollen' });
+  }
+});
+
+// POST /api/roles - Neue Rolle erstellen
+app.post('/api/roles', requireAuth, async (req, res) => {
+  try {
+    const { name } = req.body;
+    
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Rollen-Name ist erforderlich' });
+    }
+    
+    // Prüfen ob Rolle bereits existiert
+    const existingSnap = await db.collection('roles')
+      .where('name', '==', name.trim())
+      .where('isActive', '==', true)
+      .get();
+    
+    if (!existingSnap.empty) {
+      return res.status(409).json({ error: 'Eine Rolle mit diesem Namen existiert bereits' });
+    }
+    
+    const roleData = {
+      name: name.trim(),
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    const docRef = await db.collection('roles').add(roleData);
+    
+    res.json({
+      success: true,
+      role: {
+        id: docRef.id,
+        ...roleData
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Fehler beim Erstellen der Rolle' });
+  }
+});
+
+// PUT /api/roles/:id - Rolle bearbeiten
+app.put('/api/roles/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+    
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Rollen-Name ist erforderlich' });
+    }
+    
+    // Prüfen ob Rolle existiert
+    const roleDoc = await db.collection('roles').doc(id).get();
+    if (!roleDoc.exists) {
+      return res.status(404).json({ error: 'Rolle nicht gefunden' });
+    }
+    
+    // Prüfen ob Name bereits von anderer Rolle verwendet wird
+    const existingSnap = await db.collection('roles')
+      .where('name', '==', name.trim())
+      .where('isActive', '==', true)
+      .get();
+    
+    const duplicateExists = existingSnap.docs.some(doc => doc.id !== id);
+    if (duplicateExists) {
+      return res.status(409).json({ error: 'Eine andere Rolle mit diesem Namen existiert bereits' });
+    }
+    
+    const updateData = {
+      name: name.trim(),
+      updatedAt: new Date()
+    };
+    
+    await db.collection('roles').doc(id).update(updateData);
+    
+    res.json({
+      success: true,
+      message: 'Rolle wurde erfolgreich aktualisiert'
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Fehler beim Bearbeiten der Rolle' });
+  }
+});
+
+// DELETE /api/roles/:id - Rolle löschen (soft delete)
+app.delete('/api/roles/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Prüfen ob Rolle existiert
+    const roleDoc = await db.collection('roles').doc(id).get();
+    if (!roleDoc.exists) {
+      return res.status(404).json({ error: 'Rolle nicht gefunden' });
+    }
+    
+    const roleData = roleDoc.data();
+    const roleName = roleData.name;
+    
+    // Prüfen ob Tasks diese Rolle verwenden
+    const tasksSnap = await db.collection('roleTasks')
+      .where('roleId', '==', id)
+      .where('isActive', '==', true)
+      .get();
+    
+    if (!tasksSnap.empty) {
+      return res.status(409).json({ 
+        error: `Rolle "${roleName}" kann nicht gelöscht werden, da sie von ${tasksSnap.size} Tätigkeiten verwendet wird` 
+      });
+    }
+    
+    // Soft delete
+    await db.collection('roles').doc(id).update({
+      isActive: false,
+      deletedAt: new Date()
+    });
+    
+    res.json({
+      success: true,
+      message: `Rolle "${roleName}" wurde gelöscht`
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Fehler beim Löschen der Rolle' });
+  }
+});
+
+// ==========================================
+// ROLE TASKS API ENDPOINTS
+// ==========================================
+
+// GET /api/role-tasks - Alle Rollen-Tätigkeiten laden
+app.get('/api/role-tasks', requireAuth, async (req, res) => {
+  try {
+    const tasksSnap = await db.collection('roleTasks')
+      .where('isActive', '==', true)
+      .orderBy('createdAt', 'desc')
+      .get();
+    
+    const tasks = [];
+    tasksSnap.forEach(doc => {
+      tasks.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+    
+    res.json(tasks);
+  } catch (error) {
+    res.status(500).json({ error: 'Fehler beim Laden der Rollen-Tätigkeiten' });
+  }
+});
+
+// POST /api/role-tasks - Neue Rollen-Tätigkeit erstellen
+app.post('/api/role-tasks', requireAuth, async (req, res) => {
+  try {
+    const { task, description, outputs, roleId, roleName } = req.body;
+    
+    if (!task || !task.trim()) {
+      return res.status(400).json({ error: 'Tätigkeits-Name ist erforderlich' });
+    }
+    
+    const taskData = {
+      task: task.trim(),
+      description: description?.trim() || '',
+      outputs: outputs?.trim() || '',
+      roleId: roleId?.trim() || null,
+      roleName: roleName?.trim() || '', // Legacy field
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    const docRef = await db.collection('roleTasks').add(taskData);
+    
+    res.json({
+      success: true,
+      task: {
+        id: docRef.id,
+        ...taskData
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Fehler beim Erstellen der Rollen-Tätigkeit' });
+  }
+});
+
+// PUT /api/role-tasks/:id - Rollen-Tätigkeit bearbeiten
+app.put('/api/role-tasks/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { task, description, outputs, roleId, roleName } = req.body;
+    
+    if (!task || !task.trim()) {
+      return res.status(400).json({ error: 'Tätigkeits-Name ist erforderlich' });
+    }
+    
+    // Prüfen ob Task existiert
+    const taskDoc = await db.collection('roleTasks').doc(id).get();
+    if (!taskDoc.exists) {
+      return res.status(404).json({ error: 'Rollen-Tätigkeit nicht gefunden' });
+    }
+    
+    const updateData = {
+      task: task.trim(),
+      description: description?.trim() || '',
+      outputs: outputs?.trim() || '',
+      roleId: roleId?.trim() || null,
+      roleName: roleName?.trim() || '', // Legacy field
+      updatedAt: new Date()
+    };
+    
+    await db.collection('roleTasks').doc(id).update(updateData);
+    
+    res.json({
+      success: true,
+      message: 'Rollen-Tätigkeit wurde erfolgreich aktualisiert'
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Fehler beim Bearbeiten der Rollen-Tätigkeit' });
+  }
+});
+
+// DELETE /api/role-tasks/:id - Rollen-Tätigkeit löschen (soft delete)
+app.delete('/api/role-tasks/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Prüfen ob Task existiert
+    const taskDoc = await db.collection('roleTasks').doc(id).get();
+    if (!taskDoc.exists) {
+      return res.status(404).json({ error: 'Rollen-Tätigkeit nicht gefunden' });
+    }
+    
+    const taskData = taskDoc.data();
+    const taskName = taskData.task;
+    
+    // Soft delete
+    await db.collection('roleTasks').doc(id).update({
+      isActive: false,
+      deletedAt: new Date()
+    });
+    
+    res.json({
+      success: true,
+      message: `Rollen-Tätigkeit "${taskName}" wurde gelöscht`
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Fehler beim Löschen der Rollen-Tätigkeit' });
+  }
+});
+
+// ==========================================
+// ROLES BULK IMPORT API ENDPOINTS
+// ==========================================
+
+// POST /api/roles/bulk-import - Excel-Import für Rollen und Tätigkeiten
+app.post('/api/roles/bulk-import', requireAuth, async (req, res) => {
+  try {
+    const { data } = req.body; // Array von { role: string, task: string, description: string, outputs: string }
+    
+    if (!Array.isArray(data) || data.length === 0) {
+      return res.status(400).json({ error: 'Keine gültigen Daten zum Import gefunden' });
+    }
+    
+    const results = {
+      rolesCreated: 0,
+      tasksCreated: 0,
+      tasksIgnored: 0,
+      errors: []
+    };
+    
+    // Batch für bessere Performance
+    const batch = db.batch();
+    const processedRoles = new Map(); // name -> id
+    const processedTasks = new Set(); // roleId:taskName
+    
+    // Bestehende Rollen laden
+    const existingRolesSnap = await db.collection('roles')
+      .where('isActive', '==', true)
+      .get();
+    
+    existingRolesSnap.forEach(doc => {
+      processedRoles.set(doc.data().name, doc.id);
+    });
+    
+    // Bestehende Tasks laden
+    const existingTasksSnap = await db.collection('roleTasks')
+      .where('isActive', '==', true)
+      .get();
+    
+    existingTasksSnap.forEach(doc => {
+      const taskData = doc.data();
+      if (taskData.roleId) {
+        processedTasks.add(`${taskData.roleId}:${taskData.task}`);
+      }
+    });
+    
+    for (const item of data) {
+      try {
+        const roleName = item.role?.trim();
+        const taskName = item.task?.trim();
+        const description = item.description?.trim() || '';
+        const outputs = item.outputs?.trim() || '';
+        
+        // Validierung
+        if (!roleName || !taskName) {
+          results.errors.push(`Ungültige Daten: Rolle="${roleName}", Tätigkeit="${taskName}"`);
+          continue;
+        }
+        
+        // Rolle erstellen oder ID holen
+        let roleId = processedRoles.get(roleName);
+        if (!roleId) {
+          // Neue Rolle erstellen
+          const roleRef = db.collection('roles').doc();
+          roleId = roleRef.id;
+          
+          batch.set(roleRef, {
+            name: roleName,
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          });
+          
+          processedRoles.set(roleName, roleId);
+          results.rolesCreated++;
+        }
+        
+        // Task erstellen (nur wenn nicht bereits in dieser Rolle vorhanden)
+        const taskKey = `${roleId}:${taskName}`;
+        if (processedTasks.has(taskKey)) {
+          results.tasksIgnored++;
+          continue;
+        }
+        
+        // Neue Tätigkeit erstellen
+        const taskRef = db.collection('roleTasks').doc();
+        batch.set(taskRef, {
+          task: taskName,
+          description: description,
+          outputs: outputs,
+          roleId: roleId,
+          roleName: roleName, // Legacy field
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+        
+        processedTasks.add(taskKey);
+        results.tasksCreated++;
+        
+      } catch (itemError) {
+        results.errors.push(`Fehler bei Item: ${JSON.stringify(item)} - ${itemError.message}`);
+      }
+    }
+    
+    // Batch ausführen
+    await batch.commit();
+    
+    res.json({
+      success: true,
+      results: results
+    });
+    
+  } catch (error) {
+    res.status(500).json({ error: 'Fehler beim Bulk-Import der Rollen und Tätigkeiten' });
   }
 });
 
