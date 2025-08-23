@@ -6,6 +6,7 @@ import { AdminDataUploadModal } from './AdminDataUploadModal';
 import { EinsatzplanView } from './EinsatzplanView';
 import { AuslastungView } from './AuslastungView';
 import { useAuth } from '../../contexts/AuthContext';
+import { useUtilizationData } from '../../contexts/UtilizationDataContext';
 import { MultiSelectFilter } from './MultiSelectFilter';
 import { PersonFilterBar } from './PersonFilterBar';
 // DatabaseService removed - using direct Firebase calls and consolidation.ts
@@ -59,6 +60,7 @@ export function UtilizationReportView({
   setIsColumnsMenuOpen 
 }: UtilizationReportViewProps) {
   const { user, loading, profile, updateProfile } = useAuth();
+  const { databaseData, personMeta, isLoading: dataLoading, refreshData } = useUtilizationData();
   const [showAllData, setShowAllData] = useState<boolean>(() => {
     try { return JSON.parse(localStorage.getItem('utilization_show_all_data') || 'false'); } catch { return false; }
   });
@@ -70,24 +72,7 @@ export function UtilizationReportView({
   //   auslastung?: UploadedFile;
   //   einsatzplan?: UploadedFile;
   // }>({});
-  // 🚀 PHASE 2: Neue State-Struktur für konsolidierte Daten
-  const [databaseData, setDatabaseData] = useState<{
-    auslastung?: any[];
-    einsatzplan?: any[];
-    // Zusätzlich: Rohe konsolidierte Daten für erweiterte Features
-    utilizationData?: any[];
-  }>({});
-  
-  // ✅ DEBUG: Überwache databaseData Änderungen
-  useEffect(() => {
-    console.log('🔍 databaseData wurde geändert:', {
-      auslastungCount: databaseData.auslastung?.length || 0,
-      einsatzplanCount: databaseData.einsatzplan?.length || 0,
-      utilizationDataCount: databaseData.utilizationData?.length || 0,
-      timestamp: new Date().toLocaleTimeString()
-    });
-  }, [databaseData]);
-  const [dataSource, setDataSource] = useState<'upload' | 'database'>('upload');
+  const [dataSource, setDataSource] = useState<'upload' | 'database'>('database');
   const [selectedPersons, setSelectedPersons] = useState<string[]>([]);
   const [planningForPerson, setPlanningForPerson] = useState<string | null>(null);
   const [planningForWeek, setPlanningForWeek] = useState<{ year: number; week: number } | null>(null);
@@ -102,119 +87,7 @@ export function UtilizationReportView({
   // Assignments: Zugriff (Preload-Effekt wird weiter unten nach visiblePersons platziert)
   const { getAssignmentsForEmployee, assignmentsByEmployee } = useAssignments();
 
-  // ✅ VEREINFACHT: Nur noch eine Datenquelle - Database (Firebase)
-  // Upload-Funktionalität ist jetzt nur noch über Admin-Modal verfügbar
-
-  // 🚀 PHASE 2: Lade direkt aus der konsolidierten utilizationData Collection
-  const loadDatabaseData = async () => {
-    try {
-      console.log('🚀 loadDatabaseData() - Lade aus konsolidierter utilizationData Collection...');
-
-      // ✅ SINGLE SOURCE: Lade nur noch die konsolidierte Collection
-      const utilizationSnapshot = await getDocs(collection(db, 'utilizationData'));
-      const utilizationData = utilizationSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as any[];
-
-      console.log('✅ Konsolidierte Daten geladen:', {
-        totalRecords: utilizationData.length,
-        sampleRecord: utilizationData[0]
-      });
-
-      // ✅ DEBUG: Zeige Struktur der konsolidierten Daten
-      if (utilizationData.length > 0) {
-        const sample = utilizationData[0];
-        console.log('🔍 DEBUG: Konsolidierte Datenstruktur:', {
-          person: sample.person,
-          nachname: sample.nachname,
-          vorname: sample.vorname,
-          hasAuslastung: Object.keys(sample.auslastung || {}).length > 0,
-          hasEinsatzplan: Object.keys(sample.einsatzplan || {}).length > 0,
-          auslastungWeeks: Object.keys(sample.auslastung || {}),
-          einsatzplanWeeks: Object.keys(sample.einsatzplan || {}),
-          dataCompleteness: sample.dataCompleteness
-        });
-      }
-
-      // ✅ TRANSFORMED: Transformiere konsolidierte Daten für bestehende UI-Logik
-      // Für Kompatibilität mit bestehender UI, simuliere separate auslastung/einsatzplan Arrays
-      const transformedData = {
-        utilizationData: utilizationData,
-        // Backward compatibility: Erstelle separate Arrays für bestehende UI-Logik
-        auslastung: utilizationData.map(record => ({
-          id: record.id,
-          person: record.person,
-          personId: record.id,
-          lob: record.lob,
-          bereich: record.bereich,
-          cc: record.cc,
-          team: record.team,
-          lbs: record.lbs,
-          vg: record.vg,
-          values: record.auslastung || {}
-        })),
-        einsatzplan: utilizationData.map(record => ({
-          id: record.id,
-          person: record.person,
-          personId: record.id,
-          lob: record.lob,
-          bereich: record.bereich,
-          cc: record.cc,
-          team: record.team,
-          vg: record.vg,
-          // Transformiere einsatzplan zu flachen values für UI-Kompatibilität
-          values: Object.entries(record.einsatzplan || {}).reduce((acc, [week, entries]) => {
-            if (Array.isArray(entries) && entries.length > 0) {
-              // Summiere auslastungProzent aller Projekte für diese Woche
-              const totalUtilization = entries.reduce((sum, entry) => sum + (entry.auslastungProzent || 0), 0);
-              acc[week] = totalUtilization;
-            }
-            return acc;
-          }, {} as Record<string, number>)
-        }))
-      };
-
-      console.log('🔍 DEBUG: Transformierte Daten für UI:', {
-        auslastungCount: transformedData.auslastung.length,
-        einsatzplanCount: transformedData.einsatzplan.length,
-        sampleAuslastung: transformedData.auslastung[0],
-        sampleEinsatzplan: transformedData.einsatzplan[0]
-      });
-      
-      // ✅ Setze transformierte Daten für UI-Kompatibilität + rohe konsolidierte Daten
-      setDatabaseData({
-        auslastung: transformedData.auslastung,
-        einsatzplan: transformedData.einsatzplan,
-        utilizationData: transformedData.utilizationData
-      });
-      setDataSource('database');
-      
-      // ✅ KORRIGIERT: Lade Status und Action Items NUR beim initialen Laden der Daten
-      await loadPersonStatuses();
-      await loadActionItems();
-      
-      console.log('✅ Firebase-Daten direkt erfolgreich geladen');
-      
-    } catch (error) {
-      console.error('❌ Fehler beim direkten Firebase-Laden:', error);
-      console.error('❌ Fehler-Details:', error);
-      // ✅ KORRIGIERT: Nicht die Daten zurücksetzen bei Fehlern
-      // setDatabaseData({});
-      // setDataSource('upload');
-    }
-  };
-
-  // Load data from database after user is authenticated
-  useEffect(() => {
-    // Nur laden wenn User eingeloggt ist und nicht mehr im Loading-Status
-    if (!loading && user) {
-      console.log('🚀 User authentifiziert - lade Daten aus Firebase utilization-Data Collection');
-      loadDatabaseData();
-    } else if (!loading && !user) {
-      console.log('⚠️ User nicht eingeloggt - keine Daten geladen');
-    }
-  }, [loading, user]);
+  // ✅ VEREINFACHT: Daten werden jetzt über UtilizationDataContext geladen
 
   // ✅ SCHRITT 5: localStorage-Fallback entfernt - Datenbank-Daten werden erfolgreich geladen
   // Kein localStorage-Fallback mehr nötig, da die Datenbank-Daten funktionieren
@@ -857,87 +730,7 @@ export function UtilizationReportView({
     });
   }, [dataForUI, dataSource, consolidatedData]);
 
-  // Automatische ACT-Checkbox Aktivierung basierend auf niedriger Auslastung
-  useEffect(() => {
-    if (!dataForUI || dataForUI.length === 0) return;
-
-    const autoSetActionItems = () => {
-      const newActionItems: Record<string, boolean> = {};
-      
-      // Alle Personen sammeln
-      const allPersons = Array.from(new Set(dataForUI.map(item => item.person)));
-      
-      allPersons.forEach(person => {
-        // Letzte 4 Wochen aus der Auslastung prüfen (YY/WW Format)
-        const last4Weeks = Array.from({ length: 4 }, (_, i) => {
-          const weekNumber = forecastStartWeek - 4 + i;
-          const yy = String(currentIsoYear).slice(-2);
-          const weekKey = `${yy}/${String(weekNumber).padStart(2, '0')}`; // "25/33"
-          const weekData = dataForUI.find(item => 
-            item.person === person && 
-            item.week === weekKey &&
-            item.isHistorical
-          );
-          return weekData?.utilization || 0;
-        });
-
-        // Nächste 8 Wochen aus dem Einsatzplan prüfen (YY/WW Format)
-        const next8Weeks = Array.from({ length: 8 }, (_, i) => {
-          const weekNumber = forecastStartWeek + i;
-          const yy = String(currentIsoYear).slice(-2);
-          const weekKey = `${yy}/${String(weekNumber).padStart(2, '0')}`; // "25/33"
-          const weekData = dataForUI.find(item => 
-            item.person === person && 
-            item.week === weekKey &&
-            !item.isHistorical
-          );
-          return weekData?.utilization || 0;
-        });
-
-        // Durchschnitt der letzten 4 Wochen
-        const avgLast4Weeks = last4Weeks.reduce((sum, val) => sum + val, 0) / last4Weeks.length;
-        
-        // Durchschnitt der nächsten 8 Wochen
-        const avgNext8Weeks = next8Weeks.reduce((sum, val) => sum + val, 0) / next8Weeks.length;
-
-        // Automatisch ACT-Checkbox aktivieren wenn Durchschnitt der nächsten 8 Wochen <= 25%
-        if (avgNext8Weeks <= 25) {
-          newActionItems[person] = true;
-        }
-      });
-
-      // ✅ KORRIGIERT: Logik für regelbasierte Werte
-      if (Object.keys(newActionItems).length > 0) {
-        const updatedActionItems: Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }> = { ...actionItems };
-        
-        Object.entries(newActionItems).forEach(([person, actionItem]) => {
-          const current = actionItems[person];
-          
-          // ✅ NEUE LOGIK: Manuelle Werte NIEMALS überschreiben
-          if (current?.source === 'manual') {
-            // Manuelle Werte bleiben unverändert
-            console.log(`🔒 Manueller Wert für ${person} bleibt erhalten:`, current.actionItem);
-          } else {
-            // Regel-basierte oder Default-Werte können überschrieben werden
-            const shouldUpdate = !current || current.actionItem !== actionItem;
-            
-            if (shouldUpdate) {
-              console.log(`🔄 Aktualisiere ${person} von ${current?.actionItem} auf ${actionItem} (source: rule)`);
-              updatedActionItems[person] = { actionItem, source: 'rule', updatedBy: undefined };
-            }
-          }
-        });
-        
-        // ✅ Aktualisiere globalen State
-        setActionItems(updatedActionItems);
-      }
-    };
-
-    // ✅ NEU: autoSetActionItems() aufrufen wenn sich Daten ändern (ohne actionItems dependency)
-    if (dataSource === 'database') {
-      autoSetActionItems();
-    }
-  }, [dataForUI, forecastStartWeek, currentIsoYear, dataSource]);
+  // ✅ VERSCHOBEN: Automatische ACT-Checkbox Aktivierung wird nach personMeta Definition ausgeführt
 
 
 
@@ -964,124 +757,182 @@ export function UtilizationReportView({
 
 
 
-  // ✅ NEU: PersonMeta primär aus Einsatzplan Collection für alle Mitarbeiter-Informationen
-  const personMeta = useMemo(() => {
-    const meta = new Map<string, { lob?: string; bereich?: string; cc?: string; team?: string; lbs?: string; careerLevel?: string }>();
-    
-    // ✅ NEU: Extrahiere Metadaten primär aus Einsatzplan Collection (Master-Daten)
-    if (dataSource === 'database' && databaseData.einsatzplan) {
-      const personMetaMap = new Map<string, any>();
-      
-      // Sammle Metadaten aus Einsatzplan Collection (nehme ersten Eintrag pro Person)
-      databaseData.einsatzplan.forEach((row: any) => {
-        if (row.person && !personMetaMap.has(row.person)) {
-          personMetaMap.set(row.person, {
-            lob: row.lob,
-            bereich: row.bereich,
-            cc: row.cc,
-            team: row.team,
-            lbs: row.lbs,
-            careerLevel: row.careerLevel,
-            manager: row.vg
-          });
-        }
-      });
-      
-      // Ergänze fehlende Personen aus Auslastung Collection (nur als Fallback)
-      if (databaseData.auslastung) {
-        databaseData.auslastung.forEach((row: any) => {
-          if (row.person && !personMetaMap.has(row.person)) {
-            personMetaMap.set(row.person, {
-              lob: row.lob,
-              bereich: row.bereich,
-              cc: row.cc,
-              team: row.team,
-              lbs: row.lbs,
-              careerLevel: row.careerLevel
-            });
-          }
-        });
-      }
-      
-      return personMetaMap;
+  // ✅ PersonMeta kommt jetzt aus dem UtilizationDataContext
+
+  // ✅ Automatische ACT-Checkbox Aktivierung basierend auf niedriger Auslastung (nach personMeta)
+  useEffect(() => {
+    if (!dataForUI || dataForUI.length === 0 || !personMeta || personMeta.size === 0) return;
+
+    // ✅ SCHUTZ: Warte bis echte Forecast-Daten verfügbar sind
+    const hasForecastData = dataForUI.some(item => !item.isHistorical && item.utilization !== null);
+    if (!hasForecastData) {
+      console.log('⚠️ Noch keine Forecast-Daten verfügbar - warte auf vollständige Daten');
+      return;
     }
 
-    // DISABLED: Upload-Modus
-    // if (dataSource === 'upload') {
-    //   const aus = uploadedFiles.auslastung?.data as any[] | null;
-    //   const ein = uploadedFiles.einsatzplan?.data as any[] | null;
+    console.log('🚀 Starte automatische Act-Toggle Berechnung...');
 
-      const getField = (row: any, candidates: string[]): string | undefined => {
-        for (const key of candidates) {
-          const v = row?.[key];
-          if (typeof v === 'string' && v.trim()) return String(v);
+    const autoSetActionItems = () => {
+      const newActionItems: Record<string, boolean> = {};
+      
+      // ✅ KORRIGIERT: Alle Personen aus personMeta sammeln (nicht nur die mit Daten)
+      const allPersons = Array.from(personMeta.keys());
+      
+      // ✅ KORRIGIERT: Verwende aktuelle Woche als Basis
+      const currentWeek = getISOWeek(new Date());
+      const currentYear = getISOWeekYear(new Date());
+      const yy = String(currentYear).slice(-2);
+      
+      allPersons.forEach(person => {
+        // ✅ FK-REGEL: Prüfe zuerst, ob Person eine Führungskraft hat
+        const manager = personMeta.get(person)?.manager;
+        if (!manager) {
+          // Keine Führungskraft → kein Act-Toggle
+          console.log(`🔒 FK-Regel: Kein Toggle für ${person} (keine Führungskraft)`);
+          return; // Skip diese Person
         }
-        return undefined;
-      };
-      
-      const parseBereich = (raw?: string): { bereich?: string } => {
-        if (!raw || !raw.trim()) return {};
-        const match = raw.match(/^\s*.+?\s*\(([^)]+)\)\s*$/);
-        if (match) return { bereich: match[1].trim() };
-        return { bereich: raw.trim() };
-      };
-      
-      const fill = (rows?: any[]) => {
-        rows?.forEach(r => {
-          if (!r?.person) return;
-          const current = meta.get(r.person) || {} as any;
-          const lob = getField(r, ['LoB','lob','LOB','lineOfBusiness','LineOfBusiness','Line of Business']);
-          const bereichRaw = getField(r, ['Bereich','bereich']);
-          const bereichValue = parseBereich(bereichRaw || '').bereich || bereichRaw;
-          const cc = getField(r, ['CC','cc','competenceCenter','CompetenceCenter','Competence Center','CC ']);
-          const team = getField(r, ['Team','team','T ']);
-          const lbs = getField(r, ['lbs','LBS']);
-          meta.set(r.person, {
-            lob: lob ?? current.lob,
-            cc: cc ?? current.cc,
-            lbs: lbs ?? current.lbs,
-            team: team ?? current.team,
-          });
-          if (bereichValue) (meta.get(r.person) as any).bereich = bereichValue;
+        
+        // ✅ KORRIGIERT: Letzte 4 Wochen aus der Auslastung prüfen (vor aktueller Woche)
+        const last4Weeks = Array.from({ length: 4 }, (_, i) => {
+          const weekNumber = currentWeek - 4 + i;
+          let adjustedWeek = weekNumber;
+          let adjustedYear = currentYear;
+          
+          // Handle year boundary
+          if (weekNumber <= 0) {
+            adjustedYear = currentYear - 1;
+            adjustedWeek = weekNumber + 52; // Approximate weeks in year
+          }
+          
+          const weekYY = String(adjustedYear).slice(-2);
+          const weekKey = `${weekYY}/${String(adjustedWeek).padStart(2, '0')}`;
+          
+          const weekData = dataForUI.find(item => 
+            item.person === person && 
+            item.week === weekKey &&
+            item.isHistorical
+          );
+          return weekData?.utilization ?? null;
         });
-      };
-      
-      // DISABLED: Upload-Daten-Verarbeitung
-      // fill(aus || undefined);
-      // fill(ein || undefined);
-    // }
 
-    return meta;
-  }, [databaseData, dataSource]);
+        // ✅ KORRIGIERT: Nächste 8 Wochen aus dem Einsatzplan prüfen (ab nächster Woche)
+        const next8Weeks = Array.from({ length: 8 }, (_, i) => {
+          const weekNumber = currentWeek + 1 + i; // Start next week
+          let adjustedWeek = weekNumber;
+          let adjustedYear = currentYear;
+          
+          // Handle year boundary
+          if (weekNumber > 52) {
+            adjustedYear = currentYear + 1;
+            adjustedWeek = weekNumber - 52; // Approximate weeks in year
+          }
+          
+          const weekYY = String(adjustedYear).slice(-2);
+          const weekKey = `${weekYY}/${String(adjustedWeek).padStart(2, '0')}`;
+          
+          const weekData = dataForUI.find(item => 
+            item.person === person && 
+            item.week === weekKey &&
+            !item.isHistorical
+          );
+          return weekData?.utilization ?? null;
+        });
 
-  // ✅ FK-Regel nur einmal beim Laden anwenden (keine Endlosschleife!)
-  useEffect(() => {
-    if (!personMeta || personMeta.size === 0 || dataSource !== 'database') return;
+        // Durchschnitt der letzten 4 Wochen (nur echte Werte berücksichtigen)
+        const validLast4Weeks = last4Weeks.filter(val => val !== null) as number[];
+        const avgLast4Weeks = validLast4Weeks.length > 0 
+          ? validLast4Weeks.reduce((sum, val) => sum + val, 0) / validLast4Weeks.length 
+          : null;
+        
+        // Durchschnitt der nächsten 8 Wochen (nur echte Werte berücksichtigen)
+        const validNext8Weeks = next8Weeks.filter(val => val !== null) as number[];
+        const avgNext8Weeks = validNext8Weeks.length > 0 
+          ? validNext8Weeks.reduce((sum, val) => sum + val, 0) / validNext8Weeks.length 
+          : null;
 
-    const applyFKRule = () => {
-      const updatedActionItems = { ...actionItems };
+        // ✅ DEBUG: Zeige Berechnungen für erste Person
+        if (person === allPersons[0]) {
+          console.log(`🔍 DEBUG Act-Toggle Berechnung für ${person}:`, {
+            currentWeek: `${yy}/${String(currentWeek).padStart(2, '0')}`,
+            last4Weeks: last4Weeks,
+            next8Weeks: next8Weeks,
+            validLast4Weeks: validLast4Weeks.length,
+            validNext8Weeks: validNext8Weeks.length,
+            avgLast4Weeks: avgLast4Weeks !== null ? Math.round(avgLast4Weeks * 10) / 10 : null,
+            avgNext8Weeks: avgNext8Weeks !== null ? Math.round(avgNext8Weeks * 10) / 10 : null,
+            manager: manager
+          });
+        }
+
+        // ✅ KORRIGIERT: Setze Toggle NUR wenn ausreichend echte Daten vorhanden sind UND Auslastung ≤25%
+        if (avgNext8Weeks !== null && validNext8Weeks.length >= 3 && avgNext8Weeks <= 25) {
+          newActionItems[person] = true;
+          console.log(`✅ Act-Toggle für ${person}: Ø nächste 8W = ${Math.round(avgNext8Weeks)}% <= 25% (${validNext8Weeks.length} Wochen mit Daten)`);
+        } else if (avgNext8Weeks === null || validNext8Weeks.length < 3) {
+          console.log(`⚠️ Unzureichende Forecast-Daten für ${person} (${validNext8Weeks.length} Wochen) - kein Toggle gesetzt`);
+        } else {
+          console.log(`❌ Kein Toggle für ${person}: Ø nächste 8W = ${Math.round(avgNext8Weeks)}% > 25% (${validNext8Weeks.length} Wochen mit Daten)`);
+        }
+        // Personen mit >25% Auslastung werden NICHT verändert (kein automatisches false setzen)
+      });
+
+      // ✅ KORRIGIERT: Verarbeite ALLE Personen (sowohl neue als auch bestehende regelbasierte)
+      const updatedActionItems: Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }> = { ...actionItems };
       let hasChanges = false;
-
-      // Prüfe alle Personen mit regelbasierten Toggles
-      Object.entries(actionItems).forEach(([person, item]) => {
-        if (item.source === 'rule') {
-          const manager = personMeta.get(person)?.manager;
-          // Falls kein Manager (FK="X"), Toggle entfernen
-          if (!manager) {
-            updatedActionItems[person] = { actionItem: false, source: 'rule', updatedBy: undefined };
+      
+      // 1. Setze neue regelbasierte Toggles für Personen mit ≤25% Auslastung
+      Object.entries(newActionItems).forEach(([person, actionItem]) => {
+        const current = actionItems[person];
+        
+        // ✅ NEUE LOGIK: Manuelle Werte NIEMALS überschreiben
+        if (current?.source === 'manual') {
+          // Manuelle Werte bleiben unverändert
+          console.log(`🔒 Manueller Wert für ${person} bleibt erhalten:`, current.actionItem);
+        } else {
+          // Regel-basierte oder Default-Werte können überschrieben werden
+          const shouldUpdate = !current || current.actionItem !== actionItem;
+          
+          if (shouldUpdate) {
+            console.log(`🔄 Aktualisiere ${person} von ${current?.actionItem} auf ${actionItem} (source: rule)`);
+            updatedActionItems[person] = { actionItem, source: 'rule', updatedBy: undefined };
             hasChanges = true;
-            console.log(`🔒 FK-Regel: Toggle für ${person} entfernt (keine Führungskraft)`);
           }
         }
       });
-
+      
+      // 2. Entferne regelbasierte Toggles für Personen mit >25% Auslastung
+      allPersons.forEach(person => {
+        const current = actionItems[person];
+        
+        // Nur regelbasierte Toggles prüfen (manuelle bleiben unverändert)
+        if (current?.source === 'rule' && !newActionItems[person]) {
+          // Diese Person hat >25% Auslastung, aber noch einen regelbasierten Toggle
+          console.log(`🔄 Entferne regelbasierten Toggle für ${person} (Auslastung > 25%)`);
+          delete updatedActionItems[person];
+          hasChanges = true;
+        }
+      });
+      
+      // ✅ Aktualisiere globalen State nur bei Änderungen
       if (hasChanges) {
         setActionItems(updatedActionItems);
       }
+      
+      // ✅ DEBUG: Zusammenfassung der Berechnung
+      console.log('📊 Act-Toggle Berechnung abgeschlossen:', {
+        geprüftePersonen: allPersons.length,
+        neueToggles: Object.keys(newActionItems).length,
+        änderungen: hasChanges,
+        togglesGesetzt: Object.values(newActionItems).filter(Boolean).length,
+        togglesEntfernt: Object.keys(newActionItems).length - Object.values(newActionItems).filter(Boolean).length
+      });
     };
 
-    applyFKRule();
-  }, [personMeta, dataSource]); // actionItems entfernt - verhindert Endlosschleife!
+    // ✅ NEU: autoSetActionItems() aufrufen wenn sich Daten ändern (ohne actionItems dependency)
+    if (dataSource === 'database') {
+      autoSetActionItems();
+    }
+  }, [dataForUI, dataSource, personMeta]);
 
 
 
@@ -1268,16 +1119,41 @@ export function UtilizationReportView({
   const availableWeeksFromData = useMemo(() => {
     if (dataForUI.length === 0) return [];
     
+    // Berechne die letzte Auslastungswoche (entspricht der letzten Spalte links)
+    const currentWeek = getISOWeek(new Date());
+    const currentYear = getISOWeekYear(new Date());
+    const lastUtilizationWeek = currentWeek;
+    const yy = String(currentYear).slice(-2);
+    const lastUtilizationWeekKey = `${yy}/${String(lastUtilizationWeek).padStart(2, '0')}`;
+    
     // Sammle alle Wochen aus den Einsatzplan-Daten (isHistorical: false)
-    const forecastWeeks = dataForUI
+    const allForecastWeeks = dataForUI
       .filter(item => !item.isHistorical) // Nur Forecast-Daten
       .map(item => item.week)
       .filter((week, index, arr) => arr.indexOf(week) === index) // Unique
       .sort();
     
-    // ✅ DEBUG: Zeige echte vs generierte Wochen
-    console.log('🔍 DEBUG availableWeeksFromData (aus echten Daten):', {
-      forecastWochen: forecastWeeks,
+    // Filtere nur Wochen, die NACH der letzten Auslastungswoche liegen
+    const forecastWeeks = allForecastWeeks.filter(week => {
+      // Vergleiche Wochennummern (Format: "25/34")
+      const weekMatch = week.match(/(\d{2})\/(\d{2})/);
+      if (!weekMatch) return false;
+      
+      const weekYear = parseInt(`20${weekMatch[1]}`, 10);
+      const weekNumber = parseInt(weekMatch[2], 10);
+      
+      // Nur Wochen nach der aktuellen Woche (KW34) anzeigen
+      if (weekYear > currentYear) return true;
+      if (weekYear === currentYear && weekNumber > lastUtilizationWeek) return true;
+      
+      return false;
+    });
+    
+    // ✅ DEBUG: Zeige echte vs gefilterte Wochen
+    console.log('🔍 DEBUG availableWeeksFromData (gefiltert):', {
+      letztAuslastungswoche: lastUtilizationWeekKey,
+      alleForecastWochen: allForecastWeeks,
+      gefilterteForecastWochen: forecastWeeks,
       anzahl: forecastWeeks.length,
       sample: forecastWeeks.slice(0, 5)
     });
@@ -1458,8 +1334,15 @@ export function UtilizationReportView({
   // ✅ ENTFERNT: handleFilesChange ist nicht mehr nötig
   // Upload-Funktionalität läuft jetzt über AdminDataUploadModal
 
-  if (loading) {
-    return <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">Lade...</div>
+  if (loading || dataLoading) {
+    return <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p className="text-gray-600">
+          {loading ? 'Authentifizierung...' : 'Lade Auslastungsdaten...'}
+        </p>
+      </div>
+    </div>
   }
   if (!user) {
     return <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -1522,7 +1405,7 @@ export function UtilizationReportView({
                 </button>
               ) : (
                 <button
-                  onClick={() => loadDatabaseData()}
+                  onClick={() => refreshData()}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   <Database className="w-4 h-4" />
@@ -1648,7 +1531,7 @@ export function UtilizationReportView({
                 <tr>
                   {/* 8 Wochen aus dem View (letzte 8 Wochen vor aktueller KW) */}
                   {Array.from({ length: 8 }, (_, i) => {
-                    const weekNumber = getISOWeek(new Date()) - 8 + i;
+                    const weekNumber = getISOWeek(new Date()) - 7 + i;
                     const year = weekNumber <= 0 ? getISOWeekYear(new Date()) - 1 : getISOWeekYear(new Date());
                     const adjustedWeek = weekNumber <= 0 ? weekNumber + 52 : weekNumber;
                     const yy = String(year).slice(-2);
@@ -1712,7 +1595,7 @@ export function UtilizationReportView({
                     </div>
                   </th>
 
-                  {/* Forecast-Wochen aus dem Einsatzplan (startet bei der Woche nach der aktuellen) */}
+                  {/* Forecast-Wochen aus dem Einsatzplan (startet nach der letzten Auslastungswoche) */}
                   {visibleColumns.forecastWeeks && availableWeeksFromData.slice(0, forecastWeeks).map((week, i) => (
                     <th key={`forecast-${i}`} className="px-0.5 py-1 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-8">
                       {week}
@@ -1885,12 +1768,13 @@ export function UtilizationReportView({
                                   console.error('Fehler beim Speichern des Action Items:', error);
                                 }
                               }}
-                              className={`rounded border-2 focus:ring-2 focus:ring-offset-2 transition-all ${
-                                actionItems[person]?.source === 'manual' 
-                                  ? 'border-orange-400 focus:ring-orange-500' // Manueller Status: Orange Rahmen
-                                  : 'border-gray-300 focus:ring-blue-500'    // Automatischer Status: Normal
-                              }`}
+                              className="rounded border-2 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all"
                             />
+                            {/* Roter Indikatorpunkt für manuelle Änderungen */}
+                            {actionItems[person]?.source === 'manual' && (
+                              <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border border-white" 
+                                   title="Manuell gesetzt" />
+                            )}
                             {/* Tooltip für manuelle Änderungen */}
                             {actionItems[person]?.source === 'manual' && actionItems[person]?.updatedBy && (
                               <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-8 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-[10px] rounded px-2 py-1 whitespace-nowrap z-10">
@@ -2432,7 +2316,7 @@ export function UtilizationReportView({
       <AdminDataUploadModal
         isOpen={isAdminUploadModalOpen}
         onClose={() => setIsAdminUploadModalOpen(false)}
-        onDatabaseRefresh={loadDatabaseData}
+        onDatabaseRefresh={refreshData}
       />
 
       {/* AuslastungView Modal */}

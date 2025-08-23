@@ -21,6 +21,7 @@ import { ExcelUploadModal } from './components/generated/ExcelUploadModal';
 import { AssignmentsProvider } from './contexts/AssignmentsContext';
 import { RoleProvider } from './contexts/RoleContext';
 import { ProjectHistoryProvider } from './contexts/ProjectHistoryContext';
+import { UtilizationDataProvider } from './contexts/UtilizationDataContext';
 import { AppHeader } from './components/AppHeader';
 
 import DebugPanel from './components/DebugPanel';
@@ -126,9 +127,10 @@ function App() {
     
     return (
       <CustomerProvider>
-        <AssignmentsProvider>
-          <RoleProvider>
-            <ProjectHistoryProvider>
+        <UtilizationDataProvider>
+          <AssignmentsProvider>
+            <RoleProvider>
+              <ProjectHistoryProvider>
           {/* App Header - IMMER sichtbar */}
           <AppHeader
             currentView={currentView}
@@ -451,9 +453,10 @@ function App() {
           )}
           */}
 
-          </ProjectHistoryProvider>
-          </RoleProvider>
-        </AssignmentsProvider>
+              </ProjectHistoryProvider>
+            </RoleProvider>
+          </AssignmentsProvider>
+        </UtilizationDataProvider>
       </CustomerProvider>
     );
   }
