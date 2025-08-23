@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, MapPin, Users, Briefcase, Award, Mail, UserCheck, ExternalLink } from 'lucide-react';
+import { ChevronDown, ChevronUp, MapPin, Users, Briefcase, Award, Mail, ChefHat, ExternalLink } from 'lucide-react';
 import { SkillRating } from './SkillRating';
 import { ProjectDetail } from './ProjectDetail';
 interface Skill {
@@ -97,7 +97,7 @@ export const EmployeeCard = ({
           )}
           {employee.vg && (
             <div className="flex items-center gap-2 text-slate-600">
-              <UserCheck className="w-4 h-4" />
+              <ChefHat className="w-4 h-4" />
               <span className="text-sm">{employee.vg}</span>
             </div>
           )}
