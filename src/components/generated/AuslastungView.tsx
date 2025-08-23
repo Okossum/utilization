@@ -34,10 +34,10 @@ export function AuslastungView() {
       const data = await DatabaseService.getAuslastung();
       if (data) {
         setAuslastungData(data);
-        console.log('✅ Auslastung-Daten geladen:', data.length, 'Einträge');
+        // console.log entfernt
       }
     } catch (error) {
-      console.error('❌ Fehler beim Laden der Auslastung-Daten:', error);
+      // console.error entfernt
     } finally {
       setIsLoading(false);
     }

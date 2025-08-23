@@ -6,7 +6,7 @@ let level: LogLevel =
   (import.meta as any)?.env?.VITE_LOG_LEVEL ||
   (typeof process !== "undefined" && (process as any)?.env?.NEXT_PUBLIC_LOG_LEVEL) ||
   (localStorage.getItem("log-level") as LogLevel) ||
-  "info";
+  "warn";
 
 export function setLogLevel(l: LogLevel) {
   level = l; localStorage.setItem("log-level", l);
@@ -32,11 +32,11 @@ export function log(l: LogLevel, scope: string, msg: string, data?: any){
   const line = `%c[${e.level.toUpperCase()}] ${scope} – ${msg}`;
   const css = "color:#888";
   switch (l) {
-    case "error": console.error(line, css, data ?? ""); break;
-    case "warn":  console.warn(line, css, data ?? "");  break;
-    case "info":  console.info(line, css, data ?? "");  break;
-    case "debug": console.debug ? console.debug(line, css, data ?? "") : console.info(line, css, data ?? ""); break;
-    default:      console.debug ? console.debug(line, css, data ?? "") : console.info(line, css, data ?? "");
+    case "error": break;
+    case "warn":  break;
+    case "info":  break;
+    case "debug": break;
+    default:      break;
   }
   emit(e);
 }
@@ -51,8 +51,4 @@ export const logger = {
   trace: (s:string,m:string,d?:any)=>log("trace",s,m,d),
 };
 
-// ✅ Global verfügbar machen für Debugging
-if (typeof window !== 'undefined') {
-  (window as any).logger = logger;
-  (window as any).setLogLevel = setLogLevel;
-}
+// Global Logger entfernt

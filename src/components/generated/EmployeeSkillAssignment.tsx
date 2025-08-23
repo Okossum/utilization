@@ -30,9 +30,9 @@ export function EmployeeSkillAssignment({
   employeeName, 
   onSkillsChange 
 }: EmployeeSkillAssignmentProps) {
-  console.log('🚀 EmployeeSkillAssignment Komponente wird gerendert');
-  console.log('👤 employeeId:', employeeId);
-  console.log('👤 employeeName:', employeeName);
+  // console.log entfernt
+  // console.log entfernt
+  // console.log entfernt
   
   const { user, token } = useAuth();
   
@@ -47,12 +47,12 @@ export function EmployeeSkillAssignment({
 
   // Lade verfügbare Skills und zugewiesene Skills
   useEffect(() => {
-    console.log('🔄 useEffect wird ausgeführt, employeeId:', employeeId);
-    console.log('👤 AuthContext User:', user);
-    console.log('🔑 AuthContext Token:', token ? 'Verfügbar' : 'Nicht verfügbar');
+    // console.log entfernt
+    // console.log entfernt
+    // console.log entfernt
     
     if (user && token) {
-      console.log('✅ User und Token verfügbar, lade Skills...');
+      // console.log entfernt
       setIsInitialLoading(true);
       
       // Separate async Funktion für das Laden der Skills
@@ -66,24 +66,24 @@ export function EmployeeSkillAssignment({
       
       loadSkills();
     } else {
-      console.log('⏳ User oder Token noch nicht verfügbar, warte...');
+      // console.log entfernt
     }
   }, [employeeId, user, token]);
 
   const loadAvailableSkills = async () => {
-    console.log('🔍 loadAvailableSkills() aufgerufen');
+    // console.log entfernt
     try {
       // Token aus AuthContext verwenden
       if (!token) {
-        console.error('❌ Kein Token verfügbar');
+        // console.error entfernt
         return;
       }
       
-      console.log('🔑 Token aus AuthContext:', token ? 'Verfügbar' : 'Nicht verfügbar');
-      console.log('🔑 Token Länge:', token?.length);
-      console.log('🔑 Token Anfang:', token?.substring(0, 20) + '...');
+      // console.log entfernt
+      // console.log entfernt
+      // console.log entfernt
       
-      console.log('📡 API-Aufruf an /api/technical-skills startet...');
+      // console.log entfernt
       const response = await fetch('/api/technical-skills', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -91,22 +91,22 @@ export function EmployeeSkillAssignment({
         }
       });
       
-      console.log('📡 API-Antwort Status:', response.status, response.statusText);
-      console.log('📡 API-Antwort Headers:', [...response.headers.entries()]);
+      // console.log entfernt
+      // console.log entfernt
       
       if (response.ok) {
         const skills = await response.json();
-        console.log('✅ Verfügbare Technical Skills geladen:', skills);
-        console.log('✅ Technical Skills Array Länge:', skills?.length);
-        console.log('✅ Erstes Technical Skill:', skills?.[0]);
+        // console.log entfernt
+        // console.log entfernt
+        // console.log entfernt
         setAvailableSkills(skills);
       } else {
         const errorText = await response.text();
-        console.error('❌ Fehler beim Laden der Technical Skills:', response.status, response.statusText, errorText);
+        // console.error entfernt
         setError('Fehler beim Laden der verfügbaren Technical Skills');
       }
     } catch (error) {
-      console.error('❌ Exception beim Laden der verfügbaren Technical Skills:', error);
+      // console.error entfernt
       setError('Fehler beim Laden der verfügbaren Technical Skills');
     }
   };
@@ -115,7 +115,7 @@ export function EmployeeSkillAssignment({
     try {
       setIsLoading(true);
       if (!token) {
-        console.error('Kein Token verfügbar');
+        // console.error entfernt
         return;
       }
       const response = await fetch(`/api/employee-skills/${employeeId}`, {
@@ -130,11 +130,11 @@ export function EmployeeSkillAssignment({
         setAssignedSkills(skills);
         onSkillsChange?.(skills);
       } else {
-        console.error('Fehler beim Laden der zugewiesenen Skills:', response.status, response.statusText);
+        // console.error entfernt
         setError('Fehler beim Laden der zugewiesenen Skills');
       }
     } catch (error) {
-      console.error('Fehler beim Laden der zugewiesenen Skills:', error);
+      // console.error entfernt
       setError('Fehler beim Laden der zugewiesenen Skills');
     } finally {
       setIsLoading(false);
@@ -150,7 +150,7 @@ export function EmployeeSkillAssignment({
     try {
       setIsLoading(true);
       if (!token) {
-        console.error('Kein Token verfügbar');
+        // console.error entfernt
         return;
       }
       const response = await fetch('/api/employee-skills', {
@@ -176,7 +176,7 @@ export function EmployeeSkillAssignment({
         setError(errorData.error || 'Fehler beim Hinzufügen des Skills');
       }
     } catch (error) {
-      console.error('Fehler beim Hinzufügen des Skills:', error);
+      // console.error entfernt
       setError('Fehler beim Hinzufügen des Skills');
     } finally {
       setIsLoading(false);
@@ -186,7 +186,7 @@ export function EmployeeSkillAssignment({
   const updateSkillLevel = async (skillId: string, newLevel: number) => {
     try {
       if (!token) {
-        console.error('Kein Token verfügbar');
+        // console.error entfernt
         return;
       }
       const response = await fetch(`/api/employee-skills/${employeeId}/${skillId}`, {
@@ -201,11 +201,11 @@ export function EmployeeSkillAssignment({
       if (response.ok) {
         await loadAssignedSkills();
       } else {
-        console.error('Fehler beim Aktualisieren des Skill-Levels:', response.status, response.statusText);
+        // console.error entfernt
         setError('Fehler beim Aktualisieren des Skill-Levels');
       }
     } catch (error) {
-      console.error('Fehler beim Aktualisieren des Skill-Levels:', error);
+      // console.error entfernt
       setError('Fehler beim Aktualisieren des Skill-Levels');
     }
   };
@@ -213,7 +213,7 @@ export function EmployeeSkillAssignment({
   const removeSkill = async (skillId: string) => {
     try {
       if (!token) {
-        console.error('Kein Token verfügbar');
+        // console.error entfernt
         return;
       }
       const response = await fetch(`/api/employee-skills/${employeeId}/${skillId}`, {
@@ -228,17 +228,17 @@ export function EmployeeSkillAssignment({
         await loadAssignedSkills();
       }
     } catch (error) {
-      console.error('Fehler beim Entfernen des Skills:', error);
+      // console.error entfernt
     }
   };
 
   const initializeSkills = async () => {
     try {
       setIsInitializingSkills(true);
-      console.log('🔧 Initialisiere Skills...');
+      // console.log entfernt
       
       if (!token) {
-        console.error('Kein Token verfügbar');
+        // console.error entfernt
         return;
       }
       
@@ -252,7 +252,7 @@ export function EmployeeSkillAssignment({
       
       if (response.ok) {
         const result = await response.json();
-        console.log('✅ Skills initialisiert:', result);
+        // console.log entfernt
         // Lade verfügbare Skills neu
         await loadAvailableSkills();
         setError('');
@@ -261,7 +261,7 @@ export function EmployeeSkillAssignment({
         setError(errorData.error || 'Fehler beim Initialisieren der Skills');
       }
     } catch (error) {
-      console.error('Fehler beim Initialisieren der Skills:', error);
+      // console.error entfernt
       setError('Fehler beim Initialisieren der Skills');
     } finally {
       setIsInitializingSkills(false);
@@ -269,15 +269,15 @@ export function EmployeeSkillAssignment({
   };
 
   const getUnassignedSkills = () => {
-    console.log('🔍 getUnassignedSkills() aufgerufen');
-    console.log('📊 availableSkills:', availableSkills);
-    console.log('📊 assignedSkills:', assignedSkills);
+    // console.log entfernt
+    // console.log entfernt
+    // console.log entfernt
     
     const assignedSkillIds = assignedSkills.map(s => s.skillId);
-    console.log('🔑 assignedSkillIds:', assignedSkillIds);
+    // console.log entfernt
     
     const unassignedSkills = availableSkills.filter(skill => !assignedSkillIds.includes(skill.id));
-    console.log('✅ unassignedSkills:', unassignedSkills);
+    // console.log entfernt
     
     return unassignedSkills;
   };
@@ -355,9 +355,9 @@ export function EmployeeSkillAssignment({
     );
   };
 
-  console.log('🎨 Render wird ausgeführt');
-  console.log('📊 availableSkills im Render:', availableSkills);
-  console.log('📊 assignedSkills im Render:', assignedSkills);
+  // console.log entfernt
+  // console.log entfernt
+  // console.log entfernt
   
   return (
     <div className="space-y-6">

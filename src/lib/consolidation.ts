@@ -38,8 +38,8 @@ interface ConsolidatedUtilizationData {
   lbs: string;                  // aus: mitarbeiter (priorität) || einsatzplan
   vg: string;                   // aus: einsatzplan
   erfahrungSeitJahr: string;    // aus: mitarbeiter
-  verfuegbarAb: string;         // aus: mitarbeiter (ISO-Date)
-  verfuegbarFuerStaffing: string; // aus: mitarbeiter
+  verfuegbarAb: string;         // aus: mitarbeiter (priorität) || einsatzplan (ISO-Date)
+  verfuegbarFuerStaffing: boolean; // aus: mitarbeiter (priorität) || einsatzplan
   linkZumProfilUrl: string;     // aus: mitarbeiter
   
   // === AUSLASTUNGSDATEN (Historisch) ===
@@ -146,8 +146,8 @@ function mergePersonData(
     lbs: mitarbeiterData?.lbs || einsatzplanData?.lbs || "",
     vg: einsatzplanData?.vg || "",
     erfahrungSeitJahr: mitarbeiterData?.erfahrungSeitJahr || "",
-    verfuegbarAb: mitarbeiterData?.verfuegbarAb || "",
-    verfuegbarFuerStaffing: mitarbeiterData?.verfuegbarFuerStaffing || "",
+    verfuegbarAb: mitarbeiterData?.verfuegbarAb || einsatzplanData?.verfuegbarAb || "",
+    verfuegbarFuerStaffing: mitarbeiterData?.verfuegbarFuerStaffing ?? einsatzplanData?.verfuegbarFuerStaffing ?? false,
     linkZumProfilUrl: mitarbeiterData?.linkZumProfilUrl || "",
     
     // Zeitdaten
@@ -179,7 +179,7 @@ function mergePersonData(
  * Konsolidiert Daten für eine spezifische Person
  */
 export async function consolidatePersonData(personId: string): Promise<void> {
-  logger.info("consolidation.consolidatePersonData", `Starte Konsolidierung für Person: ${personId}`);
+  // logger statement entfernt
   
   try {
     // Lade Daten aus allen drei Collections
@@ -202,7 +202,7 @@ export async function consolidatePersonData(personId: string): Promise<void> {
     
     // Skip wenn keine Daten vorhanden
     if (!mitarbeiterData && !auslastungData && !einsatzplanData) {
-      logger.warn("consolidation.consolidatePersonData", `Keine Daten für Person ${personId} gefunden`);
+      // logger statement entfernt
       return;
     }
     
@@ -213,10 +213,10 @@ export async function consolidatePersonData(personId: string): Promise<void> {
     const docRef = doc(collection(db, "utilizationData"), personId);
     await setDoc(docRef, consolidatedData, { merge: true });
     
-    logger.info("consolidation.consolidatePersonData", `Konsolidierung erfolgreich für Person: ${consolidatedData.person}`);
+    // logger statement entfernt
     
   } catch (error) {
-    logger.error("consolidation.consolidatePersonData", `Fehler bei Konsolidierung für Person ${personId}`, error);
+    // logger statement entfernt
     throw error;
   }
 }
@@ -225,7 +225,7 @@ export async function consolidatePersonData(personId: string): Promise<void> {
  * Konsolidiert alle verfügbaren Personen-Daten
  */
 export async function consolidateAllData(): Promise<void> {
-  logger.info("consolidation.consolidateAllData", "Starte Vollkonsolidierung aller Daten");
+  // logger statement entfernt
   
   try {
     // Sammle alle eindeutigen PersonIds aus allen Collections
@@ -252,7 +252,7 @@ export async function consolidateAllData(): Promise<void> {
       if (personId) personIds.add(personId);
     });
     
-    logger.info("consolidation.consolidateAllData", `Gefundene eindeutige Personen: ${personIds.size}`);
+    // logger statement entfernt
     
     // Konsolidiere alle Personen in Batches
     const personIdArray = Array.from(personIds);
@@ -261,16 +261,16 @@ export async function consolidateAllData(): Promise<void> {
     for (let i = 0; i < personIdArray.length; i += batchSize) {
       const batch = personIdArray.slice(i, i + batchSize);
       
-      logger.info("consolidation.consolidateAllData", `Verarbeite Batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(personIdArray.length/batchSize)}`);
+      // logger statement entfernt
       
       // Parallele Verarbeitung innerhalb des Batches
       await Promise.all(batch.map(personId => consolidatePersonData(personId)));
     }
     
-    logger.info("consolidation.consolidateAllData", "Vollkonsolidierung erfolgreich abgeschlossen");
+    // logger statement entfernt
     
   } catch (error) {
-    logger.error("consolidation.consolidateAllData", "Fehler bei Vollkonsolidierung", error);
+    // logger statement entfernt
     throw error;
   }
 }
@@ -279,17 +279,17 @@ export async function consolidateAllData(): Promise<void> {
  * Trigger-Funktion für Upload-Events
  */
 export async function triggerConsolidationAfterUpload(uploadType: 'mitarbeiter' | 'auslastung' | 'einsatzplan'): Promise<void> {
-  logger.info("consolidation.triggerConsolidationAfterUpload", `Upload-Trigger für: ${uploadType}`);
+  // logger statement entfernt
   
   try {
     // Strategie: Konsolidiere alle Personen die vom Upload betroffen sind
     // TODO: Optimierung - nur betroffene Personen konsolidieren
     await consolidateAllData();
     
-    logger.info("consolidation.triggerConsolidationAfterUpload", `Konsolidierung nach ${uploadType}-Upload erfolgreich`);
+    // logger statement entfernt
     
   } catch (error) {
-    logger.error("consolidation.triggerConsolidationAfterUpload", `Fehler bei Konsolidierung nach ${uploadType}-Upload`, error);
+    // logger statement entfernt
     throw error;
   }
 }
@@ -302,7 +302,7 @@ export async function validateConsolidatedData(): Promise<{
   completenessStats: Record<string, number>;
   sampleData: any[];
 }> {
-  logger.info("consolidation.validateConsolidatedData", "Starte Datenqualitätsprüfung");
+  // logger statement entfernt
   
   try {
     const utilizationSnap = await getDocs(collection(db, "utilizationData"));
@@ -330,12 +330,12 @@ export async function validateConsolidatedData(): Promise<{
       sampleData: docs.slice(0, 3)
     };
     
-    logger.info("consolidation.validateConsolidatedData", "Datenqualitätsprüfung abgeschlossen", result);
+    // logger statement entfernt
     
     return result;
     
   } catch (error) {
-    logger.error("consolidation.validateConsolidatedData", "Fehler bei Datenqualitätsprüfung", error);
+    // logger statement entfernt
     throw error;
   }
 }

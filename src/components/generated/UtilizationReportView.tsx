@@ -198,7 +198,7 @@ export function UtilizationReportView({
         protectedSetPersonStatus(person, statusData.status, statusData.source);
       });
     } catch (error) {
-      console.warn('Fehler beim Laden der Person-Status:', error);
+      // console.warn entfernt
     }
   };
   
@@ -232,7 +232,7 @@ export function UtilizationReportView({
               // ✅ KORRIGIERT: Aktualisiere globalen State
         setActionItems(actionItemsMap);
     } catch (error) {
-      console.warn('Fehler beim Laden der Action Items:', error);
+      // console.warn entfernt
     }
   };
 
@@ -245,7 +245,7 @@ export function UtilizationReportView({
       
       // Wenn es bereits einen manuellen Status gibt, darf dieser NIE überschrieben werden
       if (current && current.source === 'manual' && source !== 'manual') {
-        console.log(`🚫 SCHUTZ: Manueller Status für ${person} wird nicht überschrieben`);
+        // console.log entfernt
         return prev; // Keine Änderung
       }
       
@@ -317,7 +317,7 @@ export function UtilizationReportView({
       // Revert bei unerwarteten Fehlern
       setAuslastungserklaerungen(previousAuslastungserklaerungen);
       showToast('error', 'Unerwarteter Fehler beim Erstellen der Auslastungserklaerung', 7000);
-      console.error('Unerwarteter Fehler beim Erstellen der Auslastungserklaerung:', error);
+      // console.error entfernt
     }
   };
 
@@ -341,7 +341,7 @@ export function UtilizationReportView({
       // Revert bei unerwarteten Fehlern
       setPersonAuslastungserklaerungen(prev => ({ ...prev, [person]: previousValue }));
       showToast('error', 'Unerwarteter Fehler beim Speichern der Auslastungserklaerung', 7000);
-      console.error('Unerwarteter Fehler beim Auslastungserklaerung Update:', error);
+      // console.error entfernt
     }
   };
 
@@ -351,7 +351,7 @@ export function UtilizationReportView({
       const data = await auslastungserklaerungService.getActive();
       setAuslastungserklaerungen(data);
     } catch (error) {
-      console.error('Fehler beim Laden der Auslastungserklärungen:', error);
+      // console.error entfernt
     }
   };
 
@@ -365,7 +365,7 @@ export function UtilizationReportView({
       });
       setPersonAuslastungserklaerungen(personMap);
     } catch (error) {
-      console.error('Fehler beim Laden der Person-Auslastungserklärungen:', error);
+      // console.error entfernt
     }
   };
 
@@ -658,10 +658,7 @@ export function UtilizationReportView({
   // ✅ VEREINFACHT: Nur noch UtilizationData verarbeiten
   const consolidatedData: UtilizationData[] | null = useMemo(() => {
     if (dataSource === 'database' && databaseData.auslastung) {
-      console.log('🔍 UtilizationData für UI transformieren:', {
-        count: databaseData.auslastung.length,
-        sample: databaseData.auslastung[0]
-      });
+      // UtilizationData für UI transformieren
 
       // ✅ Konvertiere Backend YY/WW Format zu Frontend YYYY-KWnn Format
       const transformed = databaseData.auslastung.map((item: any) => {
@@ -697,7 +694,7 @@ export function UtilizationReportView({
     // Der Upload-Modus wurde deaktiviert, da eine neue Upload-Funktion implementiert wird
 
     // ✅ ROBUSTER FALLBACK: Wenn weder DB noch Upload-Daten da sind
-    console.log('⚠️ Keine Daten verfügbar - weder Database noch Upload');
+    // console.log entfernt
     return [];
   }, [databaseData, dataSource, forecastStartWeek, lookbackWeeks, forecastWeeks, currentIsoYear]);
 
@@ -712,17 +709,8 @@ export function UtilizationReportView({
     });
     
     if (dataSource === 'database' && databaseData.auslastung && databaseData.einsatzplan) {
-      console.log('🔍 Erstelle UI-Daten aus Auslastung + Einsatzplan Collections');
-      console.log('🔍 DEBUG: Auslastung Collection (direkt aus Firebase):', {
-        count: databaseData.auslastung.length,
-        sample: databaseData.auslastung[0],
-        sampleValues: databaseData.auslastung[0]?.values
-      });
-      console.log('🔍 DEBUG: Einsatzplan Collection (direkt aus Firebase):', {
-        count: databaseData.einsatzplan.length,
-        sample: databaseData.einsatzplan[0],
-        sampleValues: databaseData.einsatzplan[0]?.values
-      });
+      // console.log entfernt
+      // Debug-Informationen entfernt
       
       const combinedData: UtilizationData[] = [];
       
@@ -770,11 +758,11 @@ export function UtilizationReportView({
         sampleData: combinedData.slice(0, 3)
       });
       
-      // ✅ DEBUG: Prüfe ob Daten erstellt wurden
+      // Prüfe ob Daten erstellt wurden
       if (combinedData.length === 0) {
-        console.warn('⚠️ PROBLEM: Keine combinedData erstellt! Prüfe Datenstruktur.');
-        console.log('🔍 Erste Auslastung Row Details:', databaseData.auslastung[0]);
-        console.log('🔍 Erste Einsatzplan Row Details:', databaseData.einsatzplan[0]);
+        // console.warn entfernt
+        // console.log entfernt
+        // console.log entfernt
       }
       
       return combinedData;
@@ -786,7 +774,7 @@ export function UtilizationReportView({
     }
     
     // Letzter Fallback: Mock-Daten
-    console.log('⚠️ Verwende Mock-Daten als Fallback');
+    // console.log entfernt
     return mockData;
   }, [dataSource, databaseData, consolidatedData]);
   
@@ -813,9 +801,9 @@ export function UtilizationReportView({
         if (item.source === 'rule') {
           try {
             await personActionItemService.update(person, item.actionItem, 'rule');
-            console.log(`💾 Regelbasierter Wert für ${person} in DB gespeichert:`, item.actionItem);
+            // console.log entfernt
           } catch (error) {
-            console.error(`❌ Fehler beim Speichern des regelbasierten Werts für ${person}:`, error);
+            // console.error entfernt
           }
         }
       });
@@ -837,11 +825,11 @@ export function UtilizationReportView({
     // ✅ SCHUTZ: Warte bis echte Forecast-Daten verfügbar sind
     const hasForecastData = dataForUI.some(item => !item.isHistorical && item.utilization !== null);
     if (!hasForecastData) {
-      console.log('⚠️ Noch keine Forecast-Daten verfügbar - warte auf vollständige Daten');
+      // console.log entfernt
       return;
     }
 
-    console.log('🚀 Starte automatische Act-Toggle Berechnung...');
+    // console.log entfernt
 
     const autoSetActionItems = () => {
       const newActionItems: Record<string, boolean> = {};
@@ -859,7 +847,7 @@ export function UtilizationReportView({
         const manager = personMeta.get(person)?.manager;
         if (!manager) {
           // Keine Führungskraft → kein Act-Toggle
-          console.log(`🔒 FK-Regel: Kein Toggle für ${person} (keine Führungskraft)`);
+          // console.log entfernt
           return; // Skip diese Person
         }
         
@@ -921,28 +909,16 @@ export function UtilizationReportView({
           ? validNext8Weeks.reduce((sum, val) => sum + val, 0) / validNext8Weeks.length 
           : null;
 
-        // ✅ DEBUG: Zeige Berechnungen für erste Person
-        if (person === allPersons[0]) {
-          console.log(`🔍 DEBUG Act-Toggle Berechnung für ${person}:`, {
-            currentWeek: `${yy}/${String(currentWeek).padStart(2, '0')}`,
-            last4Weeks: last4Weeks,
-            next8Weeks: next8Weeks,
-            validLast4Weeks: validLast4Weeks.length,
-            validNext8Weeks: validNext8Weeks.length,
-            avgLast4Weeks: avgLast4Weeks !== null ? Math.round(avgLast4Weeks * 10) / 10 : null,
-            avgNext8Weeks: avgNext8Weeks !== null ? Math.round(avgNext8Weeks * 10) / 10 : null,
-            manager: manager
-          });
-        }
+        // Debug-Berechnungen entfernt
 
         // ✅ KORRIGIERT: Setze Toggle NUR wenn ausreichend echte Daten vorhanden sind UND Auslastung ≤25%
         if (avgNext8Weeks !== null && validNext8Weeks.length >= 3 && avgNext8Weeks <= 25) {
           newActionItems[person] = true;
-          console.log(`✅ Act-Toggle für ${person}: Ø nächste 8W = ${Math.round(avgNext8Weeks)}% <= 25% (${validNext8Weeks.length} Wochen mit Daten)`);
+          // console.log entfernt
         } else if (avgNext8Weeks === null || validNext8Weeks.length < 3) {
-          console.log(`⚠️ Unzureichende Forecast-Daten für ${person} (${validNext8Weeks.length} Wochen) - kein Toggle gesetzt`);
+          // console.log entfernt
         } else {
-          console.log(`❌ Kein Toggle für ${person}: Ø nächste 8W = ${Math.round(avgNext8Weeks)}% > 25% (${validNext8Weeks.length} Wochen mit Daten)`);
+          // console.log entfernt
         }
         // Personen mit >25% Auslastung werden NICHT verändert (kein automatisches false setzen)
       });
@@ -958,13 +934,13 @@ export function UtilizationReportView({
         // ✅ NEUE LOGIK: Manuelle Werte NIEMALS überschreiben
         if (current?.source === 'manual') {
           // Manuelle Werte bleiben unverändert
-          console.log(`🔒 Manueller Wert für ${person} bleibt erhalten:`, current.actionItem);
+          // console.log entfernt
         } else {
           // Regel-basierte oder Default-Werte können überschrieben werden
           const shouldUpdate = !current || current.actionItem !== actionItem;
           
           if (shouldUpdate) {
-            console.log(`🔄 Aktualisiere ${person} von ${current?.actionItem} auf ${actionItem} (source: rule)`);
+            // console.log entfernt
             updatedActionItems[person] = { actionItem, source: 'rule', updatedBy: undefined };
             hasChanges = true;
           }
@@ -978,7 +954,7 @@ export function UtilizationReportView({
         // Nur regelbasierte Toggles prüfen (manuelle bleiben unverändert)
         if (current?.source === 'rule' && !newActionItems[person]) {
           // Diese Person hat >25% Auslastung, aber noch einen regelbasierten Toggle
-          console.log(`🔄 Entferne regelbasierten Toggle für ${person} (Auslastung > 25%)`);
+          // console.log entfernt
           delete updatedActionItems[person];
           hasChanges = true;
         }
@@ -989,7 +965,7 @@ export function UtilizationReportView({
         setActionItems(updatedActionItems);
       }
       
-      // ✅ DEBUG: Zusammenfassung der Berechnung
+              // Zusammenfassung der Berechnung
       console.log('📊 Act-Toggle Berechnung abgeschlossen:', {
         geprüftePersonen: allPersons.length,
         neueToggles: Object.keys(newActionItems).length,
@@ -1220,14 +1196,8 @@ export function UtilizationReportView({
       return false;
     });
     
-    // ✅ DEBUG: Zeige echte vs gefilterte Wochen
-    console.log('🔍 DEBUG availableWeeksFromData (gefiltert):', {
-      letztAuslastungswoche: lastUtilizationWeekKey,
-      alleForecastWochen: allForecastWeeks,
-      gefilterteForecastWochen: forecastWeeks,
-      anzahl: forecastWeeks.length,
-      sample: forecastWeeks.slice(0, 5)
-    });
+          // Zeige echte vs gefilterte Wochen
+    // Debug availableWeeksFromData entfernt
 
     return forecastWeeks;
   }, [dataForUI]);
@@ -1376,7 +1346,7 @@ export function UtilizationReportView({
         }
       }));
     } catch (error) {
-      console.error('❌ Fehler beim Laden des Dossiers:', error);
+      // console.error entfernt
     }
   };
   const allPersons = useMemo(() => {
@@ -1851,7 +1821,7 @@ export function UtilizationReportView({
                                   revertedActionItems[person] = actionItems[person];
                                   setActionItems(revertedActionItems);
                                   showToast('error', 'Unerwarteter Fehler beim Speichern', 7000);
-                                  console.error('Unerwarteter Fehler beim Action Item Update:', error);
+                                  // console.error entfernt
                                 }
                               }}
                               className="rounded border-2 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all"
@@ -2024,7 +1994,7 @@ export function UtilizationReportView({
                                 // Aktualisiere lokalen State mit Schutz
                                 protectedSetPersonStatus(person, status || '', 'manual');
                               } catch (error) {
-                                console.error('Fehler beim Speichern des Status:', error);
+                                // console.error entfernt
                               }
                             }}
                           />
@@ -2052,15 +2022,7 @@ export function UtilizationReportView({
                         const weekData = personData.find(item => item.week === week);
                         const utilization = weekData?.utilization;
                         
-                        // ✅ DEBUG: Prüfe warum keine Forecast-Werte angezeigt werden (vereinfacht)
-                        if (i === 0 && person === visiblePersons[0]) {
-                          console.log('🔍 DEBUG Forecast-Werte:', {
-                            person: person,
-                            suchWoche: week,
-                            hatMatch: !!weekData,
-                            utilization: utilization
-                          });
-                        }
+                        // Debug Forecast-Werte entfernt
                         
                         // Extrahiere Wochennummer aus dem week-String (z.B. "25/35" -> 35)
                         const weekNumber = parseInt(week.match(/\/(\d+)/)?.[1] || '0', 10);

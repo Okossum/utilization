@@ -177,7 +177,7 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
           }
         });
         
-        console.log('🔍 DEBUG: Einsatzplan geladen:', einsatzplanData?.length || 0, 'Einträge');
+        // console.log entfernt
 
         // ✅ NEUE LOGIK: Erstelle Employee-Objekte für alle Mitarbeiter mit Act-Toggle
         const allEmployeesWithActToggle: Employee[] = Object.keys(actionItems)
@@ -210,28 +210,28 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
             };
           });
         
-        console.log('🔍 DEBUG: Alle Mitarbeiter mit Act-Toggle:', allEmployeesWithActToggle);
-        console.log('🔍 DEBUG: Anzahl Mitarbeiter mit Act-Toggle:', allEmployeesWithActToggle.length);
+        // console.log entfernt
+        // console.log entfernt
         
         setEmployees(allEmployeesWithActToggle);
       } catch (error) {
-        console.error('Fehler beim Laden der Mitarbeiter mit Act-Toggle:', error);
+        // console.error entfernt
         setEmployees([]);
       } finally {
         setIsLoading(false);
       }
     };
     
-    // ✅ DEBUG: Prüfe actionItems
-    console.log('🔍 DEBUG: useEffect läuft mit actionItems:', actionItems);
-    console.log('🔍 DEBUG: actionItems Länge:', Object.keys(actionItems).length);
+    // Debug-Kommentar entfernt
+    // console.log entfernt
+    // console.log entfernt
     
     // Nur laden wenn actionItems verfügbar sind
     if (Object.keys(actionItems).length > 0) {
-      console.log('🔍 DEBUG: Starte loadEmployeesWithActToggle');
+      // console.log entfernt
       loadEmployeesWithActToggle();
     } else {
-      console.log('🔍 DEBUG: Keine actionItems verfügbar');
+      // console.log entfernt
     }
   }, [actionItems]);
   
@@ -264,9 +264,9 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
         isActive: newActiveStatus
       });
       
-      console.log(`✅ ACT-Status für ${employee.name} auf ${newActiveStatus ? 'aktiv' : 'inaktiv'} gesetzt`);
+      // console.log entfernt
     } catch (error) {
-      console.error('❌ Fehler beim Speichern des ACT-Status:', error);
+      // console.error entfernt
       // Bei Fehler: Status zurücksetzen
       setEmployees(prev => prev.map(emp => 
         emp.id === employeeId 
@@ -291,7 +291,7 @@ export const EmployeeListView = ({ actionItems }: EmployeeListViewProps) => {
   const departments = ['All', ...Array.from(new Set(employees.map(emp => emp.department)))];
   
   // ✅ KORRIGIERT: Alle geladenen Mitarbeiter haben bereits den Act-Toggle aktiviert
-  console.log('🔍 DEBUG: Alle Mitarbeiter mit Act-Toggle geladen:', employees.length);
+  // console.log entfernt
   
   const filteredEmployees = employees.filter(employee => {
     // ✅ NEU: Erweiterte Filter-Logik wie im UtilizationReportView

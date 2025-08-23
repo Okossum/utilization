@@ -61,7 +61,7 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
       setAvailableRoles(rolesData);
       
     } catch (error) {
-      console.error('❌ Fehler beim Laden der verfügbaren Rollen:', error);
+      // console.error entfernt
       setError('Fehler beim Laden der verfügbaren Rollen');
     }
   };
@@ -84,7 +84,7 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
       setAssignedRoles(rolesData);
       
     } catch (error) {
-      console.error('❌ Fehler beim Laden der zugewiesenen Rollen:', error);
+      // console.error entfernt
       setError('Fehler beim Laden der zugewiesenen Rollen');
     }
   };
@@ -100,7 +100,7 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
         loadAssignedRoles()
       ]);
     } catch (error) {
-      console.error('❌ Fehler beim Laden der Daten:', error);
+      // console.error entfernt
     } finally {
       setLoading(false);
     }
@@ -131,7 +131,7 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
       onRoleAssigned();
       
     } catch (error: any) {
-      console.error('❌ Fehler beim Zuweisen der Rolle:', error);
+      // console.error entfernt
       setError(error.message);
     } finally {
       setIsSubmitting(false);

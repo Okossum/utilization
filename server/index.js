@@ -26,7 +26,7 @@ app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 function removeUndefinedDeep(value, depth = 0) {
   // Verhindere Stack Overflow bei sehr tiefen Objekten
   if (depth > 10) {
-    console.warn('⚠️ removeUndefinedDeep: Maximale Tiefe erreicht, stoppe Rekursion');
+    // console.warn entfernt
     return value;
   }
   
@@ -50,7 +50,7 @@ function removeUndefinedDeep(value, depth = 0) {
 function removeInvalidNumbersDeep(value, depth = 0) {
   // Verhindere Stack Overflow bei sehr tiefen Objekten
   if (depth > 10) {
-    console.warn('⚠️ removeInvalidNumbersDeep: Maximale Tiefe erreicht, stoppe Rekursion');
+    // console.warn entfernt
     return value;
   }
   
@@ -99,18 +99,18 @@ async function authMiddleware(req, _res, next) {
   const token = authHeader.startsWith('Bearer ') ? authHeader.substring('Bearer '.length) : null;
   
   if (!token) {
-    console.log('🔒 authMiddleware: Kein Token im Header gefunden');
+    // console.log entfernt
     req.user = null;
     return next();
   }
   
   try {
-    console.log('🔍 authMiddleware: Verifiziere Token...');
+    // console.log entfernt
     const decoded = await admin.auth().verifyIdToken(token);
     req.user = decoded;
-    console.log('✅ authMiddleware: Token erfolgreich verifiziert für User:', decoded.uid);
+    // console.log entfernt
   } catch (error) {
-    console.log('❌ authMiddleware: Token-Verifikation fehlgeschlagen:', error.message);
+    // console.log entfernt
     req.user = null;
   }
   next();
@@ -121,10 +121,10 @@ app.use(authMiddleware);
 // Require authenticated user
 function requireAuth(req, res, next) {
   if (!req.user?.uid) {
-    console.log('🔒 requireAuth: Kein User gefunden, req.user:', req.user);
+    // console.log entfernt
     return res.status(401).json({ error: 'Authentifizierung fehlgeschlagen - bitte melden Sie sich erneut an' });
   }
-  console.log('✅ requireAuth: User authentifiziert:', req.user.uid);
+  // console.log entfernt
   return next();
 }
 
@@ -275,7 +275,7 @@ app.post('/api/knowledge/mitarbeiter', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Ungültige Daten' });
     }
 
-    console.log(`🔍 Speichere Mitarbeiter Knowledge: ${data.length} Einträge`);
+    // console.log entfernt
 
     // Upload-Historie speichern (unabhängig von Branchen Know-How)
     const historyRef = await db.collection('knowledgeUploadHistory').add({
@@ -344,7 +344,7 @@ app.post('/api/knowledge/mitarbeiter', requireAuth, async (req, res) => {
 
     await batch.commit();
 
-    console.log(`✅ Mitarbeiter Knowledge erfolgreich gespeichert: ${results.length} Einträge verarbeitet`);
+    // console.log entfernt
 
     res.json({
       success: true,
@@ -354,7 +354,7 @@ app.post('/api/knowledge/mitarbeiter', requireAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Fehler beim Speichern der Mitarbeiter Knowledge:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -368,7 +368,7 @@ app.post('/api/knowledge/branchen', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Ungültige Daten' });
     }
 
-    console.log(`🔍 Speichere Branchen Know-How: ${data.length} Einträge`);
+    // console.log entfernt
 
     // Upload-Historie speichern (unabhängig von Mitarbeiter Knowledge)
     const historyRef = await db.collection('knowledgeUploadHistory').add({
@@ -437,7 +437,7 @@ app.post('/api/knowledge/branchen', requireAuth, async (req, res) => {
 
     await batch.commit();
 
-    console.log(`✅ Branchen Know-How erfolgreich gespeichert: ${results.length} Einträge verarbeitet`);
+    // console.log entfernt
 
     res.json({
       success: true,
@@ -447,7 +447,7 @@ app.post('/api/knowledge/branchen', requireAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Fehler beim Speichern des Branchen Know-How:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -463,7 +463,7 @@ app.get('/api/knowledge/mitarbeiter', requireAuth, async (req, res) => {
     
     res.json(data);
   } catch (error) {
-    console.error('❌ Fehler beim Laden der Mitarbeiter Knowledge:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -479,7 +479,7 @@ app.get('/api/knowledge/branchen', requireAuth, async (req, res) => {
     
     res.json(data);
   } catch (error) {
-    console.error('❌ Fehler beim Laden des Branchen Know-How:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -507,7 +507,7 @@ app.get('/api/knowledge', requireAuth, async (req, res) => {
       branchen
     });
   } catch (error) {
-    console.error('❌ Fehler beim Laden aller Knowledge-Daten:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -516,14 +516,14 @@ app.get('/api/knowledge', requireAuth, async (req, res) => {
 
 // Auslastung-Daten speichern oder aktualisieren (Firestore)
 app.post('/api/auslastung', requireAuth, async (req, res) => {
-  console.log('🚀 === AUSLASTUNG UPLOAD START ===');
-  console.log('📨 Request Body erhalten:', JSON.stringify(req.body, null, 2));
+  // console.log entfernt
+  // console.log entfernt
   
   try {
     // 🔍 DEBUG: Zeige alle empfangenen Daten
-    console.log('🔍 DEBUG - Empfangene Daten:', JSON.stringify(req.body, null, 2));
-    console.log('🔍 DEBUG - Erste Zeile:', req.body[0]);
-    console.log('🔍 DEBUG - Erste Zeile Keys:', Object.keys(req.body[0] || {}));
+    // console.log entfernt
+    // console.log entfernt
+    // console.log entfernt
     
     const { data, fileName } = req.body;
     
@@ -562,7 +562,7 @@ app.post('/api/auslastung', requireAuth, async (req, res) => {
       if (!row.person) continue;
       
       // Debug: Zeige personId-Informationen
-      console.log(`🔍 AUSLASTUNG - Verarbeite Person: ${row.person}, personId: ${row.personId}, Typ: ${typeof row.personId}`);
+      // console.log entfernt
       
       const newWeekValues = buildWeekValuesMap(row);
       // Composite Key: Person + Team + CC für eindeutige Identifikation
@@ -642,8 +642,8 @@ app.post('/api/auslastung', requireAuth, async (req, res) => {
     const createdCount = results.filter(r => r.action === 'created').length;
     const totalNewWeeks = results.reduce((sum, r) => sum + r.newWeeks, 0);
 
-    console.log(`✅ ${results.length} Personen verarbeitet (${updatedCount} aktualisiert, ${createdCount} neu erstellt, ${totalNewWeeks} KW-Werte hinzugefügt)`);
-    console.log('🎯 === AUSLASTUNG UPLOAD ERFOLGREICH ===');
+    // console.log entfernt
+    // console.log entfernt
     
     res.json({ 
       success: true, 
@@ -654,8 +654,8 @@ app.post('/api/auslastung', requireAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Fehler beim Auslastung-Upload:', error);
-    console.log('💥 === AUSLASTUNG UPLOAD FEHLGESCHLAGEN ===');
+    // console.error entfernt
+    // console.log entfernt
     
     res.status(500).json({ error: 'Interner Server-Fehler', details: error.message });
   }
@@ -714,7 +714,7 @@ app.post('/api/einsatzplan', requireAuth, async (req, res) => {
       if (!row.person) continue;
       
       // Debug: Zeige personId-Informationen
-      console.log(`🔍 EINSATZPLAN - Verarbeite Person: ${row.person}, personId: ${row.personId}, Typ: ${typeof row.personId}`);
+      // console.log entfernt
       
       const newWeekValues = buildWeekValuesMap(row);
       // Composite Key: Person + Team + CC für eindeutige Identifikation
@@ -814,9 +814,9 @@ app.get('/api/auslastung', requireAuth, async (req, res) => {
       .sort((a, b) => String(a.person || '').localeCompare(String(b.person || ''), 'de'));
     const profile = await loadUserProfile(req.user.uid);
     // ✅ TEMP DEBUG: Scope-Filter temporär deaktiviert
-    console.log('🔍 DEBUG: Rohe Auslastung-Daten vor Filter:', out.length);
+    // console.log entfernt
     // out = applyScopeFilter(out, profile, req.user?.admin);
-    console.log('🔍 DEBUG: Auslastung-Daten nach Filter (deaktiviert):', out.length);
+    // console.log entfernt
     res.json(out);
   } catch (error) {
     
@@ -832,9 +832,9 @@ app.get('/api/einsatzplan', requireAuth, async (req, res) => {
       .sort((a, b) => String(a.person || '').localeCompare(String(b.person || ''), 'de'));
     const profile = await loadUserProfile(req.user.uid);
     // ✅ TEMP DEBUG: Scope-Filter temporär deaktiviert
-    console.log('🔍 DEBUG: Rohe Einsatzplan-Daten vor Filter:', out.length);
+    // console.log entfernt
     // out = applyScopeFilter(out, profile, req.user?.admin);
-    console.log('🔍 DEBUG: Einsatzplan-Daten nach Filter (deaktiviert):', out.length);
+    // console.log entfernt
     res.json(out);
   } catch (error) {
     
@@ -844,8 +844,8 @@ app.get('/api/einsatzplan', requireAuth, async (req, res) => {
 
 // Mitarbeiter-Daten speichern oder aktualisieren (Firestore)
 app.post('/api/mitarbeiter', requireAuth, async (req, res) => {
-  console.log('🚀 === MITARBEITER UPLOAD START ===');
-  console.log('📨 Request Body erhalten:', JSON.stringify(req.body, null, 2));
+  // console.log entfernt
+  // console.log entfernt
   
   try {
     const { fileName, data } = req.body;
@@ -948,8 +948,8 @@ app.post('/api/mitarbeiter', requireAuth, async (req, res) => {
     const updatedCount = results.filter(r => r.action === 'updated').length;
     const createdCount = results.filter(r => r.action === 'created').length;
 
-    console.log(`✅ ${results.length} Mitarbeiter verarbeitet (${updatedCount} aktualisiert, ${createdCount} neu erstellt)`);
-    console.log('🎯 === MITARBEITER UPLOAD ERFOLGREICH ===');
+    // console.log entfernt
+    // console.log entfernt
     
     res.json({ 
       success: true, 
@@ -960,8 +960,8 @@ app.post('/api/mitarbeiter', requireAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Fehler beim Mitarbeiter-Upload:', error);
-    console.log('💥 === MITARBEITER UPLOAD FEHLGESCHLAGEN ===');
+    // console.error entfernt
+    // console.log entfernt
     
     res.status(500).json({ error: 'Interner Server-Fehler', details: error.message });
   }
@@ -1036,12 +1036,12 @@ app.post('/api/consolidate', requireAuth, async (req, res) => {
             // Prüfe auf Wochen-Format: XX/XX (z.B. "25/01", "25/33")
             if (/^\d{2}\/\d{2}$/.test(key)) {
               allWeekKeys.add(key);
-              console.log(`📅 Gefundener Wochen-Key: ${key} in ${row.person || 'unbekannt'}`);
+              // console.log entfernt
             }
           });
         });
         
-        console.log(`📊 Insgesamt gefundene Wochen-Keys: ${Array.from(allWeekKeys).join(', ')}`);
+        // console.log entfernt
 
     // Konsolidiere für jede Person und jede Woche
     for (const person of allPersons) {
@@ -1097,7 +1097,7 @@ app.post('/api/consolidate', requireAuth, async (req, res) => {
           
           // Debugging: Log die gefundenen Werte
           if (ausValue !== null || einValue !== null) {
-            console.log(`📊 Woche ${weekKey} für ${person}: aus=${ausValue}, ein=${einValue}`);
+            // console.log entfernt
           }
           
           // Nur hinzufügen wenn mindestens ein Wert vorhanden ist
@@ -1187,7 +1187,7 @@ app.get('/api/utilization-data', requireAuth, async (req, res) => {
     
     res.json(filteredData);
   } catch (error) {
-    console.error('Fehler beim Laden der Nutzungsdaten:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -1201,7 +1201,7 @@ app.post('/api/utilization-data/bulk', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Ungültige Daten - Array erwartet' });
     }
 
-    console.log(`🔍 Bulk-Speicherung startet: ${data.length} Datensätze`);
+    // console.log entfernt
 
     // Bestehende Daten als "nicht mehr aktuell" markieren
     const latestUtilSnap = await db.collection('utilizationData').where('isLatest', '==', true).get();
@@ -1209,7 +1209,7 @@ app.post('/api/utilization-data/bulk', requireAuth, async (req, res) => {
       const batch = db.batch();
       latestUtilSnap.forEach(doc => batch.update(doc.ref, { isLatest: false }));
       await batch.commit();
-      console.log(`🔍 ${latestUtilSnap.size} bestehende Dokumente als nicht aktuell markiert`);
+      // console.log entfernt
     }
 
     // Neue Daten speichern (Update oder Insert)
@@ -1223,7 +1223,7 @@ app.post('/api/utilization-data/bulk', requireAuth, async (req, res) => {
       const docId = row.compositeKey ? `${row.compositeKey}__${sanitizedWeek}` : `${row.person}__${sanitizedWeek}`;
       const docRef = db.collection('utilizationData').doc(docId);
       
-      console.log(`🔍 Speichere Document: ${docId}`);
+      // console.log entfernt
       
       batch.set(docRef, {
         ...row,
@@ -1236,7 +1236,7 @@ app.post('/api/utilization-data/bulk', requireAuth, async (req, res) => {
     }
 
     await batch.commit();
-    console.log(`✅ Bulk-Speicherung erfolgreich: ${savedCount.length} Datensätze`);
+    // console.log entfernt
 
     res.json({
       success: true,
@@ -1245,7 +1245,7 @@ app.post('/api/utilization-data/bulk', requireAuth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Fehler bei Bulk-Speicherung:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Interner Server-Fehler', details: error.message });
   }
 });
@@ -1257,15 +1257,15 @@ app.post('/api/utilization-data/bulk', requireAuth, async (req, res) => {
 // Employee Dossier speichern oder aktualisieren
 app.post('/api/employee-dossier', requireAuth, async (req, res) => {
   try {
-    console.log('🔍 POST /api/employee-dossier - Request Headers:', req.headers);
-    console.log('🔍 POST /api/employee-dossier - Request Body:', JSON.stringify(req.body, null, 2));
+    // console.log entfernt
+    // console.log entfernt
     
     const { employeeId, dossierData } = req.body;
     
-    console.log('🔍 POST /api/employee-dossier - Extrahierte Daten:', { employeeId, dossierData });
+    // console.log entfernt
     
     if (!employeeId || !dossierData) {
-      console.error('❌ Ungültige Daten:', { employeeId, dossierData });
+      // console.error entfernt
       return res.status(400).json({ error: 'Ungültige Daten', received: { employeeId, dossierData } });
     }
 
@@ -1333,9 +1333,9 @@ app.post('/api/employee-dossier', requireAuth, async (req, res) => {
     // Letzte Absicherung: undefined und ungültige Zahlen entfernen
     try {
       payload = removeUndefinedDeep(removeInvalidNumbersDeep(payload));
-      console.log('✅ Payload nach Sanitisierung:', JSON.stringify(payload, null, 2));
+      // console.log entfernt
     } catch (sanitizeError) {
-      console.error('❌ Fehler bei der Payload-Sanitisierung:', sanitizeError);
+      // console.error entfernt
       // Verwende den ursprünglichen Payload ohne Sanitisierung
       payload = {
         employeeId: docId,
@@ -1345,12 +1345,12 @@ app.post('/api/employee-dossier', requireAuth, async (req, res) => {
       };
     }
     
-    console.log('💾 Speichere Employee Dossier:', { docId, payload });
+    // console.log entfernt
     
     await docRef.set(payload, { merge: true });
     const updated = await docRef.get();
     
-    console.log('✅ Employee Dossier erfolgreich gespeichert:', { docId, exists: snap.exists });
+    // console.log entfernt
     
     res.json({ 
       success: true, 
@@ -1358,7 +1358,7 @@ app.post('/api/employee-dossier', requireAuth, async (req, res) => {
       data: { id: updated.id, ...updated.data() } 
     });
   } catch (error) {
-    console.error('❌ Fehler beim Speichern des Employee Dossiers:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Interner Server-Fehler', details: error.message });
   }
 });
@@ -1423,22 +1423,22 @@ app.get('/api/employee-dossiers', requireAuth, async (req, res) => {
 app.get('/api/employee-skills/:employeeName', requireAuth, async (req, res) => {
   try {
     const { employeeName } = req.params;
-    console.log(`🔍 GET /api/employee-skills/${employeeName} - Lade Skills`);
-    console.log(`🔍 DEBUG: Suche nach Dokument-ID: "${employeeName}"`);
+    // console.log entfernt
+    // console.log entfernt
     
     const snap = await db.collection('employeeDossiers').doc(String(employeeName)).get();
     if (!snap.exists) {
-      console.log(`📝 Employee ${employeeName} nicht gefunden, gebe leeres Array zurück`);
+      // console.log entfernt
       return res.json([]);
     }
     
     const data = snap.data();
-    console.log(`🔍 DEBUG: Dokument gefunden, data.skills:`, data.skills);
+    // console.log entfernt
     const skills = Array.isArray(data.skills) ? data.skills : [];
-    console.log(`✅ Skills für ${employeeName} geladen:`, skills.length, 'Skills');
+    // console.log entfernt
     res.json(skills);
   } catch (error) {
-    console.error('❌ Fehler beim Laden der Employee Skills:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Interner Server-Fehler', details: error.message });
   }
 });
@@ -1448,10 +1448,10 @@ app.post('/api/employee-skills/:employeeName', requireAuth, async (req, res) => 
     const { employeeName } = req.params;
     const { skills } = req.body;
     
-    console.log(`💾 POST /api/employee-skills/${employeeName} - Speichere Skills:`, skills);
+    // console.log entfernt
     
     if (!Array.isArray(skills)) {
-      console.error('❌ Ungültige Skills-Daten:', skills);
+      // console.error entfernt
       return res.status(400).json({ error: 'Ungültige Skills-Daten - Array erwartet' });
     }
     
@@ -1462,7 +1462,7 @@ app.post('/api/employee-skills/:employeeName', requireAuth, async (req, res) => 
       level: Math.max(0, Math.min(5, Number(skill.level) || 0))
     })).filter(skill => skill.skillId && skill.skillName);
     
-    console.log(`✅ Validierte Skills:`, validatedSkills);
+    // console.log entfernt
     
     const docRef = db.collection('employeeDossiers').doc(String(employeeName));
     const snap = await docRef.get();
@@ -1480,14 +1480,14 @@ app.post('/api/employee-skills/:employeeName', requireAuth, async (req, res) => 
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp()
       }, { merge: true });
-      console.log(`✅ Neues Dossier für ${employeeName} mit Skills erstellt`);
+      // console.log entfernt
     } else {
       // Aktualisiere bestehendes Dossier
       await docRef.update({
         skills: validatedSkills,
         updatedAt: FieldValue.serverTimestamp()
       });
-      console.log(`✅ Skills für ${employeeName} aktualisiert`);
+      // console.log entfernt
     }
     
     res.json({ 
@@ -1497,7 +1497,7 @@ app.post('/api/employee-skills/:employeeName', requireAuth, async (req, res) => 
       count: validatedSkills.length
     });
   } catch (error) {
-    console.error('❌ Fehler beim Speichern der Employee Skills:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Interner Server-Fehler', details: error.message });
   }
 });
@@ -1535,7 +1535,7 @@ app.put('/api/employee-skills/:employeeName/:skillId', requireAuth, async (req, 
     
     res.json({ success: true, message: 'Skill-Level erfolgreich aktualisiert' });
   } catch (error) {
-    console.error('❌ Fehler beim Aktualisieren des Skill-Levels:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -1562,7 +1562,7 @@ app.delete('/api/employee-skills/:employeeName/:skillId', requireAuth, async (re
     
     res.json({ success: true, message: 'Skill erfolgreich gelöscht' });
   } catch (error) {
-    console.error('❌ Fehler beim Löschen des Skills:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -1587,7 +1587,7 @@ app.get('/api/employee-skills', requireAuth, async (req, res) => {
     
     res.json(allSkills);
   } catch (error) {
-    console.error('❌ Fehler beim Laden aller Employee Skills:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -1632,11 +1632,11 @@ app.put('/api/users/:uid', requireAdmin, async (req, res) => {
 
 // ✅ Employee Stammdaten Endpunkte
 app.post('/api/employees/bulk', authMiddleware, async (req, res) => {
-  console.log('🚀 === EMPLOYEE UPLOAD START ===');
-  console.log('📨 Request Body erhalten:', JSON.stringify(req.body, null, 2));
+  // console.log entfernt
+  // console.log entfernt
   
   if (!req.user) {
-    console.log('❌ Keine Autorisierung');
+    // console.log entfernt
     return res.status(401).json({ error: 'Nicht autorisiert' });
   }
   
@@ -1644,11 +1644,11 @@ app.post('/api/employees/bulk', authMiddleware, async (req, res) => {
     const { employees } = req.body;
     
     if (!Array.isArray(employees) || employees.length === 0) {
-      console.log('❌ Keine Employee-Daten im Request Body');
+      // console.log entfernt
       return res.status(400).json({ error: 'Keine Employee-Daten erhalten' });
     }
     
-    console.log(`💾 Speichere ${employees.length} Employee-Stammdaten...`);
+    // console.log entfernt
     
     const batch = db.batch();
     let count = 0;
@@ -1656,7 +1656,7 @@ app.post('/api/employees/bulk', authMiddleware, async (req, res) => {
     for (const employee of employees) {
       // Validierung
       if (!employee.person || !employee.lob || !employee.cc || !employee.team) {
-        console.warn('Überspringe Employee ohne Pflichtfelder:', employee);
+        // console.warn entfernt
         continue;
       }
       
@@ -1676,8 +1676,8 @@ app.post('/api/employees/bulk', authMiddleware, async (req, res) => {
     
     await batch.commit();
     
-    console.log(`✅ ${count} Employee-Stammdaten erfolgreich gespeichert`);
-    console.log('🎯 === EMPLOYEE UPLOAD ERFOLGREICH ===');
+    // console.log entfernt
+    // console.log entfernt
     res.json({ 
       success: true, 
       message: `${count} Mitarbeiter erfolgreich gespeichert`,
@@ -1685,8 +1685,8 @@ app.post('/api/employees/bulk', authMiddleware, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Fehler beim Speichern der Employee-Stammdaten:', error);
-    console.log('💥 === EMPLOYEE UPLOAD FEHLGESCHLAGEN ===');
+    // console.error entfernt
+    // console.log entfernt
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -1697,7 +1697,7 @@ app.get('/api/employees', authMiddleware, async (req, res) => {
   }
   
   try {
-    console.log('🔍 Lade Employee-Stammdaten...');
+    // console.log entfernt
     
     const snapshot = await db.collection('employeeStammdaten').get();
     const employees = [];
@@ -1709,20 +1709,20 @@ app.get('/api/employees', authMiddleware, async (req, res) => {
       });
     });
     
-    console.log(`✅ ${employees.length} Employee-Stammdaten geladen`);
+    // console.log entfernt
     res.json(employees);
     
   } catch (error) {
-    console.error('❌ Fehler beim Laden der Employee-Stammdaten:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
 
 // Server starten
 app.listen(PORT, () => {
-  console.log(`🚀 Backend-Server läuft auf Port ${PORT}`);
-  console.log(`📊 API verfügbar unter http://localhost:${PORT}/api`);
-  console.log(`🏥 Health Check: http://localhost:${PORT}/health`);
+  // console.log entfernt
+  // console.log entfernt
+  // console.log entfernt
 });
 
 // Skills API Endpoint - Alle verfügbaren Skills laden
@@ -1738,11 +1738,11 @@ app.get('/api/skills', requireAuth, async (req, res) => {
       });
     });
     
-    console.log(`✅ ${skills.length} verfügbare Skills geladen`);
+    // console.log entfernt
     res.json(skills);
     
   } catch (error) {
-    console.error('❌ Fehler beim Laden der Skills:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -1750,7 +1750,7 @@ app.get('/api/skills', requireAuth, async (req, res) => {
 // Erstelle Test-Skills (einmalig)
 app.post('/api/skills/init', requireAuth, async (req, res) => {
   try {
-    console.log('🔧 Initialisiere Test-Skills...');
+    // console.log entfernt
     
     const testSkills = [
       { name: 'JavaScript' },
@@ -1785,14 +1785,14 @@ app.post('/api/skills/init', requireAuth, async (req, res) => {
       if (existing.empty) {
         await db.collection('skills').add(skill);
         created++;
-        console.log(`✅ Skill erstellt: ${skill.name}`);
+        // console.log entfernt
       } else {
         skipped++;
-        console.log(`⏭️ Skill existiert bereits: ${skill.name}`);
+        // console.log entfernt
       }
     }
     
-    console.log(`🎉 Skills initialisiert: ${created} erstellt, ${skipped} übersprungen`);
+    // console.log entfernt
     res.json({ 
       message: `Skills erfolgreich initialisiert: ${created} erstellt, ${skipped} übersprungen`,
       created,
@@ -1800,7 +1800,7 @@ app.post('/api/skills/init', requireAuth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Fehler beim Initialisieren der Skills:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Fehler beim Initialisieren der Skills' });
   }
 });
@@ -1851,9 +1851,9 @@ app.post('/api/employee-skills', requireAuth, async (req, res) => {
     // Speichere das aktualisierte Dossier
     await dossierRef.set(dossierData, { merge: true });
     
-    console.log(`✅ Skill ${skillName} (Level ${level}) erfolgreich Mitarbeiter ${employeeId} zugewiesen`);
-    console.log(`🔍 DEBUG: Gespeichert in Dokument-ID: "${employeeId}"`);
-    console.log(`🔍 DEBUG: Skills Array Länge nach Speichern: ${dossierData.skills.length}`);
+    // console.log entfernt
+    // console.log entfernt
+    // console.log entfernt
     
     res.json({
       success: true,
@@ -1862,7 +1862,7 @@ app.post('/api/employee-skills', requireAuth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Fehler beim Zuweisen des Skills:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -1870,24 +1870,24 @@ app.post('/api/employee-skills', requireAuth, async (req, res) => {
 app.get('/api/employee-skills/:employeeId', requireAuth, async (req, res) => {
   try {
     const { employeeId } = req.params;
-    console.log(`🔍 GET /api/employee-skills/${employeeId} - Lade Skills aus employeeDossiers`);
+    // console.log entfernt
     
     // Lade das employeeDossier
     const dossierDoc = await db.collection('employeeDossiers').doc(employeeId).get();
     
     if (!dossierDoc.exists) {
-      console.log(`📝 Employee ${employeeId} nicht gefunden, gebe leeres Array zurück`);
+      // console.log entfernt
       return res.json([]);
     }
     
     const dossierData = dossierDoc.data();
     const skills = Array.isArray(dossierData.skills) ? dossierData.skills : [];
     
-    console.log(`✅ ${skills.length} Skills für Mitarbeiter ${employeeId} geladen`);
+    // console.log entfernt
     res.json(skills);
     
   } catch (error) {
-    console.error('❌ Fehler beim Laden der Skills:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -1926,7 +1926,7 @@ app.put('/api/employee-skills/:employeeId/:skillId', requireAuth, async (req, re
     // Speichere die Änderungen
     await dossierRef.update({ skills: skills });
     
-    console.log(`✅ Skill-Level für Mitarbeiter ${employeeId}, Skill ${skillId} auf ${level} aktualisiert`);
+    // console.log entfernt
     
     res.json({
       success: true,
@@ -1934,7 +1934,7 @@ app.put('/api/employee-skills/:employeeId/:skillId', requireAuth, async (req, re
     });
     
   } catch (error) {
-    console.error('❌ Fehler beim Aktualisieren des Skill-Levels:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -1967,7 +1967,7 @@ app.delete('/api/employee-skills/:employeeId/:skillId', requireAuth, async (req,
     // Speichere die Änderungen
     await dossierRef.update({ skills: skills });
     
-    console.log(`✅ Skill ${skillId} erfolgreich von Mitarbeiter ${employeeId} entfernt`);
+    // console.log entfernt
     
     res.json({
       success: true,
@@ -1975,7 +1975,7 @@ app.delete('/api/employee-skills/:employeeId/:skillId', requireAuth, async (req,
     });
     
   } catch (error) {
-    console.error('❌ Fehler beim Entfernen des Skills:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -1987,7 +1987,7 @@ app.delete('/api/employee-skills/:employeeId/:skillId', requireAuth, async (req,
 // GET /api/roles - Alle Rollen laden
 app.get('/api/roles', requireAuth, async (req, res) => {
   try {
-    console.log('🔍 GET /api/roles - Lade alle Rollen');
+    // console.log entfernt
     
     const rolesSnap = await db.collection('roles')
       .where('isActive', '==', true)
@@ -2001,10 +2001,10 @@ app.get('/api/roles', requireAuth, async (req, res) => {
     // Sortiere Rollen nach Name (im Code, da Firebase Index benötigt)
     roles.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     
-    console.log(`✅ ${roles.length} aktive Rollen geladen`);
+    // console.log entfernt
     res.json(roles);
   } catch (error) {
-    console.error('❌ Fehler beim Laden der Rollen:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Fehler beim Laden der Rollen' });
   }
 });
@@ -2018,7 +2018,7 @@ app.post('/api/roles', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Rollenname ist erforderlich' });
     }
     
-    console.log(`🔍 POST /api/roles - Erstelle neue Rolle: ${name}`);
+    // console.log entfernt
     
     // Prüfe ob Rolle bereits existiert
     const existingRoleSnap = await db.collection('roles')
@@ -2040,7 +2040,7 @@ app.post('/api/roles', requireAuth, async (req, res) => {
     
     const docRef = await db.collection('roles').add(roleData);
     
-    console.log(`✅ Rolle "${name}" erfolgreich erstellt mit ID: ${docRef.id}`);
+    // console.log entfernt
     
     res.json({
       success: true,
@@ -2048,7 +2048,7 @@ app.post('/api/roles', requireAuth, async (req, res) => {
       role: { id: docRef.id, ...roleData }
     });
   } catch (error) {
-    console.error('❌ Fehler beim Erstellen der Rolle:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Fehler beim Erstellen der Rolle' });
   }
 });
@@ -2063,7 +2063,7 @@ app.put('/api/roles/:id', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Rollenname ist erforderlich' });
     }
     
-    console.log(`🔍 PUT /api/roles/${id} - Bearbeite Rolle: ${name}`);
+    // console.log entfernt
     
     // Prüfe ob Rolle existiert
     const roleDoc = await db.collection('roles').doc(id).get();
@@ -2091,14 +2091,14 @@ app.put('/api/roles/:id', requireAuth, async (req, res) => {
     
     await db.collection('roles').doc(id).update(updateData);
     
-    console.log(`✅ Rolle "${name}" erfolgreich aktualisiert`);
+    // console.log entfernt
     
     res.json({
       success: true,
       role: { id, ...roleDoc.data(), ...updateData }
     });
   } catch (error) {
-    console.error('❌ Fehler beim Bearbeiten der Rolle:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Fehler beim Bearbeiten der Rolle' });
   }
 });
@@ -2108,7 +2108,7 @@ app.delete('/api/roles/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     
-    console.log(`🔍 DELETE /api/roles/${id} - Lösche Rolle`);
+    // console.log entfernt
     
     // Prüfe ob Rolle existiert
     const roleDoc = await db.collection('roles').doc(id).get();
@@ -2124,14 +2124,14 @@ app.delete('/api/roles/:id', requireAuth, async (req, res) => {
       deletedAt: new Date()
     });
     
-    console.log(`✅ Rolle "${roleName}" erfolgreich als inaktiv markiert`);
+    // console.log entfernt
     
     res.json({
       success: true,
       message: `Rolle "${roleName}" wurde gelöscht`
     });
   } catch (error) {
-    console.error('❌ Fehler beim Löschen der Rolle:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Fehler beim Löschen der Rolle' });
   }
 });
@@ -2143,7 +2143,7 @@ app.delete('/api/roles/:id', requireAuth, async (req, res) => {
 // GET /api/technical-skills - Alle Technical Skills laden
 app.get('/api/technical-skills', requireAuth, async (req, res) => {
   try {
-    console.log('🔍 GET /api/technical-skills - Lade alle Technical Skills');
+    // console.log entfernt
     
     const skillsSnap = await db.collection('technicalSkills')
       .where('isActive', '==', true)
@@ -2154,11 +2154,11 @@ app.get('/api/technical-skills', requireAuth, async (req, res) => {
       ...doc.data()
     }));
     
-    console.log(`✅ ${skills.length} Technical Skills geladen`);
+    // console.log entfernt
     
     res.json(skills);
   } catch (error) {
-    console.error('❌ Fehler beim Laden der Technical Skills:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Fehler beim Laden der Technical Skills' });
   }
 });
@@ -2172,7 +2172,7 @@ app.post('/api/technical-skills', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Skill-Name ist erforderlich' });
     }
     
-    console.log(`🔍 POST /api/technical-skills - Erstelle neuen Skill: ${name}`);
+    // console.log entfernt
     
     // Prüfe ob Skill bereits existiert
     const existingSkillSnap = await db.collection('technicalSkills')
@@ -2196,14 +2196,14 @@ app.post('/api/technical-skills', requireAuth, async (req, res) => {
     
     const docRef = await db.collection('technicalSkills').add(newSkill);
     
-    console.log(`✅ Technical Skill "${name}" erfolgreich erstellt mit ID: ${docRef.id}`);
+    // console.log entfernt
     
     res.json({
       success: true,
       skill: { id: docRef.id, ...newSkill }
     });
   } catch (error) {
-    console.error('❌ Fehler beim Erstellen des Technical Skills:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Fehler beim Erstellen des Technical Skills' });
   }
 });
@@ -2218,7 +2218,7 @@ app.put('/api/technical-skills/:id', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Skill-Name ist erforderlich' });
     }
     
-    console.log(`🔍 PUT /api/technical-skills/${id} - Bearbeite Skill: ${name}`);
+    // console.log entfernt
     
     // Prüfe ob Skill existiert
     const skillDoc = await db.collection('technicalSkills').doc(id).get();
@@ -2247,14 +2247,14 @@ app.put('/api/technical-skills/:id', requireAuth, async (req, res) => {
     
     await db.collection('technicalSkills').doc(id).update(updatedSkill);
     
-    console.log(`✅ Technical Skill "${name}" erfolgreich aktualisiert`);
+    // console.log entfernt
     
     res.json({
       success: true,
       skill: { id, ...skillDoc.data(), ...updatedSkill }
     });
   } catch (error) {
-    console.error('❌ Fehler beim Bearbeiten des Technical Skills:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Fehler beim Bearbeiten des Technical Skills' });
   }
 });
@@ -2264,7 +2264,7 @@ app.delete('/api/technical-skills/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     
-    console.log(`🔍 DELETE /api/technical-skills/${id} - Lösche Skill`);
+    // console.log entfernt
     
     // Prüfe ob Skill existiert
     const skillDoc = await db.collection('technicalSkills').doc(id).get();
@@ -2280,14 +2280,14 @@ app.delete('/api/technical-skills/:id', requireAuth, async (req, res) => {
       deletedAt: new Date()
     });
     
-    console.log(`✅ Technical Skill "${skillName}" erfolgreich als inaktiv markiert`);
+    // console.log entfernt
     
     res.json({
       success: true,
       message: `Technical Skill "${skillName}" wurde gelöscht`
     });
   } catch (error) {
-    console.error('❌ Fehler beim Löschen des Technical Skills:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Fehler beim Löschen des Technical Skills' });
   }
 });
@@ -2300,24 +2300,24 @@ app.delete('/api/technical-skills/:id', requireAuth, async (req, res) => {
 app.get('/api/employee-roles/:employeeId', requireAuth, async (req, res) => {
   try {
     const { employeeId } = req.params;
-    console.log(`🔍 GET /api/employee-roles/${employeeId} - Lade zugewiesene Rollen`);
+    // console.log entfernt
     
     // Lade das employeeDossier
     const dossierDoc = await db.collection('employeeDossiers').doc(employeeId).get();
     
     if (!dossierDoc.exists) {
-      console.log(`📝 Employee ${employeeId} nicht gefunden, gebe leeres Array zurück`);
+      // console.log entfernt
       return res.json([]);
     }
     
     const dossierData = dossierDoc.data();
     const assignedRoles = Array.isArray(dossierData.assignedRoles) ? dossierData.assignedRoles : [];
     
-    console.log(`✅ ${assignedRoles.length} zugewiesene Rollen für Mitarbeiter ${employeeId} geladen`);
+    // console.log entfernt
     res.json(assignedRoles);
     
   } catch (error) {
-    console.error('❌ Fehler beim Laden der zugewiesenen Rollen:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -2332,7 +2332,7 @@ app.post('/api/employee-roles/:employeeId', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'roleId und level (1-5) sind erforderlich' });
     }
     
-    console.log(`🔍 POST /api/employee-roles/${employeeId} - Weise Rolle ${roleId} zu (Level ${level})`);
+    // console.log entfernt
     
     // Lade die Rolle, um den Namen zu bekommen
     const roleDoc = await db.collection('roles').doc(roleId).get();
@@ -2386,7 +2386,7 @@ app.post('/api/employee-roles/:employeeId', requireAuth, async (req, res) => {
     // Speichere das aktualisierte Dossier
     await dossierRef.set(dossierData, { merge: true });
     
-    console.log(`✅ Rolle ${roleName} (Level ${level}) erfolgreich Mitarbeiter ${employeeId} zugewiesen`);
+    // console.log entfernt
     
     res.json({
       success: true,
@@ -2395,7 +2395,7 @@ app.post('/api/employee-roles/:employeeId', requireAuth, async (req, res) => {
       message: 'Rolle erfolgreich zugewiesen'
     });
   } catch (error) {
-    console.error('❌ Fehler beim Zuweisen der Rolle:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -2410,7 +2410,7 @@ app.put('/api/employee-roles/:employeeId/:assignmentId', requireAuth, async (req
       return res.status(400).json({ error: 'level (1-5) ist erforderlich' });
     }
     
-    console.log(`🔍 PUT /api/employee-roles/${employeeId}/${assignmentId} - Ändere Level auf ${level}`);
+    // console.log entfernt
     
     // Lade das employeeDossier
     const dossierRef = db.collection('employeeDossiers').doc(employeeId);
@@ -2439,7 +2439,7 @@ app.put('/api/employee-roles/:employeeId/:assignmentId', requireAuth, async (req
     await dossierRef.set(dossierData, { merge: true });
     
     const updatedAssignment = dossierData.assignedRoles[assignmentIndex];
-    console.log(`✅ Rollen-Level für ${updatedAssignment.roleName} erfolgreich auf ${level} geändert`);
+    // console.log entfernt
     
     res.json({
       success: true,
@@ -2447,7 +2447,7 @@ app.put('/api/employee-roles/:employeeId/:assignmentId', requireAuth, async (req
       message: 'Rollen-Level erfolgreich geändert'
     });
   } catch (error) {
-    console.error('❌ Fehler beim Ändern des Rollen-Levels:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -2457,7 +2457,7 @@ app.delete('/api/employee-roles/:employeeId/:assignmentId', requireAuth, async (
   try {
     const { employeeId, assignmentId } = req.params;
     
-    console.log(`🔍 DELETE /api/employee-roles/${employeeId}/${assignmentId} - Entferne Rollen-Zuweisung`);
+    // console.log entfernt
     
     // Lade das employeeDossier
     const dossierRef = db.collection('employeeDossiers').doc(employeeId);
@@ -2486,69 +2486,27 @@ app.delete('/api/employee-roles/:employeeId/:assignmentId', requireAuth, async (
     // Speichere das aktualisierte Dossier
     await dossierRef.set(dossierData, { merge: true });
     
-    console.log(`✅ Rollen-Zuweisung ${removedAssignment.roleName} erfolgreich entfernt`);
+    // console.log entfernt
     
     res.json({
       success: true,
       message: `Rollen-Zuweisung "${removedAssignment.roleName}" wurde entfernt`
     });
   } catch (error) {
-    console.error('❌ Fehler beim Entfernen der Rollen-Zuweisung:', error);
+    // console.error entfernt
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
 
-// Debug-Endpoint: Collection-Inhalte prüfen
-app.get('/api/debug/collections', requireAuth, async (req, res) => {
-  try {
-    // Auslastung Collection
-    const auslastungSnap = await db.collection('auslastung').limit(3).get();
-    const auslastungSample = auslastungSnap.docs.map(doc => ({
-      id: doc.id,
-      data: doc.data()
-    }));
-
-    // Einsatzplan Collection  
-    const einsatzplanSnap = await db.collection('einsatzplan').limit(3).get();
-    const einsatzplanSample = einsatzplanSnap.docs.map(doc => ({
-      id: doc.id,
-      data: doc.data()
-    }));
-
-    // UtilizationData Collection
-    const utilizationSnap = await db.collection('utilizationData').limit(3).get();
-    const utilizationSample = utilizationSnap.docs.map(doc => ({
-      id: doc.id,
-      data: doc.data()
-    }));
-
-    res.json({
-      auslastung: {
-        count: auslastungSnap.size,
-        sample: auslastungSample
-      },
-      einsatzplan: {
-        count: einsatzplanSnap.size,
-        sample: einsatzplanSample
-      },
-      utilizationData: {
-        count: utilizationSnap.size,
-        sample: utilizationSample
-      }
-    });
-  } catch (error) {
-    console.error('Debug-Fehler:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+// Debug-Endpoint entfernt
 
 // Graceful Shutdown
 process.on('SIGINT', async () => {
-  console.log('\n🛑 Server wird heruntergefahren...');
+  // console.log entfernt
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  console.log('\n🛑 Server wird heruntergefahren...');
+  // console.log entfernt
   process.exit(0);
 });

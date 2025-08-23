@@ -41,8 +41,6 @@ class ApiService {
         throw new Error('Kein gültiger Token verfügbar - bitte melden Sie sich erneut an');
       }
       
-      console.log(`🔍 API-Aufruf ${endpoint}: Token verfügbar, Länge: ${token.length}`);
-      
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         headers: {
           'Content-Type': 'application/json',
@@ -51,8 +49,6 @@ class ApiService {
         },
         ...options,
       });
-
-      console.log(`🔍 API-Response ${endpoint}: Status ${response.status}`);
 
       if (!response.ok) {
         // Spezielle Behandlung: 404 bei Dossier/Skills gilt als "nicht vorhanden" und ist kein harter Fehler
@@ -69,11 +65,9 @@ class ApiService {
       }
 
       const result = await response.json();
-      console.log(`✅ API-Aufruf ${endpoint} erfolgreich:`, result);
       return result;
     } catch (error) {
       // ✅ Bessere Error-Behandlung
-      console.error(`❌ API-Fehler bei ${endpoint}:`, error);
       throw error;
     }
   }
@@ -97,6 +91,12 @@ class ApiService {
       body: data ? JSON.stringify(data) : undefined,
     });
   }
+
+  static async delete(endpoint: string) {
+    return this.request(endpoint, {
+      method: 'DELETE',
+    });
+  }
 }
 
 // Datenbank-Service für lokale SQLite-Datenbank
@@ -110,20 +110,15 @@ export class DatabaseService {
     if (!authTokenProvider) {
       throw new Error('Token Provider nicht verfügbar nach 5 Sekunden Wartezeit');
     }
-    console.log('✅ Token Provider verfügbar');
   }
 
   // Aktuelles User-Profil abrufen
   static async getMe() {
     try {
-      console.log('🔍 getMe() aufgerufen');
       await this.waitForTokenProvider();
-      console.log('🔍 API-Aufruf /me wird gemacht...');
       const result = await ApiService.get('/me');
-      console.log('✅ getMe() erfolgreich:', result);
       return result;
     } catch (error) {
-      console.error('❌ Fehler beim Abrufen des User-Profils:', error);
       throw error;
     }
   }
@@ -183,14 +178,10 @@ export class DatabaseService {
   // Alle Auslastung-Daten abrufen (nur neueste Version)
   static async getAuslastung() {
     try {
-      console.log('🔍 getAuslastung() aufgerufen');
       await this.waitForTokenProvider();
-      console.log('🔍 API-Aufruf /auslastung wird gemacht...');
       const result = await ApiService.get('/auslastung');
-      console.log('✅ getAuslastung() erfolgreich:', result);
       return result;
     } catch (error) {
-      console.error('❌ Fehler beim Abrufen der Auslastung:', error);
       throw error;
     }
   }
@@ -198,14 +189,10 @@ export class DatabaseService {
   // Alle Einsatzplan-Daten abrufen (nur neueste Version)
   static async getEinsatzplan() {
     try {
-      console.log('🔍 getEinsatzplan() aufgerufen');
       await this.waitForTokenProvider();
-      console.log('🔍 API-Aufruf /einsatzplan wird gemacht...');
       const result = await ApiService.get('/einsatzplan');
-      console.log('✅ getEinsatzplan() erfolgreich:', result);
       return result;
     } catch (error) {
-      console.error('❌ Fehler beim Abrufen des Einsatzplans:', error);
       throw error;
     }
   }
@@ -383,7 +370,6 @@ export class DatabaseService {
     }
   ) {
     try {
-      console.log('🔍 getUtilizationData() aufgerufen');
       await this.waitForTokenProvider();
       const queryParams = new URLSearchParams();
       if (filters?.person) queryParams.append('person', filters.person);
@@ -391,12 +377,9 @@ export class DatabaseService {
       if (filters?.year) queryParams.append('year', filters.year.toString());
       
       const endpoint = `/utilization-data${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-      console.log('🔍 API-Aufruf', endpoint, 'wird gemacht...');
       const result = await ApiService.get(endpoint);
-      console.log('✅ getUtilizationData() erfolgreich:', result);
       return result;
     } catch (error) {
-      console.error('❌ Fehler beim Abrufen der Utilization-Daten:', error);
       throw error;
     }
   }
@@ -417,35 +400,30 @@ export class DatabaseService {
   // Neue Funktion: Konsolidierung mit Daten aus der Datenbank
   static async consolidateFromDatabase() {
     try {
-      console.log('🔍 Starte Konsolidierung mit Daten aus der Datenbank...');
-      
       // Lade beide Datentypen aus der Datenbank
       const auslastungData = await this.getAuslastung();
       const einsatzplanData = await this.getEinsatzplan();
       
-      console.log('🔍 Daten aus der Datenbank geladen:', {
-        auslastung: auslastungData?.length || 0,
-        einsatzplan: einsatzplanData?.length || 0
-      });
-      
-      // 🔍 DEBUG: Zeige Struktur der ersten Datensätze
+      // Zeige Struktur der ersten Datensätze
       if (auslastungData?.length > 0) {
-        console.log('🔍 AUSLASTUNG Sample:', {
-          person: auslastungData[0].person,
-          keys: Object.keys(auslastungData[0]),
-          hasValues: !!auslastungData[0].values,
-          valuesKeys: auslastungData[0].values ? Object.keys(auslastungData[0].values).slice(0, 5) : 'NO VALUES',
-          firstValues: auslastungData[0].values ? Object.entries(auslastungData[0].values).slice(0, 3) : 'NO VALUES'
-        });
+        const firstAuslastung = auslastungData[0];
+        const firstAuslastungValues = firstAuslastung.values || {};
+        const firstAuslastungWeekKeys = Object.keys(firstAuslastungValues).filter(key => /^\d{2}\/\d{2}$/.test(key));
+        
+        if (firstAuslastungWeekKeys.length > 0) {
+          const sampleWeek = firstAuslastungWeekKeys[0];
+          const sampleValue = firstAuslastungValues[sampleWeek];
+        }
       }
       if (einsatzplanData?.length > 0) {
-        console.log('🔍 EINSATZPLAN Sample:', {
-          person: einsatzplanData[0].person,
-          keys: Object.keys(einsatzplanData[0]),
-          hasValues: !!einsatzplanData[0].values,
-          valuesKeys: einsatzplanData[0].values ? Object.keys(einsatzplanData[0].values).slice(0, 5) : 'NO VALUES',
-          firstValues: einsatzplanData[0].values ? Object.entries(einsatzplanData[0].values).slice(0, 3) : 'NO VALUES'
-        });
+        const firstEinsatzplan = einsatzplanData[0];
+        const firstEinsatzplanValues = firstEinsatzplan.values || {};
+        const firstEinsatzplanWeekKeys = Object.keys(firstEinsatzplanValues).filter(key => /^\d{2}\/\d{2}$/.test(key));
+        
+        if (firstEinsatzplanWeekKeys.length > 0) {
+          const sampleWeek = firstEinsatzplanWeekKeys[0];
+          const sampleValue = firstEinsatzplanValues[sampleWeek];
+        }
       }
 
       // Prüfe Datenverfügbarkeit
@@ -472,8 +450,6 @@ export class DatabaseService {
         statusInfo.message = '✅ Vollständige Daten verfügbar - Konsolidierung läuft';
       }
 
-      console.log('📊 Status:', statusInfo.message);
-
       // Wenn beide Datentypen vorhanden sind, führe vollständige Konsolidierung durch
       if (statusInfo.canConsolidate) {
         const currentYear = new Date().getFullYear();
@@ -497,8 +473,6 @@ export class DatabaseService {
         const availableData = hasAuslastung ? auslastungData : einsatzplanData;
         const dataType = hasAuslastung ? 'auslastung' : 'einsatzplan';
         
-        console.log(`🔍 Führe teilweise Konsolidierung mit ${dataType}-Daten durch...`);
-        
         // Erstelle Platzhalter-Struktur für fehlende Daten
         const partialConsolidated = this.createPartialConsolidation(availableData, dataType);
         
@@ -509,7 +483,6 @@ export class DatabaseService {
       }
 
     } catch (error) {
-      console.error('❌ Fehler bei der Datenbank-Konsolidierung:', error);
       throw error;
     }
   }
@@ -588,7 +561,6 @@ export class DatabaseService {
    * Employee Skills für spezifischen Employee abrufen
    */
   static async getEmployeeSkills(employeeName: string): Promise<any[]> {
-    console.log(`🔍 DatabaseService.getEmployeeSkills() für: ${employeeName}`);
     
     try {
       await this.waitForTokenProvider();
@@ -596,7 +568,6 @@ export class DatabaseService {
       const response = await ApiService.get(`/employee-skills/${id}`);
       return response || [];
     } catch (error) {
-      console.error('❌ getEmployeeSkills() Fehler:', error);
       return [];
     }
   }
@@ -605,7 +576,6 @@ export class DatabaseService {
    * Employee Skills speichern/ersetzen
    */
   static async saveEmployeeSkills(employeeName: string, skills: Array<{ skillId: string; skillName: string; level: number }>): Promise<any> {
-    console.log(`🔄 DatabaseService.saveEmployeeSkills() für: ${employeeName} mit ${skills.length} Skills`);
     
     try {
       await this.waitForTokenProvider();
@@ -613,7 +583,6 @@ export class DatabaseService {
       const response = await ApiService.post(`/employee-skills/${id}`, { skills });
       return response;
     } catch (error) {
-      console.error('❌ saveEmployeeSkills() Fehler:', error);
       throw error;
     }
   }
@@ -622,7 +591,6 @@ export class DatabaseService {
    * Einzelnes Employee Skill Level aktualisieren
    */
   static async updateEmployeeSkillLevel(employeeName: string, skillId: string, level: number): Promise<any> {
-    console.log(`🔄 DatabaseService.updateEmployeeSkillLevel(): ${employeeName} -> ${skillId} = ${level}`);
     
     try {
       await this.waitForTokenProvider();
@@ -631,7 +599,6 @@ export class DatabaseService {
       const response = await ApiService.put(`/employee-skills/${id}/${sid}`, { level });
       return response;
     } catch (error) {
-      console.error('❌ updateEmployeeSkillLevel() Fehler:', error);
       throw error;
     }
   }
@@ -640,7 +607,6 @@ export class DatabaseService {
    * Employee Skill löschen
    */
   static async deleteEmployeeSkill(employeeName: string, skillId: string): Promise<any> {
-    console.log(`🗑️ DatabaseService.deleteEmployeeSkill(): ${employeeName} -> ${skillId}`);
     
     try {
       await this.waitForTokenProvider();
@@ -649,7 +615,6 @@ export class DatabaseService {
       const response = await ApiService.delete(`/employee-skills/${id}/${sid}`);
       return response;
     } catch (error) {
-      console.error('❌ deleteEmployeeSkill() Fehler:', error);
       throw error;
     }
   }
@@ -658,14 +623,12 @@ export class DatabaseService {
    * Alle Employee Skills abrufen (für Admin-Übersicht)
    */
   static async getAllEmployeeSkills(): Promise<any[]> {
-    console.log('🔍 DatabaseService.getAllEmployeeSkills()');
     
     try {
       await this.waitForTokenProvider();
       const response = await ApiService.get('/employee-skills');
       return response || [];
     } catch (error) {
-      console.error('❌ getAllEmployeeSkills() Fehler:', error);
       return [];
     }
   }
@@ -674,15 +637,12 @@ export class DatabaseService {
    * Employee Stammdaten speichern
    */
   static async saveEmployeeStammdaten(employeeData: any[]): Promise<{ success: boolean; message: string; count: number }> {
-    console.log('💾 DatabaseService.saveEmployeeStammdaten() mit', employeeData.length, 'Personen');
     
     try {
       await this.waitForTokenProvider();
       const response = await ApiService.post('/employees/bulk', { employees: employeeData });
-      console.log('✅ saveEmployeeStammdaten() erfolgreich:', response);
       return response;
     } catch (error) {
-      console.error('❌ saveEmployeeStammdaten() Fehler:', error);
       throw error;
     }
   }
@@ -691,15 +651,12 @@ export class DatabaseService {
    * Employee Stammdaten laden
    */
   static async getEmployeeStammdaten(): Promise<any[]> {
-    console.log('🔍 DatabaseService.getEmployeeStammdaten()');
     
     try {
       await this.waitForTokenProvider();
       const response = await ApiService.get('/employees');
-      console.log('✅ getEmployeeStammdaten() erfolgreich:', response.length, 'Personen');
       return response;
     } catch (error) {
-      console.error('❌ getEmployeeStammdaten() Fehler:', error);
       throw error;
     }
   }

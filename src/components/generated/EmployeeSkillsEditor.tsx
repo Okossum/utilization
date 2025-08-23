@@ -64,9 +64,9 @@ export function EmployeeSkillsEditor({ employeeName, value, onChange }: Employee
       
       onChange(employeeSkills);
       setHasUnsavedChanges(false);
-      console.log(`✅ ${skills.length} Skills geladen für ${employeeName}`);
+      // console.log entfernt
     } catch (error) {
-      console.error('❌ Fehler beim Laden der Employee Skills:', error);
+      // console.error entfernt
       setError('Fehler beim Laden der Skills aus der Datenbank');
     } finally {
       setLoading(false);
@@ -88,9 +88,9 @@ export function EmployeeSkillsEditor({ employeeName, value, onChange }: Employee
       
       await DatabaseService.saveEmployeeSkills(employeeName, skillsToSave);
       setHasUnsavedChanges(false);
-      console.log(`✅ ${skillsToSave.length} Skills gespeichert für ${employeeName}`);
+      // console.log entfernt
     } catch (error) {
-      console.error('❌ Fehler beim Speichern der Skills:', error);
+      // console.error entfernt
       setError('Fehler beim Speichern der Skills in der Datenbank');
     } finally {
       setSaving(false);

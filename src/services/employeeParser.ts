@@ -52,7 +52,6 @@ export class EmployeeExcelParser {
     }
     
     // Fallback: Zeile 8 (Index 7)
-    console.warn('Header "Vorname" nicht gefunden, verwende Fallback Zeile 8');
     return 7;
   }
 
@@ -236,7 +235,11 @@ export class EmployeeExcelParser {
       
       // Header extrahieren
       const headers = this.extractHeaders(worksheet, headerRowIndex);
-      console.log('📋 Gefundene Header:', Array.from(headers.values()));
+
+      // Zeige gefundene Header für Debugging
+      if (headers.size === 0) {
+        return { success: false, error: 'Keine gültigen Header gefunden' };
+      }
 
       // Datenzeilen extrahieren
       const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
@@ -306,13 +309,22 @@ export class EmployeeExcelParser {
       result.data = Array.from(uniqueData.values());
       result.success = result.data.length > 0;
 
-      console.log(`✅ Parsing abgeschlossen: ${result.data.length} gültige Personen aus ${result.stats.totalRows} Zeilen`);
-      
+      return {
+        success: true,
+        data: result.data,
+        stats: {
+          totalRows: result.stats.totalRows,
+          validRows: result.stats.validRows,
+          invalidRows: result.stats.invalidRows,
+          headerRowIndex: result.stats.headerRowIndex
+        }
+      };
     } catch (error) {
-      result.errors.push(`Parsing-Fehler: ${error}`);
-      console.error('❌ Excel Parsing Fehler:', error);
+      return {
+        success: false,
+        error: `Excel Parsing Fehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`,
+        data: []
+      };
     }
-
-    return result;
   }
 }

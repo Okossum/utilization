@@ -425,7 +425,7 @@ export const assignmentService = {
             cleanDoc.customer = projectData.customer;
           }
         } catch (error) {
-          console.warn('Fehler beim Laden der Projekt-Informationen:', error);
+          // console statement entfernt
         }
       }
       
@@ -434,10 +434,10 @@ export const assignmentService = {
         createdAt: new Date(),
         updatedAt: new Date(),
       });
-      console.log('✅ Assignment erfolgreich erstellt:', docRef.id);
+      // console.log entfernt
       return docRef.id;
     } catch (error) {
-      console.error('❌ Fehler beim Erstellen des Assignments:', error);
+      // console statement entfernt
       throw error;
     }
   },
@@ -479,7 +479,7 @@ export const assignmentService = {
             
             return assignment;
           } catch (error) {
-            console.warn('Fehler beim Laden der Projekt-Informationen:', error);
+            // console statement entfernt
             return assignment;
           }
         })
@@ -488,7 +488,7 @@ export const assignmentService = {
       // Sortiere clientseitig nach createdAt
       return enrichedAssignments.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
     } catch (error) {
-      console.warn('Fehler beim Laden der Assignments für Mitarbeiter:', error);
+      // console statement entfernt
       // Wenn Collection nicht existiert, gebe leeres Array zurück
       return [];
     }
@@ -509,7 +509,7 @@ export const assignmentService = {
         updatedAt: convertTimestamp(d.data().updatedAt),
       })) as FirestoreAssignment[];
     } catch (error) {
-      console.warn('Fehler beim Laden der Assignments für Projekt:', error);
+      // console statement entfernt
       // Wenn Collection nicht existiert, gebe leeres Array zurück
       return [];
     }
@@ -525,7 +525,7 @@ export const assignmentService = {
       const docRef = doc(db, COLLECTIONS.ASSIGNMENTS, id);
       await updateDoc(docRef, { ...cleanUpdates, updatedAt: new Date() });
     } catch (error) {
-      console.error('❌ Fehler beim Aktualisieren des Assignments:', error);
+      // console statement entfernt
       throw error;
     }
   },
@@ -545,7 +545,7 @@ export const assignmentService = {
         updatedAt: convertTimestamp(d.data().updatedAt),
       })) as FirestoreAssignment[];
     } catch (error) {
-      console.warn('Fehler beim Laden aller Assignments:', error);
+      // console statement entfernt
       // Wenn Collection nicht existiert, gebe leeres Array zurück
       return [];
     }

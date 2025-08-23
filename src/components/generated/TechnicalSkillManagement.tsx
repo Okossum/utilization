@@ -35,7 +35,7 @@ const TechnicalSkillManagement: React.FC = () => {
   // Skills laden
   const loadSkills = async () => {
     try {
-      console.log('🔍 Lade Technical Skills...');
+      // console.log entfernt
       
       const response = await fetch('/api/technical-skills', {
         headers: {
@@ -50,10 +50,10 @@ const TechnicalSkillManagement: React.FC = () => {
 
       const skillsData = await response.json();
       setSkills(skillsData);
-      console.log(`✅ ${skillsData.length} Technical Skills geladen`);
+      // console.log entfernt
       
     } catch (error) {
-      console.error('❌ Fehler beim Laden der Technical Skills:', error);
+      // console.error entfernt
       setError('Fehler beim Laden der Technical Skills');
     } finally {
       setLoading(false);
@@ -66,7 +66,7 @@ const TechnicalSkillManagement: React.FC = () => {
     setError(null);
     
     try {
-      console.log('🔍 Erstelle neuen Technical Skill:', skillData.name);
+      // console.log entfernt
       
       const response = await fetch('/api/technical-skills', {
         method: 'POST',
@@ -83,7 +83,7 @@ const TechnicalSkillManagement: React.FC = () => {
       }
 
       const result = await response.json();
-      console.log('✅ Technical Skill erfolgreich erstellt:', result.skill);
+      // console.log entfernt
       
       // Skills neu laden
       await loadSkills();
@@ -93,7 +93,7 @@ const TechnicalSkillManagement: React.FC = () => {
       setFormData({ name: '', description: '', category: '' });
       
     } catch (error: any) {
-      console.error('❌ Fehler beim Erstellen des Technical Skills:', error);
+      // console.error entfernt
       setError(error.message);
     } finally {
       setIsSubmitting(false);
@@ -108,7 +108,7 @@ const TechnicalSkillManagement: React.FC = () => {
     setError(null);
     
     try {
-      console.log('🔍 Bearbeite Technical Skill:', skillData.name);
+      // console.log entfernt
       
       const response = await fetch(`/api/technical-skills/${editingSkill.id}`, {
         method: 'PUT',
@@ -125,7 +125,7 @@ const TechnicalSkillManagement: React.FC = () => {
       }
 
       const result = await response.json();
-      console.log('✅ Technical Skill erfolgreich bearbeitet:', result.skill);
+      // console.log entfernt
       
       // Skills neu laden
       await loadSkills();
@@ -136,7 +136,7 @@ const TechnicalSkillManagement: React.FC = () => {
       setFormData({ name: '', description: '', category: '' });
       
     } catch (error: any) {
-      console.error('❌ Fehler beim Bearbeiten des Technical Skills:', error);
+      // console.error entfernt
       setError(error.message);
     } finally {
       setIsSubmitting(false);
@@ -152,7 +152,7 @@ const TechnicalSkillManagement: React.FC = () => {
     setError(null);
     
     try {
-      console.log('🔍 Lösche Technical Skill:', skill.name);
+      // console.log entfernt
       
       const response = await fetch(`/api/technical-skills/${skill.id}`, {
         method: 'DELETE',
@@ -167,13 +167,13 @@ const TechnicalSkillManagement: React.FC = () => {
         throw new Error(errorData.error || 'Fehler beim Löschen des Skills');
       }
 
-      console.log('✅ Technical Skill erfolgreich gelöscht');
+      // console.log entfernt
       
       // Skills neu laden
       await loadSkills();
       
     } catch (error: any) {
-      console.error('❌ Fehler beim Löschen des Technical Skills:', error);
+      // console.error entfernt
       setError(error.message);
     }
   };

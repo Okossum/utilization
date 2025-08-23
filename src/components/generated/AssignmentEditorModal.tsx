@@ -389,7 +389,7 @@ export function AssignmentEditorModal({ isOpen, onClose, employeeName, editingAs
                           await unlinkAssignment(editingAssignment.id);
                           onAssignmentCreated?.();
                         } catch (error) {
-                          console.error('Fehler beim Löschen:', error);
+                          // console.error entfernt
                           alert('Fehler beim Löschen der Projektzuweisung.');
                         }
                       }

@@ -61,7 +61,7 @@ const TechnicalSkillSelectionModal: React.FC<TechnicalSkillSelectionModalProps> 
       setAvailableSkills(skillsData);
       
     } catch (error) {
-      console.error('❌ Fehler beim Laden der verfügbaren Skills:', error);
+      // console.error entfernt
       setError('Fehler beim Laden der verfügbaren Skills');
     }
   };
@@ -99,7 +99,7 @@ const TechnicalSkillSelectionModal: React.FC<TechnicalSkillSelectionModalProps> 
       setAssignedSkills(formattedSkills);
       
     } catch (error) {
-      console.error('❌ Fehler beim Laden der zugewiesenen Skills:', error);
+      // console.error entfernt
       setError('Fehler beim Laden der zugewiesenen Skills');
     }
   };
@@ -115,7 +115,7 @@ const TechnicalSkillSelectionModal: React.FC<TechnicalSkillSelectionModalProps> 
         loadAssignedSkills()
       ]);
     } catch (error) {
-      console.error('❌ Fehler beim Laden der Daten:', error);
+      // console.error entfernt
     } finally {
       setLoading(false);
     }
@@ -152,7 +152,7 @@ const TechnicalSkillSelectionModal: React.FC<TechnicalSkillSelectionModalProps> 
       onSkillAssigned();
       
     } catch (error: any) {
-      console.error('❌ Fehler beim Zuweisen des Skills:', error);
+      // console.error entfernt
       setError(error.message);
     } finally {
       setIsSubmitting(false);

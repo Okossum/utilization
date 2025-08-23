@@ -36,14 +36,14 @@ const EmployeeRoleAssignment: React.FC<EmployeeRoleAssignmentProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
 
-  console.log('🚀 EmployeeRoleAssignment Komponente wird gerendert');
-  console.log('👤 employeeId:', employeeId);
-  console.log('👤 employeeName:', employeeName);
+  // console.log entfernt
+  // console.log entfernt
+  // console.log entfernt
 
   // Verfügbare Rollen laden
   const loadAvailableRoles = async () => {
     try {
-      console.log('🔍 loadAvailableRoles() aufgerufen');
+      // console.log entfernt
       
       const response = await fetch('/api/roles', {
         headers: {
@@ -58,10 +58,10 @@ const EmployeeRoleAssignment: React.FC<EmployeeRoleAssignmentProps> = ({
 
       const rolesData = await response.json();
       setAvailableRoles(rolesData);
-      console.log(`✅ ${rolesData.length} verfügbare Rollen geladen`);
+      // console.log entfernt
       
     } catch (error) {
-      console.error('❌ Fehler beim Laden der verfügbaren Rollen:', error);
+      // console.error entfernt
       setError('Fehler beim Laden der verfügbaren Rollen');
     }
   };
@@ -69,7 +69,7 @@ const EmployeeRoleAssignment: React.FC<EmployeeRoleAssignmentProps> = ({
   // Zugewiesene Rollen laden
   const loadAssignedRoles = async () => {
     try {
-      console.log('🔍 loadAssignedRoles() aufgerufen für:', employeeId);
+      // console.log entfernt
       
       const response = await fetch(`/api/employee-roles/${encodeURIComponent(employeeId)}`, {
         headers: {
@@ -84,10 +84,10 @@ const EmployeeRoleAssignment: React.FC<EmployeeRoleAssignmentProps> = ({
 
       const rolesData = await response.json();
       setAssignedRoles(rolesData);
-      console.log(`✅ ${rolesData.length} zugewiesene Rollen für ${employeeName} geladen`);
+      // console.log entfernt
       
     } catch (error) {
-      console.error('❌ Fehler beim Laden der zugewiesenen Rollen:', error);
+      // console.error entfernt
       setError('Fehler beim Laden der zugewiesenen Rollen');
     }
   };
@@ -103,7 +103,7 @@ const EmployeeRoleAssignment: React.FC<EmployeeRoleAssignmentProps> = ({
         loadAssignedRoles()
       ]);
     } catch (error) {
-      console.error('❌ Fehler beim Laden der Daten:', error);
+      // console.error entfernt
     } finally {
       setLoading(false);
     }
@@ -132,13 +132,13 @@ const EmployeeRoleAssignment: React.FC<EmployeeRoleAssignmentProps> = ({
       }
 
       const result = await response.json();
-      console.log('✅ Rollen-Level erfolgreich geändert:', result.assignment);
+      // console.log entfernt
       
       // Zugewiesene Rollen neu laden
       await loadAssignedRoles();
       
     } catch (error: any) {
-      console.error('❌ Fehler beim Ändern des Rollen-Levels:', error);
+      // console.error entfernt
       setError(error.message);
     } finally {
       setIsSubmitting(false);
@@ -155,7 +155,7 @@ const EmployeeRoleAssignment: React.FC<EmployeeRoleAssignmentProps> = ({
     setError(null);
     
     try {
-      console.log(`🔍 Entferne Rolle ${roleName}`);
+      // console.log entfernt
       
       const response = await fetch(`/api/employee-roles/${encodeURIComponent(employeeId)}/${assignmentId}`, {
         method: 'DELETE',
@@ -170,13 +170,13 @@ const EmployeeRoleAssignment: React.FC<EmployeeRoleAssignmentProps> = ({
         throw new Error(errorData.error || 'Fehler beim Entfernen der Rolle');
       }
 
-      console.log('✅ Rolle erfolgreich entfernt');
+      // console.log entfernt
       
       // Zugewiesene Rollen neu laden
       await loadAssignedRoles();
       
     } catch (error: any) {
-      console.error('❌ Fehler beim Entfernen der Rolle:', error);
+      // console.error entfernt
       setError(error.message);
     } finally {
       setIsSubmitting(false);

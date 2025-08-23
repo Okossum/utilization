@@ -35,7 +35,7 @@ const RoleManagement: React.FC = () => {
   // Rollen laden
   const loadRoles = async () => {
     try {
-      console.log('🔍 Lade Rollen...');
+      // console.log entfernt
       
       const response = await fetch('/api/roles', {
         headers: {
@@ -50,10 +50,10 @@ const RoleManagement: React.FC = () => {
 
       const rolesData = await response.json();
       setRoles(rolesData);
-      console.log(`✅ ${rolesData.length} Rollen geladen`);
+      // console.log entfernt
       
     } catch (error) {
-      console.error('❌ Fehler beim Laden der Rollen:', error);
+      // console.error entfernt
       setError('Fehler beim Laden der Rollen');
     } finally {
       setLoading(false);
@@ -66,7 +66,7 @@ const RoleManagement: React.FC = () => {
     setError(null);
     
     try {
-      console.log('🔍 Erstelle neue Rolle:', formData.name);
+      // console.log entfernt
       
       const response = await fetch('/api/roles', {
         method: 'POST',
@@ -83,7 +83,7 @@ const RoleManagement: React.FC = () => {
       }
 
       const result = await response.json();
-      console.log('✅ Rolle erfolgreich erstellt:', result.role);
+      // console.log entfernt
       
       // Rolle zu Liste hinzufügen
       setRoles(prev => [...prev, result.role]);
@@ -93,7 +93,7 @@ const RoleManagement: React.FC = () => {
       setFormData({ name: '', description: '', category: '' });
       
     } catch (error: any) {
-      console.error('❌ Fehler beim Erstellen der Rolle:', error);
+      // console.error entfernt
       setError(error.message);
     } finally {
       setIsSubmitting(false);
@@ -108,7 +108,7 @@ const RoleManagement: React.FC = () => {
     setError(null);
     
     try {
-      console.log('🔍 Bearbeite Rolle:', formData.name);
+      // console.log entfernt
       
       const response = await fetch(`/api/roles/${editingRole.id}`, {
         method: 'PUT',
@@ -125,7 +125,7 @@ const RoleManagement: React.FC = () => {
       }
 
       const result = await response.json();
-      console.log('✅ Rolle erfolgreich bearbeitet:', result.role);
+      // console.log entfernt
       
       // Rolle in Liste aktualisieren
       setRoles(prev => prev.map(role => 
@@ -138,7 +138,7 @@ const RoleManagement: React.FC = () => {
       setFormData({ name: '', description: '', category: '' });
       
     } catch (error: any) {
-      console.error('❌ Fehler beim Bearbeiten der Rolle:', error);
+      // console.error entfernt
       setError(error.message);
     } finally {
       setIsSubmitting(false);
@@ -152,7 +152,7 @@ const RoleManagement: React.FC = () => {
     }
     
     try {
-      console.log('🔍 Lösche Rolle:', roleName);
+      // console.log entfernt
       
       const response = await fetch(`/api/roles/${roleId}`, {
         method: 'DELETE',
@@ -167,13 +167,13 @@ const RoleManagement: React.FC = () => {
         throw new Error(errorData.error || 'Fehler beim Löschen der Rolle');
       }
 
-      console.log('✅ Rolle erfolgreich gelöscht');
+      // console.log entfernt
       
       // Rolle aus Liste entfernen
       setRoles(prev => prev.filter(role => role.id !== roleId));
       
     } catch (error: any) {
-      console.error('❌ Fehler beim Löschen der Rolle:', error);
+      // console.error entfernt
       setError(error.message);
     }
   };

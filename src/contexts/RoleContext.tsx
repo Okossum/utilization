@@ -50,7 +50,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
       const rolesData = await response.json();
       setRoles(rolesData);
     } catch (error: any) {
-      console.error('Fehler beim Laden der Rollen:', error);
+      // console.error entfernt
       setError(error.message || 'Fehler beim Laden der Rollen');
     } finally {
       setLoading(false);

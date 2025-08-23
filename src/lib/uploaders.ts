@@ -60,6 +60,14 @@ function toNumberOrUndef(v: any): number | undefined {
   return Number.isNaN(num) ? undefined : num;
 }
 
+function toBooleanOrUndef(v: any): boolean | undefined {
+  if (v === undefined || v === null) return undefined;
+  const str = String(v).trim().toLowerCase();
+  if (str === "" || str === "0" || str === "false" || str === "nein" || str === "no") return false;
+  if (str === "1" || str === "true" || str === "ja" || str === "yes" || str === "x") return true;
+  return undefined;
+}
+
 function parsePersonName(fullName: string): { nachname: string; vorname: string } {
   const trimmed = fullName.trim();
   
@@ -132,7 +140,7 @@ function cellToIsoDate(cell: any, wb: XLSX.WorkBook): string | undefined {
    - deterministische Doc-ID, merge:true (idempotent)
 ========================================================= */
 export async function uploadMitarbeiter(file: File, sheetName = "Search Results") {
-  logger.info("uploaders.mitarbeiter", `Starte Upload für Datei: ${file.name}`);
+  // logger statement entfernt
   
   const ab = await file.arrayBuffer();
   const wb = XLSX.read(ab, { type: "array", cellDates: true, cellStyles: true });
@@ -185,7 +193,7 @@ export async function uploadMitarbeiter(file: File, sheetName = "Search Results"
     LINK: findCol(/link/i),
   };
 
-  logger.debug("uploaders.mitarbeiter", "Spalten-Indizes gefunden", COL);
+  // logger.debug entfernt
 
   let written = 0;
   for (let r = dataStart0; r <= range.e.r; r++) {
@@ -262,14 +270,14 @@ export async function uploadMitarbeiter(file: File, sheetName = "Search Results"
     written++;
   }
 
-  logger.info("uploaders.mitarbeiter", "Upload abgeschlossen", { written, headerRow0, dataStart0 });
+  // logger statement entfernt
   
   // ✅ Konsolidierung nach erfolgreichem Upload triggern
   try {
     await triggerConsolidationAfterUpload('mitarbeiter');
-    logger.info("uploaders.mitarbeiter", "Konsolidierung erfolgreich getriggert");
+    // logger statement entfernt
   } catch (error) {
-    logger.error("uploaders.mitarbeiter", "Fehler bei Konsolidierung", error);
+    // logger statement entfernt
     // Konsolidierungs-Fehler sollen Upload nicht zum Scheitern bringen
   }
   
@@ -283,7 +291,7 @@ export async function uploadMitarbeiter(file: File, sheetName = "Search Results"
    - schreibt in Collection "auslastung", Doc-ID = personId, merge
 ========================================================= */
 export async function uploadAuslastung(file: File, targetCollection = "auslastung") {
-  logger.info("uploaders.auslastung", `Starte Upload für Datei: ${file.name}`);
+  // logger statement entfernt
   
   const ab = await file.arrayBuffer();
   const wb = XLSX.read(ab, { type: "array", cellDates: true });
@@ -405,9 +413,9 @@ export async function uploadAuslastung(file: File, targetCollection = "auslastun
   // ✅ Konsolidierung nach erfolgreichem Upload triggern
   try {
     await triggerConsolidationAfterUpload('auslastung');
-    logger.info("uploaders.auslastung", "Konsolidierung erfolgreich getriggert");
+    // logger statement entfernt
   } catch (error) {
-    logger.error("uploaders.auslastung", "Fehler bei Konsolidierung", error);
+    // logger statement entfernt
     // Konsolidierungs-Fehler sollen Upload nicht zum Scheitern bringen
   }
 
@@ -527,7 +535,7 @@ function getWeeklyTriples(ws: XLSX.WorkSheet, headerRow0: number, startCol0: num
 }
 
 export async function uploadEinsatzplan(file: File, sheetName = "Einsatzplan", targetCollection = "einsatzplan") {
-  logger.info("uploaders.einsatzplan", `Starte Upload für Datei: ${file.name}`);
+  // logger statement entfernt
   
   const ab = await file.arrayBuffer();
   const wb = XLSX.read(ab, { type: "array" });
@@ -553,10 +561,22 @@ export async function uploadEinsatzplan(file: File, sheetName = "Einsatzplan", t
     }
     return -1;
   };
+  
+  // Erweiterte Spaltenerkennung mit Regex-Pattern
+  const findColRegex = (pattern: RegExp) => {
+    for (let c=0; c<=range.e.c; c++) {
+      const v = String((ws as any)[A1(det.headerRow0, c)]?.v ?? "");
+      if (pattern.test(v)) return c;
+    }
+    return -1;
+  };
+  
   const teamCol0 = findCol("team");
   const lobCol0 = findCol("lob");
   const bereichCol0 = findCol("bereich");
   const vgCol0 = findCol("vg");
+  const verfAbCol0 = findColRegex(/verf.*ab/i);
+  const staffbarCol0 = findColRegex(/verf.*staffing|staffbar/i);
 
   let matched=0, ambiguous=0, unmatched=0, written=0;
 
@@ -569,6 +589,9 @@ export async function uploadEinsatzplan(file: File, sheetName = "Einsatzplan", t
     team?: string;
     lob?: string;
     bereich?: string;
+    vg?: string;
+    verfuegbarAb?: string; // ISO-Date String
+    verfuegbarFuerStaffing?: boolean;
     fileName: string;
     updatedAt: Date;
     matchStatus: string;
@@ -594,6 +617,39 @@ export async function uploadEinsatzplan(file: File, sheetName = "Einsatzplan", t
     const lob  = lobCol0 >=0 ? String((ws as any)[A1(r, lobCol0 )]?.v ?? "").trim() || undefined : undefined;
     const bereich = bereichCol0>=0 ? String((ws as any)[A1(r, bereichCol0)]?.v ?? "").trim() || undefined : undefined;
     const vg = vgCol0>=0 ? String((ws as any)[A1(r, vgCol0)]?.v ?? "").trim() || undefined : undefined;
+    
+    // ✅ Verfügbar ab Feld mit Datumskonvertierung
+    let verfuegbarAb: string | undefined;
+    if (verfAbCol0 >= 0) {
+      const cell: any = (ws as any)[A1(r, verfAbCol0)];
+      verfuegbarAb = cellToIsoDate(cell, wb);
+      
+      // Debug: Zeige Datumskonvertierung für erste paar Einträge
+      if (written < 3) {
+        logger.info("uploaders.einsatzplan", `Verfügbar ab für ${person}`, {
+          rawValue: cell?.v,
+          type: typeof cell?.v,
+          cellType: cell?.t,
+          finalValue: verfuegbarAb
+        });
+      }
+    }
+    
+    // ✅ Staffbar Feld mit Boolean-Konvertierung
+    let verfuegbarFuerStaffing: boolean | undefined;
+    if (staffbarCol0 >= 0) {
+      const cell: any = (ws as any)[A1(r, staffbarCol0)];
+      verfuegbarFuerStaffing = toBooleanOrUndef(cell?.v);
+      
+      // Debug: Zeige Boolean-Konvertierung für erste paar Einträge
+      if (written < 3) {
+        logger.info("uploaders.einsatzplan", `Staffbar für ${person}`, {
+          rawValue: cell?.v,
+          type: typeof cell?.v,
+          finalValue: verfuegbarFuerStaffing
+        });
+      }
+    }
 
     // Sammle alle Wochen-Daten für diese Person
     const values: Record<string, any[]> = {};
@@ -649,6 +705,8 @@ export async function uploadEinsatzplan(file: File, sheetName = "Einsatzplan", t
       if (lob) personData.lob = lob;
       if (bereich) personData.bereich = bereich;
       if (vg) personData.vg = vg;
+      if (verfuegbarAb) personData.verfuegbarAb = verfuegbarAb;
+      if (verfuegbarFuerStaffing !== undefined) personData.verfuegbarFuerStaffing = verfuegbarFuerStaffing;
       
       personDataMap.set(res.personId, personData);
     }
@@ -669,15 +727,19 @@ export async function uploadEinsatzplan(file: File, sheetName = "Einsatzplan", t
   }
 
   logger.info("uploaders.einsatzplan", "Upload abgeschlossen", { 
-    matched, ambiguous, unmatched, written, triplesCount: triples.length 
+    matched, ambiguous, unmatched, written, triplesCount: triples.length,
+    spaltenGefunden: {
+      verfuegbarAb: verfAbCol0 >= 0,
+      verfuegbarFuerStaffing: staffbarCol0 >= 0
+    }
   });
   
   // ✅ Konsolidierung nach erfolgreichem Upload triggern
   try {
     await triggerConsolidationAfterUpload('einsatzplan');
-    logger.info("uploaders.einsatzplan", "Konsolidierung erfolgreich getriggert");
+    // logger statement entfernt
   } catch (error) {
-    logger.error("uploaders.einsatzplan", "Fehler bei Konsolidierung", error);
+    // logger statement entfernt
     // Konsolidierungs-Fehler sollen Upload nicht zum Scheitern bringen
   }
   

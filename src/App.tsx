@@ -2,7 +2,6 @@ import { useMemo, useState, useRef, useEffect } from 'react';
 import { Container, Theme } from './settings/types';
 import { UtilizationReportView } from './components/generated/UtilizationReportView';
 import { EmployeeListView } from './components/generated/EmployeeListView';
-import { KnowledgeTestPage } from './components/generated/KnowledgeTestPage';
 import { AuslastungCommentView } from './components/generated/AuslastungCommentView';
 import { SalesView } from './components/generated/SalesView';
 import RoleManagement from './components/generated/RoleManagement';
@@ -24,7 +23,6 @@ import { ProjectHistoryProvider } from './contexts/ProjectHistoryContext';
 import { UtilizationDataProvider } from './contexts/UtilizationDataContext';
 import { AppHeader } from './components/AppHeader';
 
-import DebugPanel from './components/DebugPanel';
 
 let theme: Theme = 'light';
 // only use 'centered' container for standalone components, never for full page apps or websites.
@@ -171,8 +169,22 @@ function App() {
           
           {currentView === 'employees' && (
             <>
-              {console.log('🔍 DEBUG: App.tsx - actionItems vor EmployeeListView:', actionItems)}
-              {console.log('🔍 DEBUG: App.tsx - Anzahl actionItems:', Object.keys(actionItems).length)}
+              {/* Action Items für EmployeeListView */}
+              {Object.keys(actionItems).length > 0 && (
+                <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h3 className="text-lg font-semibold text-blue-800 mb-2">
+                    ⚠️ Action Items für EmployeeListView
+                  </h3>
+                  <div className="space-y-2">
+                    {Object.entries(actionItems).map(([person, actionItem]) => (
+                      <div key={person} className="flex items-center justify-between p-2 bg-white rounded border">
+                        <span className="font-medium text-gray-700">{person}</span>
+                        <span className="text-sm text-gray-600">{actionItem.actionItem}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <EmployeeListView 
                 actionItems={actionItems}
               />
@@ -180,7 +192,7 @@ function App() {
           )}
           
           {currentView === 'knowledge' && (
-            <KnowledgeTestPage />
+            <AuslastungCommentView />
           )}
           
           {currentView === 'auslastung-comments' && (
@@ -395,34 +407,6 @@ function App() {
             isOpen={isExcelUploadModalOpen}
             onClose={() => setIsExcelUploadModalOpen(false)}
           />
-
-          {/* Debug Panel für besseres Logging */}
-          <DebugPanel />
-
-          {/* Test Button für Logger */}
-          <button 
-            onClick={() => {
-              console.log("Test Button geklickt!");
-              // @ts-ignore
-              if (window.logger) {
-                // @ts-ignore
-                window.logger.info("test", "Test Button geklickt!");
-              }
-            }}
-            style={{
-              position: "fixed",
-              left: 12,
-              bottom: 12,
-              zIndex: 99999,
-              padding: "8px 16px",
-              background: "red",
-              color: "white",
-              border: "none",
-              borderRadius: "8px"
-            }}
-          >
-            Test Logger
-          </button>
 
           {/* Upload Panel Modal */}
           {/* DISABLED: UploadPanel Modal

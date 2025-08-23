@@ -60,10 +60,10 @@ export function KnowledgeUploadPanel({
     if (user && token) {
       KnowledgeService.setAuthTokenProvider(async () => {
         try {
-          console.log('🔑 Token für KnowledgeService in UploadPanel gesetzt:', token.substring(0, 20) + '...');
+          // console.log entfernt
           return token;
         } catch (error) {
-          console.error('❌ Fehler beim Token-Abruf für KnowledgeService in UploadPanel:', error);
+          // console.error entfernt
           return null;
         }
       });
@@ -130,26 +130,26 @@ export function KnowledgeUploadPanel({
         [type]: uploaded
       });
 
-      console.log(`✅ ${type === 'mitarbeiter' ? 'Mitarbeiter' : 'Branchen'}-Knowledge erfolgreich geparst:`, parsed.rows.length, 'Einträge');
+      // console.log entfernt
 
       // ✅ NEU: Speichern in der Datenbank wenn Datei gültig ist
       if (parsed.isValid && parsed.rows.length > 0) {
         try {
           if (type === 'mitarbeiter') {
             await KnowledgeService.saveMitarbeiterKnowledge(file.name, parsed.rows);
-            console.log(`💾 Mitarbeiter Knowledge in Datenbank gespeichert: ${parsed.rows.length} Einträge`);
+            // console.log entfernt
           } else {
             await KnowledgeService.saveBranchenKnowHow(file.name, parsed.rows);
-            console.log(`💾 Branchen Know-How in Datenbank gespeichert: ${parsed.rows.length} Einträge`);
+            // console.log entfernt
           }
           
           // Datenbank-Refresh anfordern
           if (onDatabaseRefresh) {
             await onDatabaseRefresh();
-            console.log('✅ Datenbank-Refresh nach Knowledge-Upload abgeschlossen');
+            // console.log entfernt
           }
         } catch (dbError) {
-          console.error('❌ Fehler beim Speichern in der Datenbank:', dbError);
+          // console.error entfernt
           // Trotz DB-Fehler die Datei als gültig markieren
         }
       }

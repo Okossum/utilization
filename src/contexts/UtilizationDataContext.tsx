@@ -71,9 +71,9 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
         version: CACHE_VERSION
       };
       sessionStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
-      console.log('💾 Daten im SessionStorage gespeichert');
+      // console.log entfernt
     } catch (error) {
-      console.warn('⚠️ Fehler beim Speichern im Cache:', error);
+      // console.warn entfernt
     }
   };
 
@@ -86,28 +86,28 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
       
       // Prüfe Cache-Version und Alter
       if (cacheData.version !== CACHE_VERSION) {
-        console.log('🔄 Cache-Version veraltet, lösche Cache');
+        // console.log entfernt
         sessionStorage.removeItem(CACHE_KEY);
         return null;
       }
       
       if (Date.now() - cacheData.timestamp > CACHE_DURATION) {
-        console.log('⏰ Cache abgelaufen, lösche Cache');
+        // console.log entfernt
         sessionStorage.removeItem(CACHE_KEY);
         return null;
       }
 
-      console.log('✅ Daten aus SessionStorage geladen');
+      // console.log entfernt
       return cacheData.data;
     } catch (error) {
-      console.warn('⚠️ Fehler beim Laden aus Cache:', error);
+      // console.warn entfernt
       return null;
     }
   };
 
   const clearCache = () => {
     sessionStorage.removeItem(CACHE_KEY);
-    console.log('🗑️ Cache geleert');
+    // console.log entfernt
   };
 
   // Daten aus Firebase laden
@@ -127,7 +127,7 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      console.log('🚀 Lade Daten aus Firebase...');
+      // console.log entfernt
 
       // Lade aus Firebase
       const utilizationSnapshot = await getDocs(collection(db, 'utilizationData'));
@@ -196,10 +196,10 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
         personMeta: Array.from(personMetaMap.entries())
       });
 
-      console.log('✅ Daten erfolgreich geladen und gecacht');
+      // console.log entfernt
       
     } catch (error) {
-      console.error('❌ Fehler beim Laden der Daten:', error);
+      // console.error entfernt
     } finally {
       setIsLoading(false);
       setIsInitialized(true);
@@ -212,7 +212,7 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshData = async () => {
-    console.log('🔄 Erzwinge Neuladen der Daten...');
+    // console.log entfernt
     clearCache();
     await loadDatabaseData(false);
   };
@@ -224,7 +224,7 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
     source: 'manual' | 'rule', 
     updatedBy?: string
   ): Promise<OptimisticUpdateResult> => {
-    console.log(`🔄 Optimistic Update: Action Item für ${person} → ${actionItem} (${source})`);
+    // console.log entfernt
     
     try {
       // 1. Sofortiges UI-Update (optimistic)
@@ -234,11 +234,11 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
       // 2. Firebase-Update im Hintergrund
       await personActionItemService.update(person, actionItem, source, updatedBy);
       
-      console.log(`✅ Action Item für ${person} erfolgreich gespeichert`);
+      // console.log entfernt
       return { success: true };
       
     } catch (error) {
-      console.error(`❌ Fehler beim Speichern des Action Items für ${person}:`, error);
+      // console.error entfernt
       
       // 3. Bei Fehler: Revert (hier nicht nötig, da kein lokaler State)
       return { 
@@ -254,7 +254,7 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
     person: string, 
     auslastungserklaerung: string
   ): Promise<OptimisticUpdateResult> => {
-    console.log(`🔄 Optimistic Update: Auslastungserklaerung für ${person} → ${auslastungserklaerung}`);
+    // console.log entfernt
     
     try {
       // 1. Sofortiges UI-Update (optimistic)
@@ -263,11 +263,11 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
       // 2. Firebase-Update im Hintergrund
       await personAuslastungserklaerungService.update(person, auslastungserklaerung);
       
-      console.log(`✅ Auslastungserklaerung für ${person} erfolgreich gespeichert`);
+      // console.log entfernt
       return { success: true };
       
     } catch (error) {
-      console.error(`❌ Fehler beim Speichern der Auslastungserklaerung für ${person}:`, error);
+      // console.error entfernt
       
       // 3. Bei Fehler: Revert
       return { 
@@ -282,7 +282,7 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
   const createAuslastungserklaerungOptimistic = async (
     name: string
   ): Promise<OptimisticUpdateResult> => {
-    console.log(`🔄 Optimistic Update: Neue Auslastungserklaerung → ${name}`);
+    // console.log entfernt
     
     try {
       // 1. Sofortiges UI-Update (optimistic)
@@ -291,11 +291,11 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
       // 2. Firebase-Update im Hintergrund
       await auslastungserklaerungService.save({ name: name.trim() });
       
-      console.log(`✅ Neue Auslastungserklaerung "${name}" erfolgreich erstellt`);
+      // console.log entfernt
       return { success: true };
       
     } catch (error) {
-      console.error(`❌ Fehler beim Erstellen der Auslastungserklaerung "${name}":`, error);
+      // console.error entfernt
       
       // 3. Bei Fehler: Revert
       return { 

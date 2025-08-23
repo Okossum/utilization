@@ -35,16 +35,16 @@ export function AuslastungCommentView({}: AuslastungCommentViewProps) {
       
       if (auslastungData) {
         setAuslastungData(auslastungData);
-        console.log('✅ Auslastungsdaten geladen:', auslastungData.length, 'Einträge');
+        // console.log entfernt
       }
       
       if (einsatzplanData) {
         setEinsatzplanData(einsatzplanData);
-        console.log('✅ Einsatzplandaten geladen:', einsatzplanData.length, 'Einträge');
+        // console.log entfernt
       }
       
     } catch (error) {
-      console.error('❌ Fehler beim Laden der Daten:', error);
+      // console.error entfernt
     } finally {
       setIsLoading(false);
     }
@@ -65,7 +65,7 @@ export function AuslastungCommentView({}: AuslastungCommentViewProps) {
       setPersonTravelReadiness(savedPersonTravelReadiness);
       
     } catch (error) {
-      console.error('❌ Fehler beim Laden der localStorage-Daten:', error);
+      // console.error entfernt
     }
   }, []);
 

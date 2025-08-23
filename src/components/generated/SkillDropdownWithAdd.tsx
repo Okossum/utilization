@@ -104,7 +104,7 @@ export function SkillDropdownWithAdd({
       setIsOpen(false);
       setSearchTerm('');
     } catch (error) {
-      console.error('Fehler beim Hinzufügen des Skills:', error);
+      // console.error entfernt
       alert('Fehler beim Hinzufügen des Skills. Bitte versuchen Sie es erneut.');
     } finally {
       setIsAdding(false);

@@ -26,7 +26,7 @@ export default function AuslastungserklaerungManagement() {
       const data = await auslastungserklaerungService.getAll();
       setAuslastungserklaerungen(data);
     } catch (error) {
-      console.error('Fehler beim Laden der Auslastungserklärungen:', error);
+      // console.error entfernt
     } finally {
       setLoading(false);
     }
@@ -45,7 +45,7 @@ export default function AuslastungserklaerungManagement() {
       setNewName('');
       await loadAuslastungserklaerungen();
     } catch (error) {
-      console.error('Fehler beim Hinzufügen:', error);
+      // console.error entfernt
     }
   };
 
@@ -71,7 +71,7 @@ export default function AuslastungserklaerungManagement() {
       setEditingName('');
       await loadAuslastungserklaerungen();
     } catch (error) {
-      console.error('Fehler beim Speichern:', error);
+      // console.error entfernt
     }
   };
 
@@ -108,7 +108,7 @@ export default function AuslastungserklaerungManagement() {
       setDeleteConfirmName('');
       await loadAuslastungserklaerungen();
     } catch (error) {
-      console.error('Fehler beim Löschen:', error);
+      // console.error entfernt
     }
   };
 

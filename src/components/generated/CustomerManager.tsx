@@ -41,8 +41,8 @@ export function CustomerManager({
   const [editName, setEditName] = useState('');
 
   // Debug: Zeige Props und State
-  console.log('🔍 CustomerManager - Props:', { customers, showManagement, allowCreate });
-  console.log('🔍 CustomerManager - State:', { isOpen, searchTerm, filteredCustomers: customers?.filter(c => c.toLowerCase().includes(searchTerm.toLowerCase())) });
+  // console.log entfernt
+  // console.log entfernt
 
   const filteredCustomers = customers.filter(customer =>
     customer.toLowerCase().includes(searchTerm.toLowerCase())
@@ -51,7 +51,7 @@ export function CustomerManager({
   // Debug: Zeige Dropdown-Rendering
   useEffect(() => {
     if (isOpen) {
-      console.log('🔍 CustomerManager - Dropdown ist geöffnet, filteredCustomers:', filteredCustomers);
+      // console.log entfernt
     }
   }, [isOpen, filteredCustomers]);
 
@@ -101,9 +101,9 @@ export function CustomerManager({
         />
         <button
           onClick={() => {
-            console.log('🔍 CustomerManager - Button geklickt, aktueller isOpen:', isOpen);
+            // console.log entfernt
             setIsOpen(!isOpen);
-            console.log('🔍 CustomerManager - Neuer isOpen wird:', !isOpen);
+            // console.log entfernt
           }}
           className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
         >
@@ -122,7 +122,7 @@ export function CustomerManager({
               transform: 'translate(-50%, -50%)',
               width: '300px'
             }}>
-              🔍 DEBUG: Dropdown ist sichtbar! {filteredCustomers.length} Kunden verfügbar
+              Dropdown ist sichtbar! {filteredCustomers.length} Kunden verfügbar
             </div>
             
             <motion.div
@@ -167,23 +167,23 @@ export function CustomerManager({
                 </div>
               ) : (
                 filteredCustomers.map((customer) => {
-                  console.log('🔍 CustomerManager - Rendering Kunde:', customer);
+                  // console.log entfernt
                   return (
                     <div
                       key={customer}
                       className="flex items-center justify-between p-2 hover:bg-gray-50 cursor-pointer border border-red-200"
                       onClick={() => {
-                        console.log('🔍 CustomerManager - Kunde geklickt:', customer);
-                        console.log('🔍 CustomerManager - onSelect:', onSelect);
-                        console.log('🔍 CustomerManager - onChange:', onChange);
+                        // console.log entfernt
+                        // console.log entfernt
+                        // console.log entfernt
                         setSearchTerm(customer);
                         setIsOpen(false);
                         if (onSelect) {
-                          console.log('🔍 CustomerManager - Rufe onSelect auf mit:', customer);
+                          // console.log entfernt
                           onSelect(customer);
                         }
                         if (onChange) {
-                          console.log('🔍 CustomerManager - Rufe onChange auf mit:', customer);
+                          // console.log entfernt
                           onChange(customer);
                         }
                       }}

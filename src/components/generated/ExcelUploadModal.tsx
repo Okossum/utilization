@@ -49,7 +49,7 @@ export function ExcelUploadModal({ isOpen, onClose }: ExcelUploadModalProps) {
             <div className="flex-1 overflow-y-auto p-6">
               <ModernUploadPanel 
                 onUploadComplete={(result) => {
-                  console.log('Upload completed:', result);
+                  // console.log entfernt
                   // Optional: Auto-close modal on successful upload
                   // if (result.status === 'success') {
                   //   setTimeout(() => onClose(), 2000);

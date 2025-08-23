@@ -132,7 +132,7 @@ export function EmployeeDossierModal({
         try {
           firebaseSkills = await DatabaseService.getEmployeeSkills(employee.name);
         } catch (skillError) {
-          console.warn('Fehler beim Laden der Skills, verwende leeres Array:', skillError);
+          // Fehler beim Laden der Skills, verwende leeres Array
           firebaseSkills = [];
         }
 
@@ -237,8 +237,7 @@ export function EmployeeDossierModal({
             level: skill.level
           })));
         } catch (skillError) {
-          console.warn('Fehler beim Speichern der Skills, fahre mit Dossier fort:', skillError);
-          // Fahre mit dem Speichern des Dossiers fort, auch wenn Skills fehlschlagen
+          // Fehler beim Speichern der Skills, fahre mit Dossier fort
         }
       } else {
         // Keine Skills vorhanden - das ist in Ordnung
@@ -297,8 +296,7 @@ export function EmployeeDossierModal({
       onSave(formData);
       onClose();
     } catch (error) {
-      console.error('Fehler beim Speichern der Employee Skills:', error);
-      // Hier könnte man einen Toast/Alert anzeigen
+      // Fehler beim Speichern der Employee Skills
       alert('Fehler beim Speichern. Bitte versuchen Sie es erneut.');
     }
   };
@@ -554,14 +552,13 @@ export function EmployeeDossierModal({
           try {
             await getAssignmentsForEmployee(formData.name, true);
           } catch (e) {
-            console.warn('Fehler beim Neuladen der Assignments:', e);
+            // Fehler beim Neuladen der Assignments
           }
         }}
         employeeName={formData.name}
         editingAssignment={editingAssignment}
         onAssignmentCreated={() => {
-          console.log('✅ Assignment erstellt, aktualisiere Liste...');
-          // Force refresh der Assignments für diesen Mitarbeiter
+          // Assignment erstellt, aktualisiere Liste
           getAssignmentsForEmployee(formData.name, true);
         }}
       />

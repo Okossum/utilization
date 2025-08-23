@@ -64,7 +64,7 @@ export function SkillSelector({
       const allSkills = await skillService.getAll();
       setSkills(allSkills.map(s => ({ id: s.id, name: s.name })));
     } catch (e) {
-      console.error('❌ Fehler beim Laden der Skills:', e);
+      // console.error entfernt
       setError('Fehler beim Laden der Skills');
     } finally {
       setLoading(false);
@@ -105,9 +105,9 @@ export function SkillSelector({
       
       setSkills(prev => [...prev, newSkill]);
       handleSelectSkill(name);
-      console.log(`✅ Neuer Skill erstellt: ${name}`);
+      // console.log entfernt
     } catch (e) {
-      console.error('❌ Fehler beim Erstellen des Skills:', e);
+      // console.error entfernt
       setError('Fehler beim Erstellen des neuen Skills');
     } finally {
       setAdding(false);

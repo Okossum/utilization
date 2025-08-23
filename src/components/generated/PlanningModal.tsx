@@ -66,7 +66,7 @@ export function PlanningModal({ isOpen, onClose, personId, filterByWeek, initial
       }));
       setSkills(skillsData);
     } catch (error) {
-      console.error('Fehler beim Aktualisieren der Skills:', error);
+      // console.error entfernt
     }
   };
 

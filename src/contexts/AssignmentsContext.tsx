@@ -110,7 +110,7 @@ export function AssignmentsProvider({ children }: { children: React.ReactNode })
     setEmployeeLoading(employeeName, true);
     const promise = assignmentService.getByEmployee(employeeName)
       .then(list => {
-        console.log('🔍 Assignments geladen für', employeeName, ':', list);
+        // console.log entfernt
         setAssignmentsByEmployee(prev => ({ ...prev, [employeeName]: list }));
         // Mirror into project cache
         setAssignmentsByProject(prev => {

@@ -18,8 +18,8 @@ export function SalesOpportunities({ isOpen, onClose, personId, personName }: Sa
   const [isAssignmentEditorOpen, setAssignmentEditorOpen] = useState(false);
 
   // Debug: Zeige geladene Kunden
-  console.log('🔍 SalesOpportunities - Geladene Kunden:', customers);
-  console.log('🔍 SalesOpportunities - Kunden Array Länge:', customers?.length);
+  // console.log entfernt
+  // console.log entfernt
 
   // Wenn nicht geöffnet, nichts rendern
   if (!isOpen) return null;

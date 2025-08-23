@@ -175,7 +175,7 @@ export const SalesView = () => {
       setError(null);
 
       if (!databaseData.utilizationData || !personMeta) {
-        console.log('🔍 Sales View - Warte auf Daten...');
+        // console.log entfernt
         return;
       }
 
@@ -210,11 +210,11 @@ export const SalesView = () => {
         transformedEmployees.push(employee);
       });
 
-      console.log('✅ Sales View - Transformierte Employees:', transformedEmployees.length);
+      // console.log entfernt
       setEmployees(transformedEmployees);
 
     } catch (err) {
-      console.error('❌ Fehler beim Transformieren der Sales-Daten:', err);
+      // console.error entfernt
       setError(err instanceof Error ? err.message : 'Unbekannter Fehler');
     }
   };

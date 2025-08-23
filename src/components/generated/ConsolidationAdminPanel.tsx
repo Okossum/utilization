@@ -19,7 +19,7 @@ export function ConsolidationAdminPanel() {
       await consolidateAllData();
       setConsolidationResult('success');
     } catch (error: any) {
-      console.error('Konsolidierung fehlgeschlagen:', error);
+      // console.error entfernt
       setConsolidationResult(error?.message || 'Unbekannter Fehler');
     } finally {
       setIsConsolidating(false);
@@ -34,7 +34,7 @@ export function ConsolidationAdminPanel() {
       const result = await validateConsolidatedData();
       setValidationResult(result);
     } catch (error: any) {
-      console.error('Validierung fehlgeschlagen:', error);
+      // console.error entfernt
       setValidationResult({ error: error?.message || 'Unbekannter Fehler' });
     } finally {
       setIsValidating(false);

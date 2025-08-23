@@ -34,10 +34,10 @@ export function EinsatzplanView() {
       const data = await DatabaseService.getEinsatzplan();
       if (data) {
         setEinsatzplanData(data);
-        console.log('✅ Einsatzplan-Daten geladen:', data.length, 'Einträge');
+        // console.log entfernt
       }
     } catch (error) {
-      console.error('❌ Fehler beim Laden der Einsatzplan-Daten:', error);
+      // console.error entfernt
     } finally {
       setIsLoading(false);
     }
