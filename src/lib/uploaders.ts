@@ -347,16 +347,26 @@ export async function uploadAuslastung(file: File, targetCollection = "auslastun
       const value = cell?.v;
       const num = toNumberOrUndef(value);
       if (num !== undefined) {
-        // Konvertiere Dezimalwerte (0.75) zu Prozentwerten (75)
-        const percentValue = num < 1 && num > 0 ? num * 100 : num;
+        // Intelligente Prozent-Konvertierung:
+        // - Werte zwischen 0 und 1 (exklusive) sind Dezimalwerte → *100
+        // - Werte zwischen 1 und 2 (inklusive) sind wahrscheinlich auch Dezimalwerte (100% = 1.0) → *100  
+        // - Werte > 2 sind bereits Prozentwerte → unverändert
+        let percentValue: number;
+        if (num > 0 && num <= 2) {
+          percentValue = num * 100;
+        } else {
+          percentValue = num;
+        }
+        
         values[week] = percentValue;
         
         // Debug: Zeige Konvertierung für erste paar Einträge
         if (written < 3 && num !== percentValue) {
-          logger.info("uploaders.auslastung", `Dezimal→Prozent Konvertierung für ${person}`, {
+          logger.info("uploaders.auslastung", `🔄 Dezimal→Prozent Konvertierung für ${person}`, {
             week,
             originalValue: num,
-            convertedValue: percentValue
+            convertedValue: percentValue,
+            conversionReason: num <= 2 ? "Dezimalwert erkannt" : "Bereits Prozentwert"
           });
         }
       }
