@@ -347,100 +347,160 @@ const TechnicalSkillManagement: React.FC = () => {
 
       {/* Create/Edit Dialog */}
       {(isCreateDialogOpen || isEditDialogOpen) && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">
-                {isEditDialogOpen ? 'Technical Skill bearbeiten' : 'Neuen Technical Skill hinzufügen'}
-              </h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-black/20 backdrop-blur-sm"
+            onClick={closeDialogs}
+          />
+          
+          <div className="relative w-full max-w-2xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            {/* Header */}
+            <header className="flex items-center justify-between p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+              <div>
+                <h1 className="text-xl font-semibold text-gray-900">
+                  {isEditDialogOpen ? 'Technical Skill bearbeiten' : 'Neuen Technical Skill hinzufügen'}
+                </h1>
+                <p className="text-sm text-gray-600 mt-1">
+                  {isEditDialogOpen ? 'Bearbeiten Sie die Details des Technical Skills' : 'Erstellen Sie einen neuen Technical Skill für die Mitarbeiter-Zuweisungen'}
+                </p>
+              </div>
               <button
                 onClick={closeDialogs}
-                className="text-gray-400 hover:text-gray-600"
+                className="p-2 hover:bg-white/50 rounded-lg transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5 text-gray-500" />
               </button>
-            </div>
+            </header>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Skill-Name *
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="z.B. React, Python, AWS..."
-                  required
-                  autoFocus
-                />
-              </div>
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {/* Error Message */}
+              {error && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+                  {error}
+                </div>
+              )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Beschreibung
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows={3}
-                  placeholder="Beschreibung des Skills..."
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Kategorie
-                </label>
-                <select
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Keine Kategorie</option>
-                  {availableCategories.map(category => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
-                  ))}
-                  <option value="Programming Languages">Programming Languages</option>
-                  <option value="Frameworks">Frameworks</option>
-                  <option value="Cloud Platforms">Cloud Platforms</option>
-                  <option value="Databases">Databases</option>
-                  <option value="DevOps">DevOps</option>
-                  <option value="Other">Other</option>
-                </select>
-                <div className="mt-1">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Skill Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Skill-Name *
+                  </label>
                   <input
                     type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                    placeholder="z.B. React, Python, AWS, Docker..."
+                    required
+                    autoFocus
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Geben Sie einen präzisen Namen für den Technical Skill ein
+                  </p>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Beschreibung
+                  </label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none"
+                    rows={4}
+                    placeholder="Detaillierte Beschreibung des Skills, Anwendungsbereich, wichtige Aspekte..."
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Optionale Beschreibung für bessere Verständlichkeit und Zuordnung
+                  </p>
+                </div>
+
+                {/* Category Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Kategorie
+                  </label>
+                  
+                  {/* Dropdown für bestehende Kategorien */}
+                  <select
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    placeholder="Oder neue Kategorie eingeben..."
-                  />
+                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors mb-3"
+                  >
+                    <option value="">Kategorie auswählen...</option>
+                    {availableCategories.map(category => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                    <option value="Programming Languages">Programming Languages</option>
+                    <option value="Frameworks">Frameworks</option>
+                    <option value="Cloud Platforms">Cloud Platforms</option>
+                    <option value="Databases">Databases</option>
+                    <option value="DevOps">DevOps</option>
+                    <option value="Testing">Testing</option>
+                    <option value="Mobile Development">Mobile Development</option>
+                    <option value="Data Science">Data Science</option>
+                    <option value="Security">Security</option>
+                    <option value="Other">Other</option>
+                  </select>
+                  
+                  {/* Eingabefeld für neue Kategorie */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={formData.category}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                      placeholder="Oder neue Kategorie eingeben..."
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Wählen Sie eine bestehende Kategorie oder erstellen Sie eine neue
+                  </p>
                 </div>
-              </div>
 
-              <div className="flex justify-end gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={closeDialogs}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-                >
-                  Abbrechen
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting || !formData.name.trim()}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                >
-                  {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {isEditDialogOpen ? 'Speichern' : 'Hinzufügen'}
-                </button>
-              </div>
-            </form>
+                {/* Preview Card */}
+                {formData.name && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Vorschau:</h4>
+                    <div className="bg-white border border-gray-200 rounded-lg p-3">
+                      <div className="font-medium text-gray-900 mb-1">{formData.name}</div>
+                      {formData.description && (
+                        <p className="text-sm text-gray-600 mb-2">{formData.description}</p>
+                      )}
+                      {formData.category && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {formData.category}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </form>
+            </div>
+
+            {/* Footer */}
+            <footer className="flex items-center justify-end gap-3 p-6 border-t border-gray-100 bg-gray-50">
+              <button
+                type="button"
+                onClick={closeDialogs}
+                className="px-6 py-2 text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={isSubmitting || !formData.name.trim()}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              >
+                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isEditDialogOpen ? 'Änderungen speichern' : 'Skill hinzufügen'}
+              </button>
+            </footer>
           </div>
         </div>
       )}
