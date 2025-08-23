@@ -353,7 +353,7 @@ const TechnicalSkillManagement: React.FC = () => {
             onClick={closeDialogs}
           />
           
-          <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+          <div className="relative w-full max-w-lg min-h-[500px] bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             {/* Header */}
             <header className="flex items-center justify-between p-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
               <div>
@@ -370,7 +370,7 @@ const TechnicalSkillManagement: React.FC = () => {
             </header>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto p-5">
               {/* Error Message */}
               {error && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
@@ -448,7 +448,7 @@ const TechnicalSkillManagement: React.FC = () => {
             </div>
 
             {/* Footer */}
-            <footer className="flex items-center justify-end gap-3 p-4 border-t border-gray-100 bg-gray-50">
+            <footer className="flex items-center justify-end gap-3 p-5 border-t border-gray-100 bg-gray-50">
               <button
                 type="button"
                 onClick={closeDialogs}
