@@ -353,7 +353,7 @@ const TechnicalSkillManagement: React.FC = () => {
             onClick={closeDialogs}
           />
           
-          <div className="relative w-full max-w-2xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+          <div className="relative w-full max-w-lg max-h-[95vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
             {/* Header */}
             <header className="flex items-center justify-between p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
               <div>
@@ -381,7 +381,7 @@ const TechnicalSkillManagement: React.FC = () => {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Skill Name */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -410,7 +410,7 @@ const TechnicalSkillManagement: React.FC = () => {
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none"
-                    rows={4}
+                    rows={3}
                     placeholder="Detaillierte Beschreibung des Skills, Anwendungsbereich, wichtige Aspekte..."
                   />
                   <p className="mt-1 text-xs text-gray-500">
