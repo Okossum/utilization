@@ -19,31 +19,34 @@ interface Project {
   skillsUsed: string[];
   employeeRole: string;
   utilization?: number;
+  averageUtilization?: number; // Durchschnittliche Auslastung über konsolidierte Wochen
   probability?: 'Prospect' | 'Offered' | 'Planned' | 'Commissioned' | 'On-Hold' | 'Rejected';
 }
 interface Employee {
   id: string;
   name: string;
-  area: string;
-  competenceCenter: string;
+  lbs: string;              // Karrierestufe (wird als Untertitel angezeigt)
+  cc: string;               // Competence Center
   team: string;
-  careerLevel: string;
+  mainRole: string;         // Hauptrolle (Projektleiter, Requirements Engineer, etc.)
+  email?: string;           // E-Mail-Adresse
+  vg?: string;              // Vorgesetzter
+  profileUrl?: string;      // Link zum Profil
   skills: Skill[];
   completedProjects: Project[];
   plannedProjects: Project[];
 }
-interface EmployeeOverviewProps {
-  employees?: Employee[];
-}
-
 type ViewMode = 'cards' | 'table' | 'grid';
 const defaultEmployeesData: Employee[] = [{
   id: '1',
   name: 'Sarah Chen',
-  area: 'Frontend Development',
-  competenceCenter: 'Digital Solutions',
+  lbs: 'Senior Developer',
+  cc: 'Digital Solutions',
   team: 'Alpha Team',
-  careerLevel: 'Senior Developer',
+  mainRole: 'Lead Frontend Developer',
+  email: 'sarah.chen@company.com',
+  vg: 'John Manager',
+  profileUrl: undefined, // Wird aus echter Datenbank geladen
   skills: [{
     id: 's1',
     name: 'React',
@@ -82,10 +85,12 @@ const defaultEmployeesData: Employee[] = [{
 }, {
   id: '2',
   name: 'Marcus Johnson',
-  area: 'Backend Development',
-  competenceCenter: 'Cloud Infrastructure',
+  lbs: 'Principal Engineer',
+  cc: 'Cloud Infrastructure',
   team: 'Beta Team',
-  careerLevel: 'Principal Engineer',
+  mainRole: 'Backend Architect',
+  email: 'marcus.johnson@company.com',
+  vg: 'Jane Director',
   skills: [{
     id: 's4',
     name: 'Python',
@@ -178,13 +183,15 @@ export const EmployeeOverview = ({ employees }: EmployeeOverviewProps) => {
           onFilterChange={setFilteredEmployees}
         />
 
-        <motion.main 
-          key={viewMode} 
-          initial={{ opacity: 0, y: 20 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          transition={{ duration: 0.3 }}
-          className="p-6"
-        >
+        <motion.main key={viewMode} initial={{
+        opacity: 0,
+        y: 20
+      }} animate={{
+        opacity: 1,
+        y: 0
+      }} transition={{
+        duration: 0.3
+      }}>
           {viewMode === 'table' ? <EmployeeTable employees={displayEmployees} /> : <div className={`grid gap-6 ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1'}`}>
               {displayEmployees.map(employee => <EmployeeCard key={employee.id} employee={employee} isCompact={viewMode === 'grid'} />)}
             </div>}

@@ -18,15 +18,19 @@ interface Project {
   skillsUsed: string[];
   employeeRole: string;
   utilization?: number;
+  averageUtilization?: number; // Durchschnittliche Auslastung über konsolidierte Wochen
   probability?: 'Prospect' | 'Offered' | 'Planned' | 'Commissioned' | 'On-Hold' | 'Rejected';
 }
 interface Employee {
   id: string;
   name: string;
-  area: string;
-  competenceCenter: string;
+  lbs: string;              // Karrierestufe (wird als Untertitel angezeigt)
+  cc: string;               // Competence Center
   team: string;
-  careerLevel: string;
+  mainRole: string;         // Hauptrolle (Projektleiter, Requirements Engineer, etc.)
+  email?: string;           // E-Mail-Adresse
+  vg?: string;              // Vorgesetzter
+  profileUrl?: string;      // Link zum Profil
   skills: Skill[];
   completedProjects: Project[];
   plannedProjects: Project[];
@@ -60,13 +64,13 @@ export const EmployeeTable = ({
                 <span>Employee</span>
               </th>
               <th className="text-left p-4 font-semibold text-slate-700">
-                <span>Area</span>
+                <span>LBS</span>
               </th>
               <th className="text-left p-4 font-semibold text-slate-700">
                 <span>Team</span>
               </th>
               <th className="text-left p-4 font-semibold text-slate-700">
-                <span>Level</span>
+                <span>Role</span>
               </th>
               <th className="text-left p-4 font-semibold text-slate-700">
                 <span>Projects</span>
@@ -83,12 +87,12 @@ export const EmployeeTable = ({
                         <span>{employee.name}</span>
                       </h3>
                       <p className="text-sm text-slate-600">
-                        <span>{employee.competenceCenter}</span>
+                        <span>{employee.cc}</span>
                       </p>
                     </div>
                   </td>
                   <td className="p-4">
-                    <span className="text-blue-600 font-medium">{employee.area}</span>
+                    <span className="text-blue-600 font-medium">{employee.lbs}</span>
                   </td>
                   <td className="p-4">
                     <span className="text-slate-700">{employee.team}</span>
@@ -96,7 +100,7 @@ export const EmployeeTable = ({
                   <td className="p-4">
                     <div className="flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-full w-fit">
                       <Award className="w-3 h-3 text-emerald-600" />
-                      <span className="text-xs font-medium text-emerald-700">{employee.careerLevel}</span>
+                      <span className="text-xs font-medium text-emerald-700">{employee.mainRole}</span>
                     </div>
                   </td>
                   <td className="p-4">

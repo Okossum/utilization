@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, MapPin, Users, Briefcase, Award } from 'lucide-react';
+import { ChevronDown, ChevronUp, MapPin, Users, Briefcase, Award, Mail, UserCheck, ExternalLink } from 'lucide-react';
 import { SkillRating } from './SkillRating';
 import { ProjectDetail } from './ProjectDetail';
 interface Skill {
@@ -18,15 +18,19 @@ interface Project {
   skillsUsed: string[];
   employeeRole: string;
   utilization?: number;
+  averageUtilization?: number; // Durchschnittliche Auslastung über konsolidierte Wochen
   probability?: 'Prospect' | 'Offered' | 'Planned' | 'Commissioned' | 'On-Hold' | 'Rejected';
 }
 interface Employee {
   id: string;
   name: string;
-  area: string;
-  competenceCenter: string;
+  lbs: string;              // Karrierestufe (wird als Untertitel angezeigt)
+  cc: string;               // Competence Center
   team: string;
-  careerLevel: string;
+  mainRole: string;         // Hauptrolle (Projektleiter, Requirements Engineer, etc.)
+  email?: string;           // E-Mail-Adresse
+  vg?: string;              // Vorgesetzter
+  profileUrl?: string;      // Link zum Profil
   skills: Skill[];
   completedProjects: Project[];
   plannedProjects: Project[];
@@ -52,24 +56,51 @@ export const EmployeeCard = ({
               <span>{employee.name}</span>
             </h3>
             <p className="text-blue-600 font-medium">
-              <span>{employee.area}</span>
+              <span>{employee.lbs}</span>
             </p>
           </div>
-          <div className="flex items-center gap-1 bg-emerald-50 px-3 py-1 rounded-full">
-            <Award className="w-4 h-4 text-emerald-600" />
-            <span className="text-sm font-medium text-emerald-700">{employee.careerLevel}</span>
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-1 bg-emerald-50 px-3 py-1 rounded-full">
+              <Award className="w-4 h-4 text-emerald-600" />
+              <span className="text-sm font-medium text-emerald-700">{employee.mainRole}</span>
+            </div>
+            {employee.profileUrl && (
+              <div className="flex items-center gap-1">
+                <ExternalLink className="w-3 h-3 text-slate-500" />
+                <a 
+                  href={employee.profileUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                >
+                  Profiler
+                </a>
+              </div>
+            )}
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
           <div className="flex items-center gap-2 text-slate-600">
             <MapPin className="w-4 h-4" />
-            <span className="text-sm">{employee.competenceCenter}</span>
+            <span className="text-sm">{employee.cc}</span>
           </div>
           <div className="flex items-center gap-2 text-slate-600">
             <Users className="w-4 h-4" />
             <span className="text-sm">{employee.team}</span>
           </div>
+          {employee.email && (
+            <div className="flex items-center gap-2 text-slate-600">
+              <Mail className="w-4 h-4" />
+              <span className="text-sm">{employee.email}</span>
+            </div>
+          )}
+          {employee.vg && (
+            <div className="flex items-center gap-2 text-slate-600">
+              <UserCheck className="w-4 h-4" />
+              <span className="text-sm">{employee.vg}</span>
+            </div>
+          )}
         </div>
 
         <div className="mb-4">

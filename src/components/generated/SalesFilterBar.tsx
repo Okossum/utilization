@@ -5,11 +5,14 @@ import { ChevronDown, X, Filter } from 'lucide-react';
 interface Employee {
   id: string;
   name: string;
-  area: string;
-  competenceCenter: string;
+  lbs: string;              // Karrierestufe (wird als Untertitel angezeigt)
+  cc: string;               // Competence Center
   team: string;
-  careerLevel: string;
-  status?: string; // Für zukünftige Stati
+  mainRole: string;         // Hauptrolle (Projektleiter, Requirements Engineer, etc.)
+  email?: string;           // E-Mail-Adresse
+  vg?: string;              // Vorgesetzter
+  profileUrl?: string;      // Link zum Profil
+  status?: string;          // Für zukünftige Stati
   skills: any[];
   completedProjects: any[];
   plannedProjects: any[];
@@ -21,20 +24,20 @@ interface SalesFilterBarProps {
 }
 
 interface FilterState {
-  bereich: string[];
-  kompetenzzentrum: string[];
+  cc: string[];             // Competence Center
   team: string[];
-  laufbahnStufe: string[];
+  lbs: string[];            // Laufbahn Stufe
+  mainRole: string[];       // Hauptrolle
   status: string[];
 }
 
 // @component: SalesFilterBar
 export const SalesFilterBar = ({ employees, onFilterChange }: SalesFilterBarProps) => {
   const [filters, setFilters] = useState<FilterState>({
-    bereich: [],
-    kompetenzzentrum: [],
+    cc: [],
     team: [],
-    laufbahnStufe: [],
+    lbs: [],
+    mainRole: [],
     status: []
   });
 
@@ -45,10 +48,10 @@ export const SalesFilterBar = ({ employees, onFilterChange }: SalesFilterBarProp
   const getUniqueValues = (key: keyof Employee) => {
     const values = employees.map(emp => {
       switch(key) {
-        case 'area': return emp.area;
-        case 'competenceCenter': return emp.competenceCenter;
+        case 'cc': return emp.cc;
         case 'team': return emp.team;
-        case 'careerLevel': return emp.careerLevel;
+        case 'lbs': return emp.lbs;
+        case 'mainRole': return emp.mainRole;
         case 'status': return emp.status || 'Aktiv'; // Default Status
         default: return '';
       }
@@ -59,10 +62,10 @@ export const SalesFilterBar = ({ employees, onFilterChange }: SalesFilterBarProp
 
   // Filter-Optionen generieren
   const filterOptions = {
-    bereich: getUniqueValues('area'),
-    kompetenzzentrum: getUniqueValues('competenceCenter'),
+    cc: getUniqueValues('cc'),
     team: getUniqueValues('team'),
-    laufbahnStufe: getUniqueValues('careerLevel'),
+    lbs: getUniqueValues('lbs'),
+    mainRole: getUniqueValues('mainRole'),
     status: getUniqueValues('status')
   };
 
@@ -86,13 +89,13 @@ export const SalesFilterBar = ({ employees, onFilterChange }: SalesFilterBarProp
   // Filter anwenden
   useEffect(() => {
     const filteredEmployees = employees.filter(employee => {
-      const matchesBereich = filters.bereich.length === 0 || filters.bereich.includes(employee.area);
-      const matchesKompetenzzentrum = filters.kompetenzzentrum.length === 0 || filters.kompetenzzentrum.includes(employee.competenceCenter);
+      const matchesCC = filters.cc.length === 0 || filters.cc.includes(employee.cc);
       const matchesTeam = filters.team.length === 0 || filters.team.includes(employee.team);
-      const matchesLaufbahnStufe = filters.laufbahnStufe.length === 0 || filters.laufbahnStufe.includes(employee.careerLevel);
+      const matchesLBS = filters.lbs.length === 0 || filters.lbs.includes(employee.lbs);
+      const matchesMainRole = filters.mainRole.length === 0 || filters.mainRole.includes(employee.mainRole);
       const matchesStatus = filters.status.length === 0 || filters.status.includes(employee.status || 'Aktiv');
 
-      return matchesBereich && matchesKompetenzzentrum && matchesTeam && matchesLaufbahnStufe && matchesStatus;
+      return matchesCC && matchesTeam && matchesLBS && matchesMainRole && matchesStatus;
     });
 
     onFilterChange(filteredEmployees);
@@ -111,10 +114,10 @@ export const SalesFilterBar = ({ employees, onFilterChange }: SalesFilterBarProp
   // Alle Filter zurücksetzen
   const clearAllFilters = () => {
     setFilters({
-      bereich: [],
-      kompetenzzentrum: [],
+      cc: [],
       team: [],
-      laufbahnStufe: [],
+      lbs: [],
+      mainRole: [],
       status: []
     });
   };
@@ -192,10 +195,10 @@ export const SalesFilterBar = ({ employees, onFilterChange }: SalesFilterBarProp
                       <span className="text-xs text-gray-500">
                         ({employees.filter(emp => {
                           switch(key) {
-                            case 'bereich': return emp.area === option;
-                            case 'kompetenzzentrum': return emp.competenceCenter === option;
+                            case 'cc': return emp.cc === option;
                             case 'team': return emp.team === option;
-                            case 'laufbahnStufe': return emp.careerLevel === option;
+                            case 'lbs': return emp.lbs === option;
+                            case 'mainRole': return emp.mainRole === option;
                             case 'status': return (emp.status || 'Aktiv') === option;
                             default: return false;
                           }
@@ -230,10 +233,10 @@ export const SalesFilterBar = ({ employees, onFilterChange }: SalesFilterBarProp
 
           {/* Filter-Buttons */}
           <div className="flex flex-wrap items-center gap-3">
-            {renderFilterDropdown('bereich', 'Bereich', filterOptions.bereich)}
-            {renderFilterDropdown('kompetenzzentrum', 'Kompetenzzentrum', filterOptions.kompetenzzentrum)}
+            {renderFilterDropdown('cc', 'Competence Center', filterOptions.cc)}
             {renderFilterDropdown('team', 'Team', filterOptions.team)}
-            {renderFilterDropdown('laufbahnStufe', 'Laufbahn Stufe', filterOptions.laufbahnStufe)}
+            {renderFilterDropdown('lbs', 'LBS', filterOptions.lbs)}
+            {renderFilterDropdown('mainRole', 'Rolle', filterOptions.mainRole)}
             {renderFilterDropdown('status', 'Status', filterOptions.status)}
 
             {/* Alle Filter zurücksetzen */}
@@ -264,10 +267,10 @@ export const SalesFilterBar = ({ employees, onFilterChange }: SalesFilterBarProp
                     className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full"
                   >
                     <span className="text-xs opacity-75">
-                      {filterKey === 'bereich' ? 'Bereich' :
-                       filterKey === 'kompetenzzentrum' ? 'CC' :
+                      {filterKey === 'cc' ? 'CC' :
                        filterKey === 'team' ? 'Team' :
-                       filterKey === 'laufbahnStufe' ? 'Level' : 'Status'}:
+                       filterKey === 'lbs' ? 'LBS' :
+                       filterKey === 'mainRole' ? 'Rolle' : 'Status'}:
                     </span>
                     <span>{value}</span>
                     <button

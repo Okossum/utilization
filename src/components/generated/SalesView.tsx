@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { EmployeeOverview } from './EmployeeOverview';
-// DatabaseService removed - using direct Firebase calls
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { useUtilizationData } from '../../contexts/UtilizationDataContext';
 
 interface Skill {
   id: string;
@@ -21,16 +19,20 @@ interface Project {
   skillsUsed: string[];
   employeeRole: string;
   utilization?: number;
+  averageUtilization?: number; // Durchschnittliche Auslastung über konsolidierte Wochen
   probability?: 'Prospect' | 'Offered' | 'Planned' | 'Commissioned' | 'On-Hold' | 'Rejected';
 }
 
 interface Employee {
   id: string;
   name: string;
-  area: string;
-  competenceCenter: string;
+  lbs: string;              // Karrierestufe (wird als Untertitel angezeigt)
+  cc: string;               // Competence Center
   team: string;
-  careerLevel: string;
+  mainRole: string;         // Hauptrolle (Projektleiter, Requirements Engineer, etc.)
+  email?: string;           // E-Mail-Adresse
+  vg?: string;              // Vorgesetzter
+  profileUrl?: string;      // Link zum Profil
   skills: Skill[];
   completedProjects: Project[];
   plannedProjects: Project[];
@@ -38,8 +40,8 @@ interface Employee {
 
 // @component: SalesView
 export const SalesView = () => {
+  const { databaseData, personMeta, isLoading } = useUtilizationData();
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Hilfsfunktion: Woche zu Datum konvertieren
@@ -60,66 +62,87 @@ export const SalesView = () => {
     return targetDate.toISOString().split('T')[0];
   };
 
-  // Einsatzplan-Daten zu Projekten transformieren
-  const transformEinsatzplanToProjects = (einsatzplanData: any[], personId: string): Project[] => {
-    const personData = einsatzplanData.find(e => e.personId === personId);
-    if (!personData?.values) return [];
+  // Einsatzplan-Daten zu Projekten transformieren (aus utilizationData)
+  const transformEinsatzplanToProjects = (record: any): Project[] => {
+    if (!record.einsatzplan) return [];
 
-    const projects: Project[] = [];
+    // Sammle alle Projekt-Einträge mit Wochen-Informationen (nur aktuelle und zukünftige Wochen)
+    const projectWeeks: { [key: string]: { weeks: string[], utilizations: number[], entries: any[] } } = {};
+    const currentWeek = new Date().getWeek(); // Aktuelle Kalenderwoche
+    const currentYear = new Date().getFullYear();
     
-    Object.entries(personData.values).forEach(([week, entries]: [string, any]) => {
+    Object.entries(record.einsatzplan).forEach(([week, entries]: [string, any]) => {
       if (Array.isArray(entries)) {
         entries.forEach((entry, index) => {
-          if (entry.projekt && entry.projekt !== '---') {
-            projects.push({
-              id: `${personId}-${week}-${index}`,
-              customer: entry.projekt,
-              projectName: `${entry.projekt} Assignment`,
-              startDate: weekToDate(week),
-              endDate: weekToDate(week, 6),
-              description: `Assignment at ${entry.ort || 'Remote'}`,
-              skillsUsed: [], // TODO: Aus Skills-Collection laden
-              employeeRole: 'Consultant',
-              utilization: entry.auslastungProzent || 0,
-              probability: 'Planned'
-            });
+          // Prüfe ob Woche >= aktuelle Woche
+          const [year, weekNum] = week.split('/').map(Number);
+          const fullYear = year < 50 ? 2000 + year : 1900 + year;
+          const isCurrentOrFutureWeek = fullYear > currentYear || 
+            (fullYear === currentYear && weekNum >= currentWeek);
+          
+          // Nur Projekte mit Auslastung > 0% und >= aktuelle KW berücksichtigen
+          if (entry.projekt && entry.projekt !== '---' && 
+              (entry.auslastungProzent || 0) > 0 && 
+              isCurrentOrFutureWeek) {
+            const projectKey = `${entry.projekt}-${entry.ort || 'Remote'}`;
+            
+            if (!projectWeeks[projectKey]) {
+              projectWeeks[projectKey] = {
+                weeks: [],
+                utilizations: [],
+                entries: []
+              };
+            }
+            
+            projectWeeks[projectKey].weeks.push(week);
+            projectWeeks[projectKey].utilizations.push(entry.auslastungProzent || 0);
+            projectWeeks[projectKey].entries.push(entry);
           }
         });
       }
     });
 
-    return projects;
-  };
-
-  // Auslastung-Daten zu historischen Projekten transformieren
-  const transformAuslastungToCompletedProjects = (auslastungData: any[], personId: string): Project[] => {
-    const personData = auslastungData.find(a => a.personId === personId);
-    if (!personData?.values) return [];
-
-    const projects: Project[] = [];
-    const currentWeek = new Date().getWeek(); // Vereinfacht
+    // Konsolidiere Projekte
+    const consolidatedProjects: Project[] = [];
     
-    Object.entries(personData.values).forEach(([week, utilization]: [string, any]) => {
-      const [year, weekNum] = week.split('/').map(Number);
-      const fullYear = year < 50 ? 2000 + year : 1900 + year;
+    Object.entries(projectWeeks).forEach(([projectKey, data]) => {
+      const firstEntry = data.entries[0];
+      const weeks = data.weeks.sort();
+      const utilizations = data.utilizations.filter(u => u > 0);
       
-      // Nur vergangene Wochen als "completed" betrachten
-      if (fullYear <= new Date().getFullYear() && weekNum < currentWeek && utilization > 0) {
-        projects.push({
-          id: `${personId}-completed-${week}`,
-          customer: 'Client Assignment',
-          projectName: `Week ${week} Assignment`,
-          startDate: weekToDate(week),
-          endDate: weekToDate(week, 6),
-          description: `Completed assignment with ${utilization}% utilization`,
-          skillsUsed: [],
-          employeeRole: 'Consultant',
-          utilization: utilization
-        });
-      }
+      // Berechne durchschnittliche Auslastung
+      const averageUtilization = utilizations.length > 0 
+        ? Math.round(utilizations.reduce((sum, util) => sum + util, 0) / utilizations.length)
+        : 0;
+      
+      // Ermittle Enddatum (späteste Woche)
+      const lastWeek = weeks[weeks.length - 1];
+      const endDate = weekToDate(lastWeek, 6);
+      
+      consolidatedProjects.push({
+        id: `${record.id}-planned-${projectKey}`,
+        customer: firstEntry.projekt,
+        projectName: `${firstEntry.projekt} Assignment`,
+        startDate: weekToDate(weeks[0]), // Wird nicht angezeigt, aber für interne Logik
+        endDate: endDate,
+        description: `Assignment at ${firstEntry.ort || 'Remote'} (${weeks.length} weeks)`,
+        skillsUsed: [], // TODO: Aus Skills-Collection laden
+        employeeRole: 'Consultant',
+        utilization: averageUtilization, // Für Kompatibilität
+        averageUtilization: averageUtilization,
+        probability: 'Planned'
+      });
     });
 
-    return projects.slice(0, 3); // Nur die letzten 3 für Übersichtlichkeit
+    return consolidatedProjects;
+  };
+
+  // Auslastung-Daten zu historischen Projekten transformieren (aus utilizationData)
+  // DEAKTIVIERT: Keine historischen Projektkarten mehr anzeigen
+  // Grund: Historische Auslastungsdaten haben keine Kundeninformationen
+  const transformAuslastungToCompletedProjects = (record: any): Project[] => {
+    // Keine historischen Projektkarten - nur Einsatzplan-Projekte werden angezeigt
+    return [];
   };
 
   // Mock Skills basierend auf Karrierestufe generieren
@@ -146,41 +169,42 @@ export const SalesView = () => {
     return baseSkills;
   };
 
-  // Daten aus Firebase laden
-  const loadSalesData = async () => {
+  // Daten aus UtilizationDataContext transformieren
+  const transformUtilizationDataToEmployees = () => {
     try {
-      setLoading(true);
       setError(null);
 
-      // Parallel laden aller benötigten Daten
-      const [mitarbeiterSnap, auslastungData, einsatzplanData] = await Promise.all([
-        getDocs(collection(db, 'mitarbeiter')),
-        getDocs(collection(db, 'auslastung')).then(snap => snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))).catch(() => []),
-        getDocs(collection(db, 'einsatzplan')).then(snap => snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))).catch(() => [])
-      ]);
+      if (!databaseData.utilizationData || !personMeta) {
+        console.log('🔍 Sales View - Warte auf Daten...');
+        return;
+      }
 
-      console.log('🔍 Sales View - Geladene Daten:', {
-        mitarbeiter: mitarbeiterSnap.size,
-        auslastung: auslastungData?.length || 0,
-        einsatzplan: einsatzplanData?.length || 0
+      console.log('🔍 Sales View - Transformiere UtilizationData:', {
+        utilizationData: databaseData.utilizationData?.length || 0,
+        personMeta: personMeta.size || 0
       });
 
-      // Mitarbeiter-Daten transformieren
+      // Mitarbeiter-Daten aus utilizationData transformieren
       const transformedEmployees: Employee[] = [];
       
-      mitarbeiterSnap.forEach(doc => {
-        const data = doc.data();
+      databaseData.utilizationData.forEach((record: any) => {
+        const meta = personMeta.get(record.person);
         
+
+
         const employee: Employee = {
-          id: doc.id,
-          name: data.person || `${data.vorname} ${data.nachname}`,
-          area: data.lob || data.bereich || 'Unknown Area',
-          competenceCenter: data.cc || 'Unknown CC',
-          team: data.team || 'Unknown Team',
-          careerLevel: data.lbs || data.erfahrungSeitJahr || 'Consultant',
-          skills: generateMockSkills(data.lbs, data.lob),
-          completedProjects: transformAuslastungToCompletedProjects(auslastungData || [], doc.id),
-          plannedProjects: transformEinsatzplanToProjects(einsatzplanData || [], doc.id)
+          id: record.id,
+          name: record.person,
+          lbs: meta?.careerLevel || record.lbs || 'Consultant',
+          cc: meta?.cc || record.cc || 'Unknown CC',
+          team: meta?.team || record.team || 'Unknown Team',
+          mainRole: 'Projektleiter', // Platzhalter - später aus utilizationData
+          email: record.email || `${record.person.toLowerCase().replace(' ', '.')}@company.com`, // Platzhalter
+          vg: meta?.manager || record.vg || 'Unknown Manager',
+          profileUrl: record.linkZumProfilUrl || undefined, // Aus Datenbank
+          skills: generateMockSkills(meta?.careerLevel || record.lbs, meta?.lob || record.lob),
+          completedProjects: transformAuslastungToCompletedProjects(record),
+          plannedProjects: transformEinsatzplanToProjects(record)
         };
 
         transformedEmployees.push(employee);
@@ -190,19 +214,19 @@ export const SalesView = () => {
       setEmployees(transformedEmployees);
 
     } catch (err) {
-      console.error('❌ Fehler beim Laden der Sales-Daten:', err);
+      console.error('❌ Fehler beim Transformieren der Sales-Daten:', err);
       setError(err instanceof Error ? err.message : 'Unbekannter Fehler');
-    } finally {
-      setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadSalesData();
-  }, []);
+    if (!isLoading && databaseData.utilizationData) {
+      transformUtilizationDataToEmployees();
+    }
+  }, [isLoading, databaseData.utilizationData, personMeta]);
 
   // Loading State
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
         <div className="max-w-7xl mx-auto">

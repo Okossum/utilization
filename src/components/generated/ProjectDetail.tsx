@@ -10,6 +10,7 @@ interface Project {
   skillsUsed: string[];
   employeeRole: string;
   utilization?: number;
+  averageUtilization?: number; // Durchschnittliche Auslastung über konsolidierte Wochen
   probability?: 'Prospect' | 'Offered' | 'Planned' | 'Commissioned' | 'On-Hold' | 'Rejected';
 }
 interface ProjectDetailProps {
@@ -62,7 +63,7 @@ export const ProjectDetail = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
         <div className="flex items-center gap-2 text-xs text-slate-600">
           <Calendar className="w-3 h-3" />
-          <span>{formatDate(project.startDate)} - {formatDate(project.endDate)}</span>
+          <span>Endet: {formatDate(project.endDate)}</span>
         </div>
         <div className="flex items-center gap-2 text-xs text-slate-600">
           <User className="w-3 h-3" />
@@ -70,16 +71,16 @@ export const ProjectDetail = ({
         </div>
       </div>
 
-      {type === 'planned' && project.utilization && <div className="flex items-center gap-2 mb-3">
+      {(project.averageUtilization || project.utilization) && <div className="flex items-center gap-2 mb-3">
           <TrendingUp className="w-3 h-3 text-blue-600" />
-          <span className="text-xs text-slate-600">Utilization:</span>
+          <span className="text-xs text-slate-600">Ø Auslastung:</span>
           <div className="flex items-center gap-2">
             <div className="w-16 h-2 bg-slate-200 rounded-full overflow-hidden">
               <div className="h-full bg-blue-500 rounded-full transition-all duration-300" style={{
-            width: `${project.utilization}%`
+            width: `${project.averageUtilization || project.utilization}%`
           }}></div>
             </div>
-            <span className="text-xs font-medium text-blue-600">{project.utilization}%</span>
+            <span className="text-xs font-medium text-blue-600">{project.averageUtilization || project.utilization}%</span>
           </div>
         </div>}
 
