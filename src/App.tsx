@@ -9,6 +9,7 @@ import TechnicalSkillManagement from './components/generated/TechnicalSkillManag
 import TechnicalSkillBulkUploadModal from './components/generated/TechnicalSkillBulkUploadModal';
 import RoleTaskBulkUploadModal from './components/generated/RoleTaskBulkUploadModal';
 import ProjectRoleTaskSelectorDemo from './components/generated/ProjectRoleTaskSelectorDemo';
+import ProjectSkillSelectorDemo from './components/generated/ProjectSkillSelectorDemo';
 import { CustomerProjectsManager } from './components/generated/CustomerProjectsManager';
 import AuslastungserklaerungManagement from './components/generated/AuslastungserklaerungManagement';
 import { CustomerProvider } from './contexts/CustomerContext';
@@ -57,7 +58,7 @@ function App() {
     const { user, loading, profile, logout } = useAuth();
     const [isAdminModalOpen, setAdminModalOpen] = useState(false);
     const [isMenuOpen, setMenuOpen] = useState(false);
-    const [currentView, setCurrentView] = useState<'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo'>('utilization');
+    const [currentView, setCurrentView] = useState<'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo'>('utilization');
     
     // States für UtilizationReportView spezifische Modals
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -156,6 +157,7 @@ function App() {
             onAuslastungserklaerungManagement={() => setIsAuslastungserklaerungManagementOpen(true)}
             onGeneralSettings={() => setIsGeneralSettingsOpen(true)}
             onProjectRolesDemo={() => setCurrentView('project-roles-demo')}
+            onProjectSkillsDemo={() => setCurrentView('project-skills-demo')}
             lobOptions={[]} // TODO: von UtilizationReportView holen
           />
 
@@ -215,6 +217,10 @@ function App() {
 
           {currentView === 'project-roles-demo' && (
             <ProjectRoleTaskSelectorDemo />
+          )}
+
+          {currentView === 'project-skills-demo' && (
+            <ProjectSkillSelectorDemo />
           )}
           
           {/* General Settings Modal */}

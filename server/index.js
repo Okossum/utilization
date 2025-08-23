@@ -2303,20 +2303,20 @@ app.get('/api/technical-skill-categories', requireAuth, async (req, res) => {
   try {
     const categoriesSnap = await db.collection('technicalSkillCategories')
       .where('isActive', '==', true)
-      .orderBy('name')
       .get();
     
-    const categories = [];
-    categoriesSnap.forEach(doc => {
-      categories.push({
-        id: doc.id,
-        ...doc.data()
-      });
-    });
+    const categories = categoriesSnap.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    // Sortiere Kategorien nach Name (im Code, da Firebase Index benötigt)
+    categories.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     
     res.json(categories);
   } catch (error) {
-    res.status(500).json({ error: 'Fehler beim Laden der Kategorien' });
+    console.error('Error loading technical skill categories:', error);
+    res.status(500).json({ error: 'Fehler beim Laden der Kategorien', details: error.message });
   }
 });
 
