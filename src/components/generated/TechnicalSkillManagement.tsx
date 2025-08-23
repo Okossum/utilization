@@ -347,22 +347,19 @@ const TechnicalSkillManagement: React.FC = () => {
 
       {/* Create/Edit Dialog */}
       {(isCreateDialogOpen || isEditDialogOpen) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div 
-            className="absolute inset-0 bg-black/20 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={closeDialogs}
           />
           
-          <div className="relative w-full max-w-lg max-h-[95vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+          <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
             {/* Header */}
-            <header className="flex items-center justify-between p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+            <header className="flex items-center justify-between p-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">
-                  {isEditDialogOpen ? 'Technical Skill bearbeiten' : 'Neuen Technical Skill hinzufügen'}
+                <h1 className="text-lg font-semibold text-gray-900">
+                  {isEditDialogOpen ? 'Skill bearbeiten' : 'Neuen Skill hinzufügen'}
                 </h1>
-                <p className="text-sm text-gray-600 mt-1">
-                  {isEditDialogOpen ? 'Bearbeiten Sie die Details des Technical Skills' : 'Erstellen Sie einen neuen Technical Skill für die Mitarbeiter-Zuweisungen'}
-                </p>
               </div>
               <button
                 onClick={closeDialogs}
@@ -373,10 +370,10 @@ const TechnicalSkillManagement: React.FC = () => {
             </header>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-4">
               {/* Error Message */}
               {error && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
                   {error}
                 </div>
               )}
@@ -391,14 +388,11 @@ const TechnicalSkillManagement: React.FC = () => {
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                    placeholder="z.B. React, Python, AWS, Docker..."
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                    placeholder="z.B. React, Python, AWS..."
                     required
                     autoFocus
                   />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Geben Sie einen präzisen Namen für den Technical Skill ein
-                  </p>
                 </div>
 
                 {/* Description */}
@@ -409,13 +403,10 @@ const TechnicalSkillManagement: React.FC = () => {
                   <textarea
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none"
-                    rows={3}
-                    placeholder="Detaillierte Beschreibung des Skills, Anwendungsbereich, wichtige Aspekte..."
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none"
+                    rows={2}
+                    placeholder="Beschreibung des Skills..."
                   />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Optionale Beschreibung für bessere Verständlichkeit und Zuordnung
-                  </p>
                 </div>
 
                 {/* Category Selection */}
@@ -424,11 +415,10 @@ const TechnicalSkillManagement: React.FC = () => {
                     Kategorie
                   </label>
                   
-                  {/* Dropdown für bestehende Kategorien */}
                   <select
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors mb-3"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors mb-2"
                   >
                     <option value="">Kategorie auswählen...</option>
                     {availableCategories.map(category => (
@@ -441,50 +431,24 @@ const TechnicalSkillManagement: React.FC = () => {
                     <option value="Cloud Platforms">Cloud Platforms</option>
                     <option value="Databases">Databases</option>
                     <option value="DevOps">DevOps</option>
-                    <option value="Testing">Testing</option>
-                    <option value="Mobile Development">Mobile Development</option>
-                    <option value="Data Science">Data Science</option>
-                    <option value="Security">Security</option>
                     <option value="Other">Other</option>
                   </select>
                   
-                  {/* Eingabefeld für neue Kategorie */}
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                      placeholder="Oder neue Kategorie eingeben..."
-                    />
-                  </div>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Wählen Sie eine bestehende Kategorie oder erstellen Sie eine neue
-                  </p>
+                  <input
+                    type="text"
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                    placeholder="Oder neue Kategorie eingeben..."
+                  />
                 </div>
 
-                {/* Preview Card */}
-                {formData.name && (
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <h4 className="text-sm font-medium text-gray-700 mb-2">Vorschau:</h4>
-                    <div className="bg-white border border-gray-200 rounded-lg p-3">
-                      <div className="font-medium text-gray-900 mb-1">{formData.name}</div>
-                      {formData.description && (
-                        <p className="text-sm text-gray-600 mb-2">{formData.description}</p>
-                      )}
-                      {formData.category && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          {formData.category}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
+
               </form>
             </div>
 
             {/* Footer */}
-            <footer className="flex items-center justify-end gap-3 p-6 border-t border-gray-100 bg-gray-50">
+            <footer className="flex items-center justify-end gap-3 p-4 border-t border-gray-100 bg-gray-50">
               <button
                 type="button"
                 onClick={closeDialogs}
