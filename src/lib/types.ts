@@ -168,4 +168,85 @@ export interface FirestoreAssignment extends AssignmentDoc, FirestoreDocument {
   userId?: string;
 }
 
+// ===== ERWEITERTE PROJEKT-TYPEN =====
+
+export interface ProjectRole {
+  id: string;
+  name: string;
+  categoryName: string;
+  tasks: string[];
+  level?: number; // 1-5 Sterne
+}
+
+export interface ProjectSkill {
+  id: string;
+  name: string;
+  categoryName: string;
+  level: number; // 1-5 Sterne
+}
+
+export interface ProjectHistoryItem {
+  id: string;
+  
+  // ===== BASIS-FELDER (alle Typen) =====
+  customer: string;
+  projectName: string;
+  roles: ProjectRole[];
+  skills: ProjectSkill[];
+  
+  // ===== TYP-KLASSIFIZIERUNG =====
+  projectType: 'historical' | 'planned' | 'active';
+  projectSource?: 'regular' | 'jira'; // nur bei planned/active
+  
+  // ===== GEPLANT/AKTIV-SPEZIFISCHE FELDER =====
+  probability?: number; // 0-100%
+  dailyRate?: number; // €/Tag
+  startDate?: string; // ISO Date
+  endDate?: string; // ISO Date
+  internalContact?: string; // Mitarbeiter-ID
+  customerContact?: string; // Freitext
+  jiraTicketId?: string; // JIRA-12345
+  
+  // ===== HISTORISCH-SPEZIFISCHE FELDER =====
+  duration?: string; // "6 Monate" (nur bei historical)
+  activities?: string[]; // ["Task 1", "Task 2"] (nur bei historical)
+  
+  // ===== LEGACY-FELDER (Rückwärtskompatibilität) =====
+  role?: string; // Hauptrolle (deprecated, use roles array)
+  status?: 'closed' | 'active'; // (deprecated, use projectType)
+  plannedAllocationPct?: number; // (deprecated)
+  comment?: string; // (deprecated)
+  
+  // ===== META-DATEN =====
+  createdAt: Date;
+  updatedAt: Date;
+  employeeId: string; // Zuordnung zum Mitarbeiter
+}
+
+export interface ProjectOffer {
+  id: string;
+  customerName: string;
+  projectName: string;
+  probability: number; // 0-100%
+  dailyRate?: number;
+  startDate?: string;
+  endDate?: string;
+  internalContact?: string;
+  customerContact?: string;
+  jiraTicketId?: string;
+  roles: ProjectRole[];
+  skills: ProjectSkill[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Firestore-Versionen
+export interface FirestoreProjectHistoryItem extends ProjectHistoryItem, FirestoreDocument {
+  userId?: string;
+}
+
+export interface FirestoreProjectOffer extends ProjectOffer, FirestoreDocument {
+  userId?: string;
+}
+
 

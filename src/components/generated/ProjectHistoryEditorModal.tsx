@@ -1,8 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, History, Plus, Trash2 } from 'lucide-react';
-import { useProjectHistory } from '../../contexts/ProjectHistoryContext';
-import { useRoles } from '../../contexts/RoleContext';
+import { X, History, Plus, Trash2, User, Code, CheckCircle2 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+
+import RoleSelectionModal from './RoleSelectionModal';
+import TechnicalSkillSelectionModal from './TechnicalSkillSelectionModal';
+import { ProjectRoleSelectionModal } from './ProjectRoleSelectionModal';
+import { ProjectSkillSelectionModal } from './ProjectSkillSelectionModal';
 
 import { ProjectHistoryItem } from './EmployeeDossierModal';
 
@@ -12,140 +16,167 @@ interface ProjectHistoryEditorModalProps {
   project: ProjectHistoryItem | null;
   onSave: (project: ProjectHistoryItem) => void;
   onDelete?: (projectId: string) => void;
+  employeeId: string;
+  employeeName: string;
 }
 
 export function ProjectHistoryEditorModal({ 
   isOpen, 
   onClose, 
   project, 
-  onSave,
-  onDelete 
+  onSave, 
+  onDelete,
+  employeeId,
+  employeeName 
 }: ProjectHistoryEditorModalProps) {
-  const { 
-    historicalCustomers, 
-    addHistoricalCustomer, 
-    historicalProjects, 
-    addHistoricalProject,
-    getHistoricalProjectsForCustomer 
-  } = useProjectHistory();
-  const { getActiveRoles } = useRoles();
+  const { token } = useAuth();
   
-  // Form state - für historische Daten
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
-  const [creatingCustomer, setCreatingCustomer] = useState(false);
-  const [newCustomerName, setNewCustomerName] = useState('');
-  const [creatingProject, setCreatingProject] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
-  const [offeredSkill, setOfferedSkill] = useState<string>('');
+  // Form state - vereinfacht
+  const [customerName, setCustomerName] = useState<string>('');
+  const [projectName, setProjectName] = useState<string>('');
   const [duration, setDuration] = useState<string>('');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [allocation, setAllocation] = useState<number | undefined>(undefined);
   const [status, setStatus] = useState<'closed' | 'active'>('closed');
   const [comment, setComment] = useState<string>('');
-  const [activities, setActivities] = useState<string[]>([]);
   
-  const projectsForCustomer = useMemo(() => {
-    return selectedCustomerId ? getHistoricalProjectsForCustomer(selectedCustomerId) : [];
-  }, [selectedCustomerId, getHistoricalProjectsForCustomer]);
+  // Sub-Modal States
+  const [isRoleModalOpen, setRoleModalOpen] = useState(false);
+  const [isSkillModalOpen, setSkillModalOpen] = useState(false);
+  
+  // Auto-Save State
+  const [isProjectSaved, setIsProjectSaved] = useState(false);
+  const [currentProjectId, setCurrentProjectId] = useState<string>('');
+  
+  // Ausgewählte Rollen und Skills
+  const [selectedRoles, setSelectedRoles] = useState<Array<{id: string, name: string, tasks: string[]}>>([]);
+  const [selectedSkills, setSelectedSkills] = useState<Array<{id: string, name: string, level: number}>>([]);
+  
 
-  // Initialize form when project changes - für historische Daten
+
+  // Initialize form when project changes - OHNE selectedRoles/Skills Reset
   useEffect(() => {
+    console.log('🔄 ProjectHistoryEditorModal: Initialisiere Formular für Projekt:', project?.id || 'NEU');
+    
     if (project) {
-      // Edit mode - find historical customer/project by name
-      const historicalCustomer = historicalCustomers.find(c => c.name === project.customer);
-      const historicalProject = historicalProjects.find(p => p.name === project.projectName && p.customerName === project.customer);
-      
-      setSelectedCustomerId(historicalCustomer?.id || '');
-      setSelectedProjectId(historicalProject?.id || '');
-      setOfferedSkill(project.role || '');
+      // Edit mode - direkte Werte setzen
+      console.log('📝 Edit Mode: Lade Projekt-Daten');
+      setCustomerName(project.customer || '');
+      setProjectName(project.projectName || '');
       setDuration(project.duration || '');
       setStartDate(project.startDate || '');
       setEndDate(project.endDate || '');
       setAllocation(project.plannedAllocationPct || undefined);
       setStatus(project.status || 'closed');
       setComment(project.comment || '');
-      setActivities(project.activities || []);
+      
+      // Rollen und Skills aus dem Projekt laden (falls vorhanden)
+      setSelectedRoles(project.roles || []);
+      setSelectedSkills(project.skills || []);
+      setIsProjectSaved(true); // Bestehendes Projekt ist bereits gespeichert
+      setCurrentProjectId(project.id);
+      console.log('✅ Edit Mode: Projekt-Rollen geladen:', project.roles?.length || 0);
     } else {
-      // Create mode - reset to defaults
-      setSelectedCustomerId('');
-      setSelectedProjectId('');
-      setOfferedSkill('');
+      // Create mode - leere Werte
+      console.log('🆕 Create Mode: Neue Projekt-Erstellung');
+      setCustomerName('');
+      setProjectName('');
       setDuration('');
       setStartDate('');
       setEndDate('');
       setAllocation(undefined);
       setStatus('closed');
       setComment('');
-      setActivities([]);
+      
+      // WICHTIG: Rollen und Skills NICHT hier zurücksetzen!
+      // Sie werden durch loadExistingRolesAndSkills() oder handleRoleAssigned() gesetzt
+      // setSelectedRoles([]); // ❌ ENTFERNT - Das war das Problem!
+      // setSelectedSkills([]); // ❌ ENTFERNT - Das war das Problem!
+      setIsProjectSaved(false); // Neues Projekt noch nicht gespeichert
+      setCurrentProjectId('');
+      console.log('✅ Create Mode: Formular zurückgesetzt (Rollen/Skills bleiben erhalten)');
     }
-  }, [project, isOpen, historicalCustomers, historicalProjects]);
+  }, [project, isOpen]);
 
-  // Historische Customer/Project creation handlers - komplett getrennt
-  const handleCreateCustomer = async () => {
-    const name = newCustomerName.trim();
-    if (!name) return;
-    const newCustomer = await addHistoricalCustomer(name);
-    setSelectedCustomerId(newCustomer.id);
-    setNewCustomerName('');
-    setCreatingCustomer(false);
+  // Reset bei neuem Projekt (keine automatische Vorauswahl)
+  useEffect(() => {
+    if (isOpen && !project) {
+      console.log('🔄 Modal geöffnet für NEUES Projekt - Reset zu leer (manuelle Auswahl)');
+      
+      // Beim ersten Öffnen für ein neues Projekt: Reset zu leer
+      setSelectedRoles([]);
+      setSelectedSkills([]);
+    }
+  }, [isOpen, project]);
+
+  // Auto-Save Funktion - NUR LOKALE SPEICHERUNG (schließt Modal NICHT)
+  const autoSaveProject = async () => {
+    if (!customerName.trim() || !projectName.trim()) return;
+    if (isProjectSaved) return; // Bereits gespeichert
+    
+    console.log('💾 Auto-Save: Speichere Basis-Projekt lokal (Modal bleibt offen)...');
+    
+    const projectId = project?.id || Date.now().toString();
+    
+    // WICHTIG: Nur lokale Speicherung - KEIN onSave() Aufruf!
+    // onSave() würde das Modal schließen
+    setIsProjectSaved(true);
+    setCurrentProjectId(projectId);
+    
+    console.log('✅ Auto-Save: Projekt lokal gespeichert (Modal bleibt offen):', projectId);
+    console.log('📝 Kunde:', customerName.trim());
+    console.log('📝 Projekt:', projectName.trim());
   };
 
-  const handleCreateProject = async () => {
-    const name = newProjectName.trim();
-    if (!name || !selectedCustomerId) return;
-    
-    const selectedCustomer = historicalCustomers.find(c => c.id === selectedCustomerId);
-    if (!selectedCustomer) return;
-    
-    const newProject = await addHistoricalProject(name, selectedCustomerId, selectedCustomer.name);
-    setSelectedProjectId(newProject.id);
-    setNewProjectName('');
-    setCreatingProject(false);
+  // Event Handler für Auto-Save
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      autoSaveProject();
+    }
   };
 
-  // Activity management
-  const handleActivityChange = (index: number, value: string) => {
-    const newActivities = [...activities];
-    newActivities[index] = value;
-    setActivities(newActivities);
+  const handleBlur = () => {
+    autoSaveProject();
   };
 
-  const addActivity = () => {
-    setActivities(prev => [...prev, '']);
+  // Projekt-spezifische Rollen/Skills Management
+  // Keine globale DB-Speicherung - nur lokale Auswahl für das Projekt
+
+  const removeRole = (roleId: string) => {
+    setSelectedRoles(prev => prev.filter(role => role.id !== roleId));
   };
 
-  const removeActivity = (index: number) => {
-    const newActivities = activities.filter((_, i) => i !== index);
-    setActivities(newActivities);
+  const removeSkill = (skillId: string) => {
+    setSelectedSkills(prev => prev.filter(skill => skill.id !== skillId));
   };
 
-  const canSave = !!selectedCustomerId && !!selectedProjectId;
+  // Entfernt: loadExistingRolesAndSkills - nicht mehr benötigt für projekt-spezifische Auswahl
 
-  const handleSave = () => {
-    if (!canSave) return;
+  const canSave = !!customerName.trim() && !!projectName.trim();
+
+  const handleFinalSave = async () => {
+    // Stelle sicher, dass das Basis-Projekt gespeichert ist
+    await autoSaveProject();
     
-    const selectedCustomer = historicalCustomers.find(c => c.id === selectedCustomerId);
-    const selectedProject = historicalProjects.find(p => p.id === selectedProjectId);
-    
-    if (!selectedCustomer || !selectedProject) return;
-    
-    const savedProject: ProjectHistoryItem = {
-      id: project?.id || Date.now().toString(),
-      projectName: selectedProject.name,
-      customer: selectedCustomer.name,
-      role: offeredSkill.trim(),
+    // Finaler Save mit allen aktuellen Daten (inkl. Rollen/Skills)
+    const finalProject: ProjectHistoryItem = {
+      id: currentProjectId || project?.id || Date.now().toString(),
+      projectName: projectName.trim(),
+      customer: customerName.trim(),
+      role: selectedRoles.length > 0 ? selectedRoles[0].name : '', // Erste Rolle als Haupt-Rolle
       duration: duration.trim(),
-      activities: activities.filter(a => a.trim() !== ''),
+      activities: selectedRoles.flatMap(role => role.tasks), // Tasks aus allen Rollen
       status: status,
       startDate: startDate || undefined,
       endDate: endDate || undefined,
       plannedAllocationPct: allocation,
       comment: comment.trim() || undefined,
+      roles: selectedRoles, // Neue Felder für Rollen und Skills
+      skills: selectedSkills,
     };
     
-    onSave(savedProject);
+    onSave(finalProject);
     onClose();
   };
 
@@ -207,120 +238,148 @@ export function ProjectHistoryEditorModal({
           {/* Body */}
           <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto">
             
-            {/* Historischer Customer Picker - komplett getrennt */}
+            {/* Kunde - Einfaches Textfeld */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Historischer Kunde <span className="text-xs text-gray-500">(Lebenslauf)</span>
+                Kunde
               </label>
-              <div className="flex items-center gap-2">
-                <select
-                  className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
-                  value={selectedCustomerId}
-                  onChange={(e) => { setSelectedCustomerId(e.target.value); setSelectedProjectId(''); }}
-                >
-                  <option value="">— bitte wählen —</option>
-                  {historicalCustomers.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-                <button
-                  onClick={() => setCreatingCustomer(v => !v)}
-                  className="inline-flex items-center gap-1 px-2 py-2 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded hover:bg-orange-100"
-                >
-                  <Plus className="w-3 h-3" /> Historisch
-                </button>
-              </div>
-              {creatingCustomer && (
-                <div className="mt-2 flex items-center gap-2">
-                  <input
-                    type="text"
-                    className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
-                    placeholder="Historischer Kunde (z.B. ex-Arbeitgeber)..."
-                    value={newCustomerName}
-                    onChange={(e) => setNewCustomerName(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleCreateCustomer()}
-                  />
-                  <button
-                    onClick={handleCreateCustomer}
-                    className="px-3 py-2 text-xs text-white bg-orange-600 rounded hover:bg-orange-700"
-                  >
-                    Anlegen
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Historisches Project Picker - komplett getrennt */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Historisches Projekt <span className="text-xs text-gray-500">(Lebenslauf)</span>
-              </label>
-              <div className="flex items-center gap-2">
-                <select
-                  className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
-                  value={selectedProjectId}
-                  onChange={(e) => setSelectedProjectId(e.target.value)}
-                  disabled={!selectedCustomerId}
-                >
-                  <option value="">— bitte wählen —</option>
-                  {projectsForCustomer.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-                <button
-                  onClick={() => setCreatingProject(v => !v)}
-                  className="inline-flex items-center gap-1 px-2 py-2 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded hover:bg-orange-100 disabled:opacity-50"
-                  disabled={!selectedCustomerId}
-                >
-                  <Plus className="w-3 h-3" /> Historisch
-                </button>
-              </div>
-              {creatingProject && (
-                <div className="mt-2 flex items-center gap-2">
-                  <input
-                    type="text"
-                    className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
-                    placeholder="Historisches Projekt..."
-                    value={newProjectName}
-                    onChange={(e) => setNewProjectName(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleCreateProject()}
-                  />
-                  <button
-                    onClick={handleCreateProject}
-                    className="px-3 py-2 text-xs text-white bg-orange-600 rounded hover:bg-orange-700"
-                  >
-                    Anlegen
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Rolle und Dauer */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Rolle</label>
-                <select 
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm" 
-                  value={offeredSkill} 
-                  onChange={(e) => setOfferedSkill(e.target.value)}
-                >
-                  <option value="">— bitte wählen —</option>
-                  {getActiveRoles().map(role => (
-                    <option key={role.id} value={role.name}>{role.name}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Dauer</label>
+              <div className="relative">
                 <input
                   type="text"
-                  value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onBlur={handleBlur}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
-                  placeholder="z.B. 6 Monate, 2024-2025"
+                  placeholder="z.B. BMW, Mercedes, Siemens..."
                 />
+                {isProjectSaved && customerName.trim() && (
+                  <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-600 text-xs">✓ Gespeichert</span>
+                )}
               </div>
+            </div>
+
+            {/* Projekt - Einfaches Textfeld */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Projekt
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onBlur={handleBlur}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
+                  placeholder="z.B. E-Commerce Platform, Mobile App..."
+                />
+                {isProjectSaved && projectName.trim() && (
+                  <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-600 text-xs">✓ Gespeichert</span>
+                )}
+              </div>
+            </div>
+
+            {/* Rollen-Auswahl */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Rollen im Projekt</label>
+              <div className="space-y-3">
+                {selectedRoles.length === 0 ? (
+                  <div className="text-center py-4 border-2 border-dashed border-gray-300 rounded-lg">
+                    <User className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">Noch keine Rollen ausgewählt</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {selectedRoles.map((role, index) => (
+                      <div key={role.id} className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4 text-blue-600" />
+                          <span className="font-medium text-blue-900">{role.name}</span>
+                          <span className="text-xs text-blue-600">({role.tasks.length} Tasks)</span>
+                        </div>
+                        <button
+                          onClick={() => removeRole(role.id)}
+                          className="p-1 text-red-500 hover:bg-red-100 rounded"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={async () => {
+                    await autoSaveProject();
+                    setRoleModalOpen(true);
+                  }}
+                  disabled={!customerName.trim() || !projectName.trim()}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Plus className="w-4 h-4" />
+                  Rolle auswählen
+                  {isProjectSaved && <span className="text-xs text-green-600">✓</span>}
+                </button>
+              </div>
+            </div>
+
+            {/* Skills-Auswahl */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Benötigte Technical Skills</label>
+              <div className="space-y-3">
+                {selectedSkills.length === 0 ? (
+                  <div className="text-center py-4 border-2 border-dashed border-gray-300 rounded-lg">
+                    <Code className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">Noch keine Skills ausgewählt</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {selectedSkills.map((skill, index) => (
+                      <div key={skill.id} className="flex items-center justify-between p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <Code className="w-4 h-4 text-purple-600" />
+                          <span className="font-medium text-purple-900">{skill.name}</span>
+                          <div className="flex items-center gap-1">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <span key={star} className={`text-xs ${star <= skill.level ? 'text-yellow-400' : 'text-gray-300'}`}>★</span>
+                            ))}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => removeSkill(skill.id)}
+                          className="p-1 text-red-500 hover:bg-red-100 rounded"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={async () => {
+                    await autoSaveProject();
+                    setSkillModalOpen(true);
+                  }}
+                  disabled={!customerName.trim() || !projectName.trim()}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-purple-600 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Plus className="w-4 h-4" />
+                  Skills auswählen
+                  {isProjectSaved && <span className="text-xs text-green-600">✓</span>}
+                </button>
+              </div>
+            </div>
+
+            {/* Dauer */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Dauer</label>
+              <input
+                type="text"
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
+                placeholder="z.B. 6 Monate, 2024-2025"
+              />
             </div>
 
             {/* Zeitraum und Details */}
@@ -372,38 +431,7 @@ export function ProjectHistoryEditorModal({
               </select>
             </div>
 
-            {/* Tätigkeiten */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Tätigkeiten im Projekt</label>
-              <div className="space-y-3">
-                {activities.map((activity, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={activity}
-                      onChange={(e) => handleActivityChange(index, e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm"
-                      placeholder="z.B. Frontend-Entwicklung, Team-Leadership"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeActivity(index)}
-                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={addActivity}
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-orange-600 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors border border-orange-200"
-                >
-                  <Plus className="w-4 h-4" />
-                  Tätigkeit hinzufügen
-                </button>
-              </div>
-            </div>
+
 
             {/* Kommentar */}
             <div>
@@ -427,14 +455,35 @@ export function ProjectHistoryEditorModal({
               Abbrechen
             </button>
             <button 
-              onClick={handleSave} 
+              onClick={handleFinalSave} 
               disabled={!canSave}
               className="px-4 py-2 text-white bg-orange-600 rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {project ? 'Aktualisieren' : 'Hinzufügen'}
+              {project ? 'Aktualisieren' : (isProjectSaved ? 'Fertigstellen' : 'Hinzufügen')}
             </button>
           </footer>
         </motion.div>
+
+        {/* Projekt-spezifische Modals (KEINE globale DB-Speicherung) */}
+        <ProjectRoleSelectionModal
+          isOpen={isRoleModalOpen}
+          onClose={() => setRoleModalOpen(false)}
+          onRoleSelected={(role) => {
+            console.log('🎯 Projekt-Rolle ausgewählt:', role);
+            setSelectedRoles(prev => [...prev, role]);
+            setRoleModalOpen(false);
+          }}
+        />
+
+        <ProjectSkillSelectionModal
+          isOpen={isSkillModalOpen}
+          onClose={() => setSkillModalOpen(false)}
+          onSkillSelected={(skill) => {
+            console.log('🛠️ Projekt-Skill ausgewählt:', skill);
+            setSelectedSkills(prev => [...prev, skill]);
+            setSkillModalOpen(false);
+          }}
+        />
       </div>
     </AnimatePresence>
   );

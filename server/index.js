@@ -1263,10 +1263,11 @@ app.post('/api/employee-dossier', requireAuth, async (req, res) => {
     
     const { employeeId, dossierData } = req.body;
     
-    // console.log entfernt
+    console.log('🔍 DEBUG Backend: Received employeeId:', employeeId);
+    console.log('🔍 DEBUG Backend: Received dossierData.projectHistory:', dossierData?.projectHistory);
     
     if (!employeeId || !dossierData) {
-      // console.error entfernt
+      console.error('❌ Backend: Invalid data received');
       return res.status(400).json({ error: 'Ungültige Daten', received: { employeeId, dossierData } });
     }
 
@@ -1278,14 +1279,54 @@ app.post('/api/employee-dossier', requireAuth, async (req, res) => {
     // Erstelle Payload mit allen verfügbaren Feldern (mit Normalisierung)
     const normalizedProjectHistory = Array.isArray(dossierData.projectHistory)
       ? dossierData.projectHistory.map((project) => ({
+          // Basis-Felder (Legacy-Kompatibilität)
           id: String(project.id || Date.now().toString()),
           projectName: String(project.projectName || project.project || ''),
           customer: String(project.customer || ''),
           role: String(project.role || ''),
           duration: String(project.duration || ''),
-          activities: Array.isArray(project.activities) ? project.activities.filter(a => typeof a === 'string') : []
+          activities: Array.isArray(project.activities) ? project.activities.filter(a => typeof a === 'string') : [],
+          
+          // ✅ NEUE FELDER für erweiterte Projekt-Typen
+          projectType: project.projectType || 'historical', // historical, planned, active
+          projectSource: project.projectSource || 'regular', // regular, jira
+          
+          // Datum-Felder
+          startDate: project.startDate || null,
+          endDate: project.endDate || null,
+          
+          // Geplante Projekte Felder
+          probability: project.probability || null,
+          dailyRate: project.dailyRate || null,
+          internalContact: project.internalContact || null,
+          customerContact: project.customerContact || null,
+          jiraTicketId: project.jiraTicketId || null,
+          
+          // Rollen und Skills (Projekt-spezifisch)
+          roles: Array.isArray(project.roles) ? project.roles.map(role => ({
+            roleId: String(role.roleId || ''),
+            roleName: String(role.roleName || ''),
+            tasks: Array.isArray(role.tasks) ? role.tasks.map(task => ({
+              taskId: String(task.taskId || ''),
+              taskName: String(task.taskName || '')
+            })) : []
+          })) : [],
+          
+          skills: Array.isArray(project.skills) ? project.skills.map(skill => ({
+            skillId: String(skill.skillId || ''),
+            skillName: String(skill.skillName || ''),
+            categoryId: String(skill.categoryId || ''),
+            categoryName: String(skill.categoryName || ''),
+            level: Math.max(1, Math.min(5, Number(skill.level) || 1))
+          })) : [],
+          
+          // Metadaten
+          createdAt: project.createdAt || null,
+          updatedAt: project.updatedAt || null
         }))
       : [];
+
+    console.log('🔍 DEBUG Backend: Normalized projectHistory:', normalizedProjectHistory);
 
     // Skills werden über den separaten Skills-Endpoint verwaltet
     // Hier nur als Backup, falls sie direkt übergeben werden
@@ -1351,7 +1392,7 @@ app.post('/api/employee-dossier', requireAuth, async (req, res) => {
     await docRef.set(payload, { merge: true });
     const updated = await docRef.get();
     
-    // console.log entfernt
+    console.log('🔍 DEBUG Backend: Saved to database, projectHistory:', updated.data()?.projectHistory);
     
     res.json({ 
       success: true, 
@@ -1364,12 +1405,36 @@ app.post('/api/employee-dossier', requireAuth, async (req, res) => {
   }
 });
 
+// 🔍 DEBUG: Alle Employee Dossiers auflisten (OHNE AUTH für Debugging)
+app.get('/api/debug/employee-dossiers', async (req, res) => {
+  try {
+    const snap = await db.collection('employeeDossiers').get();
+    const allDossiers = snap.docs.map(doc => ({
+      id: doc.id,
+      hasProjectHistory: !!doc.data().projectHistory,
+      projectHistoryLength: doc.data().projectHistory?.length || 0,
+      projectHistory: doc.data().projectHistory || [],
+      name: doc.data().name,
+      employeeId: doc.data().employeeId
+    }));
+    
+    console.log('🔍 DEBUG: All employee dossiers in Firestore:', allDossiers);
+    res.json(allDossiers);
+  } catch (error) {
+    console.error('❌ Error fetching all dossiers:', error);
+    res.status(500).json({ error: 'Fehler beim Laden der Dossiers' });
+  }
+});
+
 // Employee Dossier abrufen
 app.get('/api/employee-dossier/:employeeId', requireAuth, async (req, res) => {
   try {
     const { employeeId } = req.params;
     
     const snap = await db.collection('employeeDossiers').doc(String(employeeId)).get();
+    console.log('🔍 DEBUG Backend GET: Looking for employeeId:', employeeId);
+    console.log('🔍 DEBUG Backend GET: Document exists:', snap.exists);
+    
     if (!snap.exists) {
       const defaultDossier = {
         id: String(employeeId),
@@ -1399,7 +1464,9 @@ app.get('/api/employee-dossier/:employeeId', requireAuth, async (req, res) => {
       return res.json(defaultDossier);
     }
     
-    res.json({ id: snap.id, ...snap.data() });
+    const data = { id: snap.id, ...snap.data() };
+    console.log('🔍 DEBUG Backend GET: Returning data with projectHistory:', data.projectHistory);
+    res.json(data);
   } catch (error) {
     
     res.status(500).json({ error: 'Interner Server-Fehler' });

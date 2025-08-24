@@ -143,7 +143,9 @@ function App() {
     
     // Handle employee detail navigation - now goes to overview first
     const handleEmployeeDetailNavigation = () => {
-      setCurrentView('employees'); // Go to employee overview instead of selection modal
+      // Für Test: Setze einen Standard-Mitarbeiter
+      setSelectedPersonId('test-employee-1');
+      setCurrentView('employee-detail');
     };
 
     const handleEmployeeSelected = (personId: string) => {
@@ -235,9 +237,9 @@ function App() {
           />
 
           {/* Main Content */}
-          {currentView === 'utilization' && (
+                    {currentView === 'utilization' && (
             <>
-              <UtilizationReportView 
+              <UtilizationReportView
                 actionItems={actionItems}
                 setActionItems={setActionItems}
                 isSettingsModalOpen={isSettingsModalOpen}
@@ -248,6 +250,10 @@ function App() {
                 setIsEinsatzplanViewOpen={setIsEinsatzplanViewOpen}
                 isColumnsMenuOpen={isColumnsMenuOpen}
                 setIsColumnsMenuOpen={setIsColumnsMenuOpen}
+                onEmployeeDetailNavigation={(employeeId) => {
+                  setSelectedPersonId(employeeId);
+                  setCurrentView('employee-detail');
+                }}
               />
             </>
           )}

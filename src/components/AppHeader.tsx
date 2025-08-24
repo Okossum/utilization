@@ -149,10 +149,10 @@ export function AppHeader({
                 : 'text-gray-700 bg-gray-50 border-gray-200 hover:bg-gray-100'
             } border rounded-lg`}
             style={{ zIndex: 40 }}
-            title="Mitarbeiter Detailansicht"
+            title="Mitarbeiter Detailansicht (Neue UI)"
           >
             <User className="w-4 h-4" />
-            Detail
+            Detail (Neu)
           </button>
           <button
             onClick={() => setCurrentView('projects')}

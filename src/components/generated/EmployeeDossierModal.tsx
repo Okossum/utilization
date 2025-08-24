@@ -16,19 +16,8 @@ import { PlanningComment } from './PlanningComment';
 
 import { useAssignments } from '../../contexts/AssignmentsContext';
 
-export interface ProjectHistoryItem {
-  id: string;
-  projectName: string;
-  customer: string;
-  role: string;           // Hauptrolle (aus zentralem Skill-Management)
-  duration: string;
-  activities: string[];   // Individuelle Tätigkeiten im Projekt
-  status: 'closed' | 'active';
-  startDate?: string;
-  endDate?: string;
-  plannedAllocationPct?: number;
-  comment?: string;
-}
+// ProjectHistoryItem ist jetzt in src/lib/types.ts definiert
+import { ProjectHistoryItem } from '../../lib/types';
 export interface ProjectOffer {
   id: string;
   customerName: string;
@@ -328,19 +317,20 @@ export function EmployeeDossierModal({
           opacity: 0,
           scale: 0.95,
           y: 20
-        }} className="relative w-full max-w-7xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-            {/* Header */}
-            <header className="flex items-center justify-between p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+        }} className="relative w-full max-w-[95vw] max-h-[95vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            {/* Kompakter Header */}
+            <header className="flex items-center justify-between p-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-100 rounded-lg">
-                  <User className="w-5 h-5 text-blue-600" />
+                  <User className="w-4 h-4 text-blue-600" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-semibold text-gray-900">
-                    Mitarbeiter-Dossier: {formData.name}
+                  <h1 className="text-lg font-semibold text-gray-900">
+                    Mitarbeiterdetails
                   </h1>
+                  <p className="text-sm text-gray-600">{formData.name}</p>
                   {isLoading && (
-                    <p className="text-sm text-blue-600">Lade Daten...</p>
+                    <p className="text-xs text-blue-600">Lade Daten...</p>
                   )}
                 </div>
               </div>
@@ -351,14 +341,19 @@ export function EmployeeDossierModal({
               </div>
             </header>
 
-            {/* Body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-8">
-              {/* Basic Information */}
-              <section className="space-y-4">
-                <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
-                  <User className="w-5 h-5 text-blue-600" />
-                  Basisinformationen
-                </h2>
+            {/* Kompaktes 3-Spalten Layout */}
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="grid grid-cols-3 gap-4">
+                
+                {/* ========== LINKE SPALTE: Mitarbeiter-Informationen ========== */}
+                <div className="col-span-1 space-y-4">
+                  
+                  {/* 👤 Profilbereich */}
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                    <h3 className="text-md font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <User className="w-4 h-4 text-blue-600" />
+                      Profil
+                    </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">LBS</label>
@@ -386,13 +381,143 @@ export function EmployeeDossierModal({
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
-                    <input type="tel" value={formData.phone} onChange={e => handleInputChange('phone', e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                      <input type="tel" value={formData.phone} onChange={e => handleInputChange('phone', e.target.value)} className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent" />
+                    </div>
                   </div>
+                  
+                  {/* 💪 Stärken & Schwächen */}
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                    <h3 className="text-md font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <Briefcase className="w-4 h-4 text-green-600" />
+                      Stärken & Schwächen
+                    </h3>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Stärken</label>
+                        <textarea value={formData.strengths} onChange={e => handleInputChange('strengths', e.target.value)} rows={3} className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent resize-none" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Schwächen</label>
+                        <textarea value={formData.weaknesses} onChange={e => handleInputChange('weaknesses', e.target.value)} rows={3} className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent resize-none" />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* 🛠️ Technical Skills */}
+                  <EmployeeSkillAssignment
+                    employeeId={formData.id}
+                    employeeName={formData.name}
+                    onSkillsChange={(skills) => {
+                      if (!skillsInitialized) {
+                        setSkillsInitialized(true);
+                        return;
+                      }
+                      const convertedSkills = skills.map(s => ({
+                        skillId: s.skillId,
+                        name: s.skillName,
+                        level: s.level
+                      }));
+                      setFormData(prev => ({ ...prev, skills: convertedSkills }));
+                    }}
+                  />
+                  
+                  {/* 🎭 Rollen */}
+                  <EmployeeRoleAssignment
+                    employeeId={formData.id}
+                    employeeName={formData.name}
+                  />
+                  
                 </div>
-              </section>
+                
+                {/* ========== MITTLERE SPALTE: Projekte & Kommentare ========== */}
+                <div className="col-span-1 space-y-4">
+                  
+                  {/* 💬 Kommentare */}
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                    <h3 className="text-md font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4 text-purple-600" />
+                      Kommentare
+                    </h3>
+                    <textarea value={formData.comments} onChange={e => handleInputChange('comments', e.target.value)} rows={3} className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent resize-none" placeholder="Allgemeine Kommentare..." />
+                  </div>
+                  
+                  {/* Utilization & Planning Comments */}
+                  <div className="space-y-4">
+                    <UtilizationComment
+                      personId={formData.name}
+                      initialValue={formData.utilizationComment}
+                      onLocalChange={(v)=> setFormData(prev => ({ ...prev, utilizationComment: v }))}
+                      className="h-full"
+                    />
+                    <PlanningComment
+                      personId={formData.name}
+                      initialValue={planningComment}
+                      onLocalChange={(v) => setPlanningComment(v)}
+                      className="h-full"
+                    />
+                  </div>
+                  
+                </div>
+                
+                {/* ========== RECHTE SPALTE: Projektvergangenheit & Assignments ========== */}
+                <div className="col-span-1 space-y-4">
+                  
+                  {/* 📜 Projektvergangenheit */}
+                  <ProjectHistorySection
+                    employeeName={formData.name}
+                    projectHistory={formData.projectHistory || []}
+                    onChange={(projects) => {
+                      setFormData(prev => ({ ...prev, projectHistory: projects }));
+                    }}
+                    onEdit={(project) => {
+                      setEditingHistoryProject(project);
+                      setIsProjectHistoryEditorOpen(true);
+                    }}
+                  />
+                  
+                  {/* 📋 Assignments */}
+                  <AssignmentsList 
+                    employeeName={formData.name} 
+                    onEdit={(assignmentId) => {
+                      const assignments = assignmentsByEmployee[formData.name] || [];
+                      const assignment = assignments.find(a => a.id === assignmentId);
+                      if (assignment) {
+                        setEditingAssignment(assignment);
+                        setAssignmentEditorOpen(true);
+                      }
+                    }}
+                  />
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                    <button
+                      onClick={() => {
+                        setEditingAssignment(null);
+                        setAssignmentEditorOpen(true);
+                      }}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Neues Assignment
+                    </button>
+                  </div>
+                  
+                </div>
+                
+              </div>
+            </div>
+              
+              {/* Footer mit Save/Cancel Buttons */}
+              <div className="border-t border-gray-200 p-4 bg-gray-50 flex justify-end gap-3">
+                <button onClick={handleCancel} className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors">
+                  Abbrechen
+                </button>
+                <button onClick={handleSave} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                  Speichern
+                </button>
+              </div>
+            </div>
 
-
-
+            {/* Verstecke alle alten Sektionen */}
+            <div style={{display: 'none'}}>
               {/* Strengths & Weaknesses */}
               <section className="space-y-4">
                 <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
@@ -507,17 +632,16 @@ export function EmployeeDossierModal({
 
 
 
-            </div>
-
-            {/* Footer */}
-            <footer className="flex items-center justify-end gap-3 p-6 border-t border-gray-100 bg-gray-50">
+              {/* Footer */}
+              <footer className="flex items-center justify-end gap-3 p-6 border-t border-gray-100 bg-gray-50">
               <button onClick={handleCancel} className="px-4 py-2 text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                 Abbrechen
               </button>
               <button onClick={handleSave} className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
                 Speichern
               </button>
-            </footer>
+              </footer>
+            </div>
             </motion.div>
           </div>}
       </AnimatePresence>

@@ -45,6 +45,7 @@ interface UtilizationReportViewProps {
   setIsEinsatzplanViewOpen: (open: boolean) => void;
   isColumnsMenuOpen: boolean;
   setIsColumnsMenuOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
+  onEmployeeDetailNavigation?: (employeeId: string) => void;
 }
 
 // Toast-Notification Interface
@@ -65,7 +66,8 @@ export function UtilizationReportView({
   isEinsatzplanViewOpen, 
   setIsEinsatzplanViewOpen,
   isColumnsMenuOpen, 
-  setIsColumnsMenuOpen 
+  setIsColumnsMenuOpen,
+  onEmployeeDetailNavigation
 }: UtilizationReportViewProps) {
   const { user, loading, profile, updateProfile } = useAuth();
   const { 
@@ -547,8 +549,16 @@ export function UtilizationReportView({
   // Removed isWeekInPlannedProject (inline planning removed)
   const isWeekInPlannedProject = (_person: string, _weekNumber: number) => false;
 
-  // Employee Dossier Modal öffnen
+  // Employee Detail Navigation
   const openEmployeeDossier = async (person: string) => {
+    // Verwende die neue EmployeeDetailView Navigation
+    if (onEmployeeDetailNavigation) {
+      const employeeId = String(personMeta.get(person)?.id || person);
+      onEmployeeDetailNavigation(employeeId);
+      return;
+    }
+
+    // Fallback: Alte Modal-Logik (falls onEmployeeDetailNavigation nicht verfügbar)
     // Hole Excel-Daten für diese Person
     let excelData: {
       name: string;
