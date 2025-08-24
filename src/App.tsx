@@ -29,9 +29,7 @@ import { RoleProvider } from './contexts/RoleContext';
 import { ProjectHistoryProvider } from './contexts/ProjectHistoryContext';
 import { UtilizationDataProvider } from './contexts/UtilizationDataContext';
 import { AppHeader } from './components/AppHeader';
-import ProjectManagementDashboard from './components/generated/projects/ProjectManagementDashboard';
-import { OverviewPage } from './components/generated/projects/OverviewPage';
-import ProjectCreationWizard, { ProjectCreationData } from './components/generated/projects/ProjectCreationWizard';
+// Projekt-Komponenten entfernt - nicht mehr verfügbar
 
 
 let theme: Theme = 'light';
@@ -179,7 +177,7 @@ function App() {
 
 
 
-    const handleProjectWizardSave = (projectData: ProjectCreationData) => {
+    const handleProjectWizardSave = (projectData: any) => {
       console.log('Project created:', projectData);
       // Here you would typically save the project data to your backend
       // For now, we'll just close the wizard and show the projects dashboard
@@ -339,16 +337,19 @@ function App() {
 
               {/* Projects Content */}
               {projectsSubView === 'wizard' && (
-                <div className="min-h-screen bg-gray-50">
-                  <ProjectManagementDashboard 
-                    onProjectClick={handleProjectClick} 
-                    onBackToOverview={() => setCurrentView('utilization')} 
-                  />
-                  <ProjectCreationWizard 
-                    isOpen={isProjectWizardOpen}
-                    onClose={handleProjectWizardClose}
-                    onSave={handleProjectWizardSave}
-                  />
+                <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                  <div className="text-center p-8 bg-white rounded-lg shadow-lg">
+                    <h2 className="text-2xl font-bold text-gray-800 mb-4">Projekt-Wizard</h2>
+                    <p className="text-gray-600 mb-4">
+                      Die Projekt-Wizard Komponente wurde entfernt.
+                    </p>
+                    <button
+                      onClick={() => setCurrentView('utilization')}
+                      className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      Zurück zur Auslastung
+                    </button>
+                  </div>
                 </div>
               )}
               
@@ -360,14 +361,37 @@ function App() {
               )}
               
               {projectsSubView === 'overview' && (
-                <OverviewPage onEmployeeClick={handleProjectEmployeeClick} />
+                <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                  <div className="text-center p-8 bg-white rounded-lg shadow-lg">
+                    <h2 className="text-2xl font-bold text-gray-800 mb-4">Projekt-Übersicht</h2>
+                    <p className="text-gray-600 mb-4">
+                      Die Projekt-Übersicht Komponente wurde entfernt.
+                    </p>
+                    <button
+                      onClick={() => setCurrentView('utilization')}
+                      className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      Zurück zur Auslastung
+                    </button>
+                  </div>
+                </div>
               )}
               
               {projectsSubView === 'projects' && (
-                <ProjectManagementDashboard 
-                  onProjectClick={handleProjectClick}
-                  onBackToOverview={() => setCurrentView('utilization')}
-                />
+                <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                  <div className="text-center p-8 bg-white rounded-lg shadow-lg">
+                    <h2 className="text-2xl font-bold text-gray-800 mb-4">Projekt-Management</h2>
+                    <p className="text-gray-600 mb-4">
+                      Das Projekt-Management Dashboard wurde entfernt.
+                    </p>
+                    <button
+                      onClick={() => setCurrentView('utilization')}
+                      className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      Zurück zur Auslastung
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           )}
