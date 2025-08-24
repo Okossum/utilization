@@ -190,11 +190,11 @@ export function ProjectCard({
             <div>
               <div className="text-xs text-gray-600 mb-1">Rollen:</div>
               <div className="flex flex-wrap gap-1">
-                {project.roles.map(role => (
+                {project.roles.map((role, index) => (
                   <span 
-                    key={role.id} 
+                    key={role.id || `role-${index}`} 
                     className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-medium"
-                    title={`${role.categoryName}: ${role.tasks.join(', ')}`}
+                    title={`${role.categoryName}: ${role.tasks?.join(', ') || ''}`}
                   >
                     {role.name}
                   </span>
@@ -208,9 +208,9 @@ export function ProjectCard({
             <div>
               <div className="text-xs text-gray-600 mb-1">Skills:</div>
               <div className="flex flex-wrap gap-1">
-                {project.skills.map(skill => (
+                {project.skills.map((skill, index) => (
                   <span 
-                    key={skill.id} 
+                    key={skill.id || `skill-${index}`} 
                     className="bg-cyan-100 text-cyan-800 px-2 py-1 rounded text-xs font-medium"
                     title={`${skill.categoryName}: Level ${skill.level}/5`}
                   >

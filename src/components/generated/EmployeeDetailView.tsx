@@ -382,6 +382,7 @@ export default function EmployeeDetailView({
       }
       
       console.log('🔄 Loading dossier data for:', employeeId, 'with token:', token ? 'present' : 'missing');
+      console.log('🔍 Effect triggered, cancelled flag reset');
       
       setDossierLoading(true);
       try {
@@ -414,7 +415,12 @@ export default function EmployeeDetailView({
           console.log('🛠️ Loaded assigned skills:', skillsData);
           setAssignedSkills(skillsData);
         } else {
-          console.error('❌ Failed to load skills:', skillsResponse.status, skillsResponse.statusText);
+          console.error('❌ Failed to load skills:', {
+            status: skillsResponse.status,
+            statusText: skillsResponse.statusText,
+            ok: skillsResponse.ok,
+            cancelled: cancelled
+          });
         }
         
         // Load employee dossier data for form fields
@@ -463,7 +469,7 @@ export default function EmployeeDetailView({
     
     loadDossierData();
     return () => { cancelled = true; };
-  }, [employeeId, token, personName, employeeData, meta]);
+  }, [employeeId, token]); // Reduzierte Dependencies um Race Conditions zu vermeiden
 
   // Refresh dossier data function
   const refreshDossierData = async () => {
@@ -495,6 +501,20 @@ export default function EmployeeDetailView({
       if (skillsResponse.ok) {
         const skillsData = await skillsResponse.json();
         setAssignedSkills(skillsData);
+      }
+      
+      // Load employee dossier data (includes soft skills)
+      try {
+        const consistentEmployeeId = employeeId;
+        console.log('🔄 Refreshing dossier data for:', consistentEmployeeId);
+        const loadedDossierData = await DatabaseService.getEmployeeDossier(consistentEmployeeId);
+        if (loadedDossierData) {
+          console.log('📋 Refreshed dossier data:', loadedDossierData);
+          console.log('🔍 DEBUG: Soft skills in refreshed data:', loadedDossierData.assignedSoftSkills);
+          setDossierData(loadedDossierData);
+        }
+      } catch (dossierError) {
+        console.log('📋 Error refreshing dossier data:', dossierError);
       }
       
     } catch (error) {

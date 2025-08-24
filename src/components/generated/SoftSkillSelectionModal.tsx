@@ -85,6 +85,10 @@ const SoftSkillSelectionModal: React.FC<SoftSkillSelectionModalProps> = ({
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          setError('Authentifizierung fehlgeschlagen. Bitte melden Sie sich erneut an.');
+          return;
+        }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
@@ -108,6 +112,10 @@ const SoftSkillSelectionModal: React.FC<SoftSkillSelectionModalProps> = ({
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          setError('Authentifizierung fehlgeschlagen. Bitte melden Sie sich erneut an.');
+          return;
+        }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
@@ -131,6 +139,10 @@ const SoftSkillSelectionModal: React.FC<SoftSkillSelectionModalProps> = ({
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          setError('Authentifizierung fehlgeschlagen. Bitte melden Sie sich erneut an.');
+          return;
+        }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
@@ -215,8 +227,18 @@ const SoftSkillSelectionModal: React.FC<SoftSkillSelectionModalProps> = ({
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Authentifizierung fehlgeschlagen. Bitte melden Sie sich erneut an.');
+        }
         const errorData = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorData}`);
+        let errorMessage = `HTTP ${response.status}: ${errorData}`;
+        try {
+          const parsedError = JSON.parse(errorData);
+          errorMessage = parsedError.error || errorMessage;
+        } catch {
+          // Keep original error message if parsing fails
+        }
+        throw new Error(errorMessage);
       }
 
       setSuccessMessage(`${skillsToAssign.length} Soft Skills erfolgreich zugewiesen!`);

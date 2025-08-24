@@ -3100,6 +3100,8 @@ app.post('/api/employees/:employeeId/soft-skills', requireAuth, async (req, res)
     const employeeId = decodeURIComponent(rawEmployeeId);
     const { assignments } = req.body; // Array von { skillId, level }
     
+    console.log('🎯 Soft Skills Assignment Request:', { employeeId, assignments });
+    
     if (!Array.isArray(assignments) || assignments.length === 0) {
       return res.status(400).json({ error: 'Keine gültigen Skill-Zuweisungen gefunden' });
     }
@@ -3113,12 +3115,17 @@ app.post('/api/employees/:employeeId/soft-skills', requireAuth, async (req, res)
     
     // Lade alle Skills um Namen zu bekommen
     const skillIds = assignments.map(a => a.skillId);
+    console.log('🔍 Loading skills for IDs:', skillIds);
+    
     const skillsSnap = await db.collection('softSkills')
-      .where(db.FieldPath.documentId(), 'in', skillIds)
+      .where(admin.firestore.FieldPath.documentId(), 'in', skillIds)
       .get();
+    
+    console.log('📊 Found skills:', skillsSnap.size);
     
     const skillsMap = new Map();
     skillsSnap.forEach(doc => {
+      console.log('📋 Skill found:', doc.id, doc.data().name);
       skillsMap.set(doc.id, doc.data());
     });
     
@@ -3126,9 +3133,11 @@ app.post('/api/employees/:employeeId/soft-skills', requireAuth, async (req, res)
     const assignedSoftSkills = assignments.map(assignment => {
       const skillData = skillsMap.get(assignment.skillId);
       if (!skillData) {
+        console.error('❌ Skill not found:', assignment.skillId, 'Available skills:', Array.from(skillsMap.keys()));
         throw new Error(`Soft Skill mit ID ${assignment.skillId} nicht gefunden`);
       }
       
+      console.log('✅ Creating assignment for skill:', skillData.name);
       return {
         id: `${employeeId}_${assignment.skillId}_${Date.now()}`,
         skillId: assignment.skillId,
