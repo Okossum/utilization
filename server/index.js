@@ -3100,6 +3100,179 @@ app.delete('/api/employee-roles/:employeeId/:assignmentId', requireAuth, async (
 
 // Debug-Endpoint entfernt
 
+// ==========================================
+// EMPLOYEE TECHNICAL SKILLS ASSIGNMENT API ENDPOINTS
+// ==========================================
+
+// GET /api/employee-technical-skills/:employeeId - Zugewiesene Technical Skills eines Mitarbeiters laden
+app.get('/api/employee-technical-skills/:employeeId', requireAuth, async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    
+    // Lade das employeeDossier
+    const dossierRef = db.collection('employeeDossiers').doc(employeeId);
+    const dossierDoc = await dossierRef.get();
+    
+    if (!dossierDoc.exists) {
+      return res.json([]); // Leeres Array wenn kein Dossier existiert
+    }
+    
+    const dossierData = dossierDoc.data();
+    const assignedSkills = dossierData.assignedTechnicalSkills || [];
+    
+    res.json(assignedSkills);
+  } catch (error) {
+    console.error('Error fetching employee technical skills:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+// POST /api/employee-technical-skills/:employeeId - Technical Skill einem Mitarbeiter zuweisen
+app.post('/api/employee-technical-skills/:employeeId', requireAuth, async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const { skillId, level, categoryId } = req.body;
+    
+    if (!skillId || !level || level < 1 || level > 5) {
+      return res.status(400).json({ error: 'skillId und level (1-5) sind erforderlich' });
+    }
+    
+    // Lade den Skill um den Namen zu bekommen
+    const skillDoc = await db.collection('technicalSkills').doc(skillId).get();
+    if (!skillDoc.exists) {
+      return res.status(404).json({ error: 'Technical Skill nicht gefunden' });
+    }
+    
+    const skillData = skillDoc.data();
+    const skillName = skillData.name;
+    
+    // Lade oder erstelle das employeeDossier
+    const dossierRef = db.collection('employeeDossiers').doc(employeeId);
+    const dossierDoc = await dossierRef.get();
+    
+    let dossierData = {};
+    if (dossierDoc.exists) {
+      dossierData = dossierDoc.data();
+    }
+    
+    // Initialisiere assignedTechnicalSkills Array falls nicht vorhanden
+    if (!dossierData.assignedTechnicalSkills) {
+      dossierData.assignedTechnicalSkills = [];
+    }
+    
+    // Prüfe ob Skill bereits zugewiesen ist
+    const existingSkillIndex = dossierData.assignedTechnicalSkills.findIndex(
+      skill => skill.skillId === skillId
+    );
+    
+    if (existingSkillIndex !== -1) {
+      return res.status(400).json({ error: 'Technical Skill ist bereits zugewiesen' });
+    }
+    
+    // Neue Skill-Zuweisung erstellen
+    const skillAssignment = {
+      id: `${employeeId}_${skillId}_${Date.now()}`,
+      skillId: skillId,
+      skillName: skillName,
+      level: parseInt(level),
+      categoryId: categoryId || null,
+      assignedAt: new Date(),
+      lastUpdated: new Date()
+    };
+    
+    dossierData.assignedTechnicalSkills.push(skillAssignment);
+    await dossierRef.set(dossierData, { merge: true });
+    
+    res.json({ success: true, message: 'Technical Skill erfolgreich zugewiesen' });
+  } catch (error) {
+    console.error('Error assigning technical skill to employee:', error);
+    res.status(500).json({ error: 'Fehler beim Zuweisen des Technical Skills' });
+  }
+});
+
+// PUT /api/employee-technical-skills/:employeeId/:assignmentId - Technical Skill Level ändern
+app.put('/api/employee-technical-skills/:employeeId/:assignmentId', requireAuth, async (req, res) => {
+  try {
+    const { employeeId, assignmentId } = req.params;
+    const { level } = req.body;
+    
+    if (!level || level < 1 || level > 5) {
+      return res.status(400).json({ error: 'Level muss zwischen 1 und 5 liegen' });
+    }
+    
+    // Lade das employeeDossier
+    const dossierRef = db.collection('employeeDossiers').doc(employeeId);
+    const dossierDoc = await dossierRef.get();
+    
+    if (!dossierDoc.exists) {
+      return res.status(404).json({ error: 'Mitarbeiter-Dossier nicht gefunden' });
+    }
+    
+    const dossierData = dossierDoc.data();
+    const assignedSkills = dossierData.assignedTechnicalSkills || [];
+    
+    // Finde die Skill-Zuweisung
+    const skillIndex = assignedSkills.findIndex(skill => skill.id === assignmentId);
+    if (skillIndex === -1) {
+      return res.status(404).json({ error: 'Technical Skill Zuweisung nicht gefunden' });
+    }
+    
+    // Aktualisiere das Level
+    assignedSkills[skillIndex].level = parseInt(level);
+    assignedSkills[skillIndex].lastUpdated = new Date();
+    
+    // Speichere die Änderungen
+    await dossierRef.update({
+      assignedTechnicalSkills: assignedSkills
+    });
+    
+    res.json({ success: true, message: 'Technical Skill Level erfolgreich aktualisiert' });
+  } catch (error) {
+    console.error('Error updating technical skill level:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+// DELETE /api/employee-technical-skills/:employeeId/:assignmentId - Technical Skill Zuweisung entfernen
+app.delete('/api/employee-technical-skills/:employeeId/:assignmentId', requireAuth, async (req, res) => {
+  try {
+    const { employeeId, assignmentId } = req.params;
+    
+    // Lade das employeeDossier
+    const dossierRef = db.collection('employeeDossiers').doc(employeeId);
+    const dossierDoc = await dossierRef.get();
+    
+    if (!dossierDoc.exists) {
+      return res.status(404).json({ error: 'Mitarbeiter-Dossier nicht gefunden' });
+    }
+    
+    const dossierData = dossierDoc.data();
+    const assignedSkills = dossierData.assignedTechnicalSkills || [];
+    
+    // Finde und entferne die Skill-Zuweisung
+    const skillIndex = assignedSkills.findIndex(skill => skill.id === assignmentId);
+    if (skillIndex === -1) {
+      return res.status(404).json({ error: 'Technical Skill Zuweisung nicht gefunden' });
+    }
+    
+    const removedSkill = assignedSkills[skillIndex];
+    assignedSkills.splice(skillIndex, 1);
+    
+    // Speichere die Änderungen
+    await dossierRef.update({
+      assignedTechnicalSkills: assignedSkills
+    });
+    
+    res.json({ 
+      success: true, 
+      message: `Technical Skill "${removedSkill.skillName}" erfolgreich entfernt` 
+    });
+  } catch (error) {
+    console.error('Error removing technical skill assignment:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
 // Graceful Shutdown
 process.on('SIGINT', async () => {
   // console.log entfernt

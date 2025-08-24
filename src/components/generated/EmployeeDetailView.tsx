@@ -5,6 +5,7 @@ import { ArrowLeft, User, Mail, MapPin, Calendar, Clock, Star, TrendingUp, Messa
 import { collection, getDocs, limit, query, where } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useAssignments } from '../../contexts/AssignmentsContext';
+import { useAuth } from '../../contexts/AuthContext';
 import DatabaseService from '../../services/database';
 import TechnicalSkillSelectionModal from './TechnicalSkillSelectionModal';
 import RoleSelectionModal from './RoleSelectionModal';
@@ -77,13 +78,23 @@ export default function EmployeeDetailView({
   employeeId,
   onBack
 }: EmployeeDetailViewProps) {
+  console.log('🏗️ EmployeeDetailView rendered with:', { employeeId });
+  
   const { getAssignmentsForEmployee } = useAssignments();
+  const { token } = useAuth();
+  
+  console.log('🔑 Auth token status:', token ? 'present' : 'missing');
   const [personName, setPersonName] = useState<string>('');
   const [meta, setMeta] = useState<{ team?: string; cc?: string; lbs?: string; location?: string; startDate?: string } | null>(null);
   const [employeeData, setEmployeeData] = useState<{ email?: string; startDate?: string; location?: string; lbs?: string } | null>(null);
   const [utilization, setUtilization] = useState<number | null>(null);
   const [isTechSkillsOpen, setTechSkillsOpen] = useState(false);
   const [isRoleAssignOpen, setRoleAssignOpen] = useState(false);
+  
+  // Dossier-Daten State
+  const [assignedRoles, setAssignedRoles] = useState<any[]>([]);
+  const [assignedSkills, setAssignedSkills] = useState<any[]>([]);
+  const [dossierLoading, setDossierLoading] = useState(false);
 
   // Resolve personName and meta from Firestore einsatzplan by personId, with safe fallbacks
   useEffect(() => {
@@ -237,6 +248,103 @@ export default function EmployeeDetailView({
     return () => { cancelled = true; };
   }, [employeeId, personName]);
 
+  // Load employee dossier data (roles and skills)
+  useEffect(() => {
+    let cancelled = false;
+    const loadDossierData = async () => {
+      if (!employeeId || !token) {
+        console.log('❌ Missing employeeId or token:', { employeeId, token: token ? 'present' : 'missing' });
+        return;
+      }
+      
+      console.log('🔄 Loading dossier data for:', employeeId, 'with token:', token ? 'present' : 'missing');
+      
+      setDossierLoading(true);
+      try {
+        // Load assigned roles
+        const rolesResponse = await fetch(`/api/employee-roles/${employeeId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (rolesResponse.ok && !cancelled) {
+          const rolesData = await rolesResponse.json();
+          console.log('🎭 Loaded assigned roles:', rolesData);
+          setAssignedRoles(rolesData);
+        } else {
+          console.error('❌ Failed to load roles:', rolesResponse.status, rolesResponse.statusText);
+        }
+        
+        // Load assigned technical skills
+        const skillsResponse = await fetch(`/api/employee-technical-skills/${employeeId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (skillsResponse.ok && !cancelled) {
+          const skillsData = await skillsResponse.json();
+          console.log('🛠️ Loaded assigned skills:', skillsData);
+          setAssignedSkills(skillsData);
+        } else {
+          console.error('❌ Failed to load skills:', skillsResponse.status, skillsResponse.statusText);
+        }
+        
+      } catch (error) {
+        console.error('Error loading dossier data:', error);
+      } finally {
+        if (!cancelled) {
+          setDossierLoading(false);
+        }
+      }
+    };
+    
+    loadDossierData();
+    return () => { cancelled = true; };
+  }, [employeeId, token]);
+
+  // Refresh dossier data function
+  const refreshDossierData = async () => {
+    if (!employeeId || !token) return;
+    
+    setDossierLoading(true);
+    try {
+      // Load assigned roles
+      const rolesResponse = await fetch(`/api/employee-roles/${employeeId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (rolesResponse.ok) {
+        const rolesData = await rolesResponse.json();
+        setAssignedRoles(rolesData);
+      }
+      
+      // Load assigned technical skills
+      const skillsResponse = await fetch(`/api/employee-technical-skills/${employeeId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (skillsResponse.ok) {
+        const skillsData = await skillsResponse.json();
+        setAssignedSkills(skillsData);
+      }
+      
+    } catch (error) {
+      console.error('Error refreshing dossier data:', error);
+    } finally {
+      setDossierLoading(false);
+    }
+  };
+
   // Load simple utilization metric (best-effort)
   useEffect(() => {
     let cancelled = false;
@@ -280,6 +388,7 @@ export default function EmployeeDetailView({
     activities: true,
     projects: true,
     skills: true,
+    assignments: true,
     strengths: true
   });
   if (!employee) {
@@ -554,6 +663,120 @@ export default function EmployeeDetailView({
                   </div>}
               </div>
 
+              {/* Assigned Roles and Technical Skills */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Zugewiesene Rollen & Skills
+                  </h3>
+                  <button onClick={() => toggleSection('assignments')} className="p-1 text-gray-400 hover:text-gray-600 transition-colors">
+                    <ChevronDown className={`w-4 h-4 transform transition-transform ${expandedSections.assignments ? 'rotate-180' : ''}`} />
+                  </button>
+                </div>
+                
+                {expandedSections.assignments && (
+                  <div className="space-y-6">
+                    {/* Assigned Roles */}
+                    <div>
+                      <div className="flex items-center space-x-2 mb-3">
+                        <Award className="w-4 h-4 text-purple-600" />
+                        <h4 className="text-sm font-semibold text-purple-700">
+                          Zugewiesene Rollen ({assignedRoles.length})
+                        </h4>
+                      </div>
+                      {dossierLoading ? (
+                        <div className="text-sm text-gray-500">Lade Rollen...</div>
+                      ) : assignedRoles.length === 0 ? (
+                        <div className="text-sm text-gray-500 italic">Keine Rollen zugewiesen</div>
+                      ) : (
+                        <div className="space-y-2">
+                          {assignedRoles.map((role: any) => (
+                            <div key={role.id} className="group hover:bg-purple-50 p-3 rounded-lg transition-colors border border-purple-100">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <h5 className="text-sm font-medium text-gray-900 mb-1">
+                                    {role.roleName}
+                                  </h5>
+                                  <div className="flex items-center space-x-2">
+                                    <div className="flex items-center space-x-1">
+                                      {[1, 2, 3, 4, 5].map((star) => (
+                                        <Star
+                                          key={star}
+                                          className={`w-3 h-3 ${
+                                            star <= role.level 
+                                              ? 'text-yellow-400 fill-current' 
+                                              : 'text-gray-300'
+                                          }`}
+                                        />
+                                      ))}
+                                    </div>
+                                    <span className="text-xs text-gray-500">Level {role.level}</span>
+                                  </div>
+                                  {role.assignedAt && (
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      Zugewiesen: {new Date(role.assignedAt.seconds * 1000).toLocaleDateString('de-DE')}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Assigned Technical Skills */}
+                    <div>
+                      <div className="flex items-center space-x-2 mb-3">
+                        <Star className="w-4 h-4 text-green-600" />
+                        <h4 className="text-sm font-semibold text-green-700">
+                          Technical Skills ({assignedSkills.length})
+                        </h4>
+                      </div>
+                      {dossierLoading ? (
+                        <div className="text-sm text-gray-500">Lade Skills...</div>
+                      ) : assignedSkills.length === 0 ? (
+                        <div className="text-sm text-gray-500 italic">Keine Technical Skills zugewiesen</div>
+                      ) : (
+                        <div className="space-y-2">
+                          {assignedSkills.map((skill: any) => (
+                            <div key={skill.id} className="group hover:bg-green-50 p-3 rounded-lg transition-colors border border-green-100">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <h5 className="text-sm font-medium text-gray-900 mb-1">
+                                    {skill.skillName}
+                                  </h5>
+                                  <div className="flex items-center space-x-2">
+                                    <div className="flex items-center space-x-1">
+                                      {[1, 2, 3, 4, 5].map((star) => (
+                                        <Star
+                                          key={star}
+                                          className={`w-3 h-3 ${
+                                            star <= skill.level 
+                                              ? 'text-yellow-400 fill-current' 
+                                              : 'text-gray-300'
+                                          }`}
+                                        />
+                                      ))}
+                                    </div>
+                                    <span className="text-xs text-gray-500">Level {skill.level}</span>
+                                  </div>
+                                  {skill.assignedAt && (
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      Zugewiesen: {new Date(skill.assignedAt.seconds * 1000).toLocaleDateString('de-DE')}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Strengths and Weaknesses */}
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6" style={{
               paddingLeft: "14px",
@@ -743,14 +966,14 @@ export default function EmployeeDetailView({
         onClose={() => setTechSkillsOpen(false)}
         employeeId={employeeId}
         employeeName={employee.name}
-        onSkillAssigned={() => { /* no-op; could refresh a summary */ }}
+        onSkillAssigned={refreshDossierData}
       />
       <RoleSelectionModal
         isOpen={isRoleAssignOpen}
         onClose={() => setRoleAssignOpen(false)}
         employeeId={employeeId}
         employeeName={employee.name}
-        onRoleAssigned={() => { /* no-op; could refresh a summary */ }}
+        onRoleAssigned={refreshDossierData}
       />
     </div>;
 }

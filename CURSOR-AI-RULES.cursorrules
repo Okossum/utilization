@@ -120,6 +120,13 @@ Nach jeder größeren Änderung:
 2. "Soll ich weitere Optimierungen vornehmen?"
 3. "Gibt es andere Bereiche die angepasst werden sollten?"
 
+
+## Server neu starten
+- Nach Änderungen prüfen, ob Frontend und/oder Backend Server neu gestartet
+werden müssen.
+- Wenn ja, Server neu starten
+- Gleiche Portadresse Verwendungen
+- Portadresse ausgeben
 ---
 
 # WICHTIG: Diese Regeln gelten für JEDEN Prompt

@@ -30,14 +30,14 @@ export function EmployeeSkillAssignment({
   employeeName, 
   onSkillsChange 
 }: EmployeeSkillAssignmentProps) {
-  // console.log entfernt
-  // console.log entfernt
-  // console.log entfernt
+  console.log('🏗️ EmployeeSkillAssignment rendered for:', { employeeId, employeeName });
   
   const { user, token } = useAuth();
+  console.log('🔑 EmployeeSkillAssignment token status:', token ? 'present' : 'missing');
   
   const [assignedSkills, setAssignedSkills] = useState<EmployeeSkill[]>([]);
   const [availableSkills, setAvailableSkills] = useState<AvailableSkill[]>([]);
+  const [skillCategories, setSkillCategories] = useState<any[]>([]);
   const [selectedSkillId, setSelectedSkillId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -58,7 +58,7 @@ export function EmployeeSkillAssignment({
       // Separate async Funktion für das Laden der Skills
       const loadSkills = async () => {
         try {
-          await Promise.all([loadAvailableSkills(), loadAssignedSkills()]);
+          await Promise.all([loadSkillCategories(), loadAvailableSkills(), loadAssignedSkills()]);
         } finally {
           setIsInitialLoading(false);
         }
@@ -69,6 +69,35 @@ export function EmployeeSkillAssignment({
       // console.log entfernt
     }
   }, [employeeId, user, token]);
+
+  const loadSkillCategories = async () => {
+    try {
+      if (!token) {
+        console.error('❌ EmployeeSkillAssignment: No token for categories');
+        return;
+      }
+      
+      console.log('🔄 EmployeeSkillAssignment: Loading skill categories');
+      const response = await fetch('/api/technical-skill-categories', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const categories = await response.json();
+        console.log('✅ EmployeeSkillAssignment: Loaded categories:', categories);
+        setSkillCategories(categories);
+      } else {
+        console.error('❌ EmployeeSkillAssignment: Failed to load categories:', response.status);
+        setError('Fehler beim Laden der Skill-Kategorien');
+      }
+    } catch (error) {
+      console.error('❌ EmployeeSkillAssignment: Categories error:', error);
+      setError('Fehler beim Laden der Skill-Kategorien');
+    }
+  };
 
   const loadAvailableSkills = async () => {
     // console.log entfernt
@@ -115,10 +144,12 @@ export function EmployeeSkillAssignment({
     try {
       setIsLoading(true);
       if (!token) {
-        // console.error entfernt
+        console.error('❌ EmployeeSkillAssignment: No token available');
         return;
       }
-      const response = await fetch(`/api/employee-skills/${employeeId}`, {
+      
+      console.log('🔄 EmployeeSkillAssignment: Loading assigned skills for:', employeeId);
+      const response = await fetch(`/api/employee-technical-skills/${employeeId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -127,10 +158,11 @@ export function EmployeeSkillAssignment({
       
       if (response.ok) {
         const skills = await response.json();
+        console.log('✅ EmployeeSkillAssignment: Loaded assigned skills:', skills);
         setAssignedSkills(skills);
         onSkillsChange?.(skills);
       } else {
-        // console.error entfernt
+        console.error('❌ EmployeeSkillAssignment: Failed to load skills:', response.status, response.statusText);
         setError('Fehler beim Laden der zugewiesenen Skills');
       }
     } catch (error) {
@@ -282,6 +314,32 @@ export function EmployeeSkillAssignment({
     return unassignedSkills;
   };
 
+  // Gruppiere zugewiesene Skills nach Kategorien
+  const getGroupedAssignedSkills = () => {
+    const grouped: Record<string, { category: any; skills: EmployeeSkill[] }> = {};
+    
+    assignedSkills.forEach(skill => {
+      // Finde die Kategorie für diesen Skill
+      const skillDetails = availableSkills.find(s => s.id === skill.skillId);
+      const categoryId = skill.categoryId || skillDetails?.category || 'uncategorized';
+      const category = skillCategories.find(c => c.id === categoryId);
+      
+      if (!grouped[categoryId]) {
+        grouped[categoryId] = {
+          category: category || { id: categoryId, name: 'Unkategorisiert', icon: '📋' },
+          skills: []
+        };
+      }
+      
+      grouped[categoryId].skills.push(skill);
+    });
+    
+    // Sortiere Kategorien alphabetisch
+    return Object.values(grouped).sort((a, b) => 
+      a.category.name.localeCompare(b.category.name)
+    );
+  };
+
   // Sterne-Bewertung Component (identisch zu Rollen)
   const SkillStarRating: React.FC<{
     value: number;
@@ -392,9 +450,27 @@ export function EmployeeSkillAssignment({
             <p className="text-sm">Weisen Sie einen Skill aus den verfügbaren Skills unten zu.</p>
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {assignedSkills.map((skill) => (
-              <SkillAssignmentCard key={skill.id} skill={skill} />
+          <div className="space-y-6">
+            {getGroupedAssignedSkills().map((group) => (
+              <div key={group.category.id} className="space-y-3">
+                {/* Kategorie-Header */}
+                <div className="flex items-center space-x-2 pb-2 border-b border-gray-200">
+                  <span className="text-lg">{group.category.icon || '📋'}</span>
+                  <h5 className="text-md font-semibold text-gray-800">
+                    {group.category.name}
+                  </h5>
+                  <span className="text-sm text-gray-500">
+                    ({group.skills.length} Skill{group.skills.length !== 1 ? 's' : ''})
+                  </span>
+                </div>
+                
+                {/* Skills in dieser Kategorie */}
+                <div className="grid gap-3 md:grid-cols-2 pl-6">
+                  {group.skills.map((skill) => (
+                    <SkillAssignmentCard key={skill.id} skill={skill} />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -428,7 +504,7 @@ export function EmployeeSkillAssignment({
         employeeId={employeeId}
         employeeName={employeeName}
         onSkillAssigned={() => {
-          // Skill wurde zugewiesen - Daten neu laden
+          console.log('🔄 EmployeeSkillAssignment: Skill assigned, reloading...');
           loadAssignedSkills();
         }}
       />

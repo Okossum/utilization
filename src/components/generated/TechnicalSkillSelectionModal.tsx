@@ -1,16 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, Star, Loader2, Search } from 'lucide-react';
+import { 
+  X, 
+  Plus, 
+  Star, 
+  Loader2, 
+  Search, 
+  ChevronDown, 
+  ChevronRight,
+  Check,
+  Folder,
+  FolderOpen,
+  CheckCircle2,
+  Code
+} from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface TechnicalSkill {
   id: string;
   name: string;
   description: string;
-  category: string;
+  categoryId: string;
+  categoryName?: string;
 }
 
-interface AssignedSkill {
+interface TechnicalSkillCategory {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+interface AssignedTechnicalSkill {
   id: string;
   skillId: string;
   skillName: string;
@@ -24,7 +44,7 @@ interface TechnicalSkillSelectionModalProps {
   onClose: () => void;
   employeeId: string;
   employeeName: string;
-  onSkillAssigned: () => void; // Callback wenn ein Skill zugewiesen wurde
+  onSkillAssigned: () => void;
 }
 
 const TechnicalSkillSelectionModal: React.FC<TechnicalSkillSelectionModalProps> = ({
@@ -35,72 +55,75 @@ const TechnicalSkillSelectionModal: React.FC<TechnicalSkillSelectionModalProps> 
   onSkillAssigned,
 }) => {
   const { token } = useAuth();
-  const [availableSkills, setAvailableSkills] = useState<TechnicalSkill[]>([]);
-  const [assignedSkills, setAssignedSkills] = useState<AssignedSkill[]>([]);
+  
+  // State für hierarchische Auswahl
+  const [categories, setCategories] = useState<TechnicalSkillCategory[]>([]);
+  const [skills, setSkills] = useState<TechnicalSkill[]>([]);
+  const [assignedSkills, setAssignedSkills] = useState<AssignedTechnicalSkill[]>([]);
+  
+  // UI State
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  
+  // Hierarchische Auswahl State
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  
+  // Skill-Level State für jeden einzelnen Skill
+  const [skillLevels, setSkillLevels] = useState<Record<string, number>>({});
 
-  // Verfügbare Skills laden
-  const loadAvailableSkills = async () => {
+  // Kategorien laden
+  const loadCategories = async () => {
     try {
-      const response = await fetch('/api/technical-skills', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const response = await fetch('/api/technical-skill-categories', {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const skillsData = await response.json();
-      setAvailableSkills(skillsData);
-      
+      if (!response.ok) { throw new Error(`HTTP ${response.status}: ${response.statusText}`); }
+      const categoriesData = await response.json();
+      setCategories(categoriesData);
     } catch (error) {
-      // console.error entfernt
-      setError('Fehler beim Laden der verfügbaren Skills');
+      console.error('Error loading categories:', error);
+      setError('Fehler beim Laden der Kategorien');
     }
   };
 
-  // Zugewiesene Skills laden (über bestehende Employee Skills API)
-  const loadAssignedSkills = async () => {
+  // Skills laden
+  const loadSkills = async () => {
     try {
-      // Verwende die korrekte API für Employee Skills
-      const response = await fetch(`/api/employee-skills/${encodeURIComponent(employeeId)}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const response = await fetch('/api/technical-skills', {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
-
-      if (!response.ok) {
-        // Falls 404, hat der Employee noch keine Skills - das ist OK
-        if (response.status === 404) {
-          setAssignedSkills([]);
-          return;
-        }
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
+      if (!response.ok) { throw new Error(`HTTP ${response.status}: ${response.statusText}`); }
       const skillsData = await response.json();
-      // Konvertiere das Format für Kompatibilität
-      const formattedSkills = skillsData.map((skill: any) => ({
-        id: skill.skillId,
-        skillId: skill.skillId,
-        skillName: skill.skillName || skill.name,
-        level: skill.level,
-        assignedAt: skill.assignedAt,
-        lastUpdated: skill.lastUpdated
-      }));
-      setAssignedSkills(formattedSkills);
+      setSkills(skillsData);
+      
+      // Initialisiere Skill-Levels (Standard: 3 pro Skill)
+      const levelsBySkill: Record<string, number> = {};
+      skillsData.forEach((skill: TechnicalSkill) => {
+        levelsBySkill[skill.id] = 3; // Jeder Skill bekommt Standard-Level 3
+      });
+      setSkillLevels(levelsBySkill);
       
     } catch (error) {
-      // console.error entfernt
-      setError('Fehler beim Laden der zugewiesenen Skills');
+      console.error('Error loading skills:', error);
+      setError('Fehler beim Laden der Skills');
+    }
+  };
+
+  // Zugewiesene Skills laden
+  const loadAssignedSkills = async () => {
+    try {
+      const response = await fetch(`/api/employee-technical-skills/${employeeId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) { throw new Error(`HTTP ${response.status}: ${response.statusText}`); }
+      const assignedData = await response.json();
+      setAssignedSkills(assignedData);
+    } catch (error) {
+      console.warn('Error loading assigned skills:', error);
+      setAssignedSkills([]);
     }
   };
 
@@ -111,34 +134,58 @@ const TechnicalSkillSelectionModal: React.FC<TechnicalSkillSelectionModalProps> 
     
     try {
       await Promise.all([
-        loadAvailableSkills(),
+        loadCategories(),
+        loadSkills(),
         loadAssignedSkills()
       ]);
     } catch (error) {
-      // console.error entfernt
+      console.error('Error loading data:', error);
+      setError('Fehler beim Laden der Daten');
     } finally {
       setLoading(false);
     }
   };
 
-  // Skill zuweisen (über bestehende Employee Skills API)
-  const assignSkill = async (skillId: string, skillName: string, level: number) => {
+  // Kategorie expandieren/kollabieren
+  const toggleCategory = (categoryId: string) => {
+    const newExpanded = new Set(expandedCategories);
+    if (newExpanded.has(categoryId)) {
+      newExpanded.delete(categoryId);
+    } else {
+      newExpanded.add(categoryId);
+    }
+    setExpandedCategories(newExpanded);
+  };
+
+  // Bewertungslevel für einzelnen Skill ändern
+  const updateSkillLevel = (skillId: string, level: number) => {
+    setSkillLevels(prev => ({
+      ...prev,
+      [skillId]: level
+    }));
+  };
+
+  // Skill zuweisen
+  const assignSkill = async (categoryId: string, skillId: string) => {
+    const level = skillLevels[skillId] || 3;
+    const skill = skills.find(s => s.id === skillId);
+    const skillName = skill?.name || 'Skill';
+
     setIsSubmitting(true);
     setError(null);
-    
+    setSuccessMessage(null);
+
     try {
-      // Verwende die korrekte API für einzelne Skill-Zuweisungen
-      const response = await fetch('/api/employee-skills', {
+      const response = await fetch(`/api/employee-technical-skills/${employeeId}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ 
-          employeeId,
-          skillId, 
-          skillName, 
-          level 
+        body: JSON.stringify({
+          skillId: skillId,
+          level: level,
+          categoryId: categoryId
         })
       });
 
@@ -147,41 +194,40 @@ const TechnicalSkillSelectionModal: React.FC<TechnicalSkillSelectionModalProps> 
         throw new Error(errorData.error || 'Fehler beim Zuweisen des Skills');
       }
 
-      // Erfolgreich zugewiesen - Daten neu laden und Callback aufrufen
-      await loadAssignedSkills();
-      onSkillAssigned();
+      // Success message setzen
+      setSuccessMessage(`${skillName} wurde erfolgreich zugewiesen`);
       
+      // Daten neu laden
+      await loadAssignedSkills();
+      
+      // Callback aufrufen
+      onSkillAssigned();
+
     } catch (error: any) {
-      // console.error entfernt
+      console.error('Error assigning skill:', error);
       setError(error.message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Verfügbare (nicht zugewiesene) Skills berechnen
-  const getUnassignedSkills = () => {
-    const assignedSkillIds = assignedSkills.map(skill => skill.skillId);
-    return availableSkills.filter(skill => !assignedSkillIds.includes(skill.id));
+  // Skills für eine Kategorie abrufen
+  const getSkillsForCategory = (categoryId: string): TechnicalSkill[] => {
+    return skills.filter(skill => skill.categoryId === categoryId);
   };
 
-  // Gefilterte Skills basierend auf Suche und Kategorie
-  const getFilteredSkills = () => {
-    const unassigned = getUnassignedSkills();
-    
-    return unassigned.filter(skill => {
-      const matchesSearch = skill.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           skill.description.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesCategory = !selectedCategory || skill.category === selectedCategory;
-      
-      return matchesSearch && matchesCategory;
+  // Gefilterte Kategorien
+  const getFilteredCategories = (): TechnicalSkillCategory[] => {
+    return categories.filter(category => {
+      const matchesSearch = category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           (category.description && category.description.toLowerCase().includes(searchTerm.toLowerCase()));
+      return matchesSearch;
     });
   };
 
-  // Verfügbare Kategorien
-  const getAvailableCategories = () => {
-    const categories = Array.from(new Set(availableSkills.map(skill => skill.category)));
-    return categories.filter(cat => cat && cat.trim() !== '');
+  // Prüfen ob Skill bereits zugewiesen ist
+  const isSkillAssigned = (skillId: string) => {
+    return assignedSkills.some(assigned => assigned.skillId === skillId);
   };
 
   // Sterne-Bewertung Component
@@ -215,50 +261,6 @@ const TechnicalSkillSelectionModal: React.FC<TechnicalSkillSelectionModalProps> 
     );
   };
 
-  // SkillCard Component
-  const SkillCard: React.FC<{ skill: TechnicalSkill }> = ({ skill }) => {
-    const [selectedLevel, setSelectedLevel] = useState(3);
-    
-    return (
-      <div className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-        <div className="mb-3">
-          <h4 className="font-medium text-gray-900 mb-1">{skill.name}</h4>
-          {skill.description && (
-            <p className="text-sm text-gray-600 mb-2">{skill.description}</p>
-          )}
-          {skill.category && (
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-              {skill.category}
-            </span>
-          )}
-        </div>
-        
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-sm text-gray-600">Bewertung:</span>
-          <StarRating
-            value={selectedLevel}
-            onChange={setSelectedLevel}
-            disabled={isSubmitting}
-          />
-          <span className="text-sm text-gray-500">({selectedLevel}/5)</span>
-        </div>
-        
-        <button
-          onClick={() => assignSkill(skill.id, skill.name, selectedLevel)}
-          disabled={isSubmitting}
-          className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {isSubmitting ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Plus className="w-4 h-4" />
-          )}
-          Zuweisen
-        </button>
-      </div>
-    );
-  };
-
   // Beim Öffnen des Modals Daten laden
   useEffect(() => {
     if (isOpen && token && employeeId) {
@@ -266,17 +268,34 @@ const TechnicalSkillSelectionModal: React.FC<TechnicalSkillSelectionModalProps> 
     }
   }, [isOpen, token, employeeId]);
 
+  // Success-Message Timeout verwalten
+  useEffect(() => {
+    if (successMessage) {
+      console.log('Success message set, starting 3 second timeout');
+      const timeoutId = setTimeout(() => {
+        console.log('Hiding success message after 3 seconds');
+        setSuccessMessage(null);
+      }, 3000);
+      
+      return () => {
+        console.log('Clearing success message timeout');
+        clearTimeout(timeoutId);
+      };
+    }
+  }, [successMessage]);
+
   // Reset bei Schließen
   useEffect(() => {
     if (!isOpen) {
       setSearchTerm('');
-      setSelectedCategory('');
+      setSkillLevels({});
+      setExpandedCategories(new Set());
       setError(null);
+      setSuccessMessage(null);
     }
   }, [isOpen]);
 
-  const filteredSkills = getFilteredSkills();
-  const categories = getAvailableCategories();
+  const filteredCategories = getFilteredCategories();
 
   return (
     <AnimatePresence>
@@ -294,16 +313,16 @@ const TechnicalSkillSelectionModal: React.FC<TechnicalSkillSelectionModalProps> 
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-4xl max-h-[80vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            className="relative w-full max-w-5xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
           >
             {/* Header */}
-            <header className="flex items-center justify-between p-6 border-b border-gray-100 bg-gradient-to-r from-green-50 to-emerald-50">
+            <header className="flex items-center justify-between p-6 border-b border-gray-100 bg-gradient-to-r from-purple-50 to-indigo-50">
               <div>
                 <h1 className="text-xl font-semibold text-gray-900">
                   Technical Skills zuweisen
                 </h1>
                 <p className="text-sm text-gray-600 mt-1">
-                  Neue Technical Skills für {employeeName} auswählen und zuweisen
+                  Wählen Sie Kategorien und Skills für {employeeName} aus
                 </p>
               </div>
               <button
@@ -314,38 +333,25 @@ const TechnicalSkillSelectionModal: React.FC<TechnicalSkillSelectionModalProps> 
               </button>
             </header>
 
-            {/* Filters */}
+            {/* Success Message - Fixed Position */}
+            {successMessage && (
+              <div className="mx-6 mt-4 p-4 bg-green-100 border-2 border-green-300 rounded-lg text-sm text-green-800 flex items-center gap-2 shadow-lg">
+                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                <span className="font-medium">{successMessage}</span>
+              </div>
+            )}
+
+            {/* Search */}
             <div className="p-6 border-b border-gray-100 bg-gray-50">
-              <div className="flex flex-col sm:flex-row gap-4">
-                {/* Search */}
-                <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input
-                    type="text"
-                    placeholder="Skills durchsuchen..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  />
-                </div>
-                
-                {/* Category Filter */}
-                {categories.length > 0 && (
-                  <div className="sm:w-48">
-                    <select
-                      value={selectedCategory}
-                      onChange={(e) => setSelectedCategory(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    >
-                      <option value="">Alle Kategorien</option>
-                      {categories.map(category => (
-                        <option key={category} value={category}>
-                          {category}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Kategorien durchsuchen..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
               </div>
             </div>
 
@@ -362,48 +368,155 @@ const TechnicalSkillSelectionModal: React.FC<TechnicalSkillSelectionModalProps> 
               {loading ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                  <span>Lade verfügbare Skills...</span>
+                  <span>Lade Kategorien und Skills...</span>
                 </div>
               ) : (
                 <>
                   {/* Results Count */}
                   <div className="mb-4">
                     <p className="text-sm text-gray-600">
-                      {filteredSkills.length} von {getUnassignedSkills().length} verfügbaren Skills
+                      {filteredCategories.length} Kategorien verfügbar
                       {searchTerm && ` (gefiltert nach "${searchTerm}")`}
-                      {selectedCategory && ` in Kategorie "${selectedCategory}"`}
                     </p>
                   </div>
 
-                  {/* Skills Grid */}
-                  {filteredSkills.length === 0 ? (
+                  {/* Hierarchische Kategorien-Liste */}
+                  {filteredCategories.length === 0 ? (
                     <div className="text-center py-12 text-gray-500">
-                      {getUnassignedSkills().length === 0 ? (
-                        <p>Alle verfügbaren Skills sind bereits zugewiesen.</p>
-                      ) : (
-                        <p>Keine Skills gefunden, die den Filterkriterien entsprechen.</p>
-                      )}
+                      <p>Keine Kategorien gefunden.</p>
                     </div>
                   ) : (
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                      {filteredSkills.map((skill) => (
-                        <SkillCard key={skill.id} skill={skill} />
-                      ))}
+                    <div className="space-y-3">
+                      {filteredCategories.map(category => {
+                        const categorySkills = getSkillsForCategory(category.id);
+                        const isExpanded = expandedCategories.has(category.id);
+                        
+                        return (
+                          <div key={category.id} className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                            {/* Kategorie-Header */}
+                            <div className="bg-purple-50 border-b border-gray-200 p-4 flex items-center justify-between hover:bg-purple-100">
+                              <div className="flex items-center gap-3">
+                                <button
+                                  onClick={() => toggleCategory(category.id)}
+                                  className="text-gray-600 hover:text-gray-800"
+                                >
+                                  {isExpanded ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                </button>
+                                
+                                {isExpanded ? (
+                                  <FolderOpen className="h-5 w-5 text-purple-600" />
+                                ) : (
+                                  <Folder className="h-5 w-5 text-purple-600" />
+                                )}
+                                
+                                <div>
+                                  <h3 className="font-medium text-gray-900">{category.name}</h3>
+                                  {category.description && (
+                                    <p className="text-sm text-gray-600">{category.description}</p>
+                                  )}
+                                  <p className="text-xs text-gray-500">
+                                    {categorySkills.length} Skill(s)
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Skills (wenn Kategorie expandiert) */}
+                            {isExpanded && (
+                              <div className="bg-white">
+                                {categorySkills.length === 0 ? (
+                                  <div className="p-4 pl-12 text-center text-gray-500 text-sm">
+                                    Keine Skills für diese Kategorie verfügbar.
+                                  </div>
+                                ) : (
+                                  <div className="p-4 pl-12 space-y-2">
+                                    {categorySkills.map(skill => {
+                                      const isAssigned = isSkillAssigned(skill.id);
+                                      const level = skillLevels[skill.id] || 3;
+                                      
+                                      return (
+                                        <div
+                                          key={skill.id}
+                                          className={`p-3 border rounded-lg transition-colors ${
+                                            isAssigned
+                                              ? 'border-green-200 bg-green-50' 
+                                              : 'border-gray-200 bg-gray-50 hover:bg-purple-50'
+                                          }`}
+                                        >
+                                          <div className="flex items-center justify-between">
+                                            <div className="flex items-start gap-3">
+                                              <Code className="w-5 h-5 text-purple-600 mt-1" />
+                                              
+                                              <div className="flex-1 min-w-0">
+                                                <h5 className={`font-medium ${
+                                                  isAssigned ? 'text-green-900' : 'text-gray-700'
+                                                }`}>
+                                                  {skill.name}
+                                                </h5>
+                                                
+                                                {skill.description && (
+                                                  <p className={`text-sm mt-1 ${
+                                                    isAssigned ? 'text-green-700' : 'text-gray-600'
+                                                  }`}>
+                                                    {skill.description}
+                                                  </p>
+                                                )}
+                                                
+                                                {/* Level-Auswahl für diesen Skill */}
+                                                {!isAssigned && (
+                                                  <div className="flex items-center gap-2 mt-2">
+                                                    <span className="text-sm text-gray-600">Level:</span>
+                                                    <StarRating
+                                                      value={level}
+                                                      onChange={(newLevel) => updateSkillLevel(skill.id, newLevel)}
+                                                      disabled={isSubmitting}
+                                                    />
+                                                  </div>
+                                                )}
+                                                
+                                                {isAssigned && (
+                                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 mt-2">
+                                                    Bereits zugewiesen
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+                                            
+                                            {/* Zuweisen-Button */}
+                                            {!isAssigned && (
+                                              <button
+                                                onClick={() => assignSkill(category.id, skill.id)}
+                                                disabled={isSubmitting}
+                                                className="inline-flex items-center gap-2 px-3 py-2 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                              >
+                                                {isSubmitting ? (
+                                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                                ) : (
+                                                  <Plus className="w-4 h-4" />
+                                                )}
+                                                Zuweisen
+                                              </button>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </>
               )}
             </div>
-
-            {/* Footer */}
-            <footer className="flex items-center justify-end gap-3 p-6 border-t border-gray-100 bg-gray-50">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Schließen
-              </button>
-            </footer>
           </motion.div>
         </div>
       )}
