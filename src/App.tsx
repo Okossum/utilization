@@ -8,6 +8,8 @@ import EmployeeSelectionModal from './components/generated/EmployeeSelectionModa
 import EmployeeDetailView from './components/generated/EmployeeDetailView';
 import HierarchicalRoleManagement from './components/generated/HierarchicalRoleManagement';
 import TechnicalSkillManagement from './components/generated/TechnicalSkillManagement';
+import SoftSkillManagement from './components/generated/SoftSkillManagement';
+import { SoftSkillBulkUploadModal } from './components/generated/SoftSkillBulkUploadModal';
 import TechnicalSkillBulkUploadModal from './components/generated/TechnicalSkillBulkUploadModal';
 import RoleTaskBulkUploadModal from './components/generated/RoleTaskBulkUploadModal';
 import ProjectRoleTaskSelectorDemo from './components/generated/ProjectRoleTaskSelectorDemo';
@@ -80,6 +82,8 @@ function App() {
     // States für Management Modals
     const [isHierarchicalRoleManagementOpen, setIsHierarchicalRoleManagementOpen] = useState(false);
     const [isTechnicalSkillManagementOpen, setIsTechnicalSkillManagementOpen] = useState(false);
+    const [isSoftSkillManagementOpen, setIsSoftSkillManagementOpen] = useState(false);
+    const [isSoftSkillImportOpen, setIsSoftSkillImportOpen] = useState(false);
     const [isTechnicalSkillImportOpen, setIsTechnicalSkillImportOpen] = useState(false);
   const [isRoleTaskImportOpen, setIsRoleTaskImportOpen] = useState(false);
     const [isCustomerProjectsManagementOpen, setIsCustomerProjectsManagementOpen] = useState(false);
@@ -226,6 +230,8 @@ function App() {
             onEinsatzplanView={() => setIsEinsatzplanViewOpen(true)}
             onRoleManagement={() => setIsHierarchicalRoleManagementOpen(true)}
             onTechnicalSkillManagement={() => setIsTechnicalSkillManagementOpen(true)}
+            onSoftSkillManagement={() => setIsSoftSkillManagementOpen(true)}
+            onSoftSkillImport={() => setIsSoftSkillImportOpen(true)}
                           onTechnicalSkillImport={() => setIsTechnicalSkillImportOpen(true)}
               onRoleTaskImport={() => setIsRoleTaskImportOpen(true)}
             onCustomerProjectsManagement={() => setIsCustomerProjectsManagementOpen(true)}
@@ -543,6 +549,25 @@ function App() {
             </div>
           )}
 
+          {isSoftSkillManagementOpen && (
+            <div className="fixed inset-0 z-50 overflow-y-auto">
+              <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
+                <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+                  <SoftSkillManagement />
+                  <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button
+                      onClick={() => setIsSoftSkillManagementOpen(false)}
+                      className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                    >
+                      Schließen
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {isCustomerProjectsManagementOpen && (
             <div className="fixed inset-0 z-50 overflow-y-auto">
               <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
@@ -597,6 +622,14 @@ function App() {
           <TechnicalSkillBulkUploadModal
             isOpen={isTechnicalSkillImportOpen}
             onClose={() => setIsTechnicalSkillImportOpen(false)}
+            onImportComplete={() => {
+              // Refresh any relevant data if needed
+            }}
+          />
+
+          <SoftSkillBulkUploadModal
+            isOpen={isSoftSkillImportOpen}
+            onClose={() => setIsSoftSkillImportOpen(false)}
             onImportComplete={() => {
               // Refresh any relevant data if needed
             }}

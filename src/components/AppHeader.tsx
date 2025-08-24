@@ -19,6 +19,8 @@ interface AppHeaderProps {
   // Management Buttons
   onRoleManagement?: () => void;
   onTechnicalSkillManagement?: () => void;
+  onSoftSkillManagement?: () => void;
+  onSoftSkillImport?: () => void;
   onTechnicalSkillImport?: () => void;
   onRoleTaskImport?: () => void;
   onProjectRolesDemo?: () => void;
@@ -42,6 +44,8 @@ export function AppHeader({
   lobOptions = [],
   onRoleManagement,
   onTechnicalSkillManagement,
+  onSoftSkillManagement,
+  onSoftSkillImport,
   onTechnicalSkillImport,
   onRoleTaskImport,
   onProjectRolesDemo,
@@ -309,7 +313,7 @@ export function AppHeader({
                 )}
 
                 {/* Management */}
-                {(onRoleManagement || onTechnicalSkillManagement || onTechnicalSkillImport || onRoleTaskImport || onProjectRolesDemo || onProjectSkillsDemo || onCustomerProjectsManagement || onAuslastungserklaerungManagement) && (
+                {(onRoleManagement || onTechnicalSkillManagement || onSoftSkillManagement || onSoftSkillImport || onTechnicalSkillImport || onRoleTaskImport || onProjectRolesDemo || onProjectSkillsDemo || onCustomerProjectsManagement || onAuslastungserklaerungManagement) && (
                   <div className="mb-3">
                     <button
                       onClick={() => toggleSection('management')}
@@ -336,12 +340,28 @@ export function AppHeader({
                             🛠️ Tech Skills
                           </button>
                         )}
+                        {onSoftSkillManagement && (
+                          <button
+                            onClick={() => { onSoftSkillManagement(); setIsSettingsMenuOpen(false); }}
+                            className="w-full px-3 py-2 text-sm text-pink-700 bg-pink-50 border border-pink-200 rounded-lg hover:bg-pink-100 text-left font-medium"
+                          >
+                            💝 Soft Skills
+                          </button>
+                        )}
                         {onTechnicalSkillImport && (
                           <button
                             onClick={() => { onTechnicalSkillImport(); setIsSettingsMenuOpen(false); }}
                             className="w-full px-3 py-2 text-sm text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 text-left font-medium"
                           >
                             📊 Tech Skills Import
+                          </button>
+                        )}
+                        {onSoftSkillImport && (
+                          <button
+                            onClick={() => { onSoftSkillImport(); setIsSettingsMenuOpen(false); }}
+                            className="w-full px-3 py-2 text-sm text-orange-700 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 text-left font-medium"
+                          >
+                            📊 Soft Skills Import
                           </button>
                         )}
                         {onRoleTaskImport && (

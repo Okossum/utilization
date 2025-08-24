@@ -239,7 +239,7 @@ export function ProjectCard({
           <div className="text-xs text-gray-600 mb-1">Tätigkeiten:</div>
           <ul className="text-xs text-gray-700 space-y-1">
             {project.activities.map((activity, index) => (
-              <li key={index} className="flex items-start space-x-1">
+              <li key={`activity-${project.id}-${index}`} className="flex items-start space-x-1">
                 <span className="w-1 h-1 bg-gray-400 rounded-full mt-2 flex-shrink-0"></span>
                 <span>{activity}</span>
               </li>

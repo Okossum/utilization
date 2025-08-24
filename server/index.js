@@ -2651,6 +2651,537 @@ app.post('/api/technical-skills/bulk-import', requireAuth, async (req, res) => {
 });
 
 // ==========================================
+// SOFT SKILLS API ENDPOINTS
+// ==========================================
+
+// GET /api/soft-skills - Alle Soft Skills laden
+app.get('/api/soft-skills', requireAuth, async (req, res) => {
+  try {
+    const skillsSnap = await db.collection('softSkills')
+      .where('isActive', '==', true)
+      .get();
+    
+    const skills = skillsSnap.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    res.json(skills);
+  } catch (error) {
+    console.error('Error loading soft skills:', error);
+    res.status(500).json({ error: 'Fehler beim Laden der Soft Skills' });
+  }
+});
+
+// POST /api/soft-skills - Neuen Soft Skill erstellen
+app.post('/api/soft-skills', requireAuth, async (req, res) => {
+  try {
+    const { name, description, category, categoryId } = req.body;
+    
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Skill-Name ist erforderlich' });
+    }
+    
+    if (!categoryId) {
+      return res.status(400).json({ error: 'Kategorie ist erforderlich' });
+    }
+    
+    // Prüfe ob Skill bereits existiert
+    const existingSkillSnap = await db.collection('softSkills')
+      .where('name', '==', name.trim())
+      .where('isActive', '==', true)
+      .get();
+    
+    if (!existingSkillSnap.empty) {
+      return res.status(409).json({ error: 'Ein Soft Skill mit diesem Namen existiert bereits' });
+    }
+    
+    const newSkill = {
+      name: name.trim(),
+      description: description?.trim() || '',
+      category: category || '',
+      categoryId: categoryId,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    const docRef = await db.collection('softSkills').add(newSkill);
+    
+    res.json({
+      success: true,
+      skill: {
+        id: docRef.id,
+        ...newSkill
+      }
+    });
+  } catch (error) {
+    console.error('Error creating soft skill:', error);
+    res.status(500).json({ error: 'Fehler beim Erstellen des Soft Skills' });
+  }
+});
+
+// PUT /api/soft-skills/:id - Soft Skill bearbeiten
+app.put('/api/soft-skills/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, category, categoryId } = req.body;
+    
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Skill-Name ist erforderlich' });
+    }
+    
+    if (!categoryId) {
+      return res.status(400).json({ error: 'Kategorie ist erforderlich' });
+    }
+    
+    // Prüfe ob Skill existiert
+    const skillDoc = await db.collection('softSkills').doc(id).get();
+    if (!skillDoc.exists) {
+      return res.status(404).json({ error: 'Soft Skill nicht gefunden' });
+    }
+    
+    // Prüfe ob anderer Name bereits existiert
+    const existingSkillSnap = await db.collection('softSkills')
+      .where('name', '==', name.trim())
+      .where('isActive', '==', true)
+      .get();
+    
+    const conflictingSkills = existingSkillSnap.docs.filter(doc => doc.id !== id);
+    if (conflictingSkills.length > 0) {
+      return res.status(409).json({ error: 'Ein Soft Skill mit diesem Namen existiert bereits' });
+    }
+    
+    const updatedSkill = {
+      name: name.trim(),
+      description: description?.trim() || '',
+      category: category || '',
+      categoryId: categoryId,
+      updatedAt: new Date()
+    };
+    
+    await db.collection('softSkills').doc(id).update(updatedSkill);
+    
+    res.json({
+      success: true,
+      message: 'Soft Skill wurde erfolgreich aktualisiert'
+    });
+  } catch (error) {
+    console.error('Error updating soft skill:', error);
+    res.status(500).json({ error: 'Fehler beim Aktualisieren des Soft Skills' });
+  }
+});
+
+// DELETE /api/soft-skills/:id - Soft Skill löschen (soft delete)
+app.delete('/api/soft-skills/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Prüfe ob Skill existiert
+    const skillDoc = await db.collection('softSkills').doc(id).get();
+    if (!skillDoc.exists) {
+      return res.status(404).json({ error: 'Soft Skill nicht gefunden' });
+    }
+    
+    const skillName = skillDoc.data().name;
+    
+    // Soft Delete - markiere als inaktiv
+    await db.collection('softSkills').doc(id).update({
+      isActive: false,
+      deletedAt: new Date()
+    });
+    
+    res.json({
+      success: true,
+      message: `Soft Skill "${skillName}" wurde erfolgreich gelöscht`
+    });
+  } catch (error) {
+    console.error('Error deleting soft skill:', error);
+    res.status(500).json({ error: 'Fehler beim Löschen des Soft Skills' });
+  }
+});
+
+// ==========================================
+// SOFT SKILL CATEGORIES API ENDPOINTS
+// ==========================================
+
+// GET /api/soft-skill-categories - Alle Kategorien laden
+app.get('/api/soft-skill-categories', requireAuth, async (req, res) => {
+  try {
+    const categoriesSnap = await db.collection('softSkillCategories')
+      .where('isActive', '==', true)
+      .get();
+    
+    const categories = categoriesSnap.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    res.json(categories);
+  } catch (error) {
+    console.error('Error loading soft skill categories:', error);
+    res.status(500).json({ error: 'Fehler beim Laden der Kategorien' });
+  }
+});
+
+// POST /api/soft-skill-categories - Neue Kategorie erstellen
+app.post('/api/soft-skill-categories', requireAuth, async (req, res) => {
+  try {
+    const { name } = req.body;
+    
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Kategorie-Name ist erforderlich' });
+    }
+    
+    // Prüfen ob Kategorie bereits existiert
+    const existingSnap = await db.collection('softSkillCategories')
+      .where('name', '==', name.trim())
+      .where('isActive', '==', true)
+      .get();
+    
+    if (!existingSnap.empty) {
+      return res.status(409).json({ error: 'Eine Kategorie mit diesem Namen existiert bereits' });
+    }
+    
+    const categoryData = {
+      name: name.trim(),
+      isActive: true,
+      createdAt: new Date()
+    };
+    
+    const docRef = await db.collection('softSkillCategories').add(categoryData);
+    
+    res.json({
+      success: true,
+      category: {
+        id: docRef.id,
+        ...categoryData
+      }
+    });
+  } catch (error) {
+    console.error('Error creating soft skill category:', error);
+    res.status(500).json({ error: 'Fehler beim Erstellen der Kategorie' });
+  }
+});
+
+// PUT /api/soft-skill-categories/:id - Kategorie bearbeiten
+app.put('/api/soft-skill-categories/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+    
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Kategorie-Name ist erforderlich' });
+    }
+    
+    // Prüfen ob Kategorie existiert
+    const categoryDoc = await db.collection('softSkillCategories').doc(id).get();
+    if (!categoryDoc.exists) {
+      return res.status(404).json({ error: 'Kategorie nicht gefunden' });
+    }
+    
+    // Prüfen ob Name bereits von anderer Kategorie verwendet wird
+    const existingSnap = await db.collection('softSkillCategories')
+      .where('name', '==', name.trim())
+      .where('isActive', '==', true)
+      .get();
+    
+    const duplicateExists = existingSnap.docs.some(doc => doc.id !== id);
+    if (duplicateExists) {
+      return res.status(409).json({ error: 'Eine Kategorie mit diesem Namen existiert bereits' });
+    }
+    
+    const updateData = {
+      name: name.trim(),
+      updatedAt: new Date()
+    };
+    
+    await db.collection('softSkillCategories').doc(id).update(updateData);
+    
+    res.json({
+      success: true,
+      message: 'Kategorie wurde erfolgreich aktualisiert'
+    });
+  } catch (error) {
+    console.error('Error updating soft skill category:', error);
+    res.status(500).json({ error: 'Fehler beim Aktualisieren der Kategorie' });
+  }
+});
+
+// DELETE /api/soft-skill-categories/:id - Kategorie löschen (soft delete)
+app.delete('/api/soft-skill-categories/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Prüfen ob Kategorie existiert
+    const categoryDoc = await db.collection('softSkillCategories').doc(id).get();
+    if (!categoryDoc.exists) {
+      return res.status(404).json({ error: 'Kategorie nicht gefunden' });
+    }
+    
+    const categoryData = categoryDoc.data();
+    const categoryName = categoryData.name;
+    
+    // Prüfen ob Skills diese Kategorie verwenden
+    const skillsSnap = await db.collection('softSkills')
+      .where('categoryId', '==', id)
+      .where('isActive', '==', true)
+      .get();
+    
+    if (!skillsSnap.empty) {
+      return res.status(400).json({ 
+        error: `Kategorie "${categoryName}" kann nicht gelöscht werden, da sie von ${skillsSnap.size} Soft Skills verwendet wird` 
+      });
+    }
+    
+    // Soft delete
+    await db.collection('softSkillCategories').doc(id).update({
+      isActive: false,
+      deletedAt: new Date()
+    });
+    
+    res.json({
+      success: true,
+      message: `Kategorie "${categoryName}" wurde erfolgreich gelöscht`
+    });
+  } catch (error) {
+    console.error('Error deleting soft skill category:', error);
+    res.status(500).json({ error: 'Fehler beim Löschen der Kategorie' });
+  }
+});
+
+// ==========================================
+// SOFT SKILLS BULK IMPORT API ENDPOINT
+// ==========================================
+
+// POST /api/soft-skills/bulk-import - Excel-Import für Skills und Kategorien
+app.post('/api/soft-skills/bulk-import', requireAuth, async (req, res) => {
+  try {
+    const { skills } = req.body; // Array von { category: string, skill: string }
+    
+    if (!Array.isArray(skills) || skills.length === 0) {
+      return res.status(400).json({ error: 'Keine gültigen Daten zum Import gefunden' });
+    }
+    
+    let categoriesCreated = 0;
+    let skillsCreated = 0;
+    let skillsIgnored = 0;
+    const errors = [];
+    
+    // Maps für bereits verarbeitete Kategorien und Skills
+    const processedCategories = new Map(); // name -> id
+    const processedSkills = new Set(); // name
+    
+    // Bestehende Kategorien laden
+    const existingCategoriesSnap = await db.collection('softSkillCategories')
+      .where('isActive', '==', true)
+      .get();
+    
+    existingCategoriesSnap.forEach(doc => {
+      processedCategories.set(doc.data().name, doc.id);
+    });
+    
+    // Bestehende Skills laden
+    const existingSkillsSnap = await db.collection('softSkills')
+      .where('isActive', '==', true)
+      .get();
+    
+    existingSkillsSnap.forEach(doc => {
+      const skillData = doc.data();
+      processedSkills.add(skillData.name);
+    });
+    
+    // Batch für alle Operationen
+    const batch = db.batch();
+    
+    // Skills verarbeiten
+    for (const item of skills) {
+      try {
+        const categoryName = item.category?.trim();
+        const skillName = item.skill?.trim();
+        
+        if (!categoryName || !skillName) {
+          errors.push(`Übersprungen: Kategorie oder Skill fehlt`);
+          continue;
+        }
+        
+        // Kategorie verarbeiten
+        let categoryId = processedCategories.get(categoryName);
+        if (!categoryId) {
+          // Neue Kategorie erstellen
+          const categoryRef = db.collection('softSkillCategories').doc();
+          categoryId = categoryRef.id;
+          
+          batch.set(categoryRef, {
+            name: categoryName,
+            isActive: true,
+            createdAt: new Date()
+          });
+          
+          processedCategories.set(categoryName, categoryId);
+          categoriesCreated++;
+        }
+        
+        // Skill verarbeiten
+        if (processedSkills.has(skillName)) {
+          skillsIgnored++;
+          continue;
+        }
+        
+        // Neuen Skill erstellen
+        const skillRef = db.collection('softSkills').doc();
+        batch.set(skillRef, {
+          name: skillName,
+          categoryId: categoryId,
+          category: categoryName, // Legacy field
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+        
+        processedSkills.add(skillName);
+        skillsCreated++;
+        
+      } catch (error) {
+        errors.push(`Fehler bei Skill "${item.skill}": ${error.message}`);
+      }
+    }
+    
+    // Batch ausführen
+    if (categoriesCreated > 0 || skillsCreated > 0) {
+      await batch.commit();
+    }
+    
+    res.json({
+      categoriesCreated,
+      skillsCreated,
+      skillsIgnored,
+      errors
+    });
+    
+  } catch (error) {
+    console.error('Error in soft skills bulk import:', error);
+    res.status(500).json({ error: 'Fehler beim Bulk-Import der Soft Skills' });
+  }
+});
+
+// ==========================================
+// EMPLOYEE SOFT SKILLS API ENDPOINTS
+// ==========================================
+
+// GET /api/employees/:employeeId/soft-skills - Zugewiesene Soft Skills eines Mitarbeiters laden
+app.get('/api/employees/:employeeId/soft-skills', requireAuth, async (req, res) => {
+  try {
+    const { employeeId: rawEmployeeId } = req.params;
+    const employeeId = decodeURIComponent(rawEmployeeId);
+    
+    // Lade das employeeDossier
+    const dossierRef = db.collection('employeeDossiers').doc(employeeId);
+    const dossierDoc = await dossierRef.get();
+    
+    if (!dossierDoc.exists) {
+      return res.json([]); // Kein Dossier = keine Skills
+    }
+    
+    const dossierData = dossierDoc.data();
+    const assignedSoftSkills = dossierData.assignedSoftSkills || [];
+    
+    res.json(assignedSoftSkills);
+  } catch (error) {
+    console.error('Error loading employee soft skills:', error);
+    res.status(500).json({ error: 'Fehler beim Laden der Soft Skills' });
+  }
+});
+
+// POST /api/employees/:employeeId/soft-skills - Soft Skills einem Mitarbeiter zuweisen
+app.post('/api/employees/:employeeId/soft-skills', requireAuth, async (req, res) => {
+  try {
+    const { employeeId: rawEmployeeId } = req.params;
+    const employeeId = decodeURIComponent(rawEmployeeId);
+    const { assignments } = req.body; // Array von { skillId, level }
+    
+    if (!Array.isArray(assignments) || assignments.length === 0) {
+      return res.status(400).json({ error: 'Keine gültigen Skill-Zuweisungen gefunden' });
+    }
+    
+    // Validiere alle Assignments
+    for (const assignment of assignments) {
+      if (!assignment.skillId || !assignment.level || assignment.level < 1 || assignment.level > 5) {
+        return res.status(400).json({ error: 'Ungültige Skill-Zuweisung: skillId und level (1-5) sind erforderlich' });
+      }
+    }
+    
+    // Lade alle Skills um Namen zu bekommen
+    const skillIds = assignments.map(a => a.skillId);
+    const skillsSnap = await db.collection('softSkills')
+      .where(db.FieldPath.documentId(), 'in', skillIds)
+      .get();
+    
+    const skillsMap = new Map();
+    skillsSnap.forEach(doc => {
+      skillsMap.set(doc.id, doc.data());
+    });
+    
+    // Erstelle Assignment-Objekte
+    const assignedSoftSkills = assignments.map(assignment => {
+      const skillData = skillsMap.get(assignment.skillId);
+      if (!skillData) {
+        throw new Error(`Soft Skill mit ID ${assignment.skillId} nicht gefunden`);
+      }
+      
+      return {
+        id: `${employeeId}_${assignment.skillId}_${Date.now()}`,
+        skillId: assignment.skillId,
+        skillName: skillData.name,
+        level: assignment.level,
+        assignedAt: new Date(),
+        lastUpdated: new Date()
+      };
+    });
+    
+    // Lade oder erstelle employeeDossier
+    const dossierRef = db.collection('employeeDossiers').doc(employeeId);
+    const dossierDoc = await dossierRef.get();
+    
+    if (dossierDoc.exists) {
+      // Aktualisiere bestehendes Dossier
+      const existingData = dossierDoc.data();
+      const existingAssignedSoftSkills = existingData.assignedSoftSkills || [];
+      
+      // Entferne alte Zuweisungen für die gleichen Skills
+      const filteredExisting = existingAssignedSoftSkills.filter(existing => 
+        !skillIds.includes(existing.skillId)
+      );
+      
+      // Füge neue Zuweisungen hinzu
+      const updatedAssignedSoftSkills = [...filteredExisting, ...assignedSoftSkills];
+      
+      await dossierRef.update({
+        assignedSoftSkills: updatedAssignedSoftSkills,
+        updatedAt: new Date()
+      });
+    } else {
+      // Erstelle neues Dossier
+      await dossierRef.set({
+        id: employeeId,
+        assignedSoftSkills: assignedSoftSkills,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: `${assignedSoftSkills.length} Soft Skills erfolgreich zugewiesen`,
+      assignedSkills: assignedSoftSkills
+    });
+  } catch (error) {
+    console.error('Error assigning soft skills:', error);
+    res.status(500).json({ error: 'Fehler beim Zuweisen der Soft Skills' });
+  }
+});
+
+// ==========================================
 // ROLES API ENDPOINTS
 // ==========================================
 

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from 'react';
-import { ArrowLeft, User, Mail, MapPin, Calendar, Clock, Star, TrendingUp, MessageSquare, Edit3, Video, UserPlus, FileText, ChevronDown, Activity, Award, Edit, Trash2, Plus, ThumbsUp, ThumbsDown, Briefcase, Building, Pencil, Grid3X3, List, BarChart3 } from 'lucide-react';
+import { ArrowLeft, User, Mail, MapPin, Calendar, Clock, Star, TrendingUp, MessageSquare, Edit3, Video, UserPlus, FileText, ChevronDown, Award, Edit, Trash2, Plus, ThumbsUp, ThumbsDown, Briefcase, Building, Pencil, Grid3X3, List, BarChart3, Heart } from 'lucide-react';
 import { collection, getDocs, limit, query, where } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 
@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import DatabaseService from '../../services/database';
 import { useUtilizationData } from '../../contexts/UtilizationDataContext';
 import TechnicalSkillSelectionModal from './TechnicalSkillSelectionModal';
+import { SoftSkillSelectionModal } from './SoftSkillSelectionModal';
 import RoleSelectionModal from './RoleSelectionModal';
 import { ProjectHistoryList } from './ProjectHistoryList';
 import { EmployeeSkillAssignment } from './EmployeeSkillAssignment';
@@ -51,11 +52,7 @@ interface Employee {
     role: string;
     progress: number;
   }>;
-  activities: Array<{
-    type: string;
-    description: string;
-    timestamp: string;
-  }>;
+
   performance: {
     rating: number;
     goals: number;
@@ -166,6 +163,7 @@ export default function EmployeeDetailView({
   const [utilization, setUtilization] = useState<number | null>(null);
   const [averageUtilization, setAverageUtilization] = useState<number | null>(null);
   const [isTechSkillsOpen, setTechSkillsOpen] = useState(false);
+  const [isSoftSkillsOpen, setSoftSkillsOpen] = useState(false);
   const [isRoleAssignOpen, setRoleAssignOpen] = useState(false);
   // isProjectHistoryModalOpen removed - using ProjectCreationModal for both create and edit
   const [isProjectCreationModalOpen, setProjectCreationModalOpen] = useState(false);
@@ -175,6 +173,7 @@ export default function EmployeeDetailView({
   // Dossier-Daten State
   const [assignedRoles, setAssignedRoles] = useState<any[]>([]);
   const [assignedSkills, setAssignedSkills] = useState<any[]>([]);
+  const [assignedSoftSkills, setAssignedSoftSkills] = useState<any[]>([]);
   const [dossierLoading, setDossierLoading] = useState(false);
   const [dossierData, setDossierData] = useState<any>(null);
 
@@ -345,10 +344,10 @@ export default function EmployeeDetailView({
         if (employeeRecord && !cancelled) {
           console.log('📊 Employee record found:', employeeRecord);
           setEmployeeData({
-            email: employeeRecord.email || employeeRecord.mail || employeeRecord.e_mail || '',
-            startDate: employeeRecord.startDate || employeeRecord.eintrittsdatum || employeeRecord.start_date || '',
-            location: employeeRecord.location || employeeRecord.standort || employeeRecord.ort || employeeRecord.office || '',
-            lbs: employeeRecord.lbs || employeeRecord.careerLevel || employeeRecord.career_level || ''
+            email: (employeeRecord as any).email || (employeeRecord as any).mail || (employeeRecord as any).e_mail || '',
+            startDate: (employeeRecord as any).startDate || (employeeRecord as any).eintrittsdatum || (employeeRecord as any).start_date || '',
+            location: (employeeRecord as any).location || (employeeRecord as any).standort || (employeeRecord as any).ort || (employeeRecord as any).office || '',
+            lbs: (employeeRecord as any).lbs || (employeeRecord as any).careerLevel || (employeeRecord as any).career_level || ''
           });
         } else {
           console.log('❌ No employee record found for:', { employeeId, personName });
@@ -363,6 +362,15 @@ export default function EmployeeDetailView({
     load();
     return () => { cancelled = true; };
   }, [employeeId, personName]);
+
+  // Extract skills and roles from dossierData
+  useEffect(() => {
+    if (dossierData) {
+      setAssignedSkills(dossierData.assignedSkills || []);
+      setAssignedSoftSkills(dossierData.assignedSoftSkills || []);
+      setAssignedRoles(dossierData.assignedRoles || []);
+    }
+  }, [dossierData]);
 
   // Load employee dossier data (roles, skills, and form data)
   useEffect(() => {
@@ -670,16 +678,7 @@ export default function EmployeeDetailView({
 
   // Load simple utilization metric from UtilizationDataContext
   useEffect(() => {
-    console.log('🔍 Utilization useEffect triggered:', {
-      dataForUI: dataForUI ? 'present' : 'missing',
-      isArray: Array.isArray(dataForUI),
-      length: Array.isArray(dataForUI) ? dataForUI.length : 'N/A',
-      employeeId,
-      personName
-    });
-
     if (!dataForUI || !Array.isArray(dataForUI) || (!employeeId && !personName)) {
-      console.log('🔍 Early return - missing data or identifiers');
       setUtilization(null);
       setAverageUtilization(null);
       return;
@@ -689,40 +688,10 @@ export default function EmployeeDetailView({
       const data: any[] = dataForUI;
         if (!Array.isArray(data)) return;
         
-        console.log('🔍 Using UtilizationDataContext data:', {
-          totalRecords: data.length,
-          employeeId,
-          personName,
-          sampleRecord: data[0],
-          dataStructure: data.slice(0, 2).map(row => ({
-            person: row.person,
-            personId: row.personId,
-            name: row.name,
-            finalValue: row.finalValue,
-            year: row.year,
-            weekNumber: row.weekNumber,
-            keys: Object.keys(row)
-          }))
-        });
-        
         const filtered = data.filter(row => {
           const matchesPersonId = row.personId && row.personId === employeeId;
           const matchesPersonName = personName && (row.person === personName || row.name === personName);
-          const matches = matchesPersonId || matchesPersonName;
-          
-          if (matches) {
-            console.log('🔍 Found matching utilization row:', {
-              person: row.person,
-              name: row.name,
-              personId: row.personId,
-              finalValue: row.finalValue,
-              year: row.year,
-              weekNumber: row.weekNumber,
-              matchedBy: matchesPersonId ? 'personId' : 'personName'
-            });
-          }
-          
-          return matches;
+          return matchesPersonId || matchesPersonName;
         });
         if (filtered.length === 0) { 
           setUtilization(null); 
@@ -851,14 +820,12 @@ export default function EmployeeDetailView({
     utilization: utilization ?? 0,
     skills: [],
     projects: [],
-    activities: [],
     performance: { rating: 0, goals: 0, feedback: 0 },
     strengths: [],
     weaknesses: [],
   } : null;
   const [currentStatus, setCurrentStatus] = useState('active');
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    activities: true,
     projects: true,
     plannedProjects: true,
     projectHistory: true,
@@ -1094,101 +1061,7 @@ export default function EmployeeDetailView({
                 </div>
               </div>
 
-                            {/* 🛠️ Technical Skills - Kompakt */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                    <Star className="w-4 h-4 text-green-600" />
-                    Technical Skills ({assignedSkills.length})
-                  </h3>
-                  <button 
-                    onClick={() => setTechSkillsOpen(true)}
-                    className="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-                  >
-                    + Skill
-                    </button>
-                  </div>
-                {dossierLoading ? (
-                  <div className="text-xs text-gray-500">Lade Skills...</div>
-                ) : assignedSkills.length === 0 ? (
-                  <div className="text-xs text-gray-500 italic">Keine Skills zugewiesen</div>
-                ) : (
-                  <div className="space-y-1">
-                    {assignedSkills.slice(0, 5).map((skill: any) => (
-                      <div key={skill.id} className="flex items-center justify-between py-1">
-                        <div className="flex-1">
-                          <span className="text-xs font-medium text-gray-900">{skill.skillName}</span>
-                </div>
-                          <div className="flex items-center space-x-1">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Star
-                              key={star}
-                              className={`w-2.5 h-2.5 ${
-                                star <= skill.level 
-                                  ? 'text-yellow-400 fill-current' 
-                                  : 'text-gray-300'
-                              }`}
-                            />
-                          ))}
-                          </div>
-                      </div>
-                    ))}
-                    {assignedSkills.length > 5 && (
-                      <div className="text-xs text-gray-500 text-center pt-1">
-                        +{assignedSkills.length - 5} weitere Skills
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-              
-              {/* 🎭 Rollen - Kompakt */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                    <Award className="w-4 h-4 text-purple-600" />
-                    Rollen ({assignedRoles.length})
-                  </h3>
-                  <button 
-                    onClick={() => setRoleAssignOpen(true)}
-                    className="text-xs px-2 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
-                  >
-                    + Rolle
-                            </button>
-                          </div>
-                {dossierLoading ? (
-                  <div className="text-xs text-gray-500">Lade Rollen...</div>
-                ) : assignedRoles.length === 0 ? (
-                  <div className="text-xs text-gray-500 italic">Keine Rollen zugewiesen</div>
-                ) : (
-                  <div className="space-y-1">
-                    {assignedRoles.slice(0, 5).map((role: any) => (
-                      <div key={role.id} className="flex items-center justify-between py-1">
-                        <div className="flex-1">
-                          <span className="text-xs font-medium text-gray-900">{role.roleName}</span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Star
-                              key={star}
-                              className={`w-2.5 h-2.5 ${
-                                star <= role.level 
-                                  ? 'text-yellow-400 fill-current' 
-                                  : 'text-gray-300'
-                              }`}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                    {assignedRoles.length > 5 && (
-                      <div className="text-xs text-gray-500 text-center pt-1">
-                        +{assignedRoles.length - 5} weitere Rollen
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+
 
               {/* 💪 Stärken & Schwächen - Kompakt & Editierbar */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
@@ -1284,6 +1157,150 @@ export default function EmployeeDetailView({
             <div className="lg:col-span-1 xl:col-span-2 2xl:col-span-2 space-y-4">
               
 
+              {/* 🎭 Rollen - In mittlere Spalte verschoben */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    <Award className="w-4 h-4 text-purple-600" />
+                    Rollen ({assignedRoles.length})
+                  </h3>
+                  <button 
+                    onClick={() => setRoleAssignOpen(true)}
+                    className="text-xs px-2 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
+                  >
+                    + Rolle
+                  </button>
+                </div>
+                {dossierLoading ? (
+                  <div className="text-xs text-gray-500">Lade Rollen...</div>
+                ) : assignedRoles.length === 0 ? (
+                  <div className="text-xs text-gray-500 italic">Keine Rollen zugewiesen</div>
+                ) : (
+                  <div className="space-y-1">
+                    {assignedRoles.slice(0, 5).map((role: any) => (
+                      <div key={role.id} className="flex items-center justify-between py-1">
+                        <div className="flex-1">
+                          <span className="text-xs font-medium text-gray-900">{role.roleName}</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star
+                              key={star}
+                              className={`w-2.5 h-2.5 ${
+                                star <= role.level 
+                                  ? 'text-yellow-400 fill-current' 
+                                  : 'text-gray-300'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    {assignedRoles.length > 5 && (
+                      <div className="text-xs text-gray-500 text-center pt-1">
+                        +{assignedRoles.length - 5} weitere Rollen
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* 🛠️ Technical Skills - In mittlere Spalte verschoben */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    <Star className="w-4 h-4 text-green-600" />
+                    Technical Skills ({assignedSkills.length})
+                  </h3>
+                  <button 
+                    onClick={() => setTechSkillsOpen(true)}
+                    className="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                  >
+                    + Skill
+                  </button>
+                </div>
+                {dossierLoading ? (
+                  <div className="text-xs text-gray-500">Lade Skills...</div>
+                ) : assignedSkills.length === 0 ? (
+                  <div className="text-xs text-gray-500 italic">Keine Skills zugewiesen</div>
+                ) : (
+                  <div className="space-y-1">
+                    {assignedSkills.slice(0, 5).map((skill: any) => (
+                      <div key={skill.id} className="flex items-center justify-between py-1">
+                        <div className="flex-1">
+                          <span className="text-xs font-medium text-gray-900">{skill.skillName}</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star
+                              key={star}
+                              className={`w-2.5 h-2.5 ${
+                                star <= skill.level 
+                                  ? 'text-yellow-400 fill-current' 
+                                  : 'text-gray-300'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    {assignedSkills.length > 5 && (
+                      <div className="text-xs text-gray-500 text-center pt-1">
+                        +{assignedSkills.length - 5} weitere Skills
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* 💝 Soft Skills - In mittlere Spalte verschoben */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    <Heart className="w-4 h-4 text-pink-600" />
+                    Soft Skills ({assignedSoftSkills.length})
+                  </h3>
+                  <button 
+                    onClick={() => setSoftSkillsOpen(true)}
+                    className="text-xs px-2 py-1 bg-pink-600 text-white rounded hover:bg-pink-700 transition-colors"
+                  >
+                    + Skill
+                  </button>
+                </div>
+                {dossierLoading ? (
+                  <div className="text-xs text-gray-500">Lade Soft Skills...</div>
+                ) : assignedSoftSkills.length === 0 ? (
+                  <div className="text-xs text-gray-500 italic">Keine Soft Skills zugewiesen</div>
+                ) : (
+                  <div className="space-y-1">
+                    {assignedSoftSkills.slice(0, 5).map((skill: any) => (
+                      <div key={skill.id} className="flex items-center justify-between py-1">
+                        <div className="flex-1">
+                          <span className="text-xs font-medium text-gray-900">{skill.skillName}</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star
+                              key={star}
+                              className={`w-2.5 h-2.5 ${
+                                star <= skill.level 
+                                  ? 'text-yellow-400 fill-current' 
+                                  : 'text-gray-300'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    {assignedSoftSkills.length > 5 && (
+                      <div className="text-xs text-gray-500 text-center pt-1">
+                        +{assignedSoftSkills.length - 5} weitere Soft Skills
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* 💬 Kommentare - Bestehende Felder aus UtilizationReportView */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                 <div className="flex items-center gap-2 mb-4">
@@ -1314,172 +1331,9 @@ export default function EmployeeDetailView({
                 </div>
               </div>
               
-              {/* 🚀 Aktive Projekte - Neues System */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                    <Briefcase className="w-4 h-4 text-green-600" />
-                    Aktive Projekte
-                  </h3>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs text-gray-500">
-                      {projectsByType.active.length}
-                    </span>
-                    
-                    {/* View Toggle Buttons */}
-                    <div className="flex items-center bg-gray-100 rounded p-0.5">
-                      <button
-                        onClick={() => setProjectViews(prev => ({ ...prev, active: 'card' }))}
-                        className={`p-1 rounded transition-colors ${
-                          projectViews.active === 'card' 
-                            ? 'bg-white text-blue-600 shadow-sm' 
-                            : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                        title="Kartenansicht"
-                      >
-                        <Grid3X3 className="w-3 h-3" />
-                                </button>
-                      <button
-                        onClick={() => setProjectViews(prev => ({ ...prev, active: 'table' }))}
-                        className={`p-1 rounded transition-colors ${
-                          projectViews.active === 'table' 
-                            ? 'bg-white text-blue-600 shadow-sm' 
-                            : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                        title="Tabellenansicht"
-                      >
-                        <List className="w-3 h-3" />
-                                </button>
-                              </div>
-                    
-                    <button 
-                      onClick={() => toggleSection('projects')} 
-                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                      <ChevronDown className={`w-3 h-3 transform transition-transform ${expandedSections.projects ? 'rotate-180' : ''}`} />
-                    </button>
-                            </div>
-                      </div>
-                
-                {expandedSections.projects && (
-                  <div className="max-h-48 overflow-y-auto">
-                    {projectsByType.active.length > 0 ? (
-                      projectViews.active === 'card' ? (
-                        <div className="space-y-2">
-                          {projectsByType.active.map(project => (
-                            <CompactProjectCard
-                              key={project.id}
-                              project={project}
-                              type="active"
-                              onEdit={handleEditProject}
-                              onDelete={handleDeleteProject}
-                            />
-                          ))}
-                    </div>
-                      ) : (
-                        <ProjectTable
-                          projects={projectsByType.active}
-                          type="active"
-                          onEdit={handleEditProject}
-                          onDelete={handleDeleteProject}
-                          compact={true}
-                        />
-                      )
-                    ) : (
-                      <div className="p-3 text-center text-gray-500 text-xs">
-                        Keine aktiven Projekte
-              </div>
-                    )}
-                  </div>
-                )}
-            </div>
 
-              {/* 📅 Geplante Projekte - Neues System */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-blue-600" />
-                    Geplante Projekte
-                  </h3>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs text-gray-500">
-                      {projectsByType.planned.length}
-                    </span>
-                    
-                    {/* View Toggle Buttons */}
-                    <div className="flex items-center bg-gray-100 rounded p-0.5">
-                      <button
-                        onClick={() => setProjectViews(prev => ({ ...prev, planned: 'card' }))}
-                        className={`p-1 rounded transition-colors ${
-                          projectViews.planned === 'card' 
-                            ? 'bg-white text-blue-600 shadow-sm' 
-                            : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                        title="Kartenansicht"
-                      >
-                        <Grid3X3 className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={() => setProjectViews(prev => ({ ...prev, planned: 'table' }))}
-                        className={`p-1 rounded transition-colors ${
-                          projectViews.planned === 'table' 
-                            ? 'bg-white text-blue-600 shadow-sm' 
-                            : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                        title="Tabellenansicht"
-                      >
-                        <List className="w-3 h-3" />
-                  </button>
-                </div>
-                
-                    <button 
-                      onClick={handleAddPlannedProject}
-                      className="p-1 text-blue-600 hover:text-blue-700 transition-colors"
-                      title="Geplantes Projekt hinzufügen"
-                    >
-                      <Plus className="w-3 h-3" />
-                    </button>
-                    <button 
-                      onClick={() => toggleSection('plannedProjects')} 
-                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                      <ChevronDown className={`w-3 h-3 transform transition-transform ${expandedSections.plannedProjects ? 'rotate-180' : ''}`} />
-                    </button>
-                          </div>
-                </div>
-                
-                {expandedSections.plannedProjects && (
-                  <div className="max-h-48 overflow-y-auto">
-                    {projectsByType.planned.length > 0 ? (
-                      projectViews.planned === 'card' ? (
-                        <div className="space-y-2">
-                          {projectsByType.planned.map(project => (
-                            <CompactProjectCard
-                              key={project.id}
-                              project={project}
-                              type="planned"
-                              onEdit={handleEditProject}
-                              onDelete={handleDeleteProject}
-                            />
-                          ))}
-                        </div>
-                      ) : (
-                        <ProjectTable
-                          projects={projectsByType.planned}
-                          type="planned"
-                          onEdit={handleEditProject}
-                          onDelete={handleDeleteProject}
-                          compact={true}
-                        />
-                      )
-                    ) : (
-                      <div className="p-3 text-center text-gray-500 text-xs">
-                        Keine geplanten Projekte
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+
+
             </div>
 
             {/* ========== RECHTE SPALTE: Projektvergangenheit ========== */}
@@ -1571,49 +1425,175 @@ export default function EmployeeDetailView({
                     )}
                   </div>
                 )}
-            </div>
+              </div>
 
-
-              {/* 📊 Aktivitäten Timeline - Kompakt */}
+              {/* 🚀 Aktive Projekte - In rechte Spalte verschoben */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-gray-600" />
-                    Aktivitäten
+                    <Briefcase className="w-4 h-4 text-green-600" />
+                    Aktive Projekte
                   </h3>
-                  <button onClick={() => toggleSection('activities')} className="p-1 text-gray-400 hover:text-gray-600 transition-colors">
-                    <ChevronDown className={`w-3 h-3 transform transition-transform ${expandedSections.activities ? 'rotate-180' : ''}`} />
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-gray-500">
+                      {projectsByType.active.length}
+                    </span>
+                    
+                    {/* View Toggle Buttons */}
+                    <div className="flex items-center bg-gray-100 rounded p-0.5">
+                      <button
+                        onClick={() => setProjectViews(prev => ({ ...prev, active: 'card' }))}
+                        className={`p-1 rounded transition-colors ${
+                          projectViews.active === 'card' 
+                            ? 'bg-white text-blue-600 shadow-sm' 
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                        title="Kartenansicht"
+                      >
+                        <Grid3X3 className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => setProjectViews(prev => ({ ...prev, active: 'table' }))}
+                        className={`p-1 rounded transition-colors ${
+                          projectViews.active === 'table' 
+                            ? 'bg-white text-blue-600 shadow-sm' 
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                        title="Tabellenansicht"
+                      >
+                        <List className="w-3 h-3" />
+                      </button>
+                    </div>
+                    
+                    <button 
+                      onClick={() => toggleSection('projects')} 
+                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      <ChevronDown className={`w-3 h-3 transform transition-transform ${expandedSections.projects ? 'rotate-180' : ''}`} />
+                    </button>
+                  </div>
                 </div>
                 
-                {expandedSections.activities && (
-                  <div className="space-y-2 max-h-[150px] overflow-y-auto">
-                    <div className="flex items-start space-x-2 py-1">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5 flex-shrink-0"></div>
-                      <div className="flex-1">
-                        <p className="text-xs text-gray-900">Projekt "E-Commerce" abgeschlossen</p>
-                        <p className="text-xs text-gray-500">vor 2 Tagen</p>
+                {expandedSections.projects && (
+                  <div className="max-h-48 overflow-y-auto">
+                    {projectsByType.active.length > 0 ? (
+                      projectViews.active === 'card' ? (
+                        <div className="space-y-2">
+                          {projectsByType.active.map(project => (
+                            <CompactProjectCard
+                              key={project.id}
+                              project={project}
+                              type="active"
+                              onEdit={handleEditProject}
+                              onDelete={handleDeleteProject}
+                            />
+                          ))}
                         </div>
-                        </div>
-                    
-                    <div className="flex items-start space-x-2 py-1">
-                      <div className="w-2 h-2 bg-green-500 rounded-full mt-1.5 flex-shrink-0"></div>
-                      <div className="flex-1">
-                        <p className="text-xs text-gray-900">Skill "React Advanced" hinzugefügt</p>
-                        <p className="text-xs text-gray-500">vor 1 Woche</p>
+                      ) : (
+                        <ProjectTable
+                          projects={projectsByType.active}
+                          type="active"
+                          onEdit={handleEditProject}
+                          onDelete={handleDeleteProject}
+                          compact={true}
+                        />
+                      )
+                    ) : (
+                      <div className="p-3 text-center text-gray-500 text-xs">
+                        Keine aktiven Projekte
                       </div>
-              </div>
-
-                    <div className="flex items-start space-x-2 py-1">
-                      <div className="w-2 h-2 bg-purple-500 rounded-full mt-1.5 flex-shrink-0"></div>
-                      <div className="flex-1">
-                        <p className="text-xs text-gray-900">Rolle "Senior Developer" zugewiesen</p>
-                        <p className="text-xs text-gray-500">vor 2 Wochen</p>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 )}
               </div>
+
+              {/* 📅 Geplante Projekte - In rechte Spalte verschoben */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-blue-600" />
+                    Geplante Projekte
+                  </h3>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-gray-500">
+                      {projectsByType.planned.length}
+                    </span>
+                    
+                    {/* View Toggle Buttons */}
+                    <div className="flex items-center bg-gray-100 rounded p-0.5">
+                      <button
+                        onClick={() => setProjectViews(prev => ({ ...prev, planned: 'card' }))}
+                        className={`p-1 rounded transition-colors ${
+                          projectViews.planned === 'card' 
+                            ? 'bg-white text-blue-600 shadow-sm' 
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                        title="Kartenansicht"
+                      >
+                        <Grid3X3 className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => setProjectViews(prev => ({ ...prev, planned: 'table' }))}
+                        className={`p-1 rounded transition-colors ${
+                          projectViews.planned === 'table' 
+                            ? 'bg-white text-blue-600 shadow-sm' 
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                        title="Tabellenansicht"
+                      >
+                        <List className="w-3 h-3" />
+                      </button>
+                    </div>
+                    
+                    <button 
+                      onClick={handleAddPlannedProject}
+                      className="p-1 text-blue-600 hover:text-blue-700 transition-colors"
+                      title="Geplantes Projekt hinzufügen"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                    <button 
+                      onClick={() => toggleSection('plannedProjects')} 
+                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      <ChevronDown className={`w-3 h-3 transform transition-transform ${expandedSections.plannedProjects ? 'rotate-180' : ''}`} />
+                    </button>
+                  </div>
+                </div>
+                
+                {expandedSections.plannedProjects && (
+                  <div className="max-h-48 overflow-y-auto">
+                    {projectsByType.planned.length > 0 ? (
+                      projectViews.planned === 'card' ? (
+                        <div className="space-y-2">
+                          {projectsByType.planned.map(project => (
+                            <CompactProjectCard
+                              key={project.id}
+                              project={project}
+                              type="planned"
+                              onEdit={handleEditProject}
+                              onDelete={handleDeleteProject}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <ProjectTable
+                          projects={projectsByType.planned}
+                          type="planned"
+                          onEdit={handleEditProject}
+                          onDelete={handleDeleteProject}
+                          compact={true}
+                        />
+                      )
+                    ) : (
+                      <div className="p-3 text-center text-gray-500 text-xs">
+                        Keine geplanten Projekte
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
             </div>
           </div>
         </div>
@@ -1622,6 +1602,13 @@ export default function EmployeeDetailView({
       <TechnicalSkillSelectionModal
         isOpen={isTechSkillsOpen}
         onClose={() => setTechSkillsOpen(false)}
+        employeeId={employeeId}
+        employeeName={employee.name}
+        onSkillAssigned={refreshDossierData}
+      />
+      <SoftSkillSelectionModal
+        isOpen={isSoftSkillsOpen}
+        onClose={() => setSoftSkillsOpen(false)}
         employeeId={employeeId}
         employeeName={employee.name}
         onSkillAssigned={refreshDossierData}
