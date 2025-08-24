@@ -191,6 +191,7 @@ export interface ProjectHistoryItem {
   // ===== BASIS-FELDER (alle Typen) =====
   customer: string;
   projectName: string;
+  description?: string;              // ✨ NEU: Projektbeschreibung
   roles: ProjectRole[];
   skills: ProjectSkill[];
   

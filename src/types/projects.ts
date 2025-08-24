@@ -21,6 +21,7 @@ export interface ProjectFormData {
   // Schritt 3: Grunddaten
   customer: string;
   projectName: string;
+  description?: string;              // ✨ NEU: Projektbeschreibung
   
   // Schritt 4: Projekt-Details (nur bei planned)
   probability?: ProbabilityLevel;

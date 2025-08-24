@@ -143,6 +143,12 @@ export function PlanningComment({ personId, initialValue, onLocalChange, classNa
             <textarea
               value={value}
               onChange={e => setValue(e.target.value)}
+              onBlur={() => {
+                // Auto-Save beim Verlassen des Feldes
+                if (value !== remoteValue && value.trim() !== '') {
+                  handleSave();
+                }
+              }}
               rows={1}
               className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent resize-none"
               placeholder="Planung..."

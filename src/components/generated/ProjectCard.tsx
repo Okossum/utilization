@@ -223,6 +223,16 @@ export function ProjectCard({
         </div>
       )}
 
+      {/* Project Description */}
+      {project.description && (
+        <div className="mt-3 p-3 bg-gray-50 rounded-lg border-l-4 border-blue-200">
+          <div className="text-xs text-gray-600 mb-1 font-medium">Projektbeschreibung:</div>
+          <p className="text-sm text-gray-700 leading-relaxed">
+            {project.description}
+          </p>
+        </div>
+      )}
+
       {/* Legacy Activities (nur für historische Projekte) */}
       {type === 'historical' && project.activities?.length > 0 && (
         <div className="mt-3">

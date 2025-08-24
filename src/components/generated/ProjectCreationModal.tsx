@@ -51,6 +51,7 @@ export function ProjectCreationModal({
     projectType: 'historical',
     customer: '',
     projectName: '',
+    description: '',                  // ✨ NEU: Projektbeschreibung
     startDate: '',
     endDate: '',
     duration: '',
@@ -73,6 +74,7 @@ export function ProjectCreationModal({
         projectSource: project.projectSource,
         customer: project.customer,
         projectName: project.projectName,
+        description: project.description || '',    // ✨ NEU: Projektbeschreibung
         probability: project.probability as ProbabilityLevel,
         dailyRate: project.dailyRate,
         startDate: project.startDate,
@@ -323,7 +325,8 @@ export function ProjectCreationModal({
         : {
             ...createNewProject(employeeId, formData.projectType, {
               customer: formData.customer,
-              projectName: formData.projectName
+              projectName: formData.projectName,
+              description: formData.description    // ✨ NEU: Projektbeschreibung
             }),
             ...formData
           };
@@ -569,6 +572,25 @@ export function ProjectCreationModal({
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
+
+                      {/* Project Description - für historische und geplante Projekte */}
+                      {(formData.projectType === 'historical' || formData.projectType === 'planned') && (
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Projektbeschreibung (optional)
+                          </label>
+                          <textarea
+                            value={formData.description || ''}
+                            onChange={e => updateFormData({ description: e.target.value })}
+                            placeholder="Kurze Beschreibung des Projekts, Ziele, Besonderheiten..."
+                            rows={3}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Beschreiben Sie kurz die Projektziele, verwendete Technologien oder Besonderheiten
+                          </p>
+                        </div>
+                      )}
 
                       {/* JIRA Ticket ID */}
                       {formData.projectSource === 'jira' && (

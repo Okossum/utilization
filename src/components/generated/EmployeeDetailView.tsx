@@ -649,8 +649,8 @@ export default function EmployeeDetailView({
     projects: true,
     plannedProjects: true,
     projectHistory: true,
+    historicalProjects: true,
     skills: true,
-
     strengths: true
   });
   if (!employee) {
@@ -1057,55 +1057,36 @@ export default function EmployeeDetailView({
             {/* ========== MITTLERE SPALTE: Projekte & Kommentare ========== */}
             <div className="lg:col-span-1 space-y-4">
               
-              {/* 💬 Allgemeine Kommentare - Kompakt & Editierbar */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                    <MessageSquare className="w-4 h-4 text-purple-600" />
-                    Kommentare
-                  </h3>
-                  {!isEditing && (
-                    <button 
-                      onClick={() => setIsEditing(true)}
-                      className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" 
-                      title="Bearbeiten"
-                    >
-                      <Edit3 className="w-3 h-3" />
-                    </button>
-                  )}
+
+              {/* 💬 Kommentare - Bestehende Felder aus UtilizationReportView */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <MessageSquare className="w-5 h-5 text-blue-600" />
+                  <h3 className="text-lg font-semibold text-gray-900">Kommentare</h3>
                 </div>
-                {isEditing ? (
-                  <textarea
-                    value={formData.comments}
-                    onChange={(e) => handleInputChange('comments', e.target.value)}
-                    rows={2}
-                    className="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent resize-none"
-                    placeholder="Allgemeine Kommentare zum Mitarbeiter..."
-                  />
-                ) : (
-                  <div className="p-2 bg-gray-50 rounded border border-gray-100 min-h-[50px]">
-                    <p className="text-xs text-gray-700 whitespace-pre-wrap">
-                      {formData.comments || 'Keine Kommentare erfasst.'}
-                    </p>
+                
+                <div className="space-y-6">
+                  {/* Auslastungskommentar */}
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900 mb-2">Auslastungskommentar</h4>
+                    <UtilizationComment
+                      personId={employee.name}
+                      initialValue=""
+                      onLocalChange={() => {}}
+                    />
                   </div>
-                )}
+                  
+                  {/* Einsatzplan-Kommentar */}
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900 mb-2">Einsatzplan-Kommentar</h4>
+                    <PlanningComment
+                      personId={employee.name}
+                      initialValue=""
+                      onLocalChange={() => {}}
+                    />
+                  </div>
+                </div>
               </div>
-              
-              {/* 💬 Utilization Comment */}
-              <UtilizationComment
-                personId={employee.name}
-                initialValue=""
-                onLocalChange={() => {}}
-                className="h-full"
-              />
-              
-              {/* 📋 Planning Comment */}
-              <PlanningComment
-                personId={employee.name}
-                initialValue=""
-                onLocalChange={() => {}}
-                className="h-full"
-              />
               
               {/* 🚀 Aktive Projekte - Neues System */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
@@ -1201,40 +1182,52 @@ export default function EmployeeDetailView({
             <div className="lg:col-span-1 space-y-3">
               
               {/* 📜 Projektvergangenheit - Neues Design */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-blue-600" />
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-blue-600" />
                     Projektvergangenheit
                   </h3>
-                  <button 
-                    className="flex items-center gap-2 px-3 py-2 bg-orange-50 text-black rounded-lg hover:bg-orange-100 transition-colors border border-orange-200"
-                    onClick={handleAddHistoricalProject}
-                  >
-                    <Plus className="w-4 h-4 text-black" />
-                    Projekt hinzufügen
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-gray-500">
+                      {projectsByType.historical.length}
+                    </span>
+                    <button 
+                      onClick={handleAddHistoricalProject}
+                      className="p-1 text-blue-600 hover:text-blue-700 transition-colors"
+                      title="Historisches Projekt hinzufügen"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                    <button 
+                      onClick={() => toggleSection('historicalProjects')} 
+                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      <ChevronDown className={`w-3 h-3 transform transition-transform ${expandedSections.historicalProjects ? 'rotate-180' : ''}`} />
+                    </button>
+                  </div>
                 </div>
                 
-                <div className="space-y-4 max-h-[400px] overflow-y-auto">
-                  {/* Historische Projekte mit neuem System */}
-                  {projectsByType.historical.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <FileText className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                      <p>Noch keine Projekte erfasst</p>
-                    </div>
-                  ) : (
-                    projectsByType.historical.map((project: ProjectHistoryItem) => (
-                      <ProjectCard
-                        key={project.id}
-                        project={project}
-                        type="historical"
-                        onEdit={handleEditProject}
-                        onDelete={handleDeleteProject}
-                      />
-                    ))
-                  )}
-                </div>
+                {expandedSections.historicalProjects && (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {projectsByType.historical.length > 0 ? (
+                      projectsByType.historical.map((project: ProjectHistoryItem) => (
+                        <CompactProjectCard
+                          key={project.id}
+                          project={project}
+                          type="historical"
+                          onEdit={handleEditProject}
+                          onDelete={handleDeleteProject}
+                        />
+                      ))
+                    ) : (
+                      <div className="text-center py-4 text-gray-500">
+                        <FileText className="w-8 h-8 text-gray-300 mx-auto mb-1" />
+                        <p className="text-xs">Noch keine Projekte erfasst</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               
 

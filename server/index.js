@@ -1283,6 +1283,7 @@ app.post('/api/employee-dossier', requireAuth, async (req, res) => {
           id: String(project.id || Date.now().toString()),
           projectName: String(project.projectName || project.project || ''),
           customer: String(project.customer || ''),
+          description: String(project.description || ''),        // ✨ NEU: Projektbeschreibung
           role: String(project.role || ''),
           duration: String(project.duration || ''),
           activities: Array.isArray(project.activities) ? project.activities.filter(a => typeof a === 'string') : [],

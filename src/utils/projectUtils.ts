@@ -93,6 +93,7 @@ export function createNewProject(
   basicData: {
     customer: string;
     projectName: string;
+    description?: string;        // ✨ NEU: Projektbeschreibung
   }
 ): ProjectHistoryItem {
   const now = new Date();
@@ -103,6 +104,7 @@ export function createNewProject(
     projectType,
     customer: basicData.customer,
     projectName: basicData.projectName,
+    description: basicData.description,    // ✨ NEU: Projektbeschreibung
     roles: [],
     skills: [],
     createdAt: now,
