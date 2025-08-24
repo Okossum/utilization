@@ -123,7 +123,7 @@ const SoftSkillSelectionModal: React.FC<SoftSkillSelectionModalProps> = ({
   // Bereits zugewiesene Skills laden
   const loadAssignedSkills = async () => {
     try {
-      const response = await fetch(`/api/employees/${employeeId}/soft-skills`, {
+      const response = await fetch(`/api/employees/${encodeURIComponent(employeeId)}/soft-skills`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

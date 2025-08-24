@@ -91,7 +91,7 @@ export default function EmployeeDetailView({
   employeeId,
   onBack
 }: EmployeeDetailViewProps) {
-  console.log('🏗️ EmployeeDetailView rendered with:', { employeeId });
+
   
 
   const { token } = useAuth();
