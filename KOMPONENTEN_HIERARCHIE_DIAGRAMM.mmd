@@ -1,0 +1,103 @@
+graph TD
+    %% Root Level
+    App["🏠 App.tsx<br/>Hauptanwendung"]
+    
+    %% Main Navigation
+    App --> AppHeader["📋 AppHeader<br/>Navigation & Settings"]
+    
+    %% Main Views
+    App --> UtilizationView["📊 UtilizationReportView<br/>Auslastung & Vorblick"]
+    App --> EmployeeOverview["👥 EmployeeOverviewDashboard<br/>Mitarbeiter"]
+    App --> SalesView["💼 SalesView<br/>Sales Übersicht"]
+    App --> EmployeeDetail["👤 EmployeeDetailView<br/>Mitarbeiterdetails"]
+    App --> ProjectsArea["🚀 Projects Area<br/>Projekte"]
+    App --> LoginForm["🔐 LoginForm<br/>Anmeldung"]
+    
+    %% UtilizationReportView Children
+    UtilizationView --> PersonFilter["🔍 PersonFilterBar<br/>Personen Filter"]
+    UtilizationView --> KpiGrid["📈 KpiCardsGrid<br/>KPI Dashboard"]
+    UtilizationView --> TrendChart["📉 UtilizationTrendChart<br/>Trend Diagramm"]
+    UtilizationView --> MultiFilter["⚙️ MultiSelectFilter<br/>Dropdown Filter"]
+    UtilizationView --> UtilComment["💬 UtilizationComment<br/>Kommentare"]
+    UtilizationView --> SalesOpp["🎯 SalesOpportunities<br/>Verkaufschancen"]
+    UtilizationView --> ScopeFilter["🎚️ ScopeFilterDropdown<br/>Bereichsfilter"]
+    UtilizationView --> StatusSelector["🏷️ StatusLabelSelector<br/>Status Auswahl"]
+    
+    %% KpiCardsGrid Children
+    KpiGrid --> KpiCard1["📊 KpiCard<br/>Ø Auslastung Rückblick"]
+    KpiGrid --> KpiCard2["📊 KpiCard<br/>Ø Auslastung Vorblick"]
+    KpiGrid --> KpiCard3["⭐ KpiCard<br/>>100% Überauslastung"]
+    KpiGrid --> KpiCard4["⚠️ KpiCard<br/>Fehlende Werte"]
+    
+    %% EmployeeOverview Children
+    EmployeeOverview --> EmployeeCard["👤 EmployeeCard<br/>Mitarbeiter Karte"]
+    EmployeeOverview --> EmployeeList["📋 EmployeeListView<br/>Listen Ansicht"]
+    EmployeeOverview --> EmployeeTable["📊 EmployeeTable<br/>Tabellen Ansicht"]
+    
+    %% EmployeeCard Children
+    EmployeeCard --> ProjectDetail["📁 ProjectDetail<br/>Projekt Details"]
+    
+    %% SalesView Children
+    SalesView --> EmployeeOverviewSales["👥 EmployeeOverview<br/>Mitarbeiter (Sales)"]
+    SalesView --> SalesFilterBar["🔍 SalesFilterBar<br/>Sales Filter"]
+    
+    %% EmployeeOverviewSales Children
+    EmployeeOverviewSales --> EmployeeCardSales["👤 EmployeeCard<br/>Mitarbeiter Karte"]
+    EmployeeOverviewSales --> EmployeeTableSales["📊 EmployeeTable<br/>Mitarbeiter Tabelle"]
+    
+    %% Projects Area Children
+    ProjectsArea --> OverviewPage["📋 OverviewPage<br/>Projekt Übersicht"]
+    ProjectsArea --> ProjectDashboard["🎛️ ProjectManagementDashboard<br/>Projekt Dashboard"]
+    ProjectsArea --> ProjectWizard["🧙 ProjectCreationWizard<br/>Projekt Assistent"]
+    
+    %% OverviewPage Children
+    OverviewPage --> ProjectHistoryCard["📚 ProjectHistoryCard<br/>Projekt Historie"]
+    OverviewPage --> ProjectRolesCard["🎭 ProjectRolesCard<br/>Projekt Rollen"]
+    
+    %% Modals from UtilizationReportView
+    UtilizationView -.-> AuslastungView["📊 AuslastungView<br/>Modal: Auslastungsansicht"]
+    UtilizationView -.-> EinsatzplanView["📅 EinsatzplanView<br/>Modal: Einsatzplan"]
+    UtilizationView -.-> AssignmentModal["✏️ AssignmentEditorModal<br/>Modal: Zuweisungs-Editor"]
+    UtilizationView -.-> PlanningModal["📝 PlanningModal<br/>Modal: Planungs-Editor"]
+    
+    %% Modals from App Level
+    App -.-> AdminUserModal["👨‍💼 AdminUserManagementModal<br/>Modal: Admin Benutzer"]
+    App -.-> ExcelUploadModal["📤 ExcelUploadModal<br/>Modal: Excel Upload"]
+    App -.-> EmployeeSelectionModal["👥 EmployeeSelectionModal<br/>Modal: Mitarbeiter Auswahl"]
+    
+    %% ExcelUploadModal Children
+    ExcelUploadModal --> ModernUploadPanel["📁 ModernUploadPanel<br/>Upload Interface"]
+    
+    %% Management Modals (from AppHeader Settings)
+    AppHeader -.-> RoleManagement["🎭 RoleManagement<br/>Modal: Rollen Verwaltung"]
+    AppHeader -.-> TechnicalSkillMgmt["🛠️ TechnicalSkillManagement<br/>Modal: Fähigkeiten Verwaltung"]
+    AppHeader -.-> CustomerProjectsMgmt["🏢 CustomerProjectsManager<br/>Modal: Kundenprojekte"]
+    AppHeader -.-> AuslastungserklaerungMgmt["📋 AuslastungserklaerungManagement<br/>Modal: Auslastungserklärungen"]
+    AppHeader -.-> AdminDataUpload["📊 AdminDataUploadModal<br/>Modal: Admin Daten Upload"]
+    
+    %% Import Modals
+    AppHeader -.-> TechnicalSkillImport["📥 TechnicalSkillBulkUploadModal<br/>Modal: Skills Import"]
+    AppHeader -.-> RoleTaskImport["📥 RoleTaskBulkUploadModal<br/>Modal: Rollen Import"]
+    
+    %% Demo Components
+    App --> ProjectRoleDemo["🎭 ProjectRoleTaskSelectorDemo<br/>Demo: Rollen Selektor"]
+    App --> ProjectSkillDemo["🛠️ ProjectSkillSelectorDemo<br/>Demo: Skills Selektor"]
+    
+    %% Project Card Modals
+    ProjectHistoryCard -.-> PlannedProjectsModal["📋 PlannedProjectsModal<br/>Modal: Geplante Projekte"]
+    ProjectHistoryCard -.-> ProjectCreationModal["➕ ProjectCreationModal<br/>Modal: Projekt Erstellung"]
+    
+    %% Schwarz-Weiß Styling ohne Farbhintergründe
+    classDef mainView fill:#ffffff,stroke:#000000,stroke-width:3px,color:#000000
+    classDef modal fill:#ffffff,stroke:#000000,stroke-width:2px,stroke-dasharray: 5 5,color:#000000
+    classDef card fill:#ffffff,stroke:#000000,stroke-width:1px,color:#000000
+    classDef filter fill:#ffffff,stroke:#666666,stroke-width:1px,color:#000000
+    classDef demo fill:#ffffff,stroke:#999999,stroke-width:1px,color:#000000
+    classDef root fill:#ffffff,stroke:#000000,stroke-width:4px,color:#000000
+    
+    class App root
+    class UtilizationView,EmployeeOverview,SalesView,EmployeeDetail,ProjectsArea mainView
+    class AuslastungView,EinsatzplanView,AssignmentModal,PlanningModal,AdminUserModal,ExcelUploadModal,EmployeeSelectionModal,RoleManagement,TechnicalSkillMgmt,CustomerProjectsMgmt,AuslastungserklaerungMgmt,AdminDataUpload,TechnicalSkillImport,RoleTaskImport,PlannedProjectsModal,ProjectCreationModal modal
+    class EmployeeCard,ProjectDetail,KpiCard1,KpiCard2,KpiCard3,KpiCard4,ProjectHistoryCard,ProjectRolesCard card
+    class PersonFilter,MultiFilter,ScopeFilter,StatusSelector,SalesFilterBar filter
+    class ProjectRoleDemo,ProjectSkillDemo demo

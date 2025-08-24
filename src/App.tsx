@@ -29,6 +29,9 @@ import { RoleProvider } from './contexts/RoleContext';
 import { ProjectHistoryProvider } from './contexts/ProjectHistoryContext';
 import { UtilizationDataProvider } from './contexts/UtilizationDataContext';
 import { AppHeader } from './components/AppHeader';
+import ProjectManagementDashboard from './components/generated/projects/ProjectManagementDashboard';
+import { OverviewPage } from './components/generated/projects/OverviewPage';
+import ProjectCreationWizard, { ProjectCreationData } from './components/generated/projects/ProjectCreationWizard';
 
 
 let theme: Theme = 'light';
@@ -60,7 +63,13 @@ function App() {
     const { user, loading, profile, logout } = useAuth();
     const [isAdminModalOpen, setAdminModalOpen] = useState(false);
     const [isMenuOpen, setMenuOpen] = useState(false);
-    const [currentView, setCurrentView] = useState<'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail'>('utilization');
+    const [currentView, setCurrentView] = useState<'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects'>('utilization');
+    
+    // Projects sub-navigation states
+    const [projectsSubView, setProjectsSubView] = useState<'overview' | 'projects' | 'employee' | 'wizard'>('overview');
+    const [selectedProjectEmployeeId, setSelectedProjectEmployeeId] = useState<string | null>(null);
+    const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+    const [isProjectWizardOpen, setIsProjectWizardOpen] = useState(false);
     const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
     const [isEmployeeSelectionOpen, setIsEmployeeSelectionOpen] = useState(false);
     
@@ -143,6 +152,45 @@ function App() {
       setSelectedPersonId(personId);
       setCurrentView('employee-detail');
     };
+    
+    // Projects navigation handlers
+    const handleProjectEmployeeClick = (employeeId: string) => {
+      setSelectedProjectEmployeeId(employeeId);
+      setProjectsSubView('employee');
+    };
+
+    const handleProjectClick = (projectId: string) => {
+      setSelectedProjectId(projectId);
+      // For now, we'll just log the project click - in a real app this would navigate to project details
+      console.log('Project clicked:', projectId);
+    };
+
+    const handleBackToProjectsOverview = () => {
+      setSelectedProjectEmployeeId(null);
+      setSelectedProjectId(null);
+      setProjectsSubView('overview');
+    };
+
+    const handleBackToProjects = () => {
+      setSelectedProjectEmployeeId(null);
+      setSelectedProjectId(null);
+      setProjectsSubView('projects');
+    };
+
+
+
+    const handleProjectWizardSave = (projectData: ProjectCreationData) => {
+      console.log('Project created:', projectData);
+      // Here you would typically save the project data to your backend
+      // For now, we'll just close the wizard and show the projects dashboard
+      setIsProjectWizardOpen(false);
+      setProjectsSubView('projects');
+    };
+
+    const handleProjectWizardClose = () => {
+      setIsProjectWizardOpen(false);
+      setProjectsSubView('projects');
+    };
 
     return (
       <GlobalModalProvider>
@@ -157,10 +205,17 @@ function App() {
             setCurrentView={(view) => {
               if (view === 'employee-detail') {
                 handleEmployeeDetailNavigation();
+              } else if (view === 'projects') {
+                setCurrentView(view);
+                setProjectsSubView('overview'); // Always start with overview
+                setSelectedProjectEmployeeId(null);
+                setSelectedProjectId(null);
+                setIsProjectWizardOpen(false);
               } else {
                 setCurrentView(view);
               }
             }}
+
             logout={logout}
             setAdminModalOpen={setAdminModalOpen}
             onSettings={() => setIsSettingsModalOpen(true)}
@@ -251,6 +306,70 @@ function App() {
                 </div>
               )}
             </>
+          )}
+
+          {currentView === 'projects' && (
+            <div>
+              {/* Projects Sub-Navigation */}
+              <nav className="bg-white shadow-sm border-b p-4">
+                <div className="flex space-x-4">
+                  <button 
+                    onClick={() => setProjectsSubView('overview')}
+                    className={`px-3 py-2 rounded ${projectsSubView === 'overview' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}
+                  >
+                    Overview
+                  </button>
+                  <button 
+                    onClick={() => setProjectsSubView('projects')}
+                    className={`px-3 py-2 rounded ${projectsSubView === 'projects' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}
+                  >
+                    Projects
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setProjectsSubView('wizard');
+                      setIsProjectWizardOpen(true);
+                    }}
+                    className={`px-3 py-2 rounded ${projectsSubView === 'wizard' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}
+                  >
+                    Wizard
+                  </button>
+                </div>
+              </nav>
+
+              {/* Projects Content */}
+              {projectsSubView === 'wizard' && (
+                <div className="min-h-screen bg-gray-50">
+                  <ProjectManagementDashboard 
+                    onProjectClick={handleProjectClick} 
+                    onBackToOverview={() => setCurrentView('utilization')} 
+                  />
+                  <ProjectCreationWizard 
+                    isOpen={isProjectWizardOpen}
+                    onClose={handleProjectWizardClose}
+                    onSave={handleProjectWizardSave}
+                  />
+                </div>
+              )}
+              
+              {projectsSubView === 'employee' && selectedProjectEmployeeId && (
+                <EmployeeDetailView 
+                  employeeId={selectedProjectEmployeeId} 
+                  onBack={handleBackToProjects} 
+                />
+              )}
+              
+              {projectsSubView === 'overview' && (
+                <OverviewPage onEmployeeClick={handleProjectEmployeeClick} />
+              )}
+              
+              {projectsSubView === 'projects' && (
+                <ProjectManagementDashboard 
+                  onProjectClick={handleProjectClick}
+                  onBackToOverview={() => setCurrentView('utilization')}
+                />
+              )}
+            </div>
           )}
           
           {/* General Settings Modal */}
