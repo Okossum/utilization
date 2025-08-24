@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Filter, Users, Upload, UserCheck, UserX, BarChart3 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { EmployeeCard } from './EmployeeCard';
-// import { EmployeeUploadModal } from './EmployeeUploadModal'; // DISABLED
+
 import { EmployeeDossierModal } from './EmployeeDossierModal';
 // DatabaseService removed - using direct Firebase calls
 import { db } from '../../lib/firebase';
@@ -353,16 +353,7 @@ export const EmployeeListView = ({ actionItems, onOpenEmployeeDetail }: Employee
                 </p>
               </div>
             </div>
-            {/* DISABLED: Employee Upload Button
-            <button
-              onClick={() => setIsUploadModalOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all duration-200 shadow-lg hover:shadow-xl"
-              title="Mitarbeiter-Excel hochladen"
-            >
-              <Upload className="w-4 h-4" />
-              <span className="font-medium">Excel Upload</span>
-            </button>
-            */}
+
             <div className="inline-flex items-center gap-2 px-4 py-3 bg-gray-300 text-gray-600 rounded-xl">
               <Upload className="w-4 h-4" />
               <span className="font-medium">Upload deaktiviert</span>
@@ -629,11 +620,6 @@ export const EmployeeListView = ({ actionItems, onOpenEmployeeDetail }: Employee
         />
       )}
       
-      {/* DISABLED: Upload Modal
-      <EmployeeUploadModal 
-        isOpen={isUploadModalOpen} 
-        onClose={() => setIsUploadModalOpen(false)} 
-      />
-      */}
+
     </div>;
 };

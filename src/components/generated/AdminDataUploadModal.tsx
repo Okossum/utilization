@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Database, X, Upload } from 'lucide-react';
-import { ConsolidationAdminPanel } from './ConsolidationAdminPanel';
+
 // import { UploadPanel } from './UploadPanel'; // DISABLED
 
 interface UploadedFile {
@@ -104,8 +104,12 @@ export function AdminDataUploadModal({ isOpen, onClose, onDatabaseRefresh }: Adm
               onDatabaseRefresh={onDatabaseRefresh}
             />
             */}
-            {/* 🚀 PHASE 2: Konsolidierungs-Admin-Panel integriert */}
-            <ConsolidationAdminPanel />
+            {/* 🚀 PHASE 2: Konsolidierungs-Admin-Panel wurde entfernt */}
+            <div className="p-6 text-center text-gray-500">
+              <Database className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+              <p>Konsolidierungs-Panel wurde entfernt</p>
+              <p className="text-sm">Verwenden Sie die anderen Admin-Tools</p>
+            </div>
 
               {/* DISABLED: Upload-Status-Buttons
               {(false) && (

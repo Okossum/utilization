@@ -13,7 +13,7 @@ import { PersonFilterBar } from './PersonFilterBar';
 import { db } from '../../lib/firebase';
 import { collection, getDocs, doc } from 'firebase/firestore';
 import { KpiCardsGrid } from './KpiCardsGrid';
-// import { UtilizationChartSection } from './UtilizationChartSection'; // Ausgeblendet
+
 import { UtilizationTrendChart } from './UtilizationTrendChart';
 // Removed inline planning editor; Planning via modal remains
 import { StatusLabelSelector } from './StatusLabelSelector';
