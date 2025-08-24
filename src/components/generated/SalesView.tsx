@@ -38,8 +38,12 @@ interface Employee {
   plannedProjects: Project[];
 }
 
+interface SalesViewProps {
+  actionItems: Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }>;
+}
+
 // @component: SalesView
-export const SalesView = () => {
+export const SalesView = ({ actionItems }: SalesViewProps) => {
   const { databaseData, personMeta, isLoading } = useUtilizationData();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -190,7 +194,11 @@ export const SalesView = () => {
       databaseData.utilizationData.forEach((record: any) => {
         const meta = personMeta.get(record.person);
         
-
+        // ✅ FILTER: Nur Mitarbeiter mit aktiviertem ACT-Toggle anzeigen
+        const hasActToggle = actionItems[record.person]?.actionItem === true;
+        if (!hasActToggle) {
+          return; // Mitarbeiter überspringen, wenn ACT-Toggle nicht aktiviert
+        }
 
         const employee: Employee = {
           id: record.id,
@@ -210,7 +218,13 @@ export const SalesView = () => {
         transformedEmployees.push(employee);
       });
 
-      // console.log entfernt
+      console.log('🔍 Sales View - ACT-Filter angewendet:', {
+        totalRecords: databaseData.utilizationData.length,
+        filteredEmployees: transformedEmployees.length,
+        actionItemsCount: Object.keys(actionItems).length,
+        activeActToggles: Object.values(actionItems).filter(item => item.actionItem === true).length
+      });
+      
       setEmployees(transformedEmployees);
 
     } catch (err) {
@@ -223,7 +237,7 @@ export const SalesView = () => {
     if (!isLoading && databaseData.utilizationData) {
       transformUtilizationDataToEmployees();
     }
-  }, [isLoading, databaseData.utilizationData, personMeta]);
+  }, [isLoading, databaseData.utilizationData, personMeta, actionItems]);
 
   // Loading State
   if (isLoading) {

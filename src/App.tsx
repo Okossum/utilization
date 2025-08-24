@@ -274,7 +274,7 @@ function App() {
           )}
           
           {currentView === 'sales' && (
-            <SalesView />
+            <SalesView actionItems={actionItems} />
           )}
 
           {currentView === 'project-roles-demo' && (

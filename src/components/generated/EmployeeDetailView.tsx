@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
-import { ArrowLeft, User, Mail, MapPin, Calendar, Clock, Star, TrendingUp, MessageSquare, Edit3, Video, UserPlus, FileText, ChevronDown, Activity, Award, Edit, Trash2, Plus, ThumbsUp, ThumbsDown, Briefcase, Building, Pencil } from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { ArrowLeft, User, Mail, MapPin, Calendar, Clock, Star, TrendingUp, MessageSquare, Edit3, Video, UserPlus, FileText, ChevronDown, Activity, Award, Edit, Trash2, Plus, ThumbsUp, ThumbsDown, Briefcase, Building, Pencil, Grid3X3, List, BarChart3 } from 'lucide-react';
 import { collection, getDocs, limit, query, where } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 
 import { useAuth } from '../../contexts/AuthContext';
 import DatabaseService from '../../services/database';
+import { useUtilizationData } from '../../contexts/UtilizationDataContext';
 import TechnicalSkillSelectionModal from './TechnicalSkillSelectionModal';
 import RoleSelectionModal from './RoleSelectionModal';
 import { ProjectHistoryList } from './ProjectHistoryList';
@@ -19,6 +20,7 @@ import { PlanningComment } from './PlanningComment';
 // ProjectHistoryEditorModal removed - using ProjectCreationModal for both create and edit
 import { ProjectCreationModal } from './ProjectCreationModal';
 import { ProjectCard, CompactProjectCard } from './ProjectCard';
+import { ProjectTable } from './ProjectTable';
 import { ProjectToast, useProjectToast } from './ProjectToast';
 import type { ProjectHistoryItem } from '../../lib/types';
 import { ProjectsByType } from '../../types/projects';
@@ -96,12 +98,73 @@ export default function EmployeeDetailView({
   
 
   const { token } = useAuth();
+  const { databaseData } = useUtilizationData();
+  
+  // Create dataForUI similar to UtilizationReportView
+  const dataForUI = useMemo(() => {
+    if (!databaseData.auslastung || !databaseData.einsatzplan) return [];
+    
+    const result: any[] = [];
+    
+    // Process Auslastung data (historical)
+    databaseData.auslastung.forEach((row: any) => {
+      if (!row.values) return;
+      
+      Object.entries(row.values).forEach(([weekKey, value]) => {
+        if (typeof value === 'number' && Number.isFinite(value)) {
+          const [yearStr, weekStr] = weekKey.split('/');
+          const year = parseInt(`20${yearStr}`, 10);
+          const weekNumber = parseInt(weekStr, 10);
+          
+          result.push({
+            person: row.person,
+            personId: row.personId || row.id,
+            name: row.person,
+            week: weekKey,
+            year,
+            weekNumber,
+            finalValue: value,
+            utilization: value,
+            isHistorical: true
+          });
+        }
+      });
+    });
+    
+    // Process Einsatzplan data (forecast)
+    databaseData.einsatzplan.forEach((row: any) => {
+      if (!row.values) return;
+      
+      Object.entries(row.values).forEach(([weekKey, value]) => {
+        if (typeof value === 'number' && Number.isFinite(value)) {
+          const [yearStr, weekStr] = weekKey.split('/');
+          const year = parseInt(`20${yearStr}`, 10);
+          const weekNumber = parseInt(weekStr, 10);
+          
+          result.push({
+            person: row.person,
+            personId: row.personId || row.id,
+            name: row.person,
+            week: weekKey,
+            year,
+            weekNumber,
+            finalValue: value,
+            utilization: value,
+            isHistorical: false
+          });
+        }
+      });
+    });
+    
+    return result;
+  }, [databaseData]);
   
   console.log('🔑 Auth token status:', token ? 'present' : 'missing');
   const [personName, setPersonName] = useState<string>('');
   const [meta, setMeta] = useState<{ team?: string; cc?: string; lbs?: string; location?: string; startDate?: string } | null>(null);
   const [employeeData, setEmployeeData] = useState<{ email?: string; startDate?: string; location?: string; lbs?: string } | null>(null);
   const [utilization, setUtilization] = useState<number | null>(null);
+  const [averageUtilization, setAverageUtilization] = useState<number | null>(null);
   const [isTechSkillsOpen, setTechSkillsOpen] = useState(false);
   const [isRoleAssignOpen, setRoleAssignOpen] = useState(false);
   // isProjectHistoryModalOpen removed - using ProjectCreationModal for both create and edit
@@ -605,25 +668,175 @@ export default function EmployeeDetailView({
     setEditingProject(null);
   };
 
-  // Load simple utilization metric (best-effort)
+  // Load simple utilization metric from UtilizationDataContext
   useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const data: any[] = await DatabaseService.getUtilizationData();
-        if (cancelled || !Array.isArray(data)) return;
-        const filtered = data.filter(row => (row.personId && row.personId === employeeId) || (personName && row.person === personName));
-        if (filtered.length === 0) { setUtilization(null); return; }
-        // Pick latest by year/weekNumber
-        const latest = filtered.sort((a,b)=> (a.year - b.year) || (a.weekNumber - b.weekNumber)).pop();
-        if (latest && typeof latest.finalValue === 'number') setUtilization(Math.round(latest.finalValue)); else setUtilization(null);
-      } catch {
-        if (!cancelled) setUtilization(null);
+    console.log('🔍 Utilization useEffect triggered:', {
+      dataForUI: dataForUI ? 'present' : 'missing',
+      isArray: Array.isArray(dataForUI),
+      length: Array.isArray(dataForUI) ? dataForUI.length : 'N/A',
+      employeeId,
+      personName
+    });
+
+    if (!dataForUI || !Array.isArray(dataForUI) || (!employeeId && !personName)) {
+      console.log('🔍 Early return - missing data or identifiers');
+      setUtilization(null);
+      setAverageUtilization(null);
+      return;
+    }
+
+    try {
+      const data: any[] = dataForUI;
+        if (!Array.isArray(data)) return;
+        
+        console.log('🔍 Using UtilizationDataContext data:', {
+          totalRecords: data.length,
+          employeeId,
+          personName,
+          sampleRecord: data[0],
+          dataStructure: data.slice(0, 2).map(row => ({
+            person: row.person,
+            personId: row.personId,
+            name: row.name,
+            finalValue: row.finalValue,
+            year: row.year,
+            weekNumber: row.weekNumber,
+            keys: Object.keys(row)
+          }))
+        });
+        
+        const filtered = data.filter(row => {
+          const matchesPersonId = row.personId && row.personId === employeeId;
+          const matchesPersonName = personName && (row.person === personName || row.name === personName);
+          const matches = matchesPersonId || matchesPersonName;
+          
+          if (matches) {
+            console.log('🔍 Found matching utilization row:', {
+              person: row.person,
+              name: row.name,
+              personId: row.personId,
+              finalValue: row.finalValue,
+              year: row.year,
+              weekNumber: row.weekNumber,
+              matchedBy: matchesPersonId ? 'personId' : 'personName'
+            });
+          }
+          
+          return matches;
+        });
+        if (filtered.length === 0) { 
+          setUtilization(null); 
+          setAverageUtilization(null);
+          return; 
+        }
+        
+        // Calculate planned utilization for rest of year (from Einsatzplan)
+        console.log('🔍 Found', filtered.length, 'utilization records for employee');
+        
+        const currentDate = new Date();
+        const currentYear = currentDate.getFullYear();
+        
+        // Get current week number (ISO week)
+        const getWeekNumber = (date: Date): number => {
+          const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+          const dayNum = d.getUTCDay() || 7;
+          d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+          const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+          return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+        };
+        
+        const currentWeek = getWeekNumber(currentDate);
+        
+        // Filter for planned utilization (Einsatzplan = forecast data) from current week onwards
+        const plannedData = filtered.filter(row => {
+          const isForecast = !row.isHistorical; // Einsatzplan data
+          const isCurrentYearOrLater = row.year >= currentYear;
+          const isCurrentWeekOrLater = row.year > currentYear || (row.year === currentYear && row.weekNumber >= currentWeek);
+          const hasValidValue = typeof row.finalValue === 'number' && !isNaN(row.finalValue);
+          
+          return isForecast && isCurrentYearOrLater && isCurrentWeekOrLater && hasValidValue;
+        });
+        
+        console.log('🔍 Found', plannedData.length, 'planned utilization records for rest of year');
+        
+        if (plannedData.length > 0) {
+          // Calculate average planned utilization
+          const totalPlanned = plannedData.reduce((sum, row) => sum + row.finalValue, 0);
+          const avgPlanned = totalPlanned / plannedData.length;
+          const roundedValue = Math.round(avgPlanned);
+          
+          console.log('🔍 Calculated planned utilization:', roundedValue, 'from', plannedData.length, 'forecast records');
+          setUtilization(roundedValue);
+        } else {
+          // No valid planned utilization data found
+          console.log('🔍 No planned utilization data found for rest of year');
+          setUtilization(null);
+        }
+
+        // Calculate average utilization from beginning of current year to current week
+        // (currentDate and currentYear already defined above)
+        
+        // Get current week number for average calculation (reusing function)
+        const getWeekNumberForAvg = (date: Date): number => {
+          const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+          const dayNum = d.getUTCDay() || 7;
+          d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+          const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+          return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+        };
+        
+        const currentWeekForAvg = getWeekNumberForAvg(currentDate);
+        
+        // Calculate average for current year
+        
+        // Filter data for current year up to current week
+        const currentYearData = filtered.filter(row => {
+          const isCurrentYear = row.year === currentYear;
+          const isValidWeek = row.weekNumber <= currentWeekForAvg;
+          const hasValidValue = typeof row.finalValue === 'number' && !isNaN(row.finalValue);
+          
+          // Filter for current year data
+          
+          return isCurrentYear && isValidWeek && hasValidValue;
+        });
+        
+        console.log('🔍 Found', currentYearData.length, 'records for current year average');
+        
+        if (currentYearData.length > 0) {
+          const sum = currentYearData.reduce((acc, row) => acc + row.finalValue, 0);
+          const average = sum / currentYearData.length;
+          const roundedAverage = Math.round(average);
+          
+          console.log('🔍 Average utilization:', roundedAverage + '%');
+          
+          setAverageUtilization(roundedAverage);
+        } else {
+          console.log('🔍 No current year data found, trying fallback...');
+          
+          // Fallback: Use all available data if no current year data
+          const allValidData = filtered.filter(row => 
+            typeof row.finalValue === 'number' && !isNaN(row.finalValue)
+          );
+          
+          if (allValidData.length > 0) {
+            const sum = allValidData.reduce((acc, row) => acc + row.finalValue, 0);
+            const average = sum / allValidData.length;
+            const roundedAverage = Math.round(average);
+            
+            console.log('🔍 Fallback average utilization:', roundedAverage + '%');
+            
+            setAverageUtilization(roundedAverage);
+          } else {
+            setAverageUtilization(null);
+          }
+        }
+        
+      } catch (error) {
+        console.log('🔍 Error processing utilization data:', error);
+        setUtilization(null);
+        setAverageUtilization(null);
       }
-    };
-    load();
-    return () => { cancelled = true; };
-  }, [employeeId, personName]);
+  }, [dataForUI, employeeId, personName]);
 
   const employee: Employee | null = personName ? {
     id: employeeId,
@@ -652,6 +865,13 @@ export default function EmployeeDetailView({
     historicalProjects: true,
     skills: true,
     strengths: true
+  });
+  
+  // View-State für Projekt-Ansichten (card oder table)
+  const [projectViews, setProjectViews] = useState<Record<string, 'card' | 'table'>>({
+    active: 'card',
+    planned: 'card',
+    historical: 'card'
   });
   if (!employee) {
     return <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -703,8 +923,8 @@ export default function EmployeeDetailView({
   };
   return <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between max-w-[1600px] mx-auto">
+      <header className="bg-white border-b border-gray-200 px-8 py-4">
+        <div className="flex items-center justify-between w-full">
           <div className="flex items-center space-x-4">
             <button onClick={onBack} className="flex items-center space-x-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
               <ArrowLeft className="w-4 h-4" />
@@ -749,25 +969,19 @@ export default function EmployeeDetailView({
       </header>
 
       {/* Main Content */}
-      <main className="px-6 py-8" style={{
-      paddingTop: "24px",
-      paddingBottom: "24px",
-      paddingRight: "24px",
+      <main className="px-8 py-6" style={{
       display: "block",
-      alignItems: "center",
       height: "auto",
       minHeight: "min-content"
     }}>
-        <div className="max-w-[1600px] mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4" style={{
-          columnGap: "16px",
-          rowGap: "16px",
+        <div className="w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6" style={{
           height: "auto",
           minHeight: "min-content"
         }}>
             
             {/* ========== LINKE SPALTE: Mitarbeiter-Informationen ========== */}
-            <div className="lg:col-span-1 space-y-4">
+            <div className="lg:col-span-1 xl:col-span-1 2xl:col-span-1 space-y-4">
               
               {/* 👤 Profilbereich */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
@@ -830,9 +1044,21 @@ export default function EmployeeDetailView({
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <TrendingUp className="w-4 h-4 text-blue-600" />
-                      <span className="text-sm font-medium text-gray-700">Auslastung</span>
+                      <span className="text-sm font-medium text-gray-700">Geplante Auslastung</span>
                     </div>
-                    <span className="text-lg font-semibold text-blue-600">{utilization !== null ? `${utilization}%` : '—'}</span>
+                    <span className="text-lg font-semibold text-blue-600">
+                      {utilization !== null ? `${utilization}%` : (personName ? 'Lädt...' : '—')}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <BarChart3 className="w-4 h-4 text-green-600" />
+                      <span className="text-sm font-medium text-gray-700">Ø Auslastung {new Date().getFullYear()}</span>
+                    </div>
+                    <span className="text-lg font-semibold text-green-600">
+                      {averageUtilization !== null ? `${averageUtilization}%` : (personName ? 'Lädt...' : '—')}
+                    </span>
                   </div>
                   
                   <div className="flex items-center justify-between">
@@ -880,8 +1106,8 @@ export default function EmployeeDetailView({
                     className="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
                   >
                     + Skill
-                  </button>
-                </div>
+                    </button>
+                  </div>
                 {dossierLoading ? (
                   <div className="text-xs text-gray-500">Lade Skills...</div>
                 ) : assignedSkills.length === 0 ? (
@@ -892,8 +1118,8 @@ export default function EmployeeDetailView({
                       <div key={skill.id} className="flex items-center justify-between py-1">
                         <div className="flex-1">
                           <span className="text-xs font-medium text-gray-900">{skill.skillName}</span>
-                        </div>
-                        <div className="flex items-center space-x-1">
+                </div>
+                          <div className="flex items-center space-x-1">
                           {[1, 2, 3, 4, 5].map((star) => (
                             <Star
                               key={star}
@@ -904,7 +1130,7 @@ export default function EmployeeDetailView({
                               }`}
                             />
                           ))}
-                        </div>
+                          </div>
                       </div>
                     ))}
                     {assignedSkills.length > 5 && (
@@ -928,8 +1154,8 @@ export default function EmployeeDetailView({
                     className="text-xs px-2 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
                   >
                     + Rolle
-                  </button>
-                </div>
+                            </button>
+                          </div>
                 {dossierLoading ? (
                   <div className="text-xs text-gray-500">Lade Rollen...</div>
                 ) : assignedRoles.length === 0 ? (
@@ -979,7 +1205,7 @@ export default function EmployeeDetailView({
                         title="Bearbeiten"
                       >
                         <Edit3 className="w-4 h-4" />
-                      </button>
+                    </button>
                     ) : (
                       <>
                         <button 
@@ -1023,16 +1249,16 @@ export default function EmployeeDetailView({
                         <div className="p-2 bg-green-50 rounded border border-green-100 min-h-[40px]">
                           <p className="text-xs text-gray-700 whitespace-pre-wrap">
                             {formData.strengths || 'Keine Stärken erfasst.'}
-                          </p>
-                        </div>
+                                </p>
+                              </div>
                       )}
-                    </div>
+                              </div>
 
                     <div>
                       <div className="flex items-center space-x-1 mb-1">
                         <ThumbsDown className="w-3 h-3 text-orange-600" />
                         <h4 className="text-xs font-semibold text-orange-700">Schwächen</h4>
-                      </div>
+                            </div>
                       {isEditing ? (
                         <textarea
                           value={formData.weaknesses}
@@ -1051,11 +1277,11 @@ export default function EmployeeDetailView({
                     </div>
                   </div>
                 )}
-              </div>
-            </div>
+                      </div>
+                    </div>
 
             {/* ========== MITTLERE SPALTE: Projekte & Kommentare ========== */}
-            <div className="lg:col-span-1 space-y-4">
+            <div className="lg:col-span-1 xl:col-span-2 2xl:col-span-2 space-y-4">
               
 
               {/* 💬 Kommentare - Bestehende Felder aus UtilizationReportView */}
@@ -1067,14 +1293,14 @@ export default function EmployeeDetailView({
                 
                 <div className="space-y-6">
                   {/* Auslastungskommentar */}
-                  <div>
+                    <div>
                     <h4 className="text-sm font-medium text-gray-900 mb-2">Auslastungskommentar</h4>
                     <UtilizationComment
                       personId={employee.name}
                       initialValue=""
                       onLocalChange={() => {}}
                     />
-                  </div>
+                      </div>
                   
                   {/* Einsatzplan-Kommentar */}
                   <div>
@@ -1084,7 +1310,7 @@ export default function EmployeeDetailView({
                       initialValue=""
                       onLocalChange={() => {}}
                     />
-                  </div>
+                              </div>
                 </div>
               </div>
               
@@ -1099,35 +1325,74 @@ export default function EmployeeDetailView({
                     <span className="text-xs text-gray-500">
                       {projectsByType.active.length}
                     </span>
+                    
+                    {/* View Toggle Buttons */}
+                    <div className="flex items-center bg-gray-100 rounded p-0.5">
+                      <button
+                        onClick={() => setProjectViews(prev => ({ ...prev, active: 'card' }))}
+                        className={`p-1 rounded transition-colors ${
+                          projectViews.active === 'card' 
+                            ? 'bg-white text-blue-600 shadow-sm' 
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                        title="Kartenansicht"
+                      >
+                        <Grid3X3 className="w-3 h-3" />
+                                </button>
+                      <button
+                        onClick={() => setProjectViews(prev => ({ ...prev, active: 'table' }))}
+                        className={`p-1 rounded transition-colors ${
+                          projectViews.active === 'table' 
+                            ? 'bg-white text-blue-600 shadow-sm' 
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                        title="Tabellenansicht"
+                      >
+                        <List className="w-3 h-3" />
+                                </button>
+                              </div>
+                    
                     <button 
                       onClick={() => toggleSection('projects')} 
                       className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
                     >
                       <ChevronDown className={`w-3 h-3 transform transition-transform ${expandedSections.projects ? 'rotate-180' : ''}`} />
                     </button>
-                  </div>
-                </div>
+                            </div>
+                      </div>
                 
                 {expandedSections.projects && (
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                  <div className="max-h-48 overflow-y-auto">
                     {projectsByType.active.length > 0 ? (
-                      projectsByType.active.map(project => (
-                        <CompactProjectCard
-                          key={project.id}
-                          project={project}
+                      projectViews.active === 'card' ? (
+                        <div className="space-y-2">
+                          {projectsByType.active.map(project => (
+                            <CompactProjectCard
+                              key={project.id}
+                              project={project}
+                              type="active"
+                              onEdit={handleEditProject}
+                              onDelete={handleDeleteProject}
+                            />
+                          ))}
+                    </div>
+                      ) : (
+                        <ProjectTable
+                          projects={projectsByType.active}
                           type="active"
                           onEdit={handleEditProject}
                           onDelete={handleDeleteProject}
+                          compact={true}
                         />
-                      ))
+                      )
                     ) : (
                       <div className="p-3 text-center text-gray-500 text-xs">
                         Keine aktiven Projekte
-                      </div>
+              </div>
                     )}
                   </div>
                 )}
-              </div>
+            </div>
 
               {/* 📅 Geplante Projekte - Neues System */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
@@ -1140,6 +1405,33 @@ export default function EmployeeDetailView({
                     <span className="text-xs text-gray-500">
                       {projectsByType.planned.length}
                     </span>
+                    
+                    {/* View Toggle Buttons */}
+                    <div className="flex items-center bg-gray-100 rounded p-0.5">
+                      <button
+                        onClick={() => setProjectViews(prev => ({ ...prev, planned: 'card' }))}
+                        className={`p-1 rounded transition-colors ${
+                          projectViews.planned === 'card' 
+                            ? 'bg-white text-blue-600 shadow-sm' 
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                        title="Kartenansicht"
+                      >
+                        <Grid3X3 className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => setProjectViews(prev => ({ ...prev, planned: 'table' }))}
+                        className={`p-1 rounded transition-colors ${
+                          projectViews.planned === 'table' 
+                            ? 'bg-white text-blue-600 shadow-sm' 
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                        title="Tabellenansicht"
+                      >
+                        <List className="w-3 h-3" />
+                  </button>
+                </div>
+                
                     <button 
                       onClick={handleAddPlannedProject}
                       className="p-1 text-blue-600 hover:text-blue-700 transition-colors"
@@ -1153,21 +1445,33 @@ export default function EmployeeDetailView({
                     >
                       <ChevronDown className={`w-3 h-3 transform transition-transform ${expandedSections.plannedProjects ? 'rotate-180' : ''}`} />
                     </button>
-                  </div>
+                          </div>
                 </div>
                 
                 {expandedSections.plannedProjects && (
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                  <div className="max-h-48 overflow-y-auto">
                     {projectsByType.planned.length > 0 ? (
-                      projectsByType.planned.map(project => (
-                        <CompactProjectCard
-                          key={project.id}
-                          project={project}
+                      projectViews.planned === 'card' ? (
+                        <div className="space-y-2">
+                          {projectsByType.planned.map(project => (
+                            <CompactProjectCard
+                              key={project.id}
+                              project={project}
+                              type="planned"
+                              onEdit={handleEditProject}
+                              onDelete={handleDeleteProject}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <ProjectTable
+                          projects={projectsByType.planned}
                           type="planned"
                           onEdit={handleEditProject}
                           onDelete={handleDeleteProject}
+                          compact={true}
                         />
-                      ))
+                      )
                     ) : (
                       <div className="p-3 text-center text-gray-500 text-xs">
                         Keine geplanten Projekte
@@ -1179,7 +1483,7 @@ export default function EmployeeDetailView({
             </div>
 
             {/* ========== RECHTE SPALTE: Projektvergangenheit ========== */}
-            <div className="lg:col-span-1 space-y-3">
+            <div className="lg:col-span-1 xl:col-span-1 2xl:col-span-2 space-y-3">
               
               {/* 📜 Projektvergangenheit - Neues Design */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
@@ -1191,7 +1495,34 @@ export default function EmployeeDetailView({
                   <div className="flex items-center space-x-2">
                     <span className="text-xs text-gray-500">
                       {projectsByType.historical.length}
-                    </span>
+                          </span>
+                    
+                    {/* View Toggle Buttons */}
+                    <div className="flex items-center bg-gray-100 rounded p-0.5">
+                      <button
+                        onClick={() => setProjectViews(prev => ({ ...prev, historical: 'card' }))}
+                        className={`p-1 rounded transition-colors ${
+                          projectViews.historical === 'card' 
+                            ? 'bg-white text-blue-600 shadow-sm' 
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                        title="Kartenansicht"
+                      >
+                        <Grid3X3 className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => setProjectViews(prev => ({ ...prev, historical: 'table' }))}
+                        className={`p-1 rounded transition-colors ${
+                          projectViews.historical === 'table' 
+                            ? 'bg-white text-blue-600 shadow-sm' 
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                        title="Tabellenansicht"
+                      >
+                        <List className="w-3 h-3" />
+                      </button>
+                        </div>
+                    
                     <button 
                       onClick={handleAddHistoricalProject}
                       className="p-1 text-blue-600 hover:text-blue-700 transition-colors"
@@ -1205,21 +1536,33 @@ export default function EmployeeDetailView({
                     >
                       <ChevronDown className={`w-3 h-3 transform transition-transform ${expandedSections.historicalProjects ? 'rotate-180' : ''}`} />
                     </button>
-                  </div>
-                </div>
-                
+                        </div>
+              </div>
+
                 {expandedSections.historicalProjects && (
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                  <div className="max-h-48 overflow-y-auto">
                     {projectsByType.historical.length > 0 ? (
-                      projectsByType.historical.map((project: ProjectHistoryItem) => (
-                        <CompactProjectCard
-                          key={project.id}
-                          project={project}
+                      projectViews.historical === 'card' ? (
+                        <div className="space-y-2">
+                          {projectsByType.historical.map((project: ProjectHistoryItem) => (
+                            <CompactProjectCard
+                              key={project.id}
+                              project={project}
+                              type="historical"
+                              onEdit={handleEditProject}
+                              onDelete={handleDeleteProject}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <ProjectTable
+                          projects={projectsByType.historical}
                           type="historical"
                           onEdit={handleEditProject}
                           onDelete={handleDeleteProject}
+                          compact={true}
                         />
-                      ))
+                      )
                     ) : (
                       <div className="text-center py-4 text-gray-500">
                         <FileText className="w-8 h-8 text-gray-300 mx-auto mb-1" />
@@ -1228,8 +1571,8 @@ export default function EmployeeDetailView({
                     )}
                   </div>
                 )}
-              </div>
-              
+            </div>
+
 
               {/* 📊 Aktivitäten Timeline - Kompakt */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
@@ -1250,8 +1593,8 @@ export default function EmployeeDetailView({
                       <div className="flex-1">
                         <p className="text-xs text-gray-900">Projekt "E-Commerce" abgeschlossen</p>
                         <p className="text-xs text-gray-500">vor 2 Tagen</p>
-                      </div>
-                    </div>
+                        </div>
+                        </div>
                     
                     <div className="flex items-start space-x-2 py-1">
                       <div className="w-2 h-2 bg-green-500 rounded-full mt-1.5 flex-shrink-0"></div>
@@ -1259,8 +1602,8 @@ export default function EmployeeDetailView({
                         <p className="text-xs text-gray-900">Skill "React Advanced" hinzugefügt</p>
                         <p className="text-xs text-gray-500">vor 1 Woche</p>
                       </div>
-                    </div>
-                    
+              </div>
+
                     <div className="flex items-start space-x-2 py-1">
                       <div className="w-2 h-2 bg-purple-500 rounded-full mt-1.5 flex-shrink-0"></div>
                       <div className="flex-1">
