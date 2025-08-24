@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import * as XLSX from 'xlsx';
 
 interface ImportData {
+  category: string;
   role: string;
   task: string;
   description: string;
@@ -12,6 +13,7 @@ interface ImportData {
 }
 
 interface ImportResults {
+  categoriesCreated: number;
   rolesCreated: number;
   tasksCreated: number;
   tasksIgnored: number;
@@ -118,17 +120,18 @@ const RoleTaskBulkUploadModal: React.FC<RoleTaskBulkUploadModalProps> = ({
           // Skip header row and empty rows
           if (index === 0 || !row || row.length === 0) return;
 
-          const role = row[0]?.toString()?.trim();
-          const task = row[1]?.toString()?.trim();
-          const description = row[2]?.toString()?.trim() || '';
-          const outputs = row[3]?.toString()?.trim() || '';
+          const category = row[0]?.toString()?.trim();
+          const role = row[1]?.toString()?.trim();
+          const task = row[2]?.toString()?.trim();
+          const description = row[3]?.toString()?.trim() || '';
+          const outputs = row[4]?.toString()?.trim() || '';
 
-          if (!role || !task) {
-            invalid.push(`Zeile ${index + 1}: Rolle="${role || 'leer'}", Tätigkeit="${task || 'leer'}"`);
+          if (!category || !role || !task) {
+            invalid.push(`Zeile ${index + 1}: Kategorie="${category || 'leer'}", Rolle="${role || 'leer'}", Tätigkeit="${task || 'leer'}"`);
             return;
           }
 
-          parsed.push({ role, task, description, outputs });
+          parsed.push({ category, role, task, description, outputs });
         });
 
         // Remove duplicates within same role
@@ -136,7 +139,7 @@ const RoleTaskBulkUploadModal: React.FC<RoleTaskBulkUploadModalProps> = ({
         const seen = new Set<string>();
 
         parsed.forEach(item => {
-          const key = `${item.role}:${item.task}`;
+          const key = `${item.category}:${item.role}:${item.task}`;
           if (!seen.has(key)) {
             seen.add(key);
             uniqueData.push(item);
@@ -172,6 +175,7 @@ const RoleTaskBulkUploadModal: React.FC<RoleTaskBulkUploadModalProps> = ({
         },
         body: JSON.stringify({ 
           data: validData.map(item => ({ 
+            category: item.category,
             role: item.role, 
             task: item.task,
             description: item.description,
@@ -203,18 +207,22 @@ const RoleTaskBulkUploadModal: React.FC<RoleTaskBulkUploadModalProps> = ({
     onClose();
   };
 
-  // Group data by role for preview
+  // Group data by category and role for preview
   const groupedData = validData.reduce((acc, item) => {
-    if (!acc[item.role]) {
-      acc[item.role] = [];
+    const categoryKey = item.category;
+    if (!acc[categoryKey]) {
+      acc[categoryKey] = {};
     }
-    acc[item.role].push({
+    if (!acc[categoryKey][item.role]) {
+      acc[categoryKey][item.role] = [];
+    }
+    acc[categoryKey][item.role].push({
       task: item.task,
       description: item.description,
       outputs: item.outputs
     });
     return acc;
-  }, {} as Record<string, Array<{task: string, description: string, outputs: string}>>);
+  }, {} as Record<string, Record<string, Array<{task: string, description: string, outputs: string}>>>);
 
   return (
     <AnimatePresence>
@@ -279,13 +287,14 @@ const RoleTaskBulkUploadModal: React.FC<RoleTaskBulkUploadModalProps> = ({
                   <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                     <h4 className="font-medium text-purple-900 mb-2">Dateiformat:</h4>
                     <ul className="text-sm text-purple-800 space-y-1">
-                      <li>• <strong>Spalte A:</strong> Rolle (z.B. "Projektmanager")</li>
-                      <li>• <strong>Spalte B:</strong> Tätigkeit (z.B. "Projektinitialisierung")</li>
-                      <li>• <strong>Spalte C:</strong> Beschreibung (z.B. "Business Case, Ziele...")</li>
-                      <li>• <strong>Spalte D:</strong> Artefakte/Outputs (z.B. "Project Charter...")</li>
+                      <li>• <strong>Spalte A:</strong> Kategorie (z.B. "Consulting", "Agile")</li>
+                      <li>• <strong>Spalte B:</strong> Rolle (z.B. "Projektmanager")</li>
+                      <li>• <strong>Spalte C:</strong> Tätigkeit (z.B. "Projektinitialisierung")</li>
+                      <li>• <strong>Spalte D:</strong> Beschreibung (z.B. "Business Case, Ziele...")</li>
+                      <li>• <strong>Spalte E:</strong> Artefakte/Outputs (z.B. "Project Charter...")</li>
                       <li>• Erste Zeile wird als Header ignoriert</li>
                       <li>• Leere Zeilen werden ignoriert</li>
-                      <li>• Duplikate innerhalb einer Rolle werden ignoriert</li>
+                      <li>• Duplikate werden anhand Kategorie:Rolle:Tätigkeit erkannt</li>
                     </ul>
                   </div>
 
@@ -332,9 +341,13 @@ const RoleTaskBulkUploadModal: React.FC<RoleTaskBulkUploadModalProps> = ({
                   </div>
 
                   {/* Statistics */}
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-4 gap-4">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                      <div className="text-2xl font-bold text-green-600">{Object.keys(groupedData).length}</div>
+                      <div className="text-sm text-green-800">Kategorien</div>
+                    </div>
                     <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-center">
-                      <div className="text-2xl font-bold text-purple-600">{Object.keys(groupedData).length}</div>
+                      <div className="text-2xl font-bold text-purple-600">{Object.values(groupedData).reduce((sum, category) => sum + Object.keys(category).length, 0)}</div>
                       <div className="text-sm text-purple-800">Rollen</div>
                     </div>
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
@@ -361,27 +374,37 @@ const RoleTaskBulkUploadModal: React.FC<RoleTaskBulkUploadModalProps> = ({
 
                   {/* Preview Data */}
                   <div className="border border-gray-200 rounded-lg overflow-hidden max-h-96 overflow-y-auto">
-                    <div className="space-y-4 p-4">
-                      {Object.entries(groupedData).map(([role, tasks]) => (
-                        <div key={role} className="border border-gray-200 rounded-lg overflow-hidden">
-                          <div className="bg-purple-50 px-4 py-3 border-b border-gray-200">
-                            <h4 className="font-medium text-purple-900">{role}</h4>
-                            <p className="text-sm text-purple-700">{tasks.length} Tätigkeiten</p>
+                    <div className="space-y-6 p-4">
+                      {Object.entries(groupedData).map(([category, roles]) => (
+                        <div key={category} className="border border-gray-200 rounded-lg overflow-hidden">
+                          <div className="bg-green-50 px-4 py-3 border-b border-gray-200">
+                            <h3 className="font-bold text-green-900">{category}</h3>
+                            <p className="text-sm text-green-700">{Object.keys(roles).length} Rollen, {Object.values(roles).reduce((sum, tasks) => sum + tasks.length, 0)} Tätigkeiten</p>
                           </div>
-                          <div className="divide-y divide-gray-200">
-                            {tasks.map((task, index) => (
-                              <div key={index} className="p-4 hover:bg-gray-50">
-                                <div className="font-medium text-gray-900 mb-2">{task.task}</div>
-                                {task.description && (
-                                  <div className="text-sm text-gray-600 mb-2">
-                                    <strong>Beschreibung:</strong> {task.description}
-                                  </div>
-                                )}
-                                {task.outputs && (
-                                  <div className="text-sm text-gray-600">
-                                    <strong>Outputs:</strong> {task.outputs}
-                                  </div>
-                                )}
+                          <div className="space-y-4 p-4">
+                            {Object.entries(roles).map(([role, tasks]) => (
+                              <div key={role} className="border border-gray-200 rounded-lg overflow-hidden">
+                                <div className="bg-purple-50 px-4 py-3 border-b border-gray-200">
+                                  <h4 className="font-medium text-purple-900">{role}</h4>
+                                  <p className="text-sm text-purple-700">{tasks.length} Tätigkeiten</p>
+                                </div>
+                                <div className="divide-y divide-gray-200">
+                                  {tasks.map((task, index) => (
+                                    <div key={index} className="p-4 hover:bg-gray-50">
+                                      <div className="font-medium text-gray-900 mb-2">{task.task}</div>
+                                      {task.description && (
+                                        <div className="text-sm text-gray-600 mb-2">
+                                          <strong>Beschreibung:</strong> {task.description}
+                                        </div>
+                                      )}
+                                      {task.outputs && (
+                                        <div className="text-sm text-gray-600">
+                                          <strong>Outputs:</strong> {task.outputs}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -416,7 +439,11 @@ const RoleTaskBulkUploadModal: React.FC<RoleTaskBulkUploadModalProps> = ({
                   </div>
 
                   {/* Results Summary */}
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-4 gap-4">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                      <div className="text-2xl font-bold text-green-600">{importResults.categoriesCreated}</div>
+                      <div className="text-sm text-green-800">Neue Kategorien</div>
+                    </div>
                     <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-center">
                       <div className="text-2xl font-bold text-purple-600">{importResults.rolesCreated}</div>
                       <div className="text-sm text-purple-800">Neue Rollen</div>

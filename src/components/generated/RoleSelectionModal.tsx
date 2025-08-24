@@ -1,13 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, Star, Loader2, Search } from 'lucide-react';
+import { 
+  X, 
+  Plus, 
+  Star, 
+  Loader2, 
+  Search, 
+  ChevronDown, 
+  ChevronRight,
+  Check,
+  Folder,
+  FolderOpen,
+  User,
+  CheckSquare,
+  CheckCircle2
+} from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface Role {
   id: string;
   name: string;
   description: string;
-  category: string;
+  categoryId: string;
+  categoryName?: string;
+}
+
+interface RoleCategory {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+interface RoleTask {
+  id: string;
+  task: string;
+  description: string;
+  outputs: string;
+  roleId: string;
 }
 
 interface AssignedRole {
@@ -19,12 +48,21 @@ interface AssignedRole {
   lastUpdated: any;
 }
 
+interface EmployeeRoleAssignment {
+  employeeId: string;
+  categoryId: string;
+  roleId: string;
+  selectedTasks: string[];
+  level: number;
+  assignedAt: Date;
+}
+
 interface RoleSelectionModalProps {
   isOpen: boolean;
   onClose: () => void;
   employeeId: string;
   employeeName: string;
-  onRoleAssigned: () => void; // Callback wenn eine Rolle zugewiesen wurde
+  onRoleAssigned: () => void;
 }
 
 const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
@@ -35,16 +73,54 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
   onRoleAssigned,
 }) => {
   const { token } = useAuth();
-  const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
+  
+  // State für hierarchische Auswahl
+  const [categories, setCategories] = useState<RoleCategory[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [roleTasks, setRoleTasks] = useState<Record<string, RoleTask[]>>({});
   const [assignedRoles, setAssignedRoles] = useState<AssignedRole[]>([]);
+  
+  // UI State
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Hierarchische Auswahl State
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedRole, setSelectedRole] = useState<string>('');
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [expandedRoles, setExpandedRoles] = useState<Set<string>>(new Set());
+  
+  // Task-Auswahl State
+  const [selectedTasks, setSelectedTasks] = useState<Record<string, string[]>>({});
+  const [roleLevels, setRoleLevels] = useState<Record<string, number>>({});
 
-  // Verfügbare Rollen laden
-  const loadAvailableRoles = async () => {
+  // Kategorien laden
+  const loadCategories = async () => {
+    try {
+      const response = await fetch('/api/role-categories', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const categoriesData = await response.json();
+      setCategories(categoriesData);
+      
+    } catch (error) {
+      setError('Fehler beim Laden der Kategorien');
+    }
+  };
+
+  // Rollen laden
+  const loadRoles = async () => {
     try {
       const response = await fetch('/api/roles', {
         headers: {
@@ -58,13 +134,14 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
       }
 
       const rolesData = await response.json();
-      setAvailableRoles(rolesData);
+      setRoles(rolesData);
       
     } catch (error) {
-      // console.error entfernt
-      setError('Fehler beim Laden der verfügbaren Rollen');
+      setError('Fehler beim Laden der Rollen');
     }
   };
+
+
 
   // Zugewiesene Rollen laden
   const loadAssignedRoles = async () => {
@@ -84,8 +161,48 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
       setAssignedRoles(rolesData);
       
     } catch (error) {
-      // console.error entfernt
       setError('Fehler beim Laden der zugewiesenen Rollen');
+    }
+  };
+
+  // Alle Tasks für alle Rollen laden
+  const loadAllRoleTasks = async () => {
+    try {
+      // Alle Tasks auf einmal laden (ohne roleId Filter)
+      const response = await fetch('/api/role-tasks', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const allTasks = await response.json();
+      
+      // Tasks nach Rollen gruppieren
+      const tasksByRole: Record<string, RoleTask[]> = {};
+      const selectedTasksByRole: Record<string, string[]> = {};
+      const levelsByRole: Record<string, number> = {};
+      
+      allTasks.forEach((task: RoleTask) => {
+        if (!tasksByRole[task.roleId]) {
+          tasksByRole[task.roleId] = [];
+          selectedTasksByRole[task.roleId] = [];
+          levelsByRole[task.roleId] = 3; // Standard Level
+        }
+        tasksByRole[task.roleId].push(task);
+        selectedTasksByRole[task.roleId].push(task.id); // Alle standardmäßig ausgewählt
+      });
+      
+      setRoleTasks(tasksByRole);
+      setSelectedTasks(selectedTasksByRole);
+      setRoleLevels(levelsByRole);
+      
+    } catch (error) {
+      setError('Fehler beim Laden der Tasks');
     }
   };
 
@@ -96,29 +213,105 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
     
     try {
       await Promise.all([
-        loadAvailableRoles(),
-        loadAssignedRoles()
+        loadCategories(),
+        loadRoles(),
+        loadAssignedRoles(),
+        loadAllRoleTasks() // Alle Tasks auf einmal laden
       ]);
     } catch (error) {
-      // console.error entfernt
+      // Fehlerbehandlung bereits in den einzelnen Funktionen
     } finally {
       setLoading(false);
     }
   };
 
-  // Rolle zuweisen
-  const assignRole = async (roleId: string, roleName: string, level: number) => {
+  // Kategorie expandieren/kollabieren
+  const toggleCategory = (categoryId: string) => {
+    const newExpanded = new Set(expandedCategories);
+    if (newExpanded.has(categoryId)) {
+      newExpanded.delete(categoryId);
+    } else {
+      newExpanded.add(categoryId);
+    }
+    setExpandedCategories(newExpanded);
+  };
+
+  // Rolle expandieren/kollabieren
+  const toggleRole = (roleId: string) => {
+    const newExpanded = new Set(expandedRoles);
+    if (newExpanded.has(roleId)) {
+      newExpanded.delete(roleId);
+    } else {
+      newExpanded.add(roleId);
+    }
+    setExpandedRoles(newExpanded);
+  };
+
+  // Task-Auswahl togglen
+  const toggleTask = (roleId: string, taskId: string) => {
+    setSelectedTasks(prev => {
+      const currentSelected = prev[roleId] || [];
+      const newSelected = currentSelected.includes(taskId)
+        ? currentSelected.filter(id => id !== taskId)
+        : [...currentSelected, taskId];
+      
+      return {
+        ...prev,
+        [roleId]: newSelected
+      };
+    });
+  };
+
+  // Alle Tasks einer Rolle auswählen/abwählen
+  const toggleAllTasks = (roleId: string, selectAll: boolean) => {
+    const tasks = roleTasks[roleId] || [];
+    setSelectedTasks(prev => ({
+      ...prev,
+      [roleId]: selectAll ? tasks.map(task => task.id) : []
+    }));
+  };
+
+  // Bewertungslevel ändern
+  const updateRoleLevel = (roleId: string, level: number) => {
+    setRoleLevels(prev => ({
+      ...prev,
+      [roleId]: level
+    }));
+  };
+
+  // Rolle mit Tasks zuweisen
+  const assignRoleWithTasks = async (categoryId: string, roleId: string) => {
+    const tasks = roleTasks[roleId] || [];
+    const selectedTaskIds = selectedTasks[roleId] || [];
+    const level = roleLevels[roleId] || 3;
+
+    // Rollenname für Success-Nachricht finden
+    const role = roles.find(r => r.id === roleId);
+    const roleName = role?.name || 'Rolle';
+
+    if (selectedTaskIds.length === 0) {
+      setError('Bitte wählen Sie mindestens eine Task aus');
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
+    setSuccessMessage(null);
     
     try {
+      // Neue erweiterte API für Rollen mit Tasks
       const response = await fetch(`/api/employee-roles/${encodeURIComponent(employeeId)}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ roleId, level })
+        body: JSON.stringify({ 
+          roleId, 
+          level,
+          categoryId,
+          selectedTasks: selectedTaskIds
+        })
       });
 
       if (!response.ok) {
@@ -126,41 +319,39 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
         throw new Error(errorData.error || 'Fehler beim Zuweisen der Rolle');
       }
 
-      // Erfolgreich zugewiesen - Daten neu laden und Callback aufrufen
+      // Daten neu laden und Callback aufrufen
       await loadAssignedRoles();
       onRoleAssigned();
       
+      // Erfolgreich zugewiesen - Success-Nachricht anzeigen
+      console.log('Setting success message for role:', roleName);
+      setSuccessMessage(`${roleName} wurde erfolgreich zugewiesen.`);
+      
+      // Auswahl zurücksetzen (aber nicht die Success-Message)
+      setSelectedCategory('');
+      setSelectedRole('');
+      setSelectedTasks({});
+      setRoleLevels({});
+      
     } catch (error: any) {
-      // console.error entfernt
       setError(error.message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Verfügbare (nicht zugewiesene) Rollen berechnen
-  const getUnassignedRoles = () => {
-    const assignedRoleIds = assignedRoles.map(role => role.roleId);
-    return availableRoles.filter(role => !assignedRoleIds.includes(role.id));
+  // Verfügbare Rollen für eine Kategorie
+  const getRolesForCategory = (categoryId: string) => {
+    return roles.filter(role => role.categoryId === categoryId);
   };
 
-  // Gefilterte Rollen basierend auf Suche und Kategorie
-  const getFilteredRoles = () => {
-    const unassigned = getUnassignedRoles();
-    
-    return unassigned.filter(role => {
-      const matchesSearch = role.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           role.description.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesCategory = !selectedCategory || role.category === selectedCategory;
-      
-      return matchesSearch && matchesCategory;
+  // Gefilterte Kategorien basierend auf Suche
+  const getFilteredCategories = () => {
+    return categories.filter(category => {
+      const matchesSearch = category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           (category.description && category.description.toLowerCase().includes(searchTerm.toLowerCase()));
+      return matchesSearch;
     });
-  };
-
-  // Verfügbare Kategorien
-  const getAvailableCategories = () => {
-    const categories = Array.from(new Set(availableRoles.map(role => role.category)));
-    return categories.filter(cat => cat && cat.trim() !== '');
   };
 
   // Sterne-Bewertung Component
@@ -194,50 +385,6 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
     );
   };
 
-  // RoleCard Component
-  const RoleCard: React.FC<{ role: Role }> = ({ role }) => {
-    const [selectedLevel, setSelectedLevel] = useState(3);
-    
-    return (
-      <div className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-        <div className="mb-3">
-          <h4 className="font-medium text-gray-900 mb-1">{role.name}</h4>
-          {role.description && (
-            <p className="text-sm text-gray-600 mb-2">{role.description}</p>
-          )}
-          {role.category && (
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-              {role.category}
-            </span>
-          )}
-        </div>
-        
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-sm text-gray-600">Bewertung:</span>
-          <StarRating
-            value={selectedLevel}
-            onChange={setSelectedLevel}
-            disabled={isSubmitting}
-          />
-          <span className="text-sm text-gray-500">({selectedLevel}/5)</span>
-        </div>
-        
-        <button
-          onClick={() => assignRole(role.id, role.name, selectedLevel)}
-          disabled={isSubmitting}
-          className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {isSubmitting ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Plus className="w-4 h-4" />
-          )}
-          Zuweisen
-        </button>
-      </div>
-    );
-  };
-
   // Beim Öffnen des Modals Daten laden
   useEffect(() => {
     if (isOpen && token && employeeId) {
@@ -245,17 +392,39 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
     }
   }, [isOpen, token, employeeId]);
 
+  // Success-Message Timeout verwalten
+  useEffect(() => {
+    if (successMessage) {
+      console.log('Success message set, starting 3 second timeout');
+      const timeoutId = setTimeout(() => {
+        console.log('Hiding success message after 3 seconds');
+        setSuccessMessage(null);
+      }, 3000);
+      
+      return () => {
+        console.log('Clearing success message timeout');
+        clearTimeout(timeoutId);
+      };
+    }
+  }, [successMessage]);
+
   // Reset bei Schließen
   useEffect(() => {
     if (!isOpen) {
       setSearchTerm('');
       setSelectedCategory('');
+      setSelectedRole('');
+      setSelectedTasks({});
+      setRoleLevels({});
+      setExpandedCategories(new Set());
+      setExpandedRoles(new Set());
+      setRoleTasks({});
       setError(null);
+      setSuccessMessage(null);
     }
   }, [isOpen]);
 
-  const filteredRoles = getFilteredRoles();
-  const categories = getAvailableCategories();
+  const filteredCategories = getFilteredCategories();
 
   return (
     <AnimatePresence>
@@ -273,16 +442,16 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-4xl max-h-[80vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            className="relative w-full max-w-5xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
           >
             {/* Header */}
             <header className="flex items-center justify-between p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
               <div>
                 <h1 className="text-xl font-semibold text-gray-900">
-                  Rollen zuweisen
+                  Rollen & Tasks zuweisen
                 </h1>
                 <p className="text-sm text-gray-600 mt-1">
-                  Neue Rollen für {employeeName} auswählen und zuweisen
+                  Wählen Sie Kategorien, Rollen und Tasks für {employeeName} aus
                 </p>
               </div>
               <button
@@ -293,38 +462,26 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
               </button>
             </header>
 
-            {/* Filters */}
+            {/* Success Message - Fixed Position */}
+            {successMessage && (
+              <div className="mx-6 mt-4 p-4 bg-green-100 border-2 border-green-300 rounded-lg text-sm text-green-800 flex items-center gap-2 shadow-lg">
+                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                <span className="font-medium">{successMessage}</span>
+                {console.log('SUCCESS MESSAGE RENDERED AT TOP:', successMessage)}
+              </div>
+            )}
+
+            {/* Search */}
             <div className="p-6 border-b border-gray-100 bg-gray-50">
-              <div className="flex flex-col sm:flex-row gap-4">
-                {/* Search */}
-                <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input
-                    type="text"
-                    placeholder="Rollen durchsuchen..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                
-                {/* Category Filter */}
-                {categories.length > 0 && (
-                  <div className="sm:w-48">
-                    <select
-                      value={selectedCategory}
-                      onChange={(e) => setSelectedCategory(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Alle Kategorien</option>
-                      {categories.map(category => (
-                        <option key={category} value={category}>
-                          {category}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Kategorien durchsuchen..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
               </div>
             </div>
 
@@ -337,37 +494,229 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
                 </div>
               )}
 
+
+
               {/* Loading */}
               {loading ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                  <span>Lade verfügbare Rollen...</span>
+                  <span>Lade Kategorien und Rollen...</span>
                 </div>
               ) : (
                 <>
                   {/* Results Count */}
                   <div className="mb-4">
                     <p className="text-sm text-gray-600">
-                      {filteredRoles.length} von {getUnassignedRoles().length} verfügbaren Rollen
+                      {filteredCategories.length} Kategorien verfügbar
                       {searchTerm && ` (gefiltert nach "${searchTerm}")`}
-                      {selectedCategory && ` in Kategorie "${selectedCategory}"`}
                     </p>
                   </div>
 
-                  {/* Roles Grid */}
-                  {filteredRoles.length === 0 ? (
+                  {/* Hierarchische Kategorien-Liste */}
+                  {filteredCategories.length === 0 ? (
                     <div className="text-center py-12 text-gray-500">
-                      {getUnassignedRoles().length === 0 ? (
-                        <p>Alle verfügbaren Rollen sind bereits zugewiesen.</p>
-                      ) : (
-                        <p>Keine Rollen gefunden, die den Filterkriterien entsprechen.</p>
-                      )}
+                      <p>Keine Kategorien gefunden.</p>
                     </div>
                   ) : (
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                      {filteredRoles.map((role) => (
-                        <RoleCard key={role.id} role={role} />
-                      ))}
+                    <div className="space-y-3">
+                      {filteredCategories.map(category => {
+                        const categoryRoles = getRolesForCategory(category.id);
+                        const isExpanded = expandedCategories.has(category.id);
+                        
+                        return (
+                          <div key={category.id} className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                            {/* Kategorie-Header */}
+                            <div className="bg-blue-50 border-b border-gray-200 p-4 flex items-center justify-between hover:bg-blue-100">
+                              <div className="flex items-center gap-3">
+                                <button
+                                  onClick={() => toggleCategory(category.id)}
+                                  className="text-gray-600 hover:text-gray-800"
+                                >
+                                  {isExpanded ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                </button>
+                                
+                                {isExpanded ? (
+                                  <FolderOpen className="h-5 w-5 text-blue-600" />
+                                ) : (
+                                  <Folder className="h-5 w-5 text-blue-600" />
+                                )}
+                                
+                                <div>
+                                  <h3 className="font-medium text-gray-900">{category.name}</h3>
+                                  {category.description && (
+                                    <p className="text-sm text-gray-600">{category.description}</p>
+                                  )}
+                                  <p className="text-xs text-gray-500">
+                                    {categoryRoles.length} Rolle(n)
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Rollen (wenn Kategorie expandiert) */}
+                            {isExpanded && (
+                              <div className="bg-white">
+                                {categoryRoles.map(role => {
+                                  const isRoleExpanded = expandedRoles.has(role.id);
+                                  const tasks = roleTasks[role.id] || [];
+                                  const selectedTaskIds = selectedTasks[role.id] || [];
+                                  const level = roleLevels[role.id] || 3;
+                                  
+                                  return (
+                                    <div key={role.id} className="border-b border-gray-100 last:border-b-0">
+                                      {/* Rollen-Header */}
+                                      <div className="bg-green-50 p-4 pl-12 flex items-center justify-between hover:bg-green-100">
+                                        <div className="flex items-center gap-3">
+                                          <button
+                                            onClick={() => toggleRole(role.id)}
+                                            className="text-gray-600 hover:text-gray-800"
+                                          >
+                                            {isRoleExpanded ? (
+                                              <ChevronDown className="h-4 w-4" />
+                                            ) : (
+                                              <ChevronRight className="h-4 w-4" />
+                                            )}
+                                          </button>
+                                          
+                                          <User className="h-4 w-4 text-green-600" />
+                                          
+                                          <div>
+                                            <h4 className="font-medium text-gray-900">{role.name}</h4>
+                                            {role.description && (
+                                              <p className="text-sm text-gray-600">{role.description}</p>
+                                            )}
+                                            <p className="text-xs text-gray-500">
+                                              {tasks.length} Task(s)
+                                            </p>
+                                          </div>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-3">
+                                          {/* Bewertungslevel */}
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-sm text-gray-600">Level:</span>
+                                            <StarRating
+                                              value={level}
+                                              onChange={(newLevel) => updateRoleLevel(role.id, newLevel)}
+                                              disabled={isSubmitting}
+                                            />
+                                          </div>
+                                          
+                                          {/* Zuweisen-Button */}
+                                          <button
+                                            onClick={() => assignRoleWithTasks(category.id, role.id)}
+                                            disabled={isSubmitting || selectedTaskIds.length === 0}
+                                            className="inline-flex items-center gap-2 px-3 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                          >
+                                            {isSubmitting ? (
+                                              <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                              <Plus className="w-4 h-4" />
+                                            )}
+                                            Zuweisen
+                                          </button>
+                                        </div>
+                                      </div>
+
+                                      {/* Tasks (wenn Rolle expandiert) */}
+                                      {isRoleExpanded && (
+                                        <div className="bg-white">
+                                          {tasks.length === 0 ? (
+                                            <div className="p-4 pl-20 text-center text-gray-500 text-sm">
+                                              Keine Tasks für diese Rolle verfügbar.
+                                            </div>
+                                          ) : (
+                                            <>
+                                              {/* Task-Header mit "Alle auswählen" */}
+                                              <div className="p-3 pl-20 bg-gray-50 border-b border-gray-100">
+                                                <div className="flex items-center justify-between">
+                                                  <div className="flex items-center gap-3">
+                                                    <button
+                                                      onClick={() => toggleAllTasks(role.id, selectedTaskIds.length === tasks.length)}
+                                                      className="inline-flex items-center gap-2 px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+                                                    >
+                                                      <CheckSquare className="w-3 h-3" />
+                                                      {selectedTaskIds.length === tasks.length ? 'Alle abwählen' : 'Alle auswählen'}
+                                                    </button>
+                                                    <span className="text-sm text-gray-600">
+                                                      {selectedTaskIds.length} von {tasks.length} Tasks ausgewählt
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                              
+                                              {/* Task-Liste */}
+                                              <div className="p-4 pl-20 space-y-2">
+                                                {tasks.map(task => (
+                                                  <div
+                                                    key={task.id}
+                                                    className={`p-3 border rounded-lg transition-colors ${
+                                                      selectedTaskIds.includes(task.id)
+                                                        ? 'border-green-200 bg-green-50' 
+                                                        : 'border-gray-200 bg-gray-50'
+                                                    }`}
+                                                  >
+                                                    <div className="flex items-start gap-3">
+                                                      <button
+                                                        onClick={() => toggleTask(role.id, task.id)}
+                                                        className={`mt-1 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                                                          selectedTaskIds.includes(task.id)
+                                                            ? 'bg-green-600 border-green-600 text-white'
+                                                            : 'border-gray-300 hover:border-green-400'
+                                                        }`}
+                                                      >
+                                                        {selectedTaskIds.includes(task.id) && <Check className="w-3 h-3" />}
+                                                      </button>
+                                                      
+                                                      <div className="flex-1 min-w-0">
+                                                        <h5 className={`font-medium ${
+                                                          selectedTaskIds.includes(task.id) ? 'text-green-900' : 'text-gray-700'
+                                                        }`}>
+                                                          {task.task}
+                                                        </h5>
+                                                        
+                                                        {task.description && (
+                                                          <p className={`text-sm mt-1 ${
+                                                            selectedTaskIds.includes(task.id) ? 'text-green-700' : 'text-gray-600'
+                                                          }`}>
+                                                            <strong>Beschreibung:</strong> {task.description}
+                                                          </p>
+                                                        )}
+                                                        
+                                                        {task.outputs && (
+                                                          <p className={`text-sm mt-1 ${
+                                                            selectedTaskIds.includes(task.id) ? 'text-green-700' : 'text-gray-600'
+                                                          }`}>
+                                                            <strong>Outputs:</strong> {task.outputs}
+                                                          </p>
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                                
+                                {categoryRoles.length === 0 && (
+                                  <div className="p-4 pl-12 text-center text-gray-500 text-sm">
+                                    Keine Rollen in dieser Kategorie verfügbar.
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </>
