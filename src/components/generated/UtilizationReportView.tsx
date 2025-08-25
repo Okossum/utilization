@@ -187,6 +187,19 @@ export function UtilizationReportView({
     }
   };
 
+  // Hilfsfunktion: Finde die richtige ID für eine Person aus den geladenen Daten
+  const findPersonId = (personName: string): string | null => {
+    // Suche in databaseData nach der Person und gib die ID zurück
+    const personRecord = databaseData.find(record => record.person === personName);
+    if (personRecord?.id) {
+      console.log('✅ Person ID gefunden:', { person: personName, id: personRecord.id });
+      return personRecord.id;
+    }
+    
+    console.warn('⚠️ Keine ID für Person gefunden:', personName);
+    return null;
+  };
+
   // Speichere Projekt-Referenz in utilizationData Collection (zentraler Hub)
   const saveProjectToUtilizationData = async (projectData: any, employeeName: string) => {
     try {
@@ -195,89 +208,61 @@ export function UtilizationReportView({
       
       console.log('🔄 Speichere Projekt-Referenz in utilizationData für:', employeeName);
       
+      // Finde die richtige ID für diese Person
+      const personId = findPersonId(employeeName);
+      if (!personId) {
+        console.error('❌ Keine ID für Person gefunden:', employeeName);
+        showToast('error', `Keine ID für ${employeeName} gefunden`, 5000);
+        return;
+      }
+      
       // Finde den utilizationData Eintrag für diese Person
       // Suche nach 'id' (der konsolidierte Identifier)
       let utilizationQuery = query(
         collection(db, COLLECTIONS.UTILIZATION_DATA),
-        where('id', '==', employeeName)
+        where('id', '==', personId)
       );
       
       let utilizationSnapshot = await getDocs(utilizationQuery);
       
-      // Falls nicht gefunden, versuche nach 'person' zu suchen (Fallback für Legacy-Daten)
+      // Falls nicht gefunden, ist das ein Datenproblem
       if (utilizationSnapshot.empty) {
-        console.log('🔍 Suche nach id fehlgeschlagen, versuche nach person (Legacy-Fallback)...');
-        utilizationQuery = query(
-          collection(db, COLLECTIONS.UTILIZATION_DATA),
-          where('person', '==', employeeName)
-        );
-        utilizationSnapshot = await getDocs(utilizationQuery);
+        console.error('❌ Kein utilizationData Eintrag für Person ID gefunden:', { person: employeeName, id: personId });
+        showToast('error', `Dateneintrag für ${employeeName} nicht gefunden`, 5000);
+        return;
       }
       
-      // Falls immer noch nicht gefunden, versuche eine Teilstring-Suche (für Debug)
-      if (utilizationSnapshot.empty) {
-        console.log('🔍 Lade alle utilizationData Einträge für Debug...');
-        const allDocsSnapshot = await getDocs(collection(db, COLLECTIONS.UTILIZATION_DATA));
-        const allPersons = allDocsSnapshot.docs.map(doc => ({
-          docId: doc.id,
-          person: doc.data().person,
-          id: doc.data().id
-        }));
-        console.log('👥 Verfügbare Personen in utilizationData:', allPersons.slice(0, 10));
-        console.log('🔍 Suche nach:', employeeName);
-        
-        // Versuche eine ähnliche Person zu finden
-        const similarPerson = allPersons.find(p => 
-          p.person?.includes(employeeName) || 
-          employeeName.includes(p.person) ||
-          p.id === employeeName
-        );
-        
-        if (similarPerson) {
-          console.log('🎯 Ähnliche Person gefunden:', similarPerson);
-          utilizationQuery = query(
-            collection(db, COLLECTIONS.UTILIZATION_DATA),
-            where('id', '==', similarPerson.id)
-          );
-          utilizationSnapshot = await getDocs(utilizationQuery);
-        }
-      }
+      // Dokument gefunden - speichere Projekt-Referenz
+      const utilizationDoc = utilizationSnapshot.docs[0];
+      const currentData = utilizationDoc.data();
       
-      if (!utilizationSnapshot.empty) {
-        const utilizationDoc = utilizationSnapshot.docs[0];
-        const currentData = utilizationDoc.data();
+      // Füge Projekt-Referenz zu den bestehenden Projekt-Referenzen hinzu
+      const existingProjectRefs = currentData.projectReferences || [];
+      const newProjectRef = {
+        projectId: projectData.id,
+        projectName: projectData.projectName,
+        customer: projectData.customer,
+        projectType: projectData.projectType,
+        addedAt: new Date().toISOString(),
+        roles: projectData.roles?.filter((role: any) => role.employeeName === employeeName) || []
+      };
+      
+      // Prüfe ob Projekt bereits referenziert ist
+      const existingRef = existingProjectRefs.find((ref: any) => ref.projectId === projectData.id);
+      if (!existingRef) {
+        const updatedProjectRefs = [...existingProjectRefs, newProjectRef];
         
-        // Füge Projekt-Referenz zu den bestehenden Projekt-Referenzen hinzu
-        const existingProjectRefs = currentData.projectReferences || [];
-        const newProjectRef = {
-          projectId: projectData.id,
-          projectName: projectData.projectName,
-          customer: projectData.customer,
-          projectType: projectData.projectType,
-          addedAt: new Date().toISOString(),
-          roles: projectData.roles?.filter((role: any) => role.employeeName === employeeName) || []
-        };
+        // Aktualisiere utilizationData Dokument
+        await updateDoc(doc(db, COLLECTIONS.UTILIZATION_DATA, utilizationDoc.id), {
+          projectReferences: updatedProjectRefs,
+          updatedAt: new Date().toISOString()
+        });
         
-        // Prüfe ob Projekt bereits referenziert ist
-        const existingRef = existingProjectRefs.find((ref: any) => ref.projectId === projectData.id);
-        if (!existingRef) {
-          const updatedProjectRefs = [...existingProjectRefs, newProjectRef];
-          
-          // Aktualisiere utilizationData Dokument
-          await updateDoc(doc(db, COLLECTIONS.UTILIZATION_DATA, utilizationDoc.id), {
-            projectReferences: updatedProjectRefs,
-            updatedAt: new Date().toISOString()
-          });
-          
-          console.log('✅ Projekt-Referenz erfolgreich in utilizationData gespeichert');
-          showToast('success', `Projekt "${projectData.projectName}" wurde ${employeeName} zugeordnet`, 3000);
-        } else {
-          console.log('ℹ️ Projekt-Referenz bereits vorhanden');
-          showToast('info', `Projekt "${projectData.projectName}" ist bereits zugeordnet`, 3000);
-        }
+        console.log('✅ Projekt-Referenz erfolgreich in utilizationData gespeichert');
+        showToast('success', `Projekt "${projectData.projectName}" wurde ${employeeName} zugeordnet`, 3000);
       } else {
-        console.warn('⚠️ Kein utilizationData Eintrag für Person gefunden:', employeeName);
-        showToast('error', `Kein Dateneintrag für ${employeeName} gefunden`, 5000);
+        console.log('ℹ️ Projekt-Referenz bereits vorhanden');
+        showToast('info', `Projekt "${projectData.projectName}" ist bereits zugeordnet`, 3000);
       }
     } catch (error) {
       console.error('❌ Fehler beim Speichern der Projekt-Referenz:', error);
