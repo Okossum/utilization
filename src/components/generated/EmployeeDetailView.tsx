@@ -995,6 +995,12 @@ export default function EmployeeDetailView({
                       <span className="text-sm text-gray-600">{employee.email}</span>
                     </div>
                   )}
+                  {employee.cc && (
+                    <div className="flex items-center space-x-3">
+                      <Building className="w-4 h-4 text-gray-400" />
+                      <span className="text-sm text-gray-600">CC {employee.cc}</span>
+                    </div>
+                  )}
                   {employee.location && (
                     <div className="flex items-center space-x-3">
                       <MapPin className="w-4 h-4 text-gray-400" />
@@ -1005,12 +1011,6 @@ export default function EmployeeDetailView({
                     <div className="flex items-center space-x-3">
                       <Calendar className="w-4 h-4 text-gray-400" />
                       <span className="text-sm text-gray-600">Seit {formatDate(employee.startDate)}</span>
-                    </div>
-                  )}
-                  {employee.cc && (
-                    <div className="flex items-center space-x-3">
-                      <Building className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-600">CC {employee.cc}</span>
                     </div>
                   )}
                 </div>
