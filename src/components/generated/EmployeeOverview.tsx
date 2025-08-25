@@ -35,6 +35,19 @@ interface Employee {
   skills: Skill[];
   completedProjects: Project[];
   plannedProjects: Project[];
+  // Zusätzliche Felder aus EmployeeDetailView
+  phone?: string;           // Telefonnummer
+  location?: string;        // Standort
+  startDate?: string;       // Startdatum
+  status?: string;          // Status (aktiv, inaktiv, etc.)
+  utilization?: number;     // Aktuelle Auslastung
+  averageUtilization?: number; // Durchschnittliche Auslastung
+  softSkills?: Skill[];     // Soft Skills
+  technicalSkills?: Skill[]; // Technical Skills
+  strengths?: string[];     // Stärken
+  weaknesses?: string[];    // Schwächen
+  utilizationComment?: string; // Auslastungskommentar
+  planningComment?: string; // Planungskommentar
 }
 type ViewMode = 'cards' | 'table' | 'grid';
 const defaultEmployeesData: Employee[] = [{
@@ -133,13 +146,13 @@ export const EmployeeOverview = ({ employees }: EmployeeOverviewProps) => {
   const [viewMode, setViewMode] = useState<ViewMode>('cards');
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   
-  // Verwende echte Daten oder Fallback zu Mock-Daten
-  const employeesData = employees && employees.length > 0 ? employees : defaultEmployeesData;
+  // KEINE MOCK-DATEN - nur echte Daten verwenden
+  console.log('🔍 EmployeeOverview - Empfangene Employees:', employees?.length || 0, 'Mitarbeiter');
+  const employeesData = employees || [];
   
   // Verwende gefilterte Daten oder alle Daten
-  const displayEmployees = filteredEmployees.length > 0 || (employees && employees.length > 0) 
-    ? filteredEmployees.length > 0 ? filteredEmployees : employeesData
-    : employeesData;
+  const displayEmployees = filteredEmployees.length > 0 ? filteredEmployees : employeesData;
+  console.log('🔍 EmployeeOverview - Display Employees:', displayEmployees.length, displayEmployees);
   const viewModeButtons = [{
     mode: 'cards' as ViewMode,
     icon: List,

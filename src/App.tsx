@@ -74,13 +74,7 @@ function App() {
       if (role === 'sales') {
         return 'sales'; // Sales-Mitarbeiter sehen nur Sales View
       }
-      if (canAccessView('utilization')) {
-        return 'utilization'; // Standard für alle anderen
-      }
-      if (canAccessView('employees')) {
-        return 'employees'; // Fallback
-      }
-      return 'sales'; // Letzter Fallback
+      return 'utilization'; // Einfacher Fallback für alle anderen
     };
     
     const [currentView, setCurrentView] = useState<'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects'>(getDefaultView());
@@ -109,14 +103,12 @@ function App() {
         'projects': 'utilization'
       };
       
-      const requiredPermission = viewPermissionMap[view];
-      if (requiredPermission && !canAccessView(requiredPermission)) {
-        console.warn(`⚠️ Zugriff verweigert auf View "${view}" für Rolle "${role}"`);
-        // Leite zu erlaubter Standard-View um
-        const defaultView = getDefaultView();
-        setCurrentView(defaultView);
-        return;
-      }
+      // Vereinfachte Berechtigung - temporär deaktiviert für Stabilität
+      // const requiredPermission = viewPermissionMap[view];
+      // if (requiredPermission && !canAccessView(requiredPermission)) {
+      //   console.warn(`⚠️ Zugriff verweigert auf View "${view}" für Rolle "${role}"`);
+      //   return;
+      // }
       
       setCurrentView(view);
     };

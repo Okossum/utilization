@@ -37,6 +37,19 @@ interface Employee {
   skills: Skill[];
   completedProjects: Project[];
   plannedProjects: Project[];
+  // Zusätzliche Felder aus EmployeeDetailView
+  phone?: string;           // Telefonnummer
+  location?: string;        // Standort
+  startDate?: string;       // Startdatum
+  status?: string;          // Status (aktiv, inaktiv, etc.)
+  utilization?: number;     // Aktuelle Auslastung
+  averageUtilization?: number; // Durchschnittliche Auslastung
+  softSkills?: Skill[];     // Soft Skills
+  technicalSkills?: Skill[]; // Technical Skills
+  strengths?: string[];     // Stärken
+  weaknesses?: string[];    // Schwächen
+  utilizationComment?: string; // Auslastungskommentar
+  planningComment?: string; // Planungskommentar
 }
 
 interface SalesViewProps {
@@ -67,112 +80,125 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
     return targetDate.toISOString().split('T')[0];
   };
 
-  // Einsatzplan-Daten zu Projekten transformieren (aus utilizationData)
+  // Geplante Projekte aus einsatzplan und projectReferences transformieren
   const transformEinsatzplanToProjects = (record: any): Project[] => {
-    if (!record.einsatzplan) return [];
+    const plannedProjects: Project[] = [];
 
-    // Sammle alle Projekt-Einträge mit Wochen-Informationen (nur aktuelle und zukünftige Wochen)
-    const projectWeeks: { [key: string]: { weeks: string[], utilizations: number[], entries: any[] } } = {};
-    const currentWeek = getISOWeek(new Date()); // Aktuelle Kalenderwoche
-    const currentYear = new Date().getFullYear();
-    
-    Object.entries(record.einsatzplan).forEach(([week, entries]: [string, any]) => {
-      if (Array.isArray(entries)) {
-        entries.forEach((entry, index) => {
-          // Prüfe ob Woche >= aktuelle Woche
-          const [year, weekNum] = week.split('/').map(Number);
-          const fullYear = year < 50 ? 2000 + year : 1900 + year;
-          const isCurrentOrFutureWeek = fullYear > currentYear || 
-            (fullYear === currentYear && weekNum >= currentWeek);
-          
-          // Nur Projekte mit Auslastung > 0% und >= aktuelle KW berücksichtigen
-          if (entry.projekt && entry.projekt !== '---' && 
-              (entry.auslastungProzent || 0) > 0 && 
-              isCurrentOrFutureWeek) {
-            const projectKey = `${entry.projekt}-${entry.ort || 'Remote'}`;
-            
-            if (!projectWeeks[projectKey]) {
-              projectWeeks[projectKey] = {
-                weeks: [],
-                utilizations: [],
-                entries: []
-              };
-            }
-            
-            projectWeeks[projectKey].weeks.push(week);
-            projectWeeks[projectKey].utilizations.push(entry.auslastungProzent || 0);
-            projectWeeks[projectKey].entries.push(entry);
-          }
-        });
-      }
-    });
-
-    // Konsolidiere Projekte
-    const consolidatedProjects: Project[] = [];
-    
-    Object.entries(projectWeeks).forEach(([projectKey, data]) => {
-      const firstEntry = data.entries[0];
-      const weeks = data.weeks.sort();
-      const utilizations = data.utilizations.filter(u => u > 0);
-      
-      // Berechne durchschnittliche Auslastung
-      const averageUtilization = utilizations.length > 0 
-        ? Math.round(utilizations.reduce((sum, util) => sum + util, 0) / utilizations.length)
-        : 0;
-      
-      // Ermittle Enddatum (späteste Woche)
-      const lastWeek = weeks[weeks.length - 1];
-      const endDate = weekToDate(lastWeek, 6);
-      
-      consolidatedProjects.push({
-        id: `${record.id}-planned-${projectKey}`,
-        customer: firstEntry.projekt,
-        projectName: `${firstEntry.projekt} Assignment`,
-        startDate: weekToDate(weeks[0]), // Wird nicht angezeigt, aber für interne Logik
-        endDate: endDate,
-        description: `Assignment at ${firstEntry.ort || 'Remote'} (${weeks.length} weeks)`,
-        skillsUsed: [], // TODO: Aus Skills-Collection laden
-        employeeRole: 'Consultant',
-        utilization: averageUtilization, // Für Kompatibilität
-        averageUtilization: averageUtilization,
-        probability: 'Planned'
-      });
-    });
-
-    return consolidatedProjects;
-  };
-
-  // Auslastung-Daten zu historischen Projekten transformieren (aus utilizationData)
-  // DEAKTIVIERT: Keine historischen Projektkarten mehr anzeigen
-  // Grund: Historische Auslastungsdaten haben keine Kundeninformationen
-  const transformAuslastungToCompletedProjects = (record: any): Project[] => {
-    // Keine historischen Projektkarten - nur Einsatzplan-Projekte werden angezeigt
-    return [];
-  };
-
-  // Mock Skills basierend auf Karrierestufe generieren
-  const generateMockSkills = (careerLevel: string, area: string): Skill[] => {
-    const baseSkills = [
-      { id: 's1', name: 'Communication', rating: 4 },
-      { id: 's2', name: 'Project Management', rating: 3 },
-    ];
-
-    // Area-spezifische Skills
-    if (area?.toLowerCase().includes('automotive')) {
-      baseSkills.push(
-        { id: 's3', name: 'Automotive Systems', rating: 4 },
-        { id: 's4', name: 'AUTOSAR', rating: 3 }
+    // 1. Projekte aus projectReferences (geplante Projekte)
+    if (record.projectReferences) {
+      const futureProjectRefs = record.projectReferences.filter((ref: any) => 
+        ref.projectType === 'planned' || ref.projectType === 'future'
       );
+
+      futureProjectRefs.forEach((ref: any) => {
+        plannedProjects.push({
+          id: ref.projectId || `planned-${Math.random().toString(36).substr(2, 9)}`,
+          customer: ref.customer || 'Unknown Customer',
+          projectName: ref.projectName || 'Planned Project',
+          startDate: ref.startDate || '',
+          endDate: ref.endDate || '',
+          description: ref.description || 'Planned project assignment',
+          skillsUsed: ref.skills || [],
+          employeeRole: ref.roles?.[0] || 'Consultant',
+          utilization: ref.utilization || undefined,
+          averageUtilization: ref.averageUtilization || undefined,
+          probability: (ref.probability as any) || 'Planned'
+        });
+      });
     }
 
-    // Level-basierte Anpassung
-    if (careerLevel?.toLowerCase().includes('senior')) {
-      baseSkills.forEach(skill => skill.rating = Math.min(5, skill.rating + 1));
-      baseSkills.push({ id: 's5', name: 'Leadership', rating: 4 });
+    // 2. Projekte aus einsatzplan (nur zukünftige Wochen)
+    if (record.einsatzplan) {
+      const projectWeeks: { [key: string]: { weeks: string[], utilizations: number[], entries: any[] } } = {};
+      const currentWeek = getISOWeek(new Date());
+      const currentYear = new Date().getFullYear();
+      
+      Object.entries(record.einsatzplan).forEach(([week, entries]: [string, any]) => {
+        if (Array.isArray(entries)) {
+          entries.forEach((entry, index) => {
+            const [year, weekNum] = week.split('/').map(Number);
+            const fullYear = year < 50 ? 2000 + year : 1900 + year;
+            const isCurrentOrFutureWeek = fullYear > currentYear || 
+              (fullYear === currentYear && weekNum >= currentWeek);
+            
+            if (entry.projekt && entry.projekt !== '---' && 
+                (entry.auslastungProzent || 0) > 0 && 
+                isCurrentOrFutureWeek) {
+              const projectKey = `${entry.projekt}-${entry.ort || 'Remote'}`;
+              
+              if (!projectWeeks[projectKey]) {
+                projectWeeks[projectKey] = {
+                  weeks: [],
+                  utilizations: [],
+                  entries: []
+                };
+              }
+              
+              projectWeeks[projectKey].weeks.push(week);
+              projectWeeks[projectKey].utilizations.push(entry.auslastungProzent || 0);
+              projectWeeks[projectKey].entries.push(entry);
+            }
+          });
+        }
+      });
+
+      // Konsolidiere Einsatzplan-Projekte
+      Object.entries(projectWeeks).forEach(([projectKey, data]) => {
+        const firstEntry = data.entries[0];
+        const weeks = data.weeks.sort();
+        const utilizations = data.utilizations.filter(u => u > 0);
+        
+        const averageUtilization = utilizations.length > 0 
+          ? Math.round(utilizations.reduce((sum, util) => sum + util, 0) / utilizations.length)
+          : 0;
+        
+        const lastWeek = weeks[weeks.length - 1];
+        const endDate = weekToDate(lastWeek, 6);
+        
+        plannedProjects.push({
+          id: `${record.id}-einsatzplan-${projectKey}`,
+          customer: firstEntry.projekt,
+          projectName: `${firstEntry.projekt} Assignment`,
+          startDate: weekToDate(weeks[0]),
+          endDate: endDate,
+          description: `Assignment at ${firstEntry.ort || 'Remote'} (${weeks.length} weeks)`,
+          skillsUsed: [],
+          employeeRole: 'Consultant',
+          utilization: averageUtilization,
+          averageUtilization: averageUtilization,
+          probability: 'Planned'
+        });
+      });
     }
 
-    return baseSkills;
+    return plannedProjects;
   };
+
+  // Historische Projekte aus projectReferences in utilizationData laden
+  const transformAuslastungToCompletedProjects = (record: any): Project[] => {
+    if (!record.projectReferences) return [];
+
+    // Filtere historische Projekte (projectType: 'historical' oder 'completed')
+    const historicalProjects = record.projectReferences.filter((ref: any) => 
+      ref.projectType === 'historical' || ref.projectType === 'completed'
+    );
+
+    return historicalProjects.map((ref: any) => ({
+      id: ref.projectId || `hist-${Math.random().toString(36).substr(2, 9)}`,
+      customer: ref.customer || 'Unknown Customer',
+      projectName: ref.projectName || 'Historical Project',
+      startDate: ref.startDate || '',
+      endDate: ref.endDate || '',
+      description: ref.description || 'Completed project assignment',
+      skillsUsed: ref.skills || [],
+      employeeRole: ref.roles?.[0] || 'Consultant',
+      utilization: ref.utilization || undefined,
+      averageUtilization: ref.averageUtilization || undefined,
+      probability: 'Commissioned' as const
+    }));
+  };
+
+  // Mock Skills Funktion entfernt - verwende nur echte Daten
 
   // Daten aus UtilizationDataContext transformieren
   const transformUtilizationDataToEmployees = () => {
@@ -201,20 +227,76 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
           return; // Mitarbeiter überspringen, wenn ACT-Toggle nicht aktiviert
         }
 
+        // Berechne Auslastungs-KPIs aus den echten Daten
+        const calculateUtilizationKPIs = (record: any) => {
+          const currentWeek = new Date().getFullYear().toString().slice(-2) + '/' + 
+                             String(Math.ceil((new Date().getTime() - new Date(new Date().getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000))).padStart(2, '0');
+          
+          // Aktuelle Auslastung aus Einsatzplan
+          const currentUtilization = record.einsatzplan?.[currentWeek]?.[0]?.auslastungProzent || 
+                                   record.auslastung?.[currentWeek] || null;
+          
+          // Durchschnittliche Auslastung der letzten 8 Wochen aus Auslastung
+          const auslastungValues = record.auslastung ? Object.values(record.auslastung).filter((val: any) => typeof val === 'number' && val > 0) : [];
+          const averageUtilization = auslastungValues.length > 0 ? 
+            Math.round(auslastungValues.reduce((sum: number, val: any) => sum + val, 0) / auslastungValues.length) : null;
+          
+          return { currentUtilization, averageUtilization };
+        };
+
+        const { currentUtilization, averageUtilization } = calculateUtilizationKPIs(record);
+
         const employee: Employee = {
           id: record.id,
           name: record.person,
           lbs: meta?.careerLevel || record.lbs || 'Consultant',
           cc: meta?.cc || record.cc || 'Unknown CC',
           team: meta?.team || record.team || 'Unknown Team',
-          mainRole: 'Projektleiter', // Platzhalter - später aus utilizationData
-          email: record.email || `${record.person.toLowerCase().replace(' ', '.')}@company.com`, // Platzhalter
-          vg: meta?.manager || record.vg || 'Unknown Manager',
-          profileUrl: record.linkZumProfilUrl || undefined, // Aus Datenbank
-          skills: generateMockSkills(meta?.careerLevel || record.lbs, meta?.lob || record.lob),
+          mainRole: meta?.mainRole || record.mainRole || 'Consultant',
+          email: meta?.email || record.email || undefined,
+          vg: meta?.manager || record.vg || undefined,
+          profileUrl: record.linkZumProfilUrl || undefined,
+          
+          // Zusätzliche Felder aus EmployeeDetailView
+          phone: meta?.phone || record.phone || undefined,
+          location: meta?.standort || record.standort || undefined,
+          startDate: meta?.startDate || record.startDate || undefined,
+          status: meta?.status || record.status || 'active',
+          utilization: currentUtilization,
+          averageUtilization: averageUtilization,
+          
+          // Skills nur aus echten Daten - KEINE Mock-Daten
+          skills: [], // Leer lassen - wird durch technicalSkills/softSkills ersetzt
+          technicalSkills: record.technicalSkills || undefined,
+          softSkills: record.softSkills || undefined,
+          
+          // Stärken und Schwächen aus echten Daten
+          strengths: record.strengths || meta?.strengths || undefined,
+          weaknesses: record.weaknesses || meta?.weaknesses || undefined,
+          
+          // Kommentare aus echten Daten
+          utilizationComment: meta?.utilizationComment || record.utilizationComment || undefined,
+          planningComment: meta?.planningComment || record.planningComment || undefined,
+          
+          // Projekte
           completedProjects: transformAuslastungToCompletedProjects(record),
           plannedProjects: transformEinsatzplanToProjects(record)
         };
+
+        // Debug-Logging für erweiterte Daten
+        console.log('🔍 Sales View - Employee erweiterte Daten:', {
+          name: employee.name,
+          utilization: employee.utilization,
+          averageUtilization: employee.averageUtilization,
+          completedProjects: employee.completedProjects.length,
+          plannedProjects: employee.plannedProjects.length,
+          strengths: employee.strengths?.length || 0,
+          weaknesses: employee.weaknesses?.length || 0,
+          utilizationComment: !!employee.utilizationComment,
+          planningComment: !!employee.planningComment,
+          technicalSkills: employee.technicalSkills?.length || 0,
+          softSkills: employee.softSkills?.length || 0
+        });
 
         transformedEmployees.push(employee);
       });

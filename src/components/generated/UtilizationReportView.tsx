@@ -1094,16 +1094,43 @@ export function UtilizationReportView({
 
         // Debug-Berechnungen entfernt
 
-        // ✅ KORRIGIERT: Setze Toggle NUR wenn ausreichend echte Daten vorhanden sind UND Auslastung ≤25%
-        if (avgNext8Weeks !== null && validNext8Weeks.length >= 3 && avgNext8Weeks <= 25) {
+        // ✅ ERWEITERT: Prüfe Ausschlusskriterien für ACT-Toggle
+        const personMetaData = personMeta.get(person);
+        const shouldExcludeFromActToggle = () => {
+          // Ausschlusskriterium 1: Bereich AT SAL
+          if (personMetaData?.bereich === 'AT SAL') {
+            return true;
+          }
+          
+          // Ausschlusskriterium 2: Bestimmte LBS/Karrierestufen
+          const excludedLBS = [
+            'Apprentice',
+            'Intern', 
+            'Working Student',
+            'Business Unit Lead - Senior Director',
+            'Business Line Lead - Principal Director'
+          ];
+          
+          if (personMetaData?.lbs && excludedLBS.includes(personMetaData.lbs)) {
+            return true;
+          }
+          
+          return false;
+        };
+
+        // ✅ KORRIGIERT: Setze Toggle NUR wenn ausreichend echte Daten vorhanden sind UND Auslastung ≤25% UND nicht ausgeschlossen
+        if (avgNext8Weeks !== null && validNext8Weeks.length >= 3 && avgNext8Weeks <= 25 && !shouldExcludeFromActToggle()) {
           newActionItems[person] = true;
           // console.log entfernt
         } else if (avgNext8Weeks === null || validNext8Weeks.length < 3) {
           // console.log entfernt
+        } else if (shouldExcludeFromActToggle()) {
+          // Person ist von ACT-Toggle ausgeschlossen (Bereich AT SAL oder bestimmte LBS)
+          // console.log entfernt
         } else {
           // console.log entfernt
         }
-        // Personen mit >25% Auslastung werden NICHT verändert (kein automatisches false setzen)
+        // Personen mit >25% Auslastung oder Ausschlusskriterien werden NICHT verändert
       });
 
       // ✅ KORRIGIERT: Verarbeite ALLE Personen (sowohl neue als auch bestehende regelbasierte)
