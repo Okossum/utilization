@@ -295,14 +295,35 @@ export default function EmployeeDetailView({
     setEmployeeData(null);
   }, [personName]);
 
-  // Extract skills and roles from dossierData
+  // Extract skills and roles from utilizationData Hub
   useEffect(() => {
-    if (dossierData) {
-      setAssignedSkills(dossierData.assignedSkills || []);
-      setAssignedSoftSkills(dossierData.assignedSoftSkills || []);
-      setAssignedRoles(dossierData.assignedRoles || []);
+    // Finde die Person in utilizationData
+    const personData = databaseData?.utilizationData?.find(record => 
+      record.person === employeeId || record.id === employeeId
+    );
+    
+    if (personData) {
+      // Lade Skills/Rollen aus utilizationData Hub
+      setAssignedSkills(personData.technicalSkills || []);
+      setAssignedSoftSkills(personData.softSkills || []);
+      setAssignedRoles(personData.assignedRoles || []);
+      
+      console.log('🎯 Skills/Rollen aus utilizationData Hub geladen:', {
+        technicalSkills: personData.technicalSkills?.length || 0,
+        softSkills: personData.softSkills?.length || 0,
+        assignedRoles: personData.assignedRoles?.length || 0
+      });
+    } else {
+      // Fallback: Lade aus separaten APIs (Legacy)
+      console.log('⚠️ Fallback: Lade Skills/Rollen aus separaten APIs');
+      // Existing dossier logic als Fallback
+      if (dossierData) {
+        setAssignedSkills(dossierData.assignedSkills || []);
+        setAssignedSoftSkills(dossierData.assignedSoftSkills || []);
+        setAssignedRoles(dossierData.assignedRoles || []);
+      }
     }
-  }, [dossierData]);
+  }, [databaseData?.utilizationData, employeeId, dossierData]);
 
   // Load employee dossier data (roles, skills, and form data)
   useEffect(() => {
@@ -318,42 +339,8 @@ export default function EmployeeDetailView({
       
       setDossierLoading(true);
       try {
-        // Load assigned roles
-        const rolesResponse = await fetch(`/api/employee-roles/${employeeId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (rolesResponse.ok && !cancelled) {
-          const rolesData = await rolesResponse.json();
-          console.log('🎭 Loaded assigned roles:', rolesData);
-          setAssignedRoles(rolesData);
-        } else {
-          console.error('❌ Failed to load roles:', rolesResponse.status, rolesResponse.statusText);
-        }
-        
-        // Load assigned technical skills
-        const skillsResponse = await fetch(`/api/employee-technical-skills/${employeeId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (skillsResponse.ok && !cancelled) {
-          const skillsData = await skillsResponse.json();
-          console.log('🛠️ Loaded assigned skills:', skillsData);
-          setAssignedSkills(skillsData);
-        } else {
-          console.error('❌ Failed to load skills:', {
-            status: skillsResponse.status,
-            statusText: skillsResponse.statusText,
-            ok: skillsResponse.ok,
-            cancelled: cancelled
-          });
-        }
+        // Skills/Rollen werden jetzt aus utilizationData Hub geladen (siehe useEffect oben)
+        console.log('ℹ️ Skills/Rollen werden aus utilizationData Hub geladen, nicht mehr über separate APIs');
         
         // Load employee dossier data for form fields
         try {
@@ -409,31 +396,8 @@ export default function EmployeeDetailView({
     
     setDossierLoading(true);
     try {
-      // Load assigned roles
-      const rolesResponse = await fetch(`/api/employee-roles/${employeeId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (rolesResponse.ok) {
-        const rolesData = await rolesResponse.json();
-        setAssignedRoles(rolesData);
-      }
-      
-      // Load assigned technical skills
-      const skillsResponse = await fetch(`/api/employee-technical-skills/${employeeId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (skillsResponse.ok) {
-        const skillsData = await skillsResponse.json();
-        setAssignedSkills(skillsData);
-      }
+      // Skills/Rollen werden automatisch über utilizationData Hub aktualisiert
+      console.log('ℹ️ Skills/Rollen Refresh erfolgt automatisch über utilizationData Hub');
       
       // Load employee dossier data (includes soft skills)
       try {
