@@ -105,7 +105,7 @@ export interface EmployeeSkillDoc {
 // Firestore Collection Names
 export const COLLECTIONS = {
   UPLOADED_FILES: 'uploaded_files',
-  UTILIZATION_DATA: 'utilization_data',
+  UTILIZATION_DATA: 'utilizationData',
   PLANNED_ENGAGEMENTS: 'planned_engagements',
   PERSON_STATUS: 'person_status',
   PERSON_ACTION_ITEMS: 'person_action_items',
