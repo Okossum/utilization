@@ -239,6 +239,14 @@ export interface UtilizationDataHub {
   technicalSkills?: AssignedTechnicalSkill[];
   softSkills?: AssignedSoftSkill[];
   
+  // NEU: Mitarbeiter-Dossier Daten
+  strengths?: string; // Stärken des Mitarbeiters
+  weaknesses?: string; // Schwächen/Entwicklungsbereiche
+  comments?: string; // Allgemeine Kommentare
+  phone?: string; // Telefonnummer
+  location?: string; // Standort
+  position?: string; // Position/Rolle
+  
   // Meta-Daten
   createdAt?: string; // ISO Date
   updatedAt?: string; // ISO Date

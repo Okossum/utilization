@@ -188,6 +188,72 @@ export const removeTechnicalSkillFromUtilizationData = async (personName: string
   console.log('✅ Technical Skill entfernt aus utilizationData Hub:', { personName, skillId });
 };
 
+// ===== DOSSIER DATA MANAGEMENT =====
+
+/**
+ * Speichert Dossier-Daten (Stärken, Schwächen, etc.) in utilizationData Hub
+ */
+export const saveDossierDataToUtilizationHub = async (
+  personName: string, 
+  dossierData: {
+    strengths?: string;
+    weaknesses?: string;
+    comments?: string;
+    phone?: string;
+    location?: string;
+    position?: string;
+    email?: string;
+  }
+) => {
+  try {
+    console.log('💾 Speichere Dossier-Daten in utilizationData Hub für:', personName);
+    
+    const { doc: utilizationDoc } = await findUtilizationDataDoc(personName);
+    
+    const updateData = {
+      ...dossierData,
+      updatedAt: new Date().toISOString()
+    };
+    
+    await updateDoc(utilizationDoc.ref, updateData);
+    
+    console.log('✅ Dossier-Daten erfolgreich in utilizationData Hub gespeichert');
+    
+  } catch (error) {
+    console.error('❌ Fehler beim Speichern der Dossier-Daten:', error);
+    throw error;
+  }
+};
+
+/**
+ * Lädt Dossier-Daten aus utilizationData Hub
+ */
+export const getDossierDataFromUtilizationHub = async (personName: string) => {
+  try {
+    console.log('🔄 Lade Dossier-Daten aus utilizationData Hub für:', personName);
+    
+    const { data } = await findUtilizationDataDoc(personName);
+    
+    const dossierData = {
+      strengths: data.strengths || '',
+      weaknesses: data.weaknesses || '',
+      comments: data.comments || '',
+      phone: data.phone || '',
+      location: data.location || '',
+      position: data.position || '',
+      email: data.email || ''
+    };
+    
+    console.log('✅ Dossier-Daten aus utilizationData Hub geladen:', dossierData);
+    
+    return dossierData;
+    
+  } catch (error) {
+    console.error('❌ Fehler beim Laden der Dossier-Daten:', error);
+    throw error;
+  }
+};
+
 // ===== SOFT SKILLS MANAGEMENT =====
 
 /**

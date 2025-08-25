@@ -11,6 +11,7 @@ import { useUtilizationData } from '../../contexts/UtilizationDataContext';
 import TechnicalSkillSelectionModal from './TechnicalSkillSelectionModal';
 import { SoftSkillSelectionModal } from './SoftSkillSelectionModal';
 import RoleSelectionModal from './RoleSelectionModal';
+import { saveDossierDataToUtilizationHub, getDossierDataFromUtilizationHub } from '../../lib/utilization-hub-services';
 import { ProjectHistoryList } from './ProjectHistoryList';
 import { EmployeeSkillAssignment } from './EmployeeSkillAssignment';
 import EmployeeRoleAssignment from './EmployeeRoleAssignment';
@@ -335,10 +336,23 @@ export default function EmployeeDetailView({
       setAssignedSoftSkills(convertedSoftSkills);
       setAssignedRoles(convertedRoles);
       
-      console.log('🎯 Skills/Rollen aus utilizationData Hub geladen und konvertiert:', {
+      // Lade auch Dossier-Daten aus utilizationData Hub
+      setFormData(prev => ({
+        ...prev,
+        strengths: personData.strengths || '',
+        weaknesses: personData.weaknesses || '',
+        comments: personData.comments || '',
+        phone: personData.phone || '',
+        location: personData.location || employeeData?.location || '',
+        position: personData.position || employeeData?.lbs || '',
+        email: personData.email || employeeData?.email || ''
+      }));
+      
+      console.log('🎯 Skills/Rollen und Dossier-Daten aus utilizationData Hub geladen:', {
         technicalSkills: convertedTechnicalSkills.length,
         softSkills: convertedSoftSkills.length,
-        assignedRoles: convertedRoles.length
+        assignedRoles: convertedRoles.length,
+        hasDossierData: !!(personData.strengths || personData.weaknesses || personData.comments)
       });
     } else {
       // Fallback: Lade aus separaten APIs (Legacy)
@@ -471,24 +485,50 @@ export default function EmployeeDetailView({
     
     setIsSaving(true);
     try {
-      const dossierData = {
-        uid: personName || employeeId,
-        displayName: employee?.name || '',
-        ...formData,
-        skills: [], // Wird separat über EmployeeSkillAssignment verwaltet
-        experience: 0,
-        updatedAt: new Date()
-      };
+      const employeeName = employee?.name || personName || employeeId;
       
-      // ✅ FIX: Konsistente Employee-ID verwenden
-      const consistentEmployeeId = employeeId || personName;
-      console.log('🔍 DEBUG: Using consistent employeeId for dossier save:', consistentEmployeeId);
-      await DatabaseService.saveEmployeeDossier(consistentEmployeeId, dossierData);
-      console.log('✅ Dossier data saved successfully');
+      // Speichere in utilizationData Hub
+      console.log('💾 Speichere Dossier-Daten in utilizationData Hub für:', employeeName);
+      
+      await saveDossierDataToUtilizationHub(employeeName, {
+        strengths: formData.strengths,
+        weaknesses: formData.weaknesses,
+        comments: formData.comments,
+        phone: formData.phone,
+        location: formData.location,
+        position: formData.position,
+        email: formData.email
+      });
+      
+      console.log('✅ Dossier-Daten erfolgreich in utilizationData Hub gespeichert');
+      
+      // Aktualisiere utilizationData Context
+      await refreshUtilizationData();
+      
       setIsEditing(false);
     } catch (error) {
-      console.error('❌ Error saving dossier data:', error);
-      alert('Fehler beim Speichern. Bitte versuchen Sie es erneut.');
+      console.error('❌ Fehler beim Speichern der Dossier-Daten:', error);
+      
+      // Fallback: Versuche Legacy-Speicherung
+      try {
+        console.log('📋 Fallback: Speichere in Legacy Dossier System');
+        const dossierData = {
+          uid: personName || employeeId,
+          displayName: employee?.name || '',
+          ...formData,
+          skills: [], // Wird separat über EmployeeSkillAssignment verwaltet
+          experience: 0,
+          updatedAt: new Date()
+        };
+        
+        const consistentEmployeeId = employeeId || personName;
+        await DatabaseService.saveEmployeeDossier(consistentEmployeeId, dossierData);
+        console.log('✅ Fallback: Dossier data saved to legacy system');
+        setIsEditing(false);
+      } catch (fallbackError) {
+        console.error('❌ Auch Fallback-Speicherung fehlgeschlagen:', fallbackError);
+        alert('Fehler beim Speichern. Bitte versuchen Sie es erneut.');
+      }
     } finally {
       setIsSaving(false);
     }
