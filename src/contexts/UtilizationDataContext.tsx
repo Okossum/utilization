@@ -53,6 +53,8 @@ interface CacheData {
 }
 
 export function UtilizationDataProvider({ children }: { children: ReactNode }) {
+  console.log('🔧 UtilizationDataProvider wird gerendert');
+  
   const [databaseData, setDatabaseData] = useState<{
     auslastung?: any[];
     einsatzplan?: any[];
@@ -204,7 +206,9 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
             manager: row.vg,
             standort: row.standort, // ✅ Standort aus utilizationData hinzufügen
             email: row.email,       // ✅ E-Mail aus utilizationData hinzufügen
-            startDate: row.verfuegbarAb // ✅ Start-Datum aus utilizationData hinzufügen
+            startDate: row.verfuegbarAb, // ✅ Start-Datum aus utilizationData hinzufügen
+            utilizationComment: row.utilizationComment || '', // ✅ Auslastungskommentar aus utilizationData
+            planningComment: row.planningComment || '' // ✅ Einsatzplan-Kommentar aus utilizationData
           });
         }
       });

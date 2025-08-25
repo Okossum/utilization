@@ -71,6 +71,8 @@ interface Employee {
     name: string;
     description: string;
   }>;
+  utilizationComment?: string;
+  planningComment?: string;
 }
 // Remove large mock dataset. We'll derive a minimal view model and fallback values.
 const statusOptions = [{
@@ -161,7 +163,7 @@ export default function EmployeeDetailView({
   
   console.log('🔑 Auth token status:', token ? 'present' : 'missing');
   const [personName, setPersonName] = useState<string>('');
-  const [meta, setMeta] = useState<{ team?: string; cc?: string; lbs?: string; standort?: string; startDate?: string; email?: string } | null>(null);
+  const [meta, setMeta] = useState<{ team?: string; cc?: string; lbs?: string; standort?: string; startDate?: string; email?: string; utilizationComment?: string; planningComment?: string } | null>(null);
   const [employeeData, setEmployeeData] = useState<{ email?: string; startDate?: string; standort?: string; lbs?: string } | null>(null);
   const [utilization, setUtilization] = useState<number | null>(null);
   const [averageUtilization, setAverageUtilization] = useState<number | null>(null);
@@ -254,7 +256,9 @@ export default function EmployeeDetailView({
             lbs: personData.lbs, 
             standort: personData.standort, 
             startDate: personData.startDate,
-            email: personData.email // ✅ E-Mail aus utilizationData hinzufügen
+            email: personData.email, // ✅ E-Mail aus utilizationData hinzufügen
+            utilizationComment: personData.utilizationComment || '', // ✅ Auslastungskommentar aus utilizationData
+            planningComment: personData.planningComment || '' // ✅ Einsatzplan-Kommentar aus utilizationData
           });
           return;
         }
@@ -271,7 +275,9 @@ export default function EmployeeDetailView({
               lbs: data.lbs, 
               standort: data.standort, 
               startDate: data.startDate,
-              email: data.email // ✅ E-Mail aus utilizationData hinzufügen
+              email: data.email, // ✅ E-Mail aus utilizationData hinzufügen
+              utilizationComment: data.utilizationComment || '', // ✅ Auslastungskommentar aus utilizationData
+              planningComment: data.planningComment || '' // ✅ Einsatzplan-Kommentar aus utilizationData
             });
             return;
           }
@@ -846,6 +852,8 @@ export default function EmployeeDetailView({
     phone: formData.phone || '', // Phone aus formData
     location: formData.standort || '', // Location aus formData (aber eigentlich standort)
     standort: meta?.standort || formData.standort || '', // ✅ Standort prioritär aus utilizationData
+    utilizationComment: meta?.utilizationComment || '', // ✅ Auslastungskommentar aus utilizationData
+    planningComment: meta?.planningComment || '', // ✅ Einsatzplan-Kommentar aus utilizationData
     startDate: meta?.startDate || '',
     status: 'active',
     utilization: utilization ?? 0,
@@ -1630,6 +1638,33 @@ export default function EmployeeDetailView({
                 )}
               </div>
 
+            </div>
+            
+            {/* Kommentar-Bereich */}
+            <div className="mt-6 space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900">Kommentare</h3>
+              
+              {/* Auslastungskommentar */}
+              <div className="bg-white rounded-lg border border-gray-200 p-4">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Auslastungskommentar</h4>
+                <UtilizationComment 
+                  personId={employeeId}
+                  onLocalChange={(value) => {
+                    console.log('🔄 Auslastungskommentar geändert:', value);
+                  }}
+                />
+              </div>
+              
+              {/* Einsatzplan-Kommentar */}
+              <div className="bg-white rounded-lg border border-gray-200 p-4">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Einsatzplan-Kommentar</h4>
+                <PlanningComment 
+                  personId={employeeId}
+                  onLocalChange={(value) => {
+                    console.log('🔄 Einsatzplan-Kommentar geändert:', value);
+                  }}
+                />
+              </div>
             </div>
           </div>
         </div>

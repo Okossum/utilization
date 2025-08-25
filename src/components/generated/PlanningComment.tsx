@@ -24,13 +24,13 @@ export function PlanningComment({ personId, initialValue, onLocalChange, classNa
       setLoading(true);
       setError(null);
       try {
-        // Direct Firebase call instead of DatabaseService
-        const dossierSnapshot = await getDocs(collection(db, 'employee_dossiers'));
-        const dossierDoc = dossierSnapshot.docs.find(doc => doc.data().name === personId || doc.id === personId);
-        const dossier = dossierDoc?.data();
+        // Direct Firebase call to utilizationData collection
+        const utilizationSnapshot = await getDocs(collection(db, 'utilizationData'));
+        const utilizationDoc = utilizationSnapshot.docs.find(doc => doc.data().person === personId || doc.id === personId);
+        const utilizationData = utilizationDoc?.data();
         
-        if (!cancelled && dossier) {
-          const v = String(dossier.planningComment || '');
+        if (!cancelled && utilizationData) {
+          const v = String(utilizationData.planningComment || '');
           setValue(v);
           setRemoteValue(v);
         }
@@ -48,34 +48,26 @@ export function PlanningComment({ personId, initialValue, onLocalChange, classNa
     setSaving(true);
     setError(null);
     try {
-      // Direct Firebase call instead of DatabaseService
-      const dossierSnapshot = await getDocs(collection(db, 'employee_dossiers'));
-      const existingDoc = dossierSnapshot.docs.find(doc => doc.data().name === personId || doc.id === personId);
+      // Direct Firebase call to utilizationData collection
+      const utilizationSnapshot = await getDocs(collection(db, 'utilizationData'));
+      const existingDoc = utilizationSnapshot.docs.find(doc => doc.data().person === personId || doc.id === personId);
       const existing = existingDoc?.data();
       
-      const payload = {
-        id: existing?.employeeId || personId,
-        name: existing?.name || '',
-        email: existing?.email || '',
-        phone: existing?.phone || '',
-        strengths: existing?.strengths || '',
-        weaknesses: existing?.weaknesses || '',
-        comments: existing?.comments || '',
-        utilizationComment: existing?.utilizationComment || '',
-        planningComment: value || '',
-        travelReadiness: existing?.travelReadiness || '',
-        projectHistory: existing?.projectHistory || [],
-        projectOffers: existing?.projectOffers || [],
-        jiraTickets: existing?.jiraTickets || [],
-        skills: existing?.skills || [],
-        excelData: existing?.excelData || {},
-        uid: existing?.uid || personId,
-        displayName: existing?.displayName || existing?.name || '',
-        experience: existing?.experience || '',
-      };
-      
-      const docRef = existingDoc ? doc(db, 'employee_dossiers', existingDoc.id) : doc(db, 'employee_dossiers', personId);
-      await setDoc(docRef, payload, { merge: true });
+      if (existing) {
+        // Update existing utilizationData document
+        const docRef = doc(db, 'utilizationData', existingDoc.id);
+        await setDoc(docRef, { planningComment: value || '' }, { merge: true });
+      } else {
+        // Create new utilizationData document if it doesn't exist
+        const docRef = doc(db, 'utilizationData', personId);
+        await setDoc(docRef, { 
+          id: personId,
+          person: personId,
+          planningComment: value || '',
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+      }
       setRemoteValue(value);
       onLocalChange?.(value);
     } catch (e) {
@@ -89,34 +81,16 @@ export function PlanningComment({ personId, initialValue, onLocalChange, classNa
     setSaving(true);
     setError(null);
     try {
-      // Direct Firebase call instead of DatabaseService
-      const dossierSnapshot = await getDocs(collection(db, 'employee_dossiers'));
-      const existingDoc = dossierSnapshot.docs.find(doc => doc.data().name === personId || doc.id === personId);
+      // Direct Firebase call to utilizationData collection
+      const utilizationSnapshot = await getDocs(collection(db, 'utilizationData'));
+      const existingDoc = utilizationSnapshot.docs.find(doc => doc.data().person === personId || doc.id === personId);
       const existing = existingDoc?.data();
       
-      const payload = {
-        id: existing?.employeeId || personId,
-        name: existing?.name || '',
-        email: existing?.email || '',
-        phone: existing?.phone || '',
-        strengths: existing?.strengths || '',
-        weaknesses: existing?.weaknesses || '',
-        comments: existing?.comments || '',
-        utilizationComment: existing?.utilizationComment || '',
-        planningComment: '',
-        travelReadiness: existing?.travelReadiness || '',
-        projectHistory: existing?.projectHistory || [],
-        projectOffers: existing?.projectOffers || [],
-        jiraTickets: existing?.jiraTickets || [],
-        skills: existing?.skills || [],
-        excelData: existing?.excelData || {},
-        uid: existing?.uid || personId,
-        displayName: existing?.displayName || existing?.name || '',
-        experience: existing?.experience || '',
-      };
-      
-      const docRef = existingDoc ? doc(db, 'employee_dossiers', existingDoc.id) : doc(db, 'employee_dossiers', personId);
-      await setDoc(docRef, payload, { merge: true });
+      if (existing) {
+        // Update existing utilizationData document
+        const docRef = doc(db, 'utilizationData', existingDoc.id);
+        await setDoc(docRef, { planningComment: '' }, { merge: true });
+      }
       setValue('');
       setRemoteValue('');
       onLocalChange?.('');
