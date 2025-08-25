@@ -2,7 +2,25 @@ import React, { useState } from 'react';
 import { Trash2, Pencil, History, Building, User, Target, Calendar, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import { ProjectHistoryItem } from './EmployeeDossierModal';
+// ProjectHistoryItem type definition moved here since EmployeeDossierModal is removed
+interface ProjectHistoryItem {
+  id: string;
+  customer: string;
+  projectName: string;
+  startDate: string;
+  endDate: string;
+  description: string;
+  skillsUsed: string[];
+  // Erweiterte Properties für vollständige Kompatibilität
+  activities?: string[];
+  role?: string;
+  duration?: string;
+  status?: string;
+  comment?: string;
+  plannedAllocationPct?: number;
+  roles?: any[];
+  skills?: any[];
+}
 
 interface ProjectHistorySectionProps {
   employeeName: string;

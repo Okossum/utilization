@@ -312,9 +312,27 @@ export default function EmployeeDetailView({
   // Extract skills and roles from utilizationData Hub
   useEffect(() => {
     // Finde die Person in utilizationData
+    console.log('🔍 DEBUG: Suche Person in utilizationData:', {
+      employeeId,
+      personName,
+      totalRecords: databaseData?.utilizationData?.length || 0
+    });
+    
     const personData = databaseData?.utilizationData?.find(record => 
-      record.person === employeeId || record.id === employeeId
+      record.person === employeeId || record.id === employeeId || 
+      record.person === personName || record.id === personName
     );
+    
+    console.log('🔍 DEBUG: Person gefunden:', !!personData);
+    if (personData) {
+      console.log('🔍 DEBUG: PersonData Details:', {
+        person: personData.person,
+        id: personData.id,
+        hasAssignedRoles: !!personData.assignedRoles,
+        assignedRolesCount: personData.assignedRoles?.length || 0,
+        assignedRolesRaw: personData.assignedRoles
+      });
+    }
     
     if (personData) {
       // Lade Skills/Rollen aus utilizationData Hub und konvertiere Format
@@ -344,6 +362,12 @@ export default function EmployeeDetailView({
         assignedAt: role.assignedAt,
         lastUpdated: role.updatedAt
       }));
+      
+      console.log('🔍 DEBUG: Konvertierte Rollen:', {
+        rawRoles: personData.assignedRoles,
+        convertedRoles,
+        convertedCount: convertedRoles.length
+      });
       
       setAssignedSkills(convertedTechnicalSkills);
       setAssignedSoftSkills(convertedSoftSkills);
@@ -450,13 +474,14 @@ export default function EmployeeDetailView({
     
     setDossierLoading(true);
     try {
-      // Skills/Rollen werden automatisch über utilizationData Hub aktualisiert
-      console.log('ℹ️ Skills/Rollen Refresh erfolgt automatisch über utilizationData Hub');
+      // ✅ FIX: Aktualisiere utilizationData Hub ZUERST (wo Rollen gespeichert werden)
+      console.log('🔄 Refreshing utilizationData Hub for roles/skills...');
+      await refreshUtilizationData();
       
-      // Load employee dossier data (includes soft skills)
+      // Load employee dossier data (includes legacy data)
       try {
         const consistentEmployeeId = employeeId;
-        console.log('🔄 Refreshing dossier data for:', consistentEmployeeId);
+        console.log('🔄 Refreshing legacy dossier data for:', consistentEmployeeId);
         const loadedDossierData = await DatabaseService.getEmployeeDossier(consistentEmployeeId);
         if (loadedDossierData) {
           console.log('📋 Refreshed dossier data:', loadedDossierData);

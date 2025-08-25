@@ -3,137 +3,94 @@ import { Search, Filter, Users, Upload, UserCheck, UserX, BarChart3 } from 'luci
 import { motion, AnimatePresence } from 'framer-motion';
 import { EmployeeCard } from './EmployeeCard';
 
-import { EmployeeDossierModal } from './EmployeeDossierModal';
+
 // DatabaseService removed - using direct Firebase calls
 import { db } from '../../lib/firebase';
 import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
 import { useAssignments } from '../../contexts/AssignmentsContext';
 import { MultiSelectFilter } from './MultiSelectFilter';
 import { useAuth } from '../../contexts/AuthContext';
+import { useUtilizationData } from '../../contexts/UtilizationDataContext';
+
+// Type definitions für Skills und Rollen (aus utilizationData)
+interface AssignedRole {
+  id: string;
+  roleId: string;
+  roleName: string;
+  assignedAt?: string;
+}
+
+interface TechnicalSkill {
+  id: string;
+  skillId: string;
+  skillName: string;
+  rating: number;
+}
+
+interface SoftSkill {
+  id: string;
+  skillId: string;
+  skillName: string;
+  rating: number;
+}
 
 // ✅ KORRIGIERT: Props für Action-Items aus der Auslastungs-Übersicht
 interface EmployeeListViewProps {
   actionItems: Record<string, { actionItem: boolean; source: 'manual' | 'rule' | 'default'; updatedBy?: string }>;
   onOpenEmployeeDetail?: (personId: string) => void;
 }
-interface Employee {
+// Skill Interface für EmployeeCard Kompatibilität
+interface Skill {
   id: string;
   name: string;
-  role: string;
-  department: string;
-  skills: string[];
-  experience: string;
-  availability: 'Available' | 'Busy' | 'On Project';
-  comments: string;
-  email: string;
-  phone: string;
-  isActive: boolean;
-  profileImage?: string;
-  // Neue Dossier-Felder
-  careerLevel?: string;           // LBS
-  competenceCenter?: string;      // CC
-  team?: string;                  // Team
-  strengths?: string;             // Stärken
-  weaknesses?: string;            // Schwächen
-  roles?: string[];               // Rollen
-  currentProjectAssignments?: Array<{  // Aktuelle Projektzuordnungen
-    id: string;
-    projectName: string;
-    customer: string;
-    role: string;
-    startDate?: string;
-    endDate?: string;
-    workload?: number;
-  }>;
-  projectHistory?: Array<{        // Projekt Kurzlebenslauf
-    id: string;
-    projectName: string;
-    customer: string;
-    role: string;
-    duration: string;
-    activities: string[];
-  }>;
-  projectOffers?: Array<{         // Angebotene Projekte
-    id: string;
-    customerName: string;
-    startWeek: string;
-    endWeek: string;
-    probability: number;
-  }>;
+  rating: number;
 }
-const employeeData: Employee[] = [{
-  id: '1',
-  name: 'Sarah Chen',
-  role: 'Senior Frontend Developer',
-  department: 'Engineering',
-  skills: ['React', 'TypeScript', 'UI/UX Design', 'Node.js'],
-  experience: '5+ years',
-  availability: 'Available',
-  comments: 'Excellent track record with client-facing projects. Strong communication skills and proven ability to deliver complex frontend solutions on time.',
-  email: 'sarah.chen@company.com',
-  phone: '+1 (555) 123-4567',
-  isActive: false
-}, {
-  id: '2',
-  name: 'Marcus Rodriguez',
-  role: 'DevOps Engineer',
-  department: 'Infrastructure',
-  skills: ['AWS', 'Docker', 'Kubernetes', 'CI/CD'],
-  experience: '7+ years',
-  availability: 'On Project',
-  comments: 'Infrastructure specialist with deep cloud expertise. Currently leading the migration project but available for consultation.',
-  email: 'marcus.rodriguez@company.com',
-  phone: '+1 (555) 234-5678',
-  isActive: true
-}, {
-  id: '3',
-  name: 'Emily Watson',
-  role: 'Product Manager',
-  department: 'Product',
-  skills: ['Strategy', 'Analytics', 'Agile', 'Stakeholder Management'],
-  experience: '6+ years',
-  availability: 'Available',
-  comments: 'Strategic thinker with excellent client relationship management. Has successfully delivered 15+ projects with high client satisfaction.',
-  email: 'emily.watson@company.com',
-  phone: '+1 (555) 345-6789',
-  isActive: false
-}, {
-  id: '4',
-  name: 'David Kim',
-  role: 'Full Stack Developer',
-  department: 'Engineering',
-  skills: ['Python', 'Django', 'React', 'PostgreSQL'],
-  experience: '4+ years',
-  availability: 'Busy',
-  comments: 'Versatile developer with strong backend and frontend capabilities. Currently wrapping up a major client project.',
-  email: 'david.kim@company.com',
-  phone: '+1 (555) 456-7890',
-  isActive: false
-}, {
-  id: '5',
-  name: 'Lisa Thompson',
-  role: 'UX Designer',
-  department: 'Design',
-  skills: ['Figma', 'User Research', 'Prototyping', 'Design Systems'],
-  experience: '5+ years',
-  availability: 'Available',
-  comments: 'Award-winning designer with expertise in enterprise applications. Excellent at translating complex requirements into intuitive interfaces.',
-  email: 'lisa.thompson@company.com',
-  phone: '+1 (555) 567-8901',
-  isActive: true
-}, {
-  id: '6',
-  name: 'Alex Johnson',
-  role: 'Backend Developer',
-  department: 'Engineering',
-  skills: ['Java', 'Spring Boot', 'Microservices', 'MongoDB'],
-  experience: '6+ years',
-  availability: 'Available',
-  comments: 'Scalable architecture expert with proven experience in high-traffic applications. Strong problem-solving skills and mentoring capabilities.',
-  email: 'alex.johnson@company.com',
-  phone: '+1 (555) 678-9012',
-  isActive: false
-}];
+
+// Project Interface für EmployeeCard Kompatibilität
+interface Project {
+  id: string;
+  customer: string;
+  projectName: string;
+  startDate: string;
+  endDate: string;
+  description: string;
+  skillsUsed: string[];
+  employeeRole: string;
+  utilization?: number;
+  averageUtilization?: number;
+  probability?: 'Prospect' | 'Offered' | 'Planned' | 'Commissioned' | 'On-Hold' | 'Rejected';
+}
+
+// Employee Interface kompatibel mit EmployeeCard
+interface Employee {
+  id: string;
+  name: string;                   // Mapping von person -> name
+  lbs: string;                    // Karrierestufe (wird als Untertitel angezeigt)
+  cc: string;                     // Competence Center
+  team: string;
+  role: string;                   // Hauptrolle (erste assignedRole oder default)
+  email?: string;                 // E-Mail-Adresse
+  vg?: string;                    // Vorgesetzter
+  profileUrl?: string;            // Link zum Profil
+  skills: Skill[];                // Kombinierte Skills für EmployeeCard
+  completedProjects: Project[];   // Abgeschlossene Projekte
+  plannedProjects: Project[];     // Geplante Projekte
+  // Zusätzliche Felder aus EmployeeDetailView
+  phone?: string;                 // Telefonnummer
+  location?: string;              // Standort (mapping von standort)
+  startDate?: string;             // Startdatum
+  status?: string;                // Status (aktiv, inaktiv, etc.)
+  utilization?: number;           // Aktuelle Auslastung
+  averageUtilization?: number;    // Durchschnittliche Auslastung
+  softSkills?: Skill[];           // Soft Skills
+  technicalSkills?: Skill[];      // Technical Skills
+  strengths?: string[];           // Stärken
+  weaknesses?: string[];          // Schwächen
+  utilizationComment?: string;    // Auslastungskommentar
+  planningComment?: string;       // Planungskommentar
+}
+// Mock-Daten entfernt - verwende echte Daten aus utilizationData
+
 
 // @component: EmployeeListView
 export const EmployeeListView = ({ actionItems, onOpenEmployeeDetail }: EmployeeListViewProps) => {
@@ -143,10 +100,100 @@ export const EmployeeListView = ({ actionItems, onOpenEmployeeDetail }: Employee
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
-  // ✅ NEU: State für Employee Dossier Modal
-  const [isDossierModalOpen, setIsDossierModalOpen] = useState(false);
-  const [selectedEmployeeForDossier, setSelectedEmployeeForDossier] = useState<Employee | null>(null);
+  // Verwende echte Daten aus utilizationData
+  const { databaseData, isLoading: dataLoading } = useUtilizationData();
   
+  // Transformiere utilizationData zu Employee-Objekten (kompatibel mit EmployeeCard)
+  useEffect(() => {
+    if (!dataLoading && databaseData.utilizationData) {
+      const transformedEmployees: Employee[] = databaseData.utilizationData.map((record: any) => {
+        // Transformiere technicalSkills und softSkills zu Skill[]
+        const technicalSkills: Skill[] = (record.technicalSkills || []).map((skill: any) => ({
+          id: skill.id || skill.skillId || '',
+          name: skill.skillName || skill.name || '',
+          rating: skill.rating || 0
+        }));
+        
+        const softSkills: Skill[] = (record.softSkills || []).map((skill: any) => ({
+          id: skill.id || skill.skillId || '',
+          name: skill.skillName || skill.name || '',
+          rating: skill.rating || 0
+        }));
+        
+        // Kombiniere alle Skills für EmployeeCard
+        const allSkills = [...technicalSkills, ...softSkills];
+        
+        // Bestimme role aus assignedRoles
+        const role = record.assignedRoles && record.assignedRoles.length > 0 
+          ? record.assignedRoles[0].roleName 
+          : record.lbs || 'Mitarbeiter';
+        
+        // Erstelle completedProjects und plannedProjects aus projectReferences
+        const completedProjects: Project[] = [];
+        const plannedProjects: Project[] = [];
+        
+        if (record.projectReferences && Array.isArray(record.projectReferences)) {
+          record.projectReferences.forEach((projectRef: any) => {
+            const projectObj: Project = {
+              id: projectRef.id || projectRef.projectId || '',
+              customer: projectRef.customer || projectRef.customerName || 'Unbekannt',
+              projectName: projectRef.projectName || projectRef.name || 'Unbekanntes Projekt',
+              startDate: projectRef.startDate || projectRef.startWeek || '',
+              endDate: projectRef.endDate || projectRef.endWeek || '',
+              description: projectRef.description || `${projectRef.projectName || 'Projekt'} bei ${projectRef.customer || 'Unbekannt'}`,
+              skillsUsed: projectRef.skillsUsed || projectRef.requiredSkills || [],
+              employeeRole: projectRef.role || projectRef.employeeRole || role,
+              utilization: projectRef.utilization || projectRef.workload || 0,
+              averageUtilization: projectRef.averageUtilization,
+              probability: projectRef.probability || 'Commissioned'
+            };
+            
+            // Entscheide basierend auf Status/Datum ob completed oder planned
+            const isCompleted = projectRef.status === 'completed' || 
+                               projectRef.status === 'abgeschlossen' ||
+                               (projectRef.endDate && new Date(projectRef.endDate) < new Date());
+            
+            if (isCompleted) {
+              completedProjects.push(projectObj);
+            } else {
+              plannedProjects.push(projectObj);
+            }
+          });
+        }
+        
+        return {
+          id: record.id,
+          name: record.person,                    // person -> name mapping
+          lbs: record.lbs || '',
+          cc: record.cc || '',
+          team: record.team || '',
+          role: role,
+          email: record.email || '',
+          vg: record.vg || '',
+          location: record.standort || '',        // standort -> location mapping
+          skills: allSkills,                      // Kombinierte Skills
+          completedProjects: completedProjects,   // Aus einsatzplan abgeleitete abgeschlossene Projekte
+          plannedProjects: plannedProjects,       // Aus einsatzplan abgeleitete geplante Projekte
+          phone: record.phone || '',
+          startDate: record.startDate || '',
+          status: record.isActive ? 'aktiv' : 'inaktiv',
+          utilization: record.utilization,
+          averageUtilization: record.averageUtilization,
+          softSkills: softSkills,
+          technicalSkills: technicalSkills,
+          strengths: record.strengths ? [record.strengths] : [],
+          weaknesses: record.weaknesses ? [record.weaknesses] : [],
+          utilizationComment: record.utilizationComment || '',
+          planningComment: record.planningComment || '',
+          profileUrl: record.linkZumProfilUrl || ''
+        };
+      });
+      
+      setEmployees(transformedEmployees);
+      setIsLoading(false);
+    }
+  }, [dataLoading, databaseData.utilizationData]);
+
   // ✅ NEU: Filter-States wie im UtilizationReportView
   const [filterCC, setFilterCC] = useState<string[]>([]);
   const [filterLBS, setFilterLBS] = useState<string[]>([]);
@@ -161,135 +208,22 @@ export const EmployeeListView = ({ actionItems, onOpenEmployeeDetail }: Employee
   // Assignments Context für Projektzuordnungen
   const { getAssignmentsForEmployee } = useAssignments();
   
-  // ✅ KORRIGIERT: Lade alle Mitarbeiter mit Act-Toggle, unabhängig von existierenden Dossiers
-  useEffect(() => {
-    const loadEmployeesWithActToggle = async () => {
-      try {
-        setIsLoading(true);
-        
-        // Lade Einsatzplan-Daten für Metadaten (CC, Team, LBS)
-        // Direct Firebase call instead of DatabaseService
-        const einsatzplanSnapshot = await getDocs(collection(db, 'einsatzplan'));
-        const einsatzplanData = einsatzplanSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const einsatzplanMap = new Map();
-        einsatzplanData?.forEach(entry => {
-          if (entry.person) {
-            einsatzplanMap.set(entry.person, entry);
-          }
-        });
-        
-        // console.log entfernt
-
-        // ✅ NEUE LOGIK: Erstelle Employee-Objekte für alle Mitarbeiter mit Act-Toggle
-        const allEmployeesWithActToggle: Employee[] = Object.keys(actionItems)
-          .filter(name => actionItems[name]?.actionItem === true)
-          .map(name => {
-            const einsatzplanEntry = einsatzplanMap.get(name);
-            
-            return {
-              id: einsatzplanEntry?.personId || name, // Verwende personId falls verfügbar, sonst Name als Fallback
-              name: name,
-              role: einsatzplanEntry?.lbs || 'Keine Angabe',
-              department: einsatzplanEntry?.team || einsatzplanEntry?.cc || 'Keine Angabe',
-              skills: [], // Wird später aus dem Dossier geladen
-              experience: einsatzplanEntry?.lbs || 'Keine Angabe',
-              availability: 'Available',
-              comments: 'Klicken Sie auf den Mitarbeiter, um das Dossier zu öffnen/erstellen',
-              email: 'Keine E-Mail',
-              phone: 'Kein Telefon',
-              isActive: true,
-              // Metadaten aus Einsatzplan
-              careerLevel: einsatzplanEntry?.lbs,
-              competenceCenter: einsatzplanEntry?.cc,
-              team: einsatzplanEntry?.team,
-              strengths: '',
-              weaknesses: '',
-              roles: [],
-              currentProjectAssignments: [],
-              projectHistory: [],
-              projectOffers: [],
-            };
-          });
-        
-        // console.log entfernt
-        // console.log entfernt
-        
-        setEmployees(allEmployeesWithActToggle);
-      } catch (error) {
-        // console.error entfernt
-        setEmployees([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    // Debug-Kommentar entfernt
-    // console.log entfernt
-    // console.log entfernt
-    
-    // Nur laden wenn actionItems verfügbar sind
-    if (Object.keys(actionItems).length > 0) {
-      // console.log entfernt
-      loadEmployeesWithActToggle();
-    } else {
-      // console.log entfernt
-    }
-  }, [actionItems]);
+  // Alter useEffect entfernt - verwende jetzt utilizationData
   
-  // Toggle ACT-Status für einen Mitarbeiter
-  const handleToggleActive = async (employeeId: string) => {
-    try {
-      // Finde den Mitarbeiter
-      const employee = employees.find(emp => emp.id === employeeId);
-      if (!employee) return;
-      
-      // Toggle den Status
-      const newActiveStatus = !employee.isActive;
-      
-      // Aktualisiere den lokalen State
-      setEmployees(prev => prev.map(emp => 
-        emp.id === employeeId 
-          ? { ...emp, isActive: newActiveStatus }
-          : emp
-      ));
-      
-      // Speichere den neuen Status in der Datenbank
-      // Direct Firebase call instead of DatabaseService
-      const docRef = doc(db, 'employee_dossiers', employeeId);
-      await setDoc(docRef, {
-        uid: employeeId,
-        displayName: employee.name,
-        email: employee.email,
-        skills: employee.skills,
-        experience: 0, // Standard-Wert
-        isActive: newActiveStatus
-      });
-      
-      // console.log entfernt
-    } catch (error) {
-      // console.error entfernt
-      // Bei Fehler: Status zurücksetzen
-      setEmployees(prev => prev.map(emp => 
-        emp.id === employeeId 
-          ? { ...emp, isActive: !emp.isActive }
-          : emp
-      ));
-    }
-  };
+  // handleToggleActive entfernt - nicht mehr benötigt mit utilizationData
   
-  // ✅ NEU: Avatar-Click-Handler für Dossier
+  // ✅ NEU: Avatar-Click-Handler für EmployeeDetailView
   const handleAvatarClick = (employee: Employee) => {
-    setSelectedEmployeeForDossier(employee);
-    setIsDossierModalOpen(true);
+    onOpenEmployeeDetail?.(employee.id);
   };
   
   // ✅ NEU: Filter-Optionen wie im UtilizationReportView
-  const ccOptions = Array.from(new Set(employees.map(emp => emp.competenceCenter).filter(Boolean)));
-  const lbsOptions = Array.from(new Set(employees.map(emp => emp.careerLevel).filter(Boolean)));
+  const ccOptions = Array.from(new Set(employees.map(emp => emp.cc).filter(Boolean)));
+  const lbsOptions = Array.from(new Set(employees.map(emp => emp.lbs).filter(Boolean)));
   const bereichOptions = Array.from(new Set(employees.map(emp => (emp as any).bereich).filter(Boolean)));
   const statusOptions = ['Urlaub', 'Elternzeit', 'Mutterschutz', 'Krankheit', 'Lange Abwesent', 'Kündigung'];
   
-  const departments = ['All', ...Array.from(new Set(employees.map(emp => emp.department)))];
+  const departments = ['All', ...Array.from(new Set(employees.map(emp => (emp as any).bereich || 'Unbekannt')))];
   
   // ✅ KORRIGIERT: Alle geladenen Mitarbeiter haben bereits den Act-Toggle aktiviert
   // console.log entfernt
@@ -299,29 +233,29 @@ export const EmployeeListView = ({ actionItems, onOpenEmployeeDetail }: Employee
     
     // Personensuche Filter
     const matchesSearch = employee.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         employee.role.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         employee.skills.some(skill => skill.toLowerCase().includes(searchTerm.toLowerCase()));
+                                                  employee.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         employee.skills.some(skill => skill.name.toLowerCase().includes(searchTerm.toLowerCase()));
     
     // Abteilungs-Filter
-    const matchesDepartment = selectedDepartment === 'All' || employee.department === selectedDepartment;
+    const matchesDepartment = selectedDepartment === 'All' || (employee as any).bereich === selectedDepartment;
     
     // Bereich-Filter
     const matchesBereich = !selectedBereich || (employee as any).bereich === selectedBereich;
     
     // CC Filter
-    const matchesCC = filterCC.length === 0 || filterCC.includes(String(employee.competenceCenter || ''));
+    const matchesCC = filterCC.length === 0 || filterCC.includes(String(employee.cc || ''));
     
     // LBS Filter (INCLUDE)
-    const matchesLBS = filterLBS.length === 0 || filterLBS.includes(String(employee.careerLevel || ''));
+    const matchesLBS = filterLBS.length === 0 || filterLBS.includes(String(employee.lbs || ''));
     
     // LBS Filter (EXCLUDE)
-    const matchesLBSExclude = filterLBSExclude.length === 0 || !filterLBSExclude.includes(String(employee.careerLevel || ''));
+    const matchesLBSExclude = filterLBSExclude.length === 0 || !filterLBSExclude.includes(String(employee.lbs || ''));
     
     // Working Students Filter
     const matchesWorkingStudents = showWorkingStudents || 
-      (employee.careerLevel !== 'Working Student' && 
-       employee.careerLevel !== 'Working student' && 
-       employee.careerLevel !== 'working student');
+      (employee.lbs !== 'Working Student' && 
+       employee.lbs !== 'Working student' && 
+       employee.lbs !== 'working student');
     
     // Status Filter (hier vereinfacht, da wir keine Status-Daten haben)
     const matchesStatus = filterStatus.length === 0; // Alle anzeigen, da keine Status-Daten
@@ -548,7 +482,7 @@ export const EmployeeListView = ({ actionItems, onOpenEmployeeDetail }: Employee
                     >
                       <EmployeeCard 
                   employee={employee} 
-                  onToggleActive={handleToggleActive}
+                  onToggleActive={undefined}
                   onAvatarClick={handleAvatarClick}
                   onOpenDetail={onOpenEmployeeDetail ? () => onOpenEmployeeDetail(employee.id) : undefined}
                 />
@@ -592,33 +526,7 @@ export const EmployeeListView = ({ actionItems, onOpenEmployeeDetail }: Employee
         )}
       </div>
       
-      {/* ✅ NEU: Employee Dossier Modal */}
-      {selectedEmployeeForDossier && (
-        <EmployeeDossierModal
-          isOpen={isDossierModalOpen}
-          onClose={() => {
-            setIsDossierModalOpen(false);
-            setSelectedEmployeeForDossier(null);
-          }}
-          employee={selectedEmployeeForDossier}
-          onSave={(updatedEmployee) => {
-            // Aktualisiere den lokalen State
-            setEmployees(prev => prev.map(emp => 
-              emp.id === updatedEmployee.id ? updatedEmployee : emp
-            ));
-            setIsDossierModalOpen(false);
-            setSelectedEmployeeForDossier(null);
-          }}
-          excelData={{
-            name: selectedEmployeeForDossier.name,
-            manager: '',
-            team: selectedEmployeeForDossier.team || '',
-            competenceCenter: selectedEmployeeForDossier.competenceCenter || '',
-            lineOfBusiness: '',
-            careerLevel: selectedEmployeeForDossier.careerLevel || ''
-          }}
-        />
-      )}
+
       
 
     </div>;

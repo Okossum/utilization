@@ -51,97 +51,11 @@ interface Employee {
   // Callback für Projekt-Erstellung
   onCreateProject?: () => void;
 }
+
+interface EmployeeOverviewProps {
+  employees: Employee[];
+}
 type ViewMode = 'cards' | 'table' | 'grid';
-const defaultEmployeesData: Employee[] = [{
-  id: '1',
-  name: 'Sarah Chen',
-  lbs: 'Senior Developer',
-  cc: 'Digital Solutions',
-  team: 'Alpha Team',
-  mainRole: 'Lead Frontend Developer',
-  email: 'sarah.chen@company.com',
-  vg: 'John Manager',
-  profileUrl: undefined, // Wird aus echter Datenbank geladen
-  skills: [{
-    id: 's1',
-    name: 'React',
-    rating: 5
-  }, {
-    id: 's2',
-    name: 'TypeScript',
-    rating: 4
-  }, {
-    id: 's3',
-    name: 'UI/UX Design',
-    rating: 3
-  }],
-  completedProjects: [{
-    id: 'cp1',
-    customer: 'TechCorp Inc.',
-    projectName: 'E-commerce Platform',
-    startDate: '2023-01-15',
-    endDate: '2023-06-30',
-    description: 'Built a modern e-commerce platform with React and Node.js',
-    skillsUsed: ['React', 'TypeScript', 'Node.js'],
-    employeeRole: 'Lead Frontend Developer'
-  }],
-  plannedProjects: [{
-    id: 'pp1',
-    customer: 'StartupXYZ',
-    projectName: 'Mobile App Development',
-    startDate: '2024-02-01',
-    endDate: '2024-08-15',
-    description: 'Develop a cross-platform mobile application',
-    skillsUsed: ['React Native', 'TypeScript'],
-    employeeRole: 'Senior Developer',
-    utilization: 80,
-    probability: 'Planned'
-  }]
-}, {
-  id: '2',
-  name: 'Marcus Johnson',
-  lbs: 'Principal Engineer',
-  cc: 'Cloud Infrastructure',
-  team: 'Beta Team',
-  mainRole: 'Backend Architect',
-  email: 'marcus.johnson@company.com',
-  vg: 'Jane Director',
-  skills: [{
-    id: 's4',
-    name: 'Python',
-    rating: 5
-  }, {
-    id: 's5',
-    name: 'AWS',
-    rating: 4
-  }, {
-    id: 's6',
-    name: 'Docker',
-    rating: 5
-  }],
-  completedProjects: [{
-    id: 'cp2',
-    customer: 'FinanceFlow',
-    projectName: 'Payment Processing System',
-    startDate: '2023-03-01',
-    endDate: '2023-09-15',
-    description: 'Designed and implemented a secure payment processing system',
-    skillsUsed: ['Python', 'PostgreSQL', 'Redis'],
-    employeeRole: 'Backend Architect'
-  }],
-  plannedProjects: [{
-    id: 'pp2',
-    customer: 'DataCorp',
-    projectName: 'Analytics Platform',
-    startDate: '2024-01-15',
-    endDate: '2024-07-30',
-    description: 'Build a real-time analytics platform',
-    skillsUsed: ['Python', 'Apache Kafka', 'Elasticsearch'],
-    employeeRole: 'Technical Lead',
-    utilization: 90,
-    probability: 'Commissioned'
-  }]
-}];
 
 // @component: EmployeeOverview
 export const EmployeeOverview = ({ employees }: EmployeeOverviewProps) => {

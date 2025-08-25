@@ -197,6 +197,7 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
             allKeys: Object.keys(row)
           });
           personMetaMap.set(row.person, {
+            id: row.id,  // ✅ ID hinzugefügt für korrekte Identifikation in EmployeeDetailView
             lob: row.lob,
             bereich: row.bereich,
             cc: row.cc,

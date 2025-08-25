@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { EmployeeOverview } from './EmployeeOverview';
 import { ProjectCreationModal } from './ProjectCreationModal';
@@ -207,19 +207,67 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
 
   // Mock Skills Funktion entfernt - verwende nur echte Daten
 
+  // Erstelle dataForUI wie in UtilizationReportView (KORREKTE DATENQUELLE)
+  const dataForUI = useMemo(() => {
+    if (!databaseData.auslastung || !databaseData.einsatzplan) {
+      return [];
+    }
+    
+    const combinedData: any[] = [];
+    
+    // Verarbeite Auslastung-Daten (historisch)
+    databaseData.auslastung.forEach(row => {
+      if (row.values) {
+        Object.entries(row.values).forEach(([weekKey, value]) => {
+          if (typeof value === 'number' && weekKey.match(/^\d{2}\/\d{2}$/)) {
+            combinedData.push({
+              person: row.person || 'Unknown',
+              personId: row.personId || row.id,
+              week: weekKey,
+              utilization: value,
+              finalValue: value,
+              isHistorical: true
+            });
+          }
+        });
+      }
+    });
+    
+    // Verarbeite Einsatzplan-Daten (forecast)
+    databaseData.einsatzplan.forEach(row => {
+      if (row.values) {
+        Object.entries(row.values).forEach(([weekKey, value]) => {
+          if (typeof value === 'number' && weekKey.match(/^\d{2}\/\d{2}$/)) {
+            combinedData.push({
+              person: row.person || 'Unknown',
+              personId: row.personId || row.id,
+              week: weekKey,
+              utilization: value,
+              finalValue: value,
+              isHistorical: false
+            });
+          }
+        });
+      }
+    });
+    
+    return combinedData;
+  }, [databaseData.auslastung, databaseData.einsatzplan]);
+
   // Daten aus UtilizationDataContext transformieren
   const transformUtilizationDataToEmployees = () => {
     try {
       setError(null);
 
-      if (!databaseData.utilizationData || !personMeta) {
+      if (!databaseData.utilizationData || !personMeta || !dataForUI.length) {
         // console.log entfernt
         return;
       }
 
       console.log('🔍 Sales View - Transformiere UtilizationData:', {
         utilizationData: databaseData.utilizationData?.length || 0,
-        personMeta: personMeta.size || 0
+        personMeta: personMeta.size || 0,
+        dataForUI: dataForUI.length
       });
 
       // Mitarbeiter-Daten aus utilizationData transformieren
@@ -234,24 +282,122 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
           return; // Mitarbeiter überspringen, wenn ACT-Toggle nicht aktiviert
         }
 
-        // Berechne Auslastungs-KPIs aus den echten Daten
+        // Berechne Auslastungs-KPIs mit der GLEICHEN Logik wie EmployeeDetailView
         const calculateUtilizationKPIs = (record: any) => {
-          const currentWeek = new Date().getFullYear().toString().slice(-2) + '/' + 
-                             String(Math.ceil((new Date().getTime() - new Date(new Date().getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000))).padStart(2, '0');
-          
-          // Aktuelle Auslastung aus Einsatzplan
-          const currentUtilization = record.einsatzplan?.[currentWeek]?.[0]?.auslastungProzent || 
-                                   record.auslastung?.[currentWeek] || null;
-          
-          // Durchschnittliche Auslastung der letzten 8 Wochen aus Auslastung
-          const auslastungValues = record.auslastung ? Object.values(record.auslastung).filter((val: any) => typeof val === 'number' && val > 0) : [];
-          const averageUtilization = auslastungValues.length > 0 ? 
-            Math.round(auslastungValues.reduce((sum: number, val: any) => sum + val, 0) / auslastungValues.length) : null;
-          
-          return { currentUtilization, averageUtilization };
+          try {
+            // Verwende dataForUI (wie EmployeeDetailView)
+            const personName = record.person;
+            const employeeId = record.id;
+            
+            // Filtere dataForUI für diese Person (wie in EmployeeDetailView)
+            const filtered = dataForUI.filter(row => {
+              const matchesPersonId = row.personId && row.personId === employeeId;
+              const matchesPersonName = personName && (row.person === personName || row.name === personName);
+              return matchesPersonId || matchesPersonName;
+            });
+            
+            if (filtered.length === 0) {
+              return { currentUtilization: null, averageUtilization: null };
+            }
+            
+            // Berechne geplante Auslastung für den Rest des Jahres (EXAKT wie EmployeeDetailView)
+            const currentDate = new Date();
+            const currentYear = currentDate.getFullYear();
+            const currentWeekNumber = getISOWeek(currentDate);
+            
+            // EXAKTE Filterlogik aus EmployeeDetailView
+            const plannedData = filtered.filter(row => {
+              const isForecast = !row.isHistorical;
+              
+              // Parse week format YY/WW
+              const [yearStr, weekStr] = row.week.split('/');
+              const year = parseInt(yearStr) < 50 ? 2000 + parseInt(yearStr) : 1900 + parseInt(yearStr);
+              const weekNum = parseInt(weekStr);
+              
+              const isCurrentYearOrLater = year >= currentYear;
+              const isCurrentWeekOrLater = year > currentYear || (year === currentYear && weekNum >= currentWeekNumber);
+              const hasValidValue = typeof row.finalValue === 'number' && row.finalValue > 0;
+              
+              return isForecast && isCurrentYearOrLater && isCurrentWeekOrLater && hasValidValue;
+            });
+            
+            let currentUtilization: number | undefined = undefined;
+            if (plannedData.length > 0) {
+              const totalPlanned = plannedData.reduce((sum, row) => sum + row.finalValue, 0);
+              const avgPlanned = totalPlanned / plannedData.length;
+              currentUtilization = Math.round(avgPlanned);
+            } else {
+              // Wenn keine geplanten Daten gefunden werden, setze auf 0 (wie EmployeeDetailView)
+              currentUtilization = 0;
+            }
+            
+            // Berechne Durchschnittsauslastung (EXAKT wie EmployeeDetailView)
+            const getWeekNumberForAvg = (date: Date): number => {
+              const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+              const dayNum = d.getUTCDay() || 7;
+              d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+              const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+              return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+            };
+            
+            const currentWeekForAvg = getWeekNumberForAvg(currentDate);
+            
+            // Filter für aktuelles Jahr bis zur aktuellen Woche (EXAKT wie EmployeeDetailView)
+            const currentYearData = filtered.filter(row => {
+              // Parse week format YY/WW
+              const [yearStr, weekStr] = row.week.split('/');
+              const year = parseInt(yearStr) < 50 ? 2000 + parseInt(yearStr) : 1900 + parseInt(yearStr);
+              const weekNum = parseInt(weekStr);
+              
+              const isCurrentYear = year === currentYear;
+              const isValidWeek = weekNum <= currentWeekForAvg;
+              const hasValidValue = typeof row.finalValue === 'number' && !isNaN(row.finalValue);
+              
+              return isCurrentYear && isValidWeek && hasValidValue;
+            });
+            
+            let averageUtilization: number | undefined = undefined;
+            if (currentYearData.length > 0) {
+              const sum = currentYearData.reduce((acc, row) => acc + row.finalValue, 0);
+              const average = sum / currentYearData.length;
+              averageUtilization = Math.round(average);
+            } else {
+              // Fallback: Verwende alle verfügbaren Daten (wie EmployeeDetailView)
+              const allValidData = filtered.filter(row => 
+                typeof row.finalValue === 'number' && row.finalValue > 0
+              );
+              if (allValidData.length > 0) {
+                const sum = allValidData.reduce((acc, row) => acc + row.finalValue, 0);
+                const average = sum / allValidData.length;
+                averageUtilization = Math.round(average);
+              }
+            }
+            
+            return { currentUtilization, averageUtilization };
+            
+          } catch (error) {
+            console.error('🔍 Error calculating utilization KPIs:', error);
+            return { currentUtilization: null, averageUtilization: null };
+          }
         };
 
         const { currentUtilization, averageUtilization } = calculateUtilizationKPIs(record);
+
+        // Debug-Logging für alle Mitarbeiter mit ACT-Toggle
+        if (record.person && actionItems[record.person]?.actionItem === true) {
+          console.log(`🔍 Sales View - ${record.person} Auslastungsberechnung:`, {
+            person: record.person,
+            currentUtilization,
+            averageUtilization,
+            hasAuslastung: !!record.auslastung,
+            hasEinsatzplan: !!record.einsatzplan,
+            auslastungKeys: record.auslastung ? Object.keys(record.auslastung).length : 0,
+            einsatzplanKeys: record.einsatzplan ? Object.keys(record.einsatzplan).length : 0,
+            sampleAuslastung: record.auslastung ? Object.entries(record.auslastung).slice(0, 2) : [],
+            sampleEinsatzplan: record.einsatzplan ? Object.entries(record.einsatzplan).slice(0, 2) : [],
+            recordKeys: Object.keys(record)
+          });
+        }
 
         const employee: Employee = {
           id: record.id,
@@ -312,6 +458,18 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
         });
 
         transformedEmployees.push(employee);
+        
+        // Debug: Zeige finale Employee-Daten
+        if (record.person && actionItems[record.person]?.actionItem === true) {
+          console.log(`🔍 Sales View - ${record.person} finale Employee-Daten:`, {
+            name: employee.name,
+            utilization: employee.utilization,
+            averageUtilization: employee.averageUtilization,
+            hasSkills: employee.skills?.length || 0,
+            hasTechnicalSkills: employee.technicalSkills?.length || 0,
+            hasSoftSkills: employee.softSkills?.length || 0
+          });
+        }
       });
 
       console.log('🔍 Sales View - ACT-Filter angewendet:', {
@@ -330,10 +488,10 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
   };
 
   useEffect(() => {
-    if (!isLoading && databaseData.utilizationData) {
+    if (!isLoading && databaseData.utilizationData && dataForUI.length > 0) {
       transformUtilizationDataToEmployees();
     }
-  }, [isLoading, databaseData.utilizationData, personMeta, actionItems]);
+  }, [isLoading, databaseData.utilizationData, personMeta, actionItems, dataForUI]);
 
   // Loading State
   if (isLoading) {

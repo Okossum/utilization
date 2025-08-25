@@ -27,7 +27,7 @@ interface Employee {
   lbs: string;              // Karrierestufe (wird als Untertitel angezeigt)
   cc: string;               // Competence Center
   team: string;
-  mainRole: string;         // Hauptrolle (Projektleiter, Requirements Engineer, etc.)
+  role: string;             // Hauptrolle (Projektleiter, Requirements Engineer, etc.)
   email?: string;           // E-Mail-Adresse
   vg?: string;              // Vorgesetzter
   profileUrl?: string;      // Link zum Profil
@@ -85,7 +85,7 @@ export const EmployeeCard = ({
           <div className="flex flex-col items-end gap-2">
             <div className="flex items-center gap-1 bg-emerald-50 px-3 py-1 rounded-full">
               <Award className="w-4 h-4 text-emerald-600" />
-              <span className="text-sm font-medium text-emerald-700">{employee.mainRole}</span>
+              <span className="text-sm font-medium text-emerald-700">{employee.role}</span>
             </div>
             {employee.profileUrl && (
               <div className="flex items-center gap-1">
@@ -162,13 +162,13 @@ export const EmployeeCard = ({
               {employee.utilization !== undefined && (
                 <div className="text-center">
                   <div className="text-lg font-bold text-blue-600">{employee.utilization}%</div>
-                  <div className="text-xs text-slate-600">Aktuell</div>
+                  <div className="text-xs text-slate-600">Geplante Auslastung</div>
                 </div>
               )}
               {employee.averageUtilization !== undefined && (
                 <div className="text-center">
-                  <div className="text-lg font-bold text-indigo-600">{employee.averageUtilization}%</div>
-                  <div className="text-xs text-slate-600">Durchschnitt</div>
+                  <div className="text-lg font-bold text-green-600">{employee.averageUtilization}%</div>
+                  <div className="text-xs text-slate-600">Ø Auslastung {new Date().getFullYear()}</div>
                 </div>
               )}
             </div>

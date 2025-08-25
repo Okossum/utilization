@@ -18,7 +18,7 @@ import { KpiCardsGrid } from './KpiCardsGrid';
 import { UtilizationTrendChart } from './UtilizationTrendChart';
 // Removed inline planning editor; Planning via modal remains
 import { StatusLabelSelector } from './StatusLabelSelector';
-import { EmployeeDossierModal, Employee } from './EmployeeDossierModal';
+
 import { PlanningModal } from './PlanningModal';
 import { PlanningCommentModal } from './PlanningCommentModal';
 import { UtilizationComment } from './UtilizationComment';
@@ -613,9 +613,7 @@ export function UtilizationReportView({
     return () => document.removeEventListener('mousedown', handler);
   }, []);
   
-  // Employee Dossier Modal
-  const [isEmployeeDossierOpen, setIsEmployeeDossierOpen] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+
   const [isSalesOpportunitiesOpen, setIsSalesOpportunitiesOpen] = useState(false);
   const [salesOpportunitiesPerson, setSalesOpportunitiesPerson] = useState<string | null>(null);
   const currentWeek = getISOWeek(new Date());
@@ -723,104 +721,10 @@ export function UtilizationReportView({
   const isWeekInPlannedProject = (_person: string, _weekNumber: number) => false;
 
   // Employee Detail Navigation
-  const openEmployeeDossier = async (person: string) => {
-    // Verwende die neue EmployeeDetailView Navigation
-    if (onEmployeeDetailNavigation) {
-      const employeeId = String(personMeta.get(person)?.id || person);
-      onEmployeeDetailNavigation(employeeId);
-      return;
-    }
-
-    // Fallback: Alte Modal-Logik (falls onEmployeeDetailNavigation nicht verfügbar)
-    // Hole Excel-Daten für diese Person
-    let excelData: {
-      name: string;
-      manager: string;
-      team: string;
-      competenceCenter: string;
-      lineOfBusiness: string;
-      careerLevel: string;
-    } | undefined = undefined;
-    
-    // Priorität: Datenbank hat immer erste Priorität
-    let einsatzplanData: any = null;
-    
-    if (dataSource === 'database' && databaseData.einsatzplan) {
-      einsatzplanData = databaseData.einsatzplan.find((item: any) => item.person === person);
-    }
-    
-    if (einsatzplanData) {
-      // Einsatzplan-Daten aus der Datenbank haben höchste Priorität
-      excelData = {
-        name: person,
-        manager: String(einsatzplanData.vg || ''),
-        team: String(einsatzplanData.team || ''),
-        competenceCenter: String(einsatzplanData.cc || ''),
-        lineOfBusiness: String(einsatzplanData.bereich || ''),
-        careerLevel: String(einsatzplanData.lbs || '')
-      };
-    } else if (dataSource === 'database' && databaseData.auslastung) {
-      // Fallback: Auslastung Collection wenn kein Einsatzplan verfügbar
-      const personData = databaseData.auslastung.find(item => item.person === person);
-      if (personData) {
-        excelData = {
-          name: person,
-          manager: String((personData as any).vg || ''), // ✅ VG jetzt verfügbar
-          team: String(personData.team || ''),
-          competenceCenter: String(personData.cc || ''),
-          lineOfBusiness: String(personData.bereich || ''),
-          careerLevel: String(personData.lbs || '')
-        };
-      }
-    } else {
-      // Kein Eintrag in der Datenbank gefunden
-      excelData = {
-        name: person,
-        manager: 'Eintrag fehlt',
-        team: 'Eintrag fehlt',
-        competenceCenter: 'Eintrag fehlt',
-        lineOfBusiness: 'Eintrag fehlt',
-        careerLevel: 'Eintrag fehlt'
-      };
-    }
-
-    // Prefetch vermeiden: Modal lädt Dossier selbst anhand der Employee-ID
-    if (!dossiersByPerson[person]) {
-      setDossiersByPerson(prev => ({
-        ...prev,
-        [person]: {
-          projectOffers: [],
-          jiraTickets: [],
-          utilizationComment: '',
-          planningComment: ''
-        }
-      }));
-    }
-
+  const openEmployeeDetailView = (person: string) => {
+    // Verwende die EmployeeDetailView Navigation
     const employeeId = String(personMeta.get(person)?.id || person);
-    const employee: Employee = {
-      id: employeeId,
-      name: person,
-      careerLevel: excelData?.careerLevel || '',
-      manager: excelData?.manager || '',
-      team: excelData?.team || '',
-      competenceCenter: excelData?.competenceCenter || '',
-      lineOfBusiness: excelData?.lineOfBusiness || '',
-      email: '',
-      phone: '',
-      projectHistory: [],
-              // simpleProjects: [], // Entfernt da nicht in Employee Interface definiert
-      strengths: '',
-      weaknesses: '',
-      comments: '',
-      travelReadiness: String(personTravelReadiness[person] || ''),
-      projectOffers: dossiersByPerson[person]?.projectOffers || [],
-      jiraTickets: dossiersByPerson[person]?.jiraTickets || [],
-      excelData: excelData
-    };
-
-    setSelectedEmployee(employee);
-    setIsEmployeeDossierOpen(true);
+    onEmployeeDetailNavigation?.(employeeId);
   };
 
   // Mock data for demonstration
@@ -2421,9 +2325,9 @@ export function UtilizationReportView({
                       }`} style={{padding: '2px 2px'}}>
                         <div className="flex items-center justify-center">
                           <button
-                            onClick={() => openEmployeeDossier(person)}
+                            onClick={() => openEmployeeDetailView(person)}
                             className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded border border-blue-300 transition-colors"
-                            title="Mitarbeiter-Dossier öffnen"
+                            title="Mitarbeiter-Detail öffnen"
                           >
                             <User className="w-4 h-4" />
                           </button>
@@ -2634,31 +2538,7 @@ export function UtilizationReportView({
         </div>
       </main>
 
-      {/* Employee Dossier Modal */}
-      {selectedEmployee && (
-        <EmployeeDossierModal
-          isOpen={isEmployeeDossierOpen}
-          onClose={() => {
-            setIsEmployeeDossierOpen(false);
-            setSelectedEmployee(null);
-          }}
-          employee={selectedEmployee}
-          onSave={(updatedEmployee) => {
-            // Aktualisiere den lokalen State
-            // Konvertiere travelReadiness von String zu Number falls nötig
-            const travelReadinessNumber = typeof updatedEmployee.travelReadiness === 'string' 
-              ? parseInt(updatedEmployee.travelReadiness) || 0 
-              : updatedEmployee.travelReadiness;
-            
-            setPersonTravelReadiness(prev => ({
-              ...prev,
-              [updatedEmployee.name]: travelReadinessNumber
-            }));
-          }}
-          excelData={selectedEmployee.excelData}
-          // Kunden-Funktionalität entfernt
-        />
-      )}
+
 
       {/* Settings Modal */}
       <AnimatePresence>

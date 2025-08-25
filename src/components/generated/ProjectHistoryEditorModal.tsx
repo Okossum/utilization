@@ -8,7 +8,25 @@ import TechnicalSkillSelectionModal from './TechnicalSkillSelectionModal';
 import { ProjectRoleSelectionModal } from './ProjectRoleSelectionModal';
 import { ProjectSkillSelectionModal } from './ProjectSkillSelectionModal';
 
-import { ProjectHistoryItem } from './EmployeeDossierModal';
+// ProjectHistoryItem type definition moved here since EmployeeDossierModal is removed
+interface ProjectHistoryItem {
+  id: string;
+  customer: string;
+  projectName: string;
+  startDate: string;
+  endDate: string;
+  description: string;
+  skillsUsed: string[];
+  // Erweiterte Properties für vollständige Kompatibilität
+  activities?: string[];
+  role?: string;
+  duration?: string;
+  status?: string;
+  comment?: string;
+  plannedAllocationPct?: number;
+  roles?: any[];
+  skills?: any[];
+}
 
 interface ProjectHistoryEditorModalProps {
   isOpen: boolean;
