@@ -304,9 +304,9 @@ export function UtilizationReportView({
   const setFilterLBS = (lob: string[]) => {
     updateFilterSettings({ selectedLoB: lob });
   };
-  const filterLBSExclude: string[] = []; // Not in user settings yet
-  const setFilterLBSExclude = (lob: string[]) => {
-    // TODO: Add to user settings if needed
+  const filterLBSExclude = filterSettings.selectedLBSExclude || [];
+  const setFilterLBSExclude = (lbs: string[]) => {
+    updateFilterSettings({ selectedLBSExclude: lbs });
   };
   const filterStatus: string[] = []; // Not in user settings yet
   const setFilterStatus = (status: string[]) => {

@@ -10,6 +10,7 @@ export interface FilterSettings {
   selectedBereich: string[];
   selectedCC: string[];
   selectedTeam: string[];
+  selectedLBSExclude: string[];
   showWorkingStudents: boolean;
   showActionItems: boolean;
   showAllData: boolean;
@@ -53,6 +54,7 @@ export const DEFAULT_FILTER_SETTINGS: FilterSettings = {
   selectedBereich: [],
   selectedCC: [],
   selectedTeam: [],
+  selectedLBSExclude: [],
   showWorkingStudents: true,
   showActionItems: false,
   showAllData: true,
