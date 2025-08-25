@@ -160,7 +160,7 @@ export default function EmployeeDetailView({
   
   console.log('🔑 Auth token status:', token ? 'present' : 'missing');
   const [personName, setPersonName] = useState<string>('');
-  const [meta, setMeta] = useState<{ team?: string; cc?: string; lbs?: string; location?: string; startDate?: string } | null>(null);
+  const [meta, setMeta] = useState<{ team?: string; cc?: string; lbs?: string; location?: string; startDate?: string; email?: string } | null>(null);
   const [employeeData, setEmployeeData] = useState<{ email?: string; startDate?: string; location?: string; lbs?: string } | null>(null);
   const [utilization, setUtilization] = useState<number | null>(null);
   const [averageUtilization, setAverageUtilization] = useState<number | null>(null);
@@ -832,9 +832,9 @@ export default function EmployeeDetailView({
     position: meta?.lbs || 'LBS nicht verfügbar', // All data from utilizationData
     team: meta?.team || '',
     cc: meta?.cc || '', // Competence Center
-    email: '', // Will be added to utilizationData in future
-    phone: '', // Removed as requested
-    location: meta?.location || '',
+    email: formData.email || meta?.email || '', // E-Mail aus formData oder meta
+    phone: formData.phone || '', // Phone aus formData
+    location: formData.location || meta?.location || '', // Location aus formData oder meta
     startDate: meta?.startDate || '',
     status: 'active',
     utilization: utilization ?? 0,
@@ -989,6 +989,12 @@ export default function EmployeeDetailView({
                 </div>
 
                 <div className="space-y-4">
+                  {employee.location && (
+                    <div className="flex items-center space-x-3">
+                      <MapPin className="w-4 h-4 text-gray-400" />
+                      <span className="text-sm text-gray-600">{employee.location}</span>
+                    </div>
+                  )}
                   {employee.email && (
                     <div className="flex items-center space-x-3">
                       <Mail className="w-4 h-4 text-gray-400" />
@@ -999,12 +1005,6 @@ export default function EmployeeDetailView({
                     <div className="flex items-center space-x-3">
                       <Building className="w-4 h-4 text-gray-400" />
                       <span className="text-sm text-gray-600">CC {employee.cc}</span>
-                    </div>
-                  )}
-                  {employee.location && (
-                    <div className="flex items-center space-x-3">
-                      <MapPin className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-600">{employee.location}</span>
                     </div>
                   )}
                   {employee.startDate && (
