@@ -249,7 +249,11 @@ export default function EmployeeDetailView({
           console.log('🔍 STANDORT from utilizationData:', personData.standort);
           console.log('🔍 EMAIL from utilizationData:', personData.email);
           console.log('🔍 ALL KEYS:', Object.keys(personData));
-          setPersonName(employeeId);
+          // ✅ Formatiere Name von "Nachname, Vorname" zu "Vorname Nachname"
+          const formattedName = personData.person.includes(',') 
+            ? personData.person.split(',').reverse().map(part => part.trim()).join(' ')
+            : personData.person;
+          setPersonName(formattedName);
           setMeta({ 
             team: personData.team, 
             cc: personData.cc, 
@@ -268,7 +272,11 @@ export default function EmployeeDetailView({
           if (personName === employeeId && !cancelled) {
             console.log('🔍 UtilizationData person found by name:', data);
             console.log('🔍 LBS from utilizationData by name:', data.lbs);
-            setPersonName(personName);
+            // ✅ Formatiere Name von "Nachname, Vorname" zu "Vorname Nachname"
+            const formattedName = personName.includes(',') 
+              ? personName.split(',').reverse().map(part => part.trim()).join(' ')
+              : personName;
+            setPersonName(formattedName);
             setMeta({ 
               team: data.team, 
               cc: data.cc, 
@@ -283,23 +291,44 @@ export default function EmployeeDetailView({
           }
         }
         
-        // Last resort: use id as name
+        // Last resort: search directly in utilizationData by ID
         if (!cancelled) {
-          console.log('🔍 No person data found in utilizationData for:', employeeId);
-          setPersonName(employeeId);
-          setMeta(null);
+          console.log('🔍 Searching directly in utilizationData by ID:', employeeId);
+          const personRecord = databaseData?.utilizationData?.find(record => record.id === employeeId);
+          if (personRecord) {
+            console.log('🔍 Found person by ID in utilizationData:', personRecord.person);
+            // ✅ Formatiere Name von "Nachname, Vorname" zu "Vorname Nachname"
+            const formattedName = personRecord.person.includes(',') 
+              ? personRecord.person.split(',').reverse().map(part => part.trim()).join(' ')
+              : personRecord.person;
+            setPersonName(formattedName);
+            setMeta({ 
+              team: personRecord.team, 
+              cc: personRecord.cc, 
+              lbs: personRecord.lbs, 
+              standort: personRecord.standort, 
+              startDate: personRecord.startDate,
+              email: personRecord.email,
+              utilizationComment: personRecord.utilizationComment || '',
+              planningComment: personRecord.planningComment || ''
+            });
+          } else {
+            console.log('🔍 No person data found in utilizationData for:', employeeId);
+            setPersonName('Unbekannter Mitarbeiter');
+            setMeta(null);
+          }
         }
       } catch (error) {
         console.error('🔍 Error loading person data from utilizationData:', error);
         if (!cancelled) {
-          setPersonName(employeeId);
+          setPersonName('Fehler beim Laden');
           setMeta(null);
         }
       }
     };
     load();
     return () => { cancelled = true; };
-  }, [employeeId, personMeta]);
+  }, [employeeId, personMeta, databaseData?.utilizationData]);
 
   // Employee data is now loaded from utilizationData (no separate mitarbeiter collection needed)
   // All data comes from the central utilizationData hub via personMeta

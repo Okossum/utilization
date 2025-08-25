@@ -190,13 +190,15 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
       // Erstelle PersonMeta aus den RAW utilizationData (nicht transformiert)
       const personMetaMap = new Map<string, any>();
       utilizationData.forEach((row: any) => {
-        if (row.person && !personMetaMap.has(row.person)) {
+        if (row.person) {
           console.log('🔍 DEBUG: Creating personMeta for', row.person, {
+            id: row.id,
             standort: row.standort,
             email: row.email,
             allKeys: Object.keys(row)
           });
-          personMetaMap.set(row.person, {
+          
+          const personData = {
             id: row.id,  // ✅ ID hinzugefügt für korrekte Identifikation in EmployeeDetailView
             lob: row.lob,
             bereich: row.bereich,
@@ -209,8 +211,17 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
             email: row.email,       // ✅ E-Mail aus utilizationData hinzufügen
             startDate: row.verfuegbarAb, // ✅ Start-Datum aus utilizationData hinzufügen
             utilizationComment: row.utilizationComment || '', // ✅ Auslastungskommentar aus utilizationData
-            planningComment: row.planningComment || '' // ✅ Einsatzplan-Kommentar aus utilizationData
-          });
+            planningComment: row.planningComment || '', // ✅ Einsatzplan-Kommentar aus utilizationData
+            person: row.person // ✅ Person Name für Formatierung
+          };
+          
+          // ✅ NEU: Sowohl Namen- als auch ID-basierte Keys setzen
+          if (!personMetaMap.has(row.person)) {
+            personMetaMap.set(row.person, personData);  // Name als Key (für bestehende Funktionalität)
+          }
+          if (!personMetaMap.has(row.id)) {
+            personMetaMap.set(row.id, personData);      // ID als Key (für EmployeeDetailView)
+          }
         }
       });
 
