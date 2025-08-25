@@ -196,12 +196,52 @@ export function UtilizationReportView({
       console.log('🔄 Speichere Projekt-Referenz in utilizationData für:', employeeName);
       
       // Finde den utilizationData Eintrag für diese Person
-      const utilizationQuery = query(
+      // Versuche zuerst nach 'person' zu suchen
+      let utilizationQuery = query(
         collection(db, COLLECTIONS.UTILIZATION_DATA),
         where('person', '==', employeeName)
       );
       
-      const utilizationSnapshot = await getDocs(utilizationQuery);
+      let utilizationSnapshot = await getDocs(utilizationQuery);
+      
+      // Falls nicht gefunden, versuche nach 'id' zu suchen (falls employeeName eine ID ist)
+      if (utilizationSnapshot.empty) {
+        console.log('🔍 Suche nach person fehlgeschlagen, versuche nach id...');
+        utilizationQuery = query(
+          collection(db, COLLECTIONS.UTILIZATION_DATA),
+          where('id', '==', employeeName)
+        );
+        utilizationSnapshot = await getDocs(utilizationQuery);
+      }
+      
+      // Falls immer noch nicht gefunden, versuche eine Teilstring-Suche (für Debug)
+      if (utilizationSnapshot.empty) {
+        console.log('🔍 Lade alle utilizationData Einträge für Debug...');
+        const allDocsSnapshot = await getDocs(collection(db, COLLECTIONS.UTILIZATION_DATA));
+        const allPersons = allDocsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          person: doc.data().person,
+          dataId: doc.data().id
+        }));
+        console.log('👥 Verfügbare Personen in utilizationData:', allPersons.slice(0, 10));
+        console.log('🔍 Suche nach:', employeeName);
+        
+        // Versuche eine ähnliche Person zu finden
+        const similarPerson = allPersons.find(p => 
+          p.person?.includes(employeeName) || 
+          employeeName.includes(p.person) ||
+          p.dataId === employeeName
+        );
+        
+        if (similarPerson) {
+          console.log('🎯 Ähnliche Person gefunden:', similarPerson);
+          utilizationQuery = query(
+            collection(db, COLLECTIONS.UTILIZATION_DATA),
+            where('person', '==', similarPerson.person)
+          );
+          utilizationSnapshot = await getDocs(utilizationQuery);
+        }
+      }
       
       if (!utilizationSnapshot.empty) {
         const utilizationDoc = utilizationSnapshot.docs[0];
