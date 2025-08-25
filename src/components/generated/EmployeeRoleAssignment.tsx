@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Star, Trash2, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import RoleSelectionModal from './RoleSelectionModal';
+import { updateRoleInUtilizationData, removeRoleFromUtilizationData, getPersonSkillsRolesFromHub } from '../../lib/utilization-hub-services';
 
 interface Role {
   id: string;
@@ -66,29 +67,48 @@ const EmployeeRoleAssignment: React.FC<EmployeeRoleAssignmentProps> = ({
     }
   };
 
-  // Zugewiesene Rollen laden
+  // Zugewiesene Rollen aus utilizationData Hub laden
   const loadAssignedRoles = async () => {
     try {
-      // console.log entfernt
+      console.log('🔄 Lade zugewiesene Rollen aus utilizationData Hub für:', employeeName);
       
-      const response = await fetch(`/api/employee-roles/${encodeURIComponent(employeeId)}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const rolesData = await response.json();
-      setAssignedRoles(rolesData);
-      // console.log entfernt
+      const { assignedRoles: hubRoles } = await getPersonSkillsRolesFromHub(employeeName);
+      
+      // Konvertiere utilizationData Format zu Component Format
+      const convertedRoles = hubRoles.map(role => ({
+        id: role.roleId,
+        roleId: role.roleId,
+        roleName: role.roleName,
+        level: role.level || 3,
+        assignedAt: role.assignedAt,
+        lastUpdated: role.updatedAt
+      }));
+      
+      console.log('✅ Rollen aus utilizationData Hub geladen:', convertedRoles);
+      setAssignedRoles(convertedRoles);
       
     } catch (error) {
-      // console.error entfernt
-      setError('Fehler beim Laden der zugewiesenen Rollen');
+      console.error('❌ Fehler beim Laden der Rollen aus utilizationData Hub:', error);
+      // Fallback: Versuche Legacy API
+      try {
+        const response = await fetch(`/api/employee-roles/${encodeURIComponent(employeeId)}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const rolesData = await response.json();
+          console.log('📋 Fallback: Rollen aus Legacy API geladen:', rolesData);
+          setAssignedRoles(rolesData);
+        } else {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+      } catch (legacyError) {
+        console.error('❌ Auch Legacy API fehlgeschlagen:', legacyError);
+        setError('Fehler beim Laden der zugewiesenen Rollen');
+      }
     }
   };
 
@@ -117,22 +137,24 @@ const EmployeeRoleAssignment: React.FC<EmployeeRoleAssignmentProps> = ({
     setError(null);
     
     try {
-      const response = await fetch(`/api/employee-roles/${encodeURIComponent(employeeId)}/${assignmentId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ level: newLevel })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Fehler beim Ändern des Rollen-Levels');
+      // Finde die Rolle anhand der assignmentId (entspricht roleId)
+      const roleToUpdate = assignedRoles.find(role => role.id === assignmentId);
+      if (!roleToUpdate) {
+        throw new Error('Rolle nicht gefunden');
       }
-
-      const result = await response.json();
-      // console.log entfernt
+      
+      console.log('💾 Aktualisiere Rolle Level in utilizationData Hub:', { 
+        employeeName, 
+        roleId: roleToUpdate.roleId, 
+        newLevel 
+      });
+      
+      // Aktualisiere in utilizationData Hub
+      await updateRoleInUtilizationData(employeeName, roleToUpdate.roleId, {
+        level: newLevel
+      });
+      
+      console.log('✅ Rolle Level erfolgreich aktualisiert');
       
       // Zugewiesene Rollen neu laden
       await loadAssignedRoles();
@@ -155,22 +177,22 @@ const EmployeeRoleAssignment: React.FC<EmployeeRoleAssignmentProps> = ({
     setError(null);
     
     try {
-      // console.log entfernt
-      
-      const response = await fetch(`/api/employee-roles/${encodeURIComponent(employeeId)}/${assignmentId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Fehler beim Entfernen der Rolle');
+      // Finde die Rolle anhand der assignmentId (entspricht roleId)
+      const roleToRemove = assignedRoles.find(role => role.id === assignmentId);
+      if (!roleToRemove) {
+        throw new Error('Rolle nicht gefunden');
       }
-
-      // console.log entfernt
+      
+      console.log('🗑️ Entferne Rolle aus utilizationData Hub:', { 
+        employeeName, 
+        roleId: roleToRemove.roleId, 
+        roleName 
+      });
+      
+      // Entferne aus utilizationData Hub
+      await removeRoleFromUtilizationData(employeeName, roleToRemove.roleId);
+      
+      console.log('✅ Rolle erfolgreich entfernt');
       
       // Zugewiesene Rollen neu laden
       await loadAssignedRoles();
