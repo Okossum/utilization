@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { getISOWeek, getISOWeekYear } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, ChefHat, Database, Target, User, Ticket, Columns, ArrowLeft, MessageSquare, X, ArrowRight, Building2, Link2, Banknote, Dog, Coffee, BarChart3, FileText, ChevronDown, LogOut, CheckCircle, XCircle } from 'lucide-react';
+import { Settings, Download, FileSpreadsheet, AlertCircle, Users, TrendingUp, Star, Info, Minus, Plus, Calendar, Baby, Heart, Thermometer, UserX, GraduationCap, ChefHat, Database, Target, User, Ticket, Columns, ArrowLeft, MessageSquare, X, ArrowRight, Building2, Link2, Banknote, Dog, Coffee, BarChart3, FileText, ChevronDown, ChevronUp, LogOut, CheckCircle, XCircle } from 'lucide-react';
 import { AdminDataUploadModal } from './AdminDataUploadModal';
 import { EinsatzplanView } from './EinsatzplanView';
 import { AuslastungView } from './AuslastungView';
@@ -26,7 +26,7 @@ import { SalesOpportunities } from './SalesOpportunities';
 import { useAssignments } from '../../contexts/AssignmentsContext';
 import { AssignmentEditorModal } from './AssignmentEditorModal';
 import { ProjectCreationModal } from './ProjectCreationModal';
-import ScopeFilterDropdown from './ScopeFilterDropdown';
+
 import { auslastungserklaerungService, personAuslastungserklaerungService, personActionItemService } from '../../lib/firebase-services';
 interface UtilizationData {
   person: string;
@@ -1172,11 +1172,7 @@ export function UtilizationReportView({
     personMeta.forEach(m => { if (m.cc) s.add(String(m.cc)); });
     return Array.from(s).sort((a, b) => a.localeCompare(b, 'de'));
   }, [personMeta]);
-  const lobOptions = useMemo(() => {
-    const s = new Set<string>();
-    personMeta.forEach(m => { if (m.lob) s.add(String(m.lob)); });
-    return Array.from(s).sort((a, b) => a.localeCompare(b, 'de'));
-  }, [personMeta]);
+
   const bereichOptions = useMemo(() => {
     const s = new Set<string>();
     personMeta.forEach(m => { const b = (m as any).bereich; if (b && String(b).trim()) s.add(String(b)); });
@@ -1228,56 +1224,95 @@ export function UtilizationReportView({
     return STATUS_OPTIONS.map(status => status.label).sort((a, b) => a.localeCompare(b, 'de'));
   }, []);
 
-  // Auswahlzustände (persistiert)
-  const [selectedLoB, setSelectedLoB] = useState<string[]>([]);
-  const [selectedBereich, setSelectedBereich] = useState<string[]>([]);
-  const [selectedCC, setSelectedCC] = useState<string[]>([]);
-  const [selectedTeam, setSelectedTeam] = useState<string[]>([]);
-  // Initialwerte aus Profil laden (nur wenn nicht "Alle Daten" aktiv)
-  useEffect(() => {
-    if (!profile || showAllData) return;
-    const lob = String(profile.lob || '');
-    const bereich = String((profile as any).bereich || '');
-    const cc = String(profile.competenceCenter || '');
-    const team = String(profile.team || '');
-    if (lob) setSelectedLoB([lob]);
-    if (bereich) setSelectedBereich([bereich]);
-    if (cc) setSelectedCC([cc]);
-    if (team) setSelectedTeam([team]);
-  }, [profile?.lob, (profile as any)?.bereich, profile?.competenceCenter, profile?.team, showAllData]);
+  // Auswahlzustände (persistiert über UserSettings)
+  const selectedBereich = filterSettings.selectedBereich || [];
+  const setSelectedBereich = (bereich: string[]) => {
+    updateFilterSettings({ selectedBereich: bereich });
+  };
+  const selectedCC = filterSettings.selectedCC || [];
+  const setSelectedCC = (cc: string[]) => {
+    updateFilterSettings({ selectedCC: cc });
+  };
+  const selectedTeam = filterSettings.selectedTeam || [];
+  const setSelectedTeam = (team: string[]) => {
+    updateFilterSettings({ selectedTeam: team });
+  };
+
+  // Sortierungsstate für Mitarbeiterinformationen
+  const [sortConfig, setSortConfig] = useState<{
+    field: 'name' | 'lbs' | 'manager' | 'status' | 'bereich' | 'cc' | 'team' | null;
+    direction: 'asc' | 'desc';
+  }>({ field: null, direction: 'asc' });
+
+  // Sortierungsfunktion für Spalten-Header
+  const handleSort = (field: 'name' | 'lbs' | 'manager' | 'status' | 'bereich' | 'cc' | 'team') => {
+    setSortConfig(prev => ({
+      field,
+      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  // Sortierbare Header-Komponente
+  const SortableHeader = ({ 
+    field, 
+    children, 
+    className = "px-0.5 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100",
+    style = {}
+  }: {
+    field: 'name' | 'lbs' | 'manager' | 'status' | 'bereich' | 'cc' | 'team';
+    children: React.ReactNode;
+    className?: string;
+    style?: React.CSSProperties;
+  }) => (
+    <th 
+      className={`${className} cursor-pointer hover:bg-gray-200 transition-colors select-none`}
+      style={{
+        width: 'auto',
+        minWidth: 'max-content',
+        ...style
+      }}
+      onClick={() => handleSort(field)}
+    >
+      <div className="flex items-center gap-1 w-full">
+        <span className="flex-1 whitespace-nowrap">{children}</span>
+        <div className="flex flex-col flex-shrink-0 ml-1">
+          <ChevronUp 
+            className={`w-3 h-3 ${
+              sortConfig.field === field && sortConfig.direction === 'asc' 
+                ? 'text-blue-600' 
+                : 'text-gray-400'
+            }`} 
+          />
+          <ChevronDown 
+            className={`w-3 h-3 -mt-1 ${
+              sortConfig.field === field && sortConfig.direction === 'desc' 
+                ? 'text-blue-600' 
+                : 'text-gray-400'
+            }`} 
+          />
+        </div>
+      </div>
+    </th>
+  );
+  // Filter-Einstellungen aus UserSettings laden (nicht aus Profil)
+  // Die Filter werden über useUserSettings bereits geladen und gespeichert
   
-  // Defaults: wenn nur eine Option vorhanden und nichts gewählt, automatisch setzen (nur wenn nicht "Alle Daten" aktiv)
-  useEffect(() => { if (!showAllData && selectedLoB.length === 0 && lobOptions.length === 1) setSelectedLoB([lobOptions[0]]); }, [lobOptions, showAllData, selectedLoB.length]);
-  useEffect(() => { if (!showAllData && selectedBereich.length === 0 && bereichOptions.length === 1) setSelectedBereich([bereichOptions[0]]); }, [bereichOptions, showAllData, selectedBereich.length]);
-  useEffect(() => { if (!showAllData && selectedCC.length === 0 && ccOptions.length === 1) setSelectedCC([ccOptions[0]]); }, [ccOptions, showAllData, selectedCC.length]);
-  useEffect(() => { if (!showAllData && selectedTeam.length === 0 && teamOptions.length === 1) setSelectedTeam([teamOptions[0]]); }, [teamOptions, showAllData, selectedTeam.length]);
+  // Automatische Defaults entfernt: Benutzer soll selbst über Filter entscheiden
+  // Filter-Einstellungen werden über useUserSettings persistent gespeichert
   
-  // Wenn "Alle Daten" aktiviert wird, alle Header-Filter zurücksetzen
-  useEffect(() => {
-    if (showAllData) {
-      setSelectedLoB([]);
-      setSelectedBereich([]);
-      setSelectedCC([]);
-      setSelectedTeam([]);
-    }
-  }, [showAllData]);
-  // Korrigiere Auswahl, falls nicht mehr vorhanden
-  useEffect(() => { 
-    const validLoB = selectedLoB.filter(lob => lobOptions.includes(lob));
-    if (validLoB.length !== selectedLoB.length) setSelectedLoB(validLoB);
-  }, [lobOptions, selectedLoB]);
+  // Filter-Validierung: Korrigiere Auswahl, falls Optionen nicht mehr verfügbar sind
   useEffect(() => { 
     const validBereich = selectedBereich.filter(bereich => bereichOptions.includes(bereich));
     if (validBereich.length !== selectedBereich.length) setSelectedBereich(validBereich);
-  }, [bereichOptions, selectedBereich]);
+  }, [bereichOptions, selectedBereich, setSelectedBereich]);
   useEffect(() => { 
     const validCC = selectedCC.filter(cc => ccOptions.includes(cc));
     if (validCC.length !== selectedCC.length) setSelectedCC(validCC);
-  }, [ccOptions, selectedCC]);
+  }, [ccOptions, selectedCC, setSelectedCC]);
   useEffect(() => { 
     const validTeam = selectedTeam.filter(team => teamOptions.includes(team));
     if (validTeam.length !== selectedTeam.length) setSelectedTeam(validTeam);
-  }, [teamOptions, selectedTeam]);
+  }, [teamOptions, selectedTeam, setSelectedTeam]);
 
   const filteredData = useMemo(() => {
     let base = dataForUI;
@@ -1339,12 +1374,9 @@ export function UtilizationReportView({
       base = base.filter(item => selectedPersons.includes(item.person));
     }
 
-    // Filter nach LoB/Bereich/CC/Team aus Header-Auswahl
+    // Filter nach Bereich/CC/Team aus Header-Auswahl
     // Header-Auswahl-Filter nur anwenden, wenn nicht "Alle Daten" aktiv ist
     if (!showAllData) {
-      if (selectedLoB.length > 0) {
-        base = base.filter(d => selectedLoB.includes((personMeta.get(d.person) as any)?.lob));
-      }
       if (selectedBereich.length > 0) {
         base = base.filter(d => selectedBereich.includes((personMeta.get(d.person) as any)?.bereich));
       }
@@ -1356,21 +1388,10 @@ export function UtilizationReportView({
       }
     }
 
-    // Scope-Filter: wenn nicht "Alle Daten" und Profil vorhanden, nach BU/CC/Team filtern (Team > CC > BU)
-    if (!showAllData && profile) {
-      const scopeTeam = profile.team || '';
-      const scopeCc = profile.competenceCenter || '';
-      const scopeBereich = (profile as any).bereich || '';
-      base = base.filter(d => {
-        const meta = personMeta.get(d.person) || {} as any;
-        if (scopeTeam) return String(meta.team || '') === String(scopeTeam);
-        if (scopeCc) return String(meta.cc || '') === String(scopeCc);
-        if (scopeBereich) return String(meta.bereich || '') === String(scopeBereich);
-        return true;
-      });
-    }
+    // Scope-Filter entfernt: Alle Mitarbeiter werden standardmäßig angezeigt
+    // Benutzer kann über die Dropdown-Filter selbst filtern
     return base;
-  }, [dataForUI, selectedPersons, filterCC, filterLBS, filterLBSExclude, filterStatus, personMeta, personStatus, showWorkingStudents, showActionItems, actionItems, personSearchTerm, showAllData, profile, selectedLoB, selectedBereich, selectedCC, selectedTeam]);
+  }, [dataForUI, selectedPersons, filterCC, filterLBS, filterLBSExclude, filterStatus, personMeta, personStatus, showWorkingStudents, showActionItems, actionItems, personSearchTerm, showAllData, profile, selectedBereich, selectedCC, selectedTeam]);
   
   // ✅ Ermittle verfügbare Forecast-Wochen direkt aus den echten Einsatzplan-Daten
   const availableWeeksFromData = useMemo(() => {
@@ -1503,27 +1524,59 @@ export function UtilizationReportView({
       // Header-Auswahl-Filter (nur wenn nicht "Alle Daten")
       if (!showAllData) {
         const meta = personMeta.get(person);
-        if (selectedLoB.length > 0 && !selectedLoB.includes((meta as any)?.lob)) return false;
         if (selectedBereich.length > 0 && !selectedBereich.includes((meta as any)?.bereich)) return false;
         if (selectedCC.length > 0 && !selectedCC.includes((meta as any)?.cc)) return false;
         if (selectedTeam.length > 0 && !selectedTeam.includes((meta as any)?.team)) return false;
       }
       
-      // Scope-Filter (nur wenn nicht "Alle Daten" und Profil vorhanden)
-      if (!showAllData && profile) {
-        const scopeTeam = profile.team || '';
-        const scopeCc = profile.competenceCenter || '';
-        const scopeBereich = (profile as any).bereich || '';
-        const meta = personMeta.get(person) || {} as any;
-        
-        if (scopeTeam && String(meta.team || '') !== String(scopeTeam)) return false;
-        if (!scopeTeam && scopeCc && String(meta.cc || '') !== String(scopeCc)) return false;
-        if (!scopeTeam && !scopeCc && scopeBereich && String(meta.bereich || '') !== String(scopeBereich)) return false;
-      }
+      // Scope-Filter entfernt: Alle Mitarbeiter werden standardmäßig angezeigt
+      // Benutzer kann über die Dropdown-Filter selbst filtern
       
       return true;
+    }).sort((a, b) => {
+      // Sortierung anwenden wenn konfiguriert
+      if (!sortConfig.field) return 0;
+
+      let aValue: string;
+      let bValue: string;
+
+      switch (sortConfig.field) {
+        case 'name':
+          aValue = a;
+          bValue = b;
+          break;
+        case 'lbs':
+          aValue = personMeta.get(a)?.lbs || '';
+          bValue = personMeta.get(b)?.lbs || '';
+          break;
+        case 'manager':
+          aValue = personMeta.get(a)?.manager || '';
+          bValue = personMeta.get(b)?.manager || '';
+          break;
+        case 'status':
+          aValue = getPersonStatus(a) || '';
+          bValue = getPersonStatus(b) || '';
+          break;
+        case 'bereich':
+          aValue = (personMeta.get(a) as any)?.bereich || '';
+          bValue = (personMeta.get(b) as any)?.bereich || '';
+          break;
+        case 'cc':
+          aValue = (personMeta.get(a) as any)?.cc || '';
+          bValue = (personMeta.get(b) as any)?.cc || '';
+          break;
+        case 'team':
+          aValue = (personMeta.get(a) as any)?.team || '';
+          bValue = (personMeta.get(b) as any)?.team || '';
+          break;
+        default:
+          return 0;
+      }
+
+      const comparison = aValue.localeCompare(bValue, 'de', { numeric: true });
+      return sortConfig.direction === 'asc' ? comparison : -comparison;
     });
-  }, [filteredData, dataSource, databaseData, personMeta, showWorkingStudents, personSearchTerm, filterCC, filterLBS, filterLBSExclude, filterStatus, personStatus, showActionItems, actionItems, selectedPersons, showAllData, selectedLoB, selectedBereich, selectedCC, selectedTeam, profile]);
+  }, [filteredData, dataSource, databaseData, personMeta, showWorkingStudents, personSearchTerm, filterCC, filterLBS, filterLBSExclude, filterStatus, personStatus, showActionItems, actionItems, selectedPersons, showAllData, selectedBereich, selectedCC, selectedTeam, profile, sortConfig]);
 
   // Assignments: Vorladen für sichtbare Personen
   useEffect(() => {
@@ -1616,9 +1669,8 @@ export function UtilizationReportView({
             <FileSpreadsheet className="w-8 h-8 text-blue-600" />
           </div>
           <h2 className="text-xl font-semibold text-gray-900 mb-2">
-            Lade Auslastung & Einsatzplan hoch
+            Auslastung & Einsatzplan
           </h2>
-          <p className="text-gray-600">um den Report zu sehen</p>
         </motion.div>
       </div>
   }
@@ -1702,9 +1754,6 @@ export function UtilizationReportView({
         {/* Table Section */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="p-6 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Detailansicht nach Person
-            </h3>
             
             {/* Alle Filter in einer Reihe - Personen, Bereich, CC, LBS, Status und Action */}
             <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
@@ -1762,42 +1811,123 @@ export function UtilizationReportView({
                 </div>
               </div>
               
-              {/* Working Students Toggle als separater Filter */}
-              <div className="flex items-center justify-center">
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showWorkingStudents}
-                    onChange={(e) => setShowWorkingStudents(e.target.checked)}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700">Working Students</span>
-                </label>
-              </div>
+
             </div>
             
-            {/* Scope Filter Dropdown für "Alle Daten anzeigen" */}
-            <div className="mt-4 flex justify-end">
-              <ScopeFilterDropdown
-                lobOptions={lobOptions}
-                bereichOptions={bereichOptions}
-                ccOptions={ccOptions}
-                teamOptions={teamOptions}
-                selectedLoB={selectedLoB}
-                setSelectedLoB={setSelectedLoB}
-                selectedBereich={selectedBereich}
-                setSelectedBereich={setSelectedBereich}
-                selectedCC={selectedCC}
-                setSelectedCC={setSelectedCC}
-                selectedTeam={selectedTeam}
-                setSelectedTeam={setSelectedTeam}
-                showAllData={showAllData}
-                setShowAllData={setShowAllData}
-              />
-            </div>
+            {/* Aktive Filter Anzeige */}
+            {(selectedBereich.length > 0 || selectedCC.length > 0 || selectedTeam.length > 0 || filterCC.length > 0 || filterLBS.length > 0 || filterLBSExclude.length > 0 || selectedPersons.length > 0 || personSearchTerm.trim() !== '') && (
+              <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex flex-wrap gap-1">
+                  {/* Bereich Filter */}
+                  {selectedBereich.map(bereich => (
+                    <div key={`bereich-${bereich}`} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-white border border-blue-300 rounded-full text-[10px]">
+                      <span className="text-blue-700">Bereich: {bereich}</span>
+                      <button
+                        onClick={() => setSelectedBereich(selectedBereich.filter(b => b !== bereich))}
+                        className="text-blue-500 hover:text-blue-700 text-xs"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  
+                  {/* CC Filter */}
+                  {selectedCC.map(cc => (
+                    <div key={`cc-${cc}`} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-white border border-blue-300 rounded-full text-[10px]">
+                      <span className="text-blue-700">CC: {cc}</span>
+                      <button
+                        onClick={() => setSelectedCC(selectedCC.filter(c => c !== cc))}
+                        className="text-blue-500 hover:text-blue-700 text-xs"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  
+                  {/* Team Filter */}
+                  {selectedTeam.map(team => (
+                    <div key={`team-${team}`} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-white border border-blue-300 rounded-full text-[10px]">
+                      <span className="text-blue-700">Team: {team}</span>
+                      <button
+                        onClick={() => setSelectedTeam(selectedTeam.filter(t => t !== team))}
+                        className="text-blue-500 hover:text-blue-700 text-xs"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  
+                  {/* CC Filter (aus filterCC) */}
+                  {filterCC.map(cc => (
+                    <div key={`filter-cc-${cc}`} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-white border border-green-300 rounded-full text-[10px]">
+                      <span className="text-green-700">CC Filter: {cc}</span>
+                      <button
+                        onClick={() => setFilterCC(filterCC.filter(c => c !== cc))}
+                        className="text-green-500 hover:text-green-700 text-xs"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  
+                  {/* LBS Filter */}
+                  {filterLBS.map(lbs => (
+                    <div key={`filter-lbs-${lbs}`} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-white border border-purple-300 rounded-full text-[10px]">
+                      <span className="text-purple-700">LBS: {lbs}</span>
+                      <button
+                        onClick={() => setFilterLBS(filterLBS.filter(l => l !== lbs))}
+                        className="text-purple-500 hover:text-purple-700 text-xs"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  
+                  {/* LBS Exclude Filter */}
+                  {filterLBSExclude.map(lbs => (
+                    <div key={`filter-lbs-exclude-${lbs}`} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-white border border-red-300 rounded-full text-[10px]">
+                      <span className="text-red-700">Nicht LBS: {lbs}</span>
+                      <button
+                        onClick={() => setFilterLBSExclude(filterLBSExclude.filter(l => l !== lbs))}
+                        className="text-red-500 hover:text-red-700 text-xs"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  
+                  {/* Personen Filter */}
+                  {selectedPersons.map(person => (
+                    <div key={`person-${person}`} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-white border border-indigo-300 rounded-full text-[10px]">
+                      <span className="text-indigo-700">Person: {person}</span>
+                      <button
+                        onClick={() => setSelectedPersons(selectedPersons.filter(p => p !== person))}
+                        className="text-indigo-500 hover:text-indigo-700 text-xs"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  
+                  {/* Suchbegriff */}
+                  {personSearchTerm.trim() !== '' && (
+                    <div className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-white border border-gray-300 rounded-full text-[10px]">
+                      <span className="text-gray-700">Suche: "{personSearchTerm}"</span>
+                      <button
+                        onClick={() => setPersonSearchTerm('')}
+                        className="text-gray-500 hover:text-gray-700 text-xs"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full" style={{tableLayout: 'auto', minWidth: 'max-content'}}>
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
                   {/* 8 Wochen aus dem View (letzte 8 Wochen vor aktueller KW) */}
@@ -1834,29 +1964,63 @@ export function UtilizationReportView({
                   </th>
 
                   {/* FK-Spalte für Führungskraft */}
-                  <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
+                  <SortableHeader
+                    field="manager"
+                    className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100"
+                  >
                     FK
-                  </th>
+                  </SortableHeader>
                   {/* Info-Spalte für Career Level Icons */}
                   <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
                     Info
                   </th>
                   {/* Name-Spalte zwischen Auslastung und Einsatzplan */}
-                  <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
+                  <SortableHeader
+                    field="name"
+                    className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100"
+                  >
                     Name
-                  </th>
+                  </SortableHeader>
                   {/* LBS-Spalte */}
-                  <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
+                  <SortableHeader 
+                    field="lbs" 
+                    className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100"
+                  >
                     LBS
-                  </th>
+                  </SortableHeader>
+
+                  {/* Bereich-Spalte */}
+                  <SortableHeader 
+                    field="bereich" 
+                    className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100"
+                  >
+                    Bereich
+                  </SortableHeader>
+                  {/* CC-Spalte */}
+                  <SortableHeader 
+                    field="cc" 
+                    className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100"
+                  >
+                    CC
+                  </SortableHeader>
+                  {/* Team-Spalte */}
+                  <SortableHeader 
+                    field="team" 
+                    className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100"
+                  >
+                    Team
+                  </SortableHeader>
                   {/* Details-Spalte für Mitarbeiter-Dossier */}
                   <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
                     Details
                   </th>
                   {/* Status-Spalte */}
-                  <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
+                  <SortableHeader 
+                    field="status" 
+                    className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100"
+                  >
                     Status
-                  </th>
+                  </SortableHeader>
 
                   {/* Planning Comments Spalte */}
                   <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
@@ -2170,17 +2334,54 @@ export function UtilizationReportView({
                         hasNoManager 
                           ? 'bg-yellow-100'
                           : (actionItems[person]?.actionItem ? 'bg-blue-100' : 'bg-gray-50')
-                      } ${isTerminated ? 'line-through opacity-60' : ''}`} style={{padding: '2px 2px'}}>
-                        <span className="font-medium text-gray-900">{person}</span>
+                      } ${isTerminated ? 'line-through opacity-60' : ''}`} style={{padding: '2px 2px', minWidth: 'max-content'}}>
+                        <span className="font-medium text-gray-900 whitespace-nowrap">{person}</span>
                       </td>
                       {/* LBS-Spalte */}
                       <td className={`px-0.5 py-0.5 text-sm ${
                         hasNoManager 
                           ? 'bg-yellow-100'
                           : (actionItems[person]?.actionItem ? 'bg-blue-100' : 'bg-gray-50')
-                      } ${isTerminated ? 'line-through opacity-60' : ''}`} style={{padding: '2px 2px'}}>
+                      } ${isTerminated ? 'line-through opacity-60' : ''}`} style={{padding: '2px 2px', minWidth: 'max-content'}}>
                         {personMeta.get(person)?.lbs ? (
-                          <span className="text-xs text-gray-700">{personMeta.get(person)?.lbs}</span>
+                          <span className="text-xs text-gray-700 whitespace-nowrap">{personMeta.get(person)?.lbs}</span>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+
+                      {/* Bereich-Spalte */}
+                      <td className={`px-0.5 py-0.5 text-sm ${
+                        hasNoManager 
+                          ? 'bg-yellow-100'
+                          : (actionItems[person]?.actionItem ? 'bg-blue-100' : 'bg-gray-50')
+                      } ${isTerminated ? 'line-through opacity-60' : ''}`} style={{padding: '2px 2px', minWidth: 'max-content'}}>
+                        {(personMeta.get(person) as any)?.bereich ? (
+                          <span className="text-xs text-gray-700 whitespace-nowrap">{(personMeta.get(person) as any)?.bereich}</span>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                      {/* CC-Spalte */}
+                      <td className={`px-0.5 py-0.5 text-sm ${
+                        hasNoManager 
+                          ? 'bg-yellow-100'
+                          : (actionItems[person]?.actionItem ? 'bg-blue-100' : 'bg-gray-50')
+                      } ${isTerminated ? 'line-through opacity-60' : ''}`} style={{padding: '2px 2px', minWidth: 'max-content'}}>
+                        {(personMeta.get(person) as any)?.cc ? (
+                          <span className="text-xs text-gray-700 whitespace-nowrap">{(personMeta.get(person) as any)?.cc}</span>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                      {/* Team-Spalte */}
+                      <td className={`px-0.5 py-0.5 text-sm ${
+                        hasNoManager 
+                          ? 'bg-yellow-100'
+                          : (actionItems[person]?.actionItem ? 'bg-blue-100' : 'bg-gray-50')
+                      } ${isTerminated ? 'line-through opacity-60' : ''}`} style={{padding: '2px 2px', minWidth: 'max-content'}}>
+                        {(personMeta.get(person) as any)?.team ? (
+                          <span className="text-xs text-gray-700 whitespace-nowrap">{(personMeta.get(person) as any)?.team}</span>
                         ) : (
                           <span className="text-xs text-gray-400">—</span>
                         )}
@@ -2481,7 +2682,7 @@ export function UtilizationReportView({
                 {/* Forecast Weeks */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Vorblick-Wochen
+                    Einsatzplan-Wochen
                   </label>
                   <div className="flex items-center gap-4">
                     <button onClick={() => setForecastWeeks(Math.max(1, forecastWeeks - 1))} disabled={forecastWeeks <= 1} className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -2503,7 +2704,7 @@ export function UtilizationReportView({
                 {/* Forecast Start Week */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Basiswoche Vorblick
+                    Basiswoche Einsatzplan
                   </label>
                   <select value={forecastStartWeek} onChange={e => setForecastStartWeek(Number(e.target.value))} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     {Array.from({

@@ -32,6 +32,7 @@ interface AppHeaderProps {
   onUserRoleManagement?: () => void;
   onAdminSetup?: () => void;
   onRestoreAdmin?: () => void;
+  onFirebaseAuthSetup?: () => void;
 }
 
 export function AppHeader({
@@ -60,7 +61,8 @@ export function AppHeader({
   onGeneralSettings,
   onUserRoleManagement,
   onAdminSetup,
-  onRestoreAdmin
+  onRestoreAdmin,
+  onFirebaseAuthSetup
 }: AppHeaderProps) {
   const { user, profile, role, canAccessView, canAccessSettings } = useAuth();
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
@@ -106,7 +108,7 @@ export function AppHeader({
       <div className="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            {currentView === 'utilization' && 'Auslastung & Vorblick'}
+            {currentView === 'utilization' && 'Auslastung & Einsatzplan'}
             {currentView === 'employees' && 'Mitarbeiter'}
             {currentView === 'knowledge' && 'Knowledge Library'}
             {currentView === 'auslastung-comments' && 'Auslastung mit Kommentaren'}
@@ -114,20 +116,11 @@ export function AppHeader({
             {currentView === 'employee-detail' && 'Mitarbeiter Detail'}
             {currentView === 'projects' && 'Projekt Management'}
           </h1>
-          <p className="text-sm text-gray-600 mt-1">
-            {currentView === 'utilization' && 'Rückblick & Vorblick · ISO-KW'}
-            {currentView === 'employees' && 'Mitarbeiter-Verwaltung und Übersicht'}
-            {currentView === 'knowledge' && 'Knowledge Upload und Verwaltung'}
-            {currentView === 'auslastung-comments' && 'Direkte Bearbeitung von Auslastung und Kommentaren'}
-            {currentView === 'sales' && 'Freelance Sales Team · Skills & Projekte'}
-            {currentView === 'employee-detail' && 'Detailansicht eines Mitarbeiters'}
-            {currentView === 'projects' && 'Projekt-Dashboard · Planung & Verwaltung'}
-          </p>
         </div>
         
         <div className="flex items-center gap-2" style={{ zIndex: 40 }}>
-          {/* Navigation Buttons - temporär für alle sichtbar */}
-          {true && (
+          {/* Navigation Buttons - basierend auf Berechtigungen */}
+          {canAccessView('utilization') && (
             <button
               onClick={() => setCurrentView('utilization')}
               className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
@@ -143,7 +136,7 @@ export function AppHeader({
             </button>
           )}
           
-          {true && (
+          {canAccessView('employees') && (
             <button
               onClick={() => setCurrentView('employees')}
               className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
@@ -159,7 +152,7 @@ export function AppHeader({
             </button>
           )}
           
-          {true && (
+          {canAccessView('sales') && (
             <button
               onClick={() => setCurrentView('sales')}
               className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
@@ -203,8 +196,8 @@ export function AppHeader({
             {isSettingsMenuOpen && (
               <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg p-3" style={{ zIndex: 50 }}>
                 
-                {/* Daten & Upload */}
-                {(onAdminUpload || currentView === 'utilization') && (
+                {/* Daten & Upload - nur für Berechtigte */}
+                {canAccessSettings('excel-upload') && (onAdminUpload || currentView === 'utilization') && (
                   <div className="mb-3">
                     <button
                       onClick={() => toggleSection('dataUpload')}
@@ -227,8 +220,8 @@ export function AppHeader({
                         )}
                         */}
                         
-                        {/* Excel Upload - temporär für alle sichtbar */}
-                        {onExcelUpload && (
+                        {/* Excel Upload - nur für Führungskräfte und Admins */}
+                        {canAccessSettings('excel-upload') && onExcelUpload && (
                           <button
                             onClick={() => { onExcelUpload(); setIsSettingsMenuOpen(false); }}
                             className="w-full px-3 py-2 text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 text-left font-medium"
@@ -274,8 +267,8 @@ export function AppHeader({
                   </div>
                 )}
 
-                {/* Management - temporär für alle sichtbar */}
-                {(onRoleManagement || onTechnicalSkillManagement || onSoftSkillManagement || onSoftSkillImport || onTechnicalSkillImport || onRoleTaskImport || onProjectRolesDemo || onProjectSkillsDemo || onCustomerProjectsManagement || onAuslastungserklaerungManagement || onUserSettings) && (
+                {/* Management - nur für Admins */}
+                {canAccessSettings('user-management') && (onRoleManagement || onTechnicalSkillManagement || onSoftSkillManagement || onSoftSkillImport || onTechnicalSkillImport || onRoleTaskImport || onProjectRolesDemo || onProjectSkillsDemo || onCustomerProjectsManagement || onAuslastungserklaerungManagement || onUserSettings) && (
                   <div className="mb-3">
                     <button
                       onClick={() => toggleSection('management')}
@@ -376,8 +369,8 @@ export function AppHeader({
                           </button>
                         )}
                         
-                        {/* Benutzerverwaltung - für alle Rollen sichtbar (temporär) */}
-                        {onUserRoleManagement && (
+                        {/* Benutzerverwaltung - nur für Admins */}
+                        {canAccessSettings('user-management') && onUserRoleManagement && (
                           <button
                             onClick={() => { onUserRoleManagement(); setIsSettingsMenuOpen(false); }}
                             className="w-full px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 text-left font-medium"
@@ -386,8 +379,8 @@ export function AppHeader({
                           </button>
                         )}
 
-                        {/* Admin Setup - für alle sichtbar (temporär) */}
-                        {onAdminSetup && (
+                        {/* Admin Setup - nur für Admins */}
+                        {canAccessSettings('user-management') && onAdminSetup && (
                           <button
                             onClick={() => { onAdminSetup(); setIsSettingsMenuOpen(false); }}
                             className="w-full px-3 py-2 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 text-left font-medium"
@@ -403,6 +396,16 @@ export function AppHeader({
                             className="w-full px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 text-left font-medium"
                           >
                             🚨 Admin-Rolle wiederherstellen
+                          </button>
+                        )}
+
+                        {/* Firebase Auth Setup - nur für Admins */}
+                        {canAccessSettings('user-management') && onFirebaseAuthSetup && (
+                          <button
+                            onClick={() => { onFirebaseAuthSetup(); setIsSettingsMenuOpen(false); }}
+                            className="w-full px-3 py-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 text-left font-medium"
+                          >
+                            🔐 Firebase Auth Setup
                           </button>
                         )}
                       </div>

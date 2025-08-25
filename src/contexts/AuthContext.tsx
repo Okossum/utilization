@@ -78,8 +78,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return 'unknown';
         }
       } else {
-        console.log('📭 Keine Daten in utilizationData gefunden - Standard: führungskraft');
-        return 'führungskraft'; // Standard-Rolle für neue E-Mails
+        console.log('📭 Keine Daten in utilizationData gefunden für:', userEmail);
+        console.log('🔍 Mögliche Ursachen:');
+        console.log('  - E-Mail nicht in utilizationData vorhanden');
+        console.log('  - Groß-/Kleinschreibung unterschiedlich');
+        console.log('  - Benutzer hat keine Rolle zugewiesen');
+        
+        return 'unknown'; // Kein Zugriff wenn nicht in System
       }
     } catch (error) {
       console.error('❌ Fehler beim Laden der Rolle:', error);

@@ -20,7 +20,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewAllEmployees: true
   },
   führungskraft: {
-    views: ['utilization', 'employees'],
+    views: ['utilization', 'employees', 'sales'], // ALLE Views
     settings: ['excel-upload'], // Nur Excel-Upload im Settings
     canManageUsers: false,
     canUploadData: true,

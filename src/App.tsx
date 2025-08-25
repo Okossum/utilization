@@ -20,6 +20,7 @@ import { UserSettingsDemo } from './components/generated/UserSettingsDemo';
 import UserRoleManagement from './components/generated/UserRoleManagement';
 import AdminSetup from './components/generated/AdminSetup';
 import RestoreAdminRole from './components/generated/RestoreAdminRole';
+import FirebaseAuthBulkSetup from './components/generated/FirebaseAuthBulkSetup';
 import { CustomerProvider } from './contexts/CustomerContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './contexts/AuthContext';
@@ -64,10 +65,61 @@ function App() {
 
   // ✅ SCHRITT 3: RootRouter als separate Komponente definieren
   function RootRouter() {
-    const { user, loading, profile, logout } = useAuth();
+    const { user, loading, profile, logout, role, canAccessView } = useAuth();
     const [isAdminModalOpen, setAdminModalOpen] = useState(false);
     const [isMenuOpen, setMenuOpen] = useState(false);
-    const [currentView, setCurrentView] = useState<'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects'>('utilization');
+    
+    // Standard-View basierend auf Benutzerrolle setzen
+    const getDefaultView = (): 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects' => {
+      if (role === 'sales') {
+        return 'sales'; // Sales-Mitarbeiter sehen nur Sales View
+      }
+      if (canAccessView('utilization')) {
+        return 'utilization'; // Standard für alle anderen
+      }
+      if (canAccessView('employees')) {
+        return 'employees'; // Fallback
+      }
+      return 'sales'; // Letzter Fallback
+    };
+    
+    const [currentView, setCurrentView] = useState<'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects'>(getDefaultView());
+    
+    // Aktualisiere View wenn sich die Rolle ändert
+    useEffect(() => {
+      const defaultView = getDefaultView();
+      if (role !== 'unknown' && currentView !== defaultView) {
+        console.log(`🎯 Rolle "${role}" erkannt - wechsle zu View: ${defaultView}`);
+        setCurrentView(defaultView);
+      }
+    }, [role, canAccessView]);
+    
+    // Schutz: Verhindere Zugriff auf nicht-erlaubte Views
+    const safeSetCurrentView = (view: typeof currentView) => {
+      // Prüfe ob der Benutzer Zugriff auf diese View hat
+      const viewPermissionMap = {
+        'utilization': 'utilization',
+        'employees': 'employees', 
+        'sales': 'sales',
+        'knowledge': 'utilization', // Knowledge braucht Utilization-Berechtigung
+        'auslastung-comments': 'utilization',
+        'project-roles-demo': 'utilization',
+        'project-skills-demo': 'utilization', 
+        'employee-detail': 'employees',
+        'projects': 'utilization'
+      };
+      
+      const requiredPermission = viewPermissionMap[view];
+      if (requiredPermission && !canAccessView(requiredPermission)) {
+        console.warn(`⚠️ Zugriff verweigert auf View "${view}" für Rolle "${role}"`);
+        // Leite zu erlaubter Standard-View um
+        const defaultView = getDefaultView();
+        setCurrentView(defaultView);
+        return;
+      }
+      
+      setCurrentView(view);
+    };
     
     // Projects sub-navigation states
     const [projectsSubView, setProjectsSubView] = useState<'overview' | 'projects' | 'employee' | 'wizard'>('overview');
@@ -97,6 +149,7 @@ function App() {
     const [isUserRoleManagementOpen, setIsUserRoleManagementOpen] = useState(false);
   const [isAdminSetupOpen, setIsAdminSetupOpen] = useState(false);
   const [isRestoreAdminOpen, setIsRestoreAdminOpen] = useState(false);
+  const [isFirebaseAuthSetupOpen, setIsFirebaseAuthSetupOpen] = useState(false);
     
     // State für Upload Panel
 
@@ -157,12 +210,12 @@ function App() {
     const handleEmployeeDetailNavigation = () => {
       // Für Test: Setze einen Standard-Mitarbeiter
       setSelectedPersonId('test-employee-1');
-      setCurrentView('employee-detail');
+      safeSetCurrentView('employee-detail');
     };
 
     const handleEmployeeSelected = (personId: string) => {
       setSelectedPersonId(personId);
-      setCurrentView('employee-detail');
+      safeSetCurrentView('employee-detail');
     };
     
     // Projects navigation handlers
@@ -218,13 +271,13 @@ function App() {
               if (view === 'employee-detail') {
                 handleEmployeeDetailNavigation();
               } else if (view === 'projects') {
-                setCurrentView(view);
+                safeSetCurrentView(view);
                 setProjectsSubView('overview'); // Always start with overview
                 setSelectedProjectEmployeeId(null);
                 setSelectedProjectId(null);
                 setIsProjectWizardOpen(false);
               } else {
-                setCurrentView(view);
+                safeSetCurrentView(view);
               }
             }}
 
@@ -249,8 +302,9 @@ function App() {
             onUserRoleManagement={() => setIsUserRoleManagementOpen(true)}
             onAdminSetup={() => setIsAdminSetupOpen(true)}
             onRestoreAdmin={() => setIsRestoreAdminOpen(true)}
-            onProjectRolesDemo={() => setCurrentView('project-roles-demo')}
-            onProjectSkillsDemo={() => setCurrentView('project-skills-demo')}
+            onFirebaseAuthSetup={() => setIsFirebaseAuthSetupOpen(true)}
+            onProjectRolesDemo={() => safeSetCurrentView('project-roles-demo')}
+            onProjectSkillsDemo={() => safeSetCurrentView('project-skills-demo')}
             lobOptions={[]} // TODO: von UtilizationReportView holen
           />
 
@@ -270,7 +324,7 @@ function App() {
                 setIsColumnsMenuOpen={setIsColumnsMenuOpen}
                 onEmployeeDetailNavigation={(employeeId) => {
                   setSelectedPersonId(employeeId);
-                  setCurrentView('employee-detail');
+                  safeSetCurrentView('employee-detail');
                 }}
               />
             </>
@@ -279,7 +333,7 @@ function App() {
           {currentView === 'employees' && (
             <EmployeeOverviewDashboard 
               onEmployeeClick={handleEmployeeSelected}
-              onBackToOverview={() => setCurrentView('utilization')}
+              onBackToOverview={() => safeSetCurrentView('utilization')}
             />
           )}
           
@@ -308,7 +362,7 @@ function App() {
               {selectedPersonId ? (
                 <EmployeeDetailView
                   employeeId={selectedPersonId}
-                  onBack={() => setCurrentView('employees')}
+                  onBack={() => safeSetCurrentView('employees')}
                 />
               ) : (
                 <div className="p-6">
@@ -317,7 +371,7 @@ function App() {
                     <div className="mt-3">
                       <button
                         className="px-4 py-2 text-sm bg-blue-600 text-white rounded mr-2"
-                        onClick={() => setCurrentView('employees')}
+                        onClick={() => safeSetCurrentView('employees')}
                       >Zur Mitarbeiterliste</button>
                       <button
                         className="px-4 py-2 text-sm bg-green-600 text-white rounded"
@@ -368,7 +422,7 @@ function App() {
                       Die Projekt-Wizard Komponente wurde entfernt.
                     </p>
                     <button
-                      onClick={() => setCurrentView('utilization')}
+                      onClick={() => safeSetCurrentView('utilization')}
                       className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                     >
                       Zurück zur Auslastung
@@ -392,7 +446,7 @@ function App() {
                       Die Projekt-Übersicht Komponente wurde entfernt.
                     </p>
                     <button
-                      onClick={() => setCurrentView('utilization')}
+                      onClick={() => safeSetCurrentView('utilization')}
                       className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                     >
                       Zurück zur Auslastung
@@ -409,7 +463,7 @@ function App() {
                       Das Projekt-Management Dashboard wurde entfernt.
                     </p>
                     <button
-                      onClick={() => setCurrentView('utilization')}
+                      onClick={() => safeSetCurrentView('utilization')}
                       className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                     >
                       Zurück zur Auslastung
@@ -688,6 +742,26 @@ function App() {
                   <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                     <button
                       onClick={() => setIsRestoreAdminOpen(false)}
+                      className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                    >
+                      Schließen
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Firebase Auth Setup Modal */}
+          {isFirebaseAuthSetupOpen && (
+            <div className="fixed inset-0 z-50 overflow-y-auto">
+              <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setIsFirebaseAuthSetupOpen(false)}></div>
+                <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-6xl sm:w-full">
+                  <FirebaseAuthBulkSetup />
+                  <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button
+                      onClick={() => setIsFirebaseAuthSetupOpen(false)}
                       className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                     >
                       Schließen
