@@ -1749,21 +1749,17 @@ export function UtilizationReportView({
                         const weekData = personData.find(item => item.week === weekKey);
                         const weekValue = weekData?.utilization;
                         
-                        // Farbkodierung basierend auf dem Wert
+                        // Farbkodierung basierend auf dem Wert (nur für Hintergrund)
                         let bgColor = 'bg-gray-100';
-                        let textColor = 'text-gray-500';
                         
                         if (weekValue !== null && weekValue !== undefined) {
                           if (weekValue > 90) {
                             bgColor = 'bg-green-100';
-                            textColor = 'text-green-700';
                           } else if (weekValue > 75) {
                             bgColor = 'bg-yellow-100';
-                            textColor = 'text-yellow-700';
                           } else {
                             // Alle Werte ≤ 75% (inkl. 0%) sind kritisch und werden rot markiert
                             bgColor = 'bg-red-100';
-                            textColor = 'text-red-700';
                           }
                         }
                         
@@ -1772,7 +1768,7 @@ export function UtilizationReportView({
                             hasNoManager ? 'bg-yellow-100' : bgColor
                           } ${isTerminated ? 'line-through opacity-60' : ''}`}>
                             {weekValue !== null && weekValue !== undefined ? (
-                              <span className={`font-medium ${textColor}`}>
+                              <span className="text-gray-900">
                                 {Math.round(weekValue * 10) / 10}%
                               </span>
                             ) : (
@@ -2113,12 +2109,12 @@ export function UtilizationReportView({
                           }`}>
                             <div className={`flex flex-col items-center gap-1 ${isTerminated ? 'line-through opacity-60' : ''}`}>
                               {utilization !== null && utilization !== undefined ? (
-                                <span className={`flex items-center justify-center gap-1 ${isTerminated ? 'line-through opacity-60' : ''}`}>
+                                <span className={`flex items-center justify-center gap-1 text-gray-900 ${isTerminated ? 'line-through opacity-60' : ''}`}>
                                   {utilization}%
                                   {utilization > 100 && <Star className="w-3 h-3 text-yellow-500" />}
                                 </span>
                               ) : (
-                                <span className={`${isTerminated ? 'line-through opacity-60' : ''}`}>—</span>
+                                <span className={`text-gray-400 ${isTerminated ? 'line-through opacity-60' : ''}`}>—</span>
                               )}
                               {(() => {
                                 const dossier = dossiersByPerson[person] || { projectOffers: [], jiraTickets: [] };
