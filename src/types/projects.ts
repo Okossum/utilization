@@ -50,6 +50,7 @@ export interface ProjectCreationModalProps {
   employeeId: string;
   employeeName: string;
   project?: ProjectHistoryItem; // Für Edit-Modus
+  forceProjectType?: ProjectType; // Erzwingt einen bestimmten Projekt-Typ (z.B. nur 'planned')
 }
 
 export interface ProjectCardProps {

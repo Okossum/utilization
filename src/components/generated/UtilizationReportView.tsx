@@ -2632,6 +2632,7 @@ export function UtilizationReportView({
          }}
          employeeId={projectCreationPerson || ''}
          employeeName={projectCreationPerson || ''}
+         forceProjectType="planned"
        />
 
       {/* Scope Settings Modal entfernt: Es gibt nur noch EIN Dropdown für alle Filter */}

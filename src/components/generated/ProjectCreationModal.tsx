@@ -33,12 +33,13 @@ export function ProjectCreationModal({
   onSave,
   employeeId,
   employeeName,
-  project
+  project,
+  forceProjectType
 }: ProjectCreationModalProps) {
   
   // State Management
   const [formData, setFormData] = useState<ProjectFormData>({
-    projectType: 'historical',
+    projectType: forceProjectType || 'historical',
     customer: '',
     projectName: '',
     description: '',
@@ -80,7 +81,7 @@ export function ProjectCreationModal({
     } else {
       // Reset for new project
       setFormData({
-        projectType: 'historical',
+        projectType: forceProjectType || 'historical',
         customer: '',
         projectName: '',
         description: '',
@@ -370,31 +371,46 @@ export function ProjectCreationModal({
                 <div className="space-y-6">
                   
                   {/* Projekt-Typ */}
-                  <div>
-                    <h4 className="text-lg font-medium mb-4">Projekt-Typ</h4>
-                    <div className="space-y-3">
-                      {(['historical', 'planned'] as ProjectType[]).map(type => (
-                        <button
-                          key={type}
-                          type="button"
-                          onClick={() => updateFormData({ projectType: type })}
-                          className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
-                            formData.projectType === type
-                              ? 'border-blue-500 bg-blue-50'
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                        >
-                          <h5 className="font-semibold mb-1">{PROJECT_TYPE_LABELS[type]}</h5>
-                          <p className="text-sm text-gray-600">
-                            {type === 'historical' 
-                              ? 'Dokumentation abgeschlossener Projekte'
-                              : 'Planung zukünftiger Projekte mit Wahrscheinlichkeiten'
-                            }
-                          </p>
-                        </button>
-                      ))}
+                  {!forceProjectType && (
+                    <div>
+                      <h4 className="text-lg font-medium mb-4">Projekt-Typ</h4>
+                      <div className="space-y-3">
+                        {(['historical', 'planned'] as ProjectType[]).map(type => (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => updateFormData({ projectType: type })}
+                            className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
+                              formData.projectType === type
+                                ? 'border-blue-500 bg-blue-50'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <h5 className="font-semibold mb-1">{PROJECT_TYPE_LABELS[type]}</h5>
+                            <p className="text-sm text-gray-600">
+                              {type === 'historical' 
+                                ? 'Dokumentation abgeschlossener Projekte'
+                                : 'Planung zukünftiger Projekte mit Wahrscheinlichkeiten'
+                              }
+                            </p>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
+                  
+                  {/* Wenn Projekt-Typ erzwungen ist, zeige Info */}
+                  {forceProjectType && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h4 className="text-lg font-medium mb-2">Projekt-Typ: {PROJECT_TYPE_LABELS[forceProjectType]}</h4>
+                      <p className="text-sm text-blue-700">
+                        {forceProjectType === 'planned' 
+                          ? 'Es wird automatisch ein geplantes Projekt erstellt.'
+                          : 'Es wird automatisch ein historisches Projekt erstellt.'
+                        }
+                      </p>
+                    </div>
+                  )}
 
                   {/* Projekt-Quelle (nur bei geplanten Projekten) */}
                   {formData.projectType === 'planned' && (
