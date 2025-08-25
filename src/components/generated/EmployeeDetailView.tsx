@@ -177,22 +177,42 @@ export default function EmployeeDetailView({
   const [dossierLoading, setDossierLoading] = useState(false);
   const [dossierData, setDossierData] = useState<any>(null);
 
-  // Projekte nach Typen filtern
+  // Projekte nach Typen filtern - JETZT AUS UTILIZATION DATA HUB
   const projectsByType: ProjectsByType = React.useMemo(() => {
-    const projects = dossierData?.projectHistory || [];
-    console.log('🔍 DEBUG: Raw projects from dossierData:', projects);
+    // Finde die Person in utilizationData
+    const personData = databaseData?.utilizationData?.find(record => 
+      record.person === employeeId || record.id === employeeId
+    );
+    
+    const projects = personData?.projectReferences || [];
+    console.log('🔍 DEBUG: Raw projects from utilizationData Hub:', projects);
     console.log('🔍 DEBUG: Projects structure:', projects.map(p => ({ 
-      id: p.id, 
+      id: p.projectId, 
       projectName: p.projectName, 
       projectType: p.projectType,
-      startDate: p.startDate,
-      endDate: p.endDate,
-      duration: p.duration
+      customer: p.customer,
+      addedAt: p.addedAt
     })));
-    const filtered = filterProjectsByType(projects);
-    console.log('🔍 DEBUG: Filtered projects by type:', filtered);
+    
+    // Konvertiere projectReferences zu ProjectHistoryItem Format
+    const convertedProjects = projects.map(ref => ({
+      id: ref.projectId,
+      projectName: ref.projectName,
+      customer: ref.customer,
+      projectType: ref.projectType || 'planned',
+      description: ref.description || '',
+      startDate: ref.startDate || '',
+      endDate: ref.endDate || '',
+      duration: ref.duration || '',
+      roles: ref.roles || [],
+      skills: ref.skills || [],
+      activities: ref.activities || []
+    }));
+    
+    const filtered = filterProjectsByType(convertedProjects);
+    console.log('🔍 DEBUG: Filtered projects by type from utilizationData:', filtered);
     return filtered;
-  }, [dossierData?.projectHistory]);
+  }, [databaseData?.utilizationData, employeeId]);
 
   // Toast-System für Benachrichtigungen
   const { notification, showToast, hideToast } = useProjectToast();
@@ -496,69 +516,76 @@ export default function EmployeeDetailView({
   };
 
   const handleSaveProject = async (project: ProjectHistoryItem) => {
-    console.log('💾 Saving project:', project);
-    console.log('🔍 DEBUG: Project structure being saved:', {
-      id: project.id,
-      projectName: project.projectName,
-      projectType: project.projectType,
-      startDate: project.startDate,
-      endDate: project.endDate,
-      duration: project.duration,
-      customer: project.customer,
-      roles: project.roles,
-      skills: project.skills
-    });
+    console.log('💾 Saving project to utilizationData Hub:', project);
     
-    // Update dossier data with new/updated project
-    const currentProjects = dossierData?.projectHistory || [];
-    let updatedProjects;
-    
-    if (editingProject) {
-      // Update existing project
-      updatedProjects = currentProjects.map((p: ProjectHistoryItem) => 
-        p.id === project.id ? project : p
-      );
-    } else {
-      // Add new project
-      updatedProjects = [...currentProjects, project];
-    }
-    
-    // Update local state
-    setDossierData(prev => ({
-      ...prev,
-      projectHistory: updatedProjects
-    }));
-    
-    // Save to database
     try {
-      const updatedDossierData = {
-        ...dossierData,
-        projectHistory: updatedProjects,
-        updatedAt: new Date()
-      };
+      // Speichere Projekt-Referenz in utilizationData Hub (zentraler Data Hub)
+      const { collection, query, where, getDocs, updateDoc, doc } = await import('firebase/firestore');
+      const { COLLECTIONS } = await import('../../lib/types');
       
-      // ✅ FIX: Konsistente Employee-ID verwenden
-      const consistentEmployeeId = employeeId || personName;
-      console.log('🔍 DEBUG: Using consistent employeeId for save:', consistentEmployeeId);
-      await DatabaseService.saveEmployeeDossier(consistentEmployeeId, updatedDossierData);
-      console.log('✅ Project history saved to database successfully');
+      // Finde utilizationData Eintrag für diese Person
+      const utilizationQuery = query(
+        collection(db, COLLECTIONS.UTILIZATION_DATA),
+        where('person', '==', personName)
+      );
       
-      // Show success notification
-      const wasUpgraded = project.projectType === 'active' && 
-                         editingProject && 
-                         editingProject.projectType === 'planned';
+      const utilizationSnapshot = await getDocs(utilizationQuery);
       
-      const notificationEvent = wasUpgraded ? 'upgraded' : 
-                               editingProject ? 'updated' : 'created';
+      if (!utilizationSnapshot.empty) {
+        const utilizationDoc = utilizationSnapshot.docs[0];
+        const currentData = utilizationDoc.data();
+        
+        // Aktualisiere oder füge Projekt-Referenz hinzu
+        const existingProjectRefs = currentData.projectReferences || [];
+        const projectRef = {
+          projectId: project.id,
+          projectName: project.projectName,
+          customer: project.customer,
+          projectType: project.projectType,
+          description: project.description,
+          startDate: project.startDate,
+          endDate: project.endDate,
+          duration: project.duration,
+          roles: project.roles,
+          skills: project.skills,
+          activities: project.activities,
+          addedAt: editingProject ? existingProjectRefs.find(ref => ref.projectId === project.id)?.addedAt : new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        let updatedProjectRefs;
+        if (editingProject) {
+          // Update existing project reference
+          updatedProjectRefs = existingProjectRefs.map(ref => 
+            ref.projectId === project.id ? projectRef : ref
+          );
+        } else {
+          // Add new project reference
+          updatedProjectRefs = [...existingProjectRefs, projectRef];
+        }
+        
+        // Speichere in utilizationData (zentraler Hub)
+        await updateDoc(doc(db, COLLECTIONS.UTILIZATION_DATA, utilizationDoc.id), {
+          projectReferences: updatedProjectRefs,
+          updatedAt: new Date().toISOString()
+        });
+        
+        console.log('✅ Project reference saved to utilizationData Hub successfully');
+        
+        // Show success notification
+        const notificationEvent = editingProject ? 'updated' : 'created';
+        const toast = createProjectNotification(notificationEvent, project);
+        showToast(toast);
+        
+      } else {
+        console.error('❌ No utilizationData entry found for person:', personName);
+        showToast({ type: 'error', message: 'Kein Dateneintrag für Person gefunden' });
+      }
       
-      const toast = createProjectNotification(notificationEvent, project);
-      showToast(toast);
     } catch (error) {
-      console.error('❌ Error saving project history:', error);
-      // TODO: Show error toast to user
+      console.error('❌ Error saving project to utilizationData Hub:', error);
+      showToast({ type: 'error', message: 'Fehler beim Speichern des Projekts' });
     }
-    
-    console.log('📋 Updated project history:', updatedProjects);
     
     // Close modal and reset editing state
     setProjectCreationModalOpen(false);
@@ -566,46 +593,58 @@ export default function EmployeeDetailView({
   };
 
   const handleDeleteProject = async (projectId: string) => {
-    console.log('🗑️ Deleting project:', projectId);
+    console.log('🗑️ Deleting project from utilizationData Hub:', projectId);
     
-    const currentProjects = dossierData?.projectHistory || [];
-    const updatedProjects = currentProjects.filter((p: ProjectHistoryItem) => p.id !== projectId);
-    
-    // Update local state
-    setDossierData(prev => ({
-      ...prev,
-      projectHistory: updatedProjects
-    }));
-    
-    // Save to database
     try {
-      const updatedDossierData = {
-        ...dossierData,
-        projectHistory: updatedProjects,
-        updatedAt: new Date()
-      };
+      // Lösche Projekt-Referenz aus utilizationData Hub
+      const { collection, query, where, getDocs, updateDoc, doc } = await import('firebase/firestore');
+      const { COLLECTIONS } = await import('../../lib/types');
       
-      // ✅ FIX: Konsistente Employee-ID verwenden
-      const consistentEmployeeId = employeeId || personName;
-      console.log('🔍 DEBUG: Using consistent employeeId for delete:', consistentEmployeeId);
-      await DatabaseService.saveEmployeeDossier(consistentEmployeeId, updatedDossierData);
-      console.log('✅ Project history deletion saved to database successfully');
+      // Finde utilizationData Eintrag für diese Person
+      const utilizationQuery = query(
+        collection(db, COLLECTIONS.UTILIZATION_DATA),
+        where('person', '==', personName)
+      );
       
-      // Show deletion notification
-      const deletedProject = currentProjects.find((p: ProjectHistoryItem) => p.id === projectId);
-      if (deletedProject) {
-        const toast = createProjectNotification('deleted', deletedProject);
-        showToast(toast);
+      const utilizationSnapshot = await getDocs(utilizationQuery);
+      
+      if (!utilizationSnapshot.empty) {
+        const utilizationDoc = utilizationSnapshot.docs[0];
+        const currentData = utilizationDoc.data();
+        
+        // Entferne Projekt-Referenz
+        const existingProjectRefs = currentData.projectReferences || [];
+        const updatedProjectRefs = existingProjectRefs.filter(ref => ref.projectId !== projectId);
+        
+        // Speichere in utilizationData (zentraler Hub)
+        await updateDoc(doc(db, COLLECTIONS.UTILIZATION_DATA, utilizationDoc.id), {
+          projectReferences: updatedProjectRefs,
+          updatedAt: new Date().toISOString()
+        });
+        
+        console.log('✅ Project reference deleted from utilizationData Hub successfully');
+        
+        // Show deletion notification
+        const deletedProject = existingProjectRefs.find(ref => ref.projectId === projectId);
+        if (deletedProject) {
+          const toast = createProjectNotification('deleted', {
+            id: deletedProject.projectId,
+            projectName: deletedProject.projectName,
+            customer: deletedProject.customer,
+            projectType: deletedProject.projectType
+          } as ProjectHistoryItem);
+          showToast(toast);
+        }
+        
+      } else {
+        console.error('❌ No utilizationData entry found for person:', personName);
+        showToast({ type: 'error', message: 'Kein Dateneintrag für Person gefunden' });
       }
+      
     } catch (error) {
-      console.error('❌ Error saving project history deletion:', error);
-      // TODO: Show error toast to user
+      console.error('❌ Error deleting project from utilizationData Hub:', error);
+      showToast({ type: 'error', message: 'Fehler beim Löschen des Projekts' });
     }
-    
-    console.log('📋 Updated project history after delete:', updatedProjects);
-    
-    setProjectCreationModalOpen(false);
-    setEditingProject(null);
   };
 
   // Load simple utilization metric from UtilizationDataContext
