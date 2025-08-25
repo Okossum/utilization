@@ -25,6 +25,7 @@ import { UtilizationComment } from './UtilizationComment';
 import { SalesOpportunities } from './SalesOpportunities';
 import { useAssignments } from '../../contexts/AssignmentsContext';
 import { AssignmentEditorModal } from './AssignmentEditorModal';
+import { ProjectCreationModal } from './ProjectCreationModal';
 import ScopeFilterDropdown from './ScopeFilterDropdown';
 import { auslastungserklaerungService, personAuslastungserklaerungService, personActionItemService } from '../../lib/firebase-services';
 interface UtilizationData {
@@ -136,6 +137,8 @@ export function UtilizationReportView({
 
   const [isAssignmentEditorOpen, setIsAssignmentEditorOpen] = useState(false);
   const [assignmentEditorPerson, setAssignmentEditorPerson] = useState<string | null>(null);
+  const [isProjectCreationModalOpen, setIsProjectCreationModalOpen] = useState(false);
+  const [projectCreationPerson, setProjectCreationPerson] = useState<string | null>(null);
 
   // Assignments: Zugriff (Preload-Effekt wird weiter unten nach visiblePersons platziert)
   const { getAssignmentsForEmployee, assignmentsByEmployee } = useAssignments();
@@ -2228,9 +2231,9 @@ export function UtilizationReportView({
 
                           <div className="relative group">
                             <button
-                              onClick={() => { setAssignmentEditorPerson(person); setIsAssignmentEditorOpen(true); }}
+                              onClick={() => { setProjectCreationPerson(person); setIsProjectCreationModalOpen(true); }}
                               className="relative p-1 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded border border-indigo-300 transition-colors"
-                              title="Projekt zuordnen"
+                              title="Neues Projekt erstellen"
                             >
                               <Link2 className="w-4 h-4" />
                               {(() => {
@@ -2506,6 +2509,20 @@ export function UtilizationReportView({
         onClose={() => { setIsAssignmentEditorOpen(false); setAssignmentEditorPerson(null); }}
         employeeName={assignmentEditorPerson || ''}
       />
+
+             {/* Project Creation Modal */}
+       <ProjectCreationModal
+         isOpen={isProjectCreationModalOpen}
+         onClose={() => setIsProjectCreationModalOpen(false)}
+         onSave={() => {
+           setIsProjectCreationModalOpen(false);
+           setProjectCreationPerson(null);
+           // Refresh data after project creation
+           refreshData();
+         }}
+         employeeId={projectCreationPerson || ''}
+         employeeName={projectCreationPerson || ''}
+       />
 
       {/* Scope Settings Modal entfernt: Es gibt nur noch EIN Dropdown für alle Filter */}
       
