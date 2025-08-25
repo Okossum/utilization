@@ -737,7 +737,7 @@ app.post('/api/einsatzplan', requireAuth, async (req, res) => {
           team: row.team ?? existing.data.team ?? null,
           lbs: row.lbs ?? existing.data.lbs ?? null,
           vg: pickField(row, ['VG', 'vg']) ?? existing.data.vg ?? null,
-          location: row.location ?? row.geschäftsstelle ?? row.standort ?? row.ort ?? existing.data.location ?? null,
+          location: pickField(row, ['location', 'Geschäftsstelle', 'geschäftsstelle', 'standort', 'ort']) ?? existing.data.location ?? null,
           values: mergedValues,
           updatedAt: FieldValue.serverTimestamp(),
         });
@@ -767,7 +767,7 @@ app.post('/api/einsatzplan', requireAuth, async (req, res) => {
           team: row.team ?? null,
           lob: row.lob ?? null,
           bereich: row.bereich ?? null,
-          location: row.location ?? row.geschäftsstelle ?? row.standort ?? row.ort ?? null,
+          location: pickField(row, ['location', 'Geschäftsstelle', 'geschäftsstelle', 'standort', 'ort']) ?? null,
           values: newWeekValues,
           isLatest: true,
           createdAt: FieldValue.serverTimestamp(),
