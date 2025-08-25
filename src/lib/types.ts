@@ -168,6 +168,82 @@ export interface FirestoreAssignment extends AssignmentDoc, FirestoreDocument {
   userId?: string;
 }
 
+// ===== UTILIZATION DATA HUB - SKILLS & ROLLEN =====
+
+export interface AssignedRole {
+  roleId: string;
+  roleName: string;
+  categoryName: string;
+  level?: number; // 1-5 Sterne
+  tasks?: string[];
+  assignedAt: string; // ISO Date
+  assignedBy?: string; // User ID/Email
+  updatedAt?: string; // ISO Date
+}
+
+export interface AssignedTechnicalSkill {
+  skillId: string;
+  skillName: string;
+  categoryName: string;
+  rating: number; // 0-5, step 0.5
+  assessedAt: string; // ISO Date
+  assessedBy?: string; // User ID/Email
+  updatedAt?: string; // ISO Date
+  certificationLevel?: string; // "Beginner", "Intermediate", "Advanced", "Expert"
+}
+
+export interface AssignedSoftSkill {
+  skillId: string;
+  skillName: string;
+  categoryName: string;
+  rating: number; // 0-5, step 0.5
+  assessedAt: string; // ISO Date
+  assessedBy?: string; // User ID/Email
+  updatedAt?: string; // ISO Date
+  description?: string; // Freitext-Beschreibung
+}
+
+// Erweiterte UtilizationData mit Skills & Rollen Hub
+export interface UtilizationDataHub {
+  // Basis-Felder (bestehend)
+  person: string;
+  id: string; // Eindeutige Person-ID
+  lob?: string; // Line of Business
+  bereich?: string; // Bereich
+  cc?: string; // Cost Center
+  team?: string; // Team
+  email?: string; // E-Mail
+  
+  // Auslastungs- und Einsatzplan-Daten
+  values?: Record<string, number>; // Week keys: "25/01", "25/02", etc.
+  
+  // Projekt-Referenzen (bereits implementiert)
+  projectReferences?: Array<{
+    projectId: string;
+    projectName: string;
+    customer: string;
+    projectType: string;
+    description?: string;
+    startDate?: string;
+    endDate?: string;
+    duration?: string;
+    roles?: ProjectRole[];
+    skills?: ProjectSkill[];
+    activities?: string[];
+    addedAt: string;
+    updatedAt: string;
+  }>;
+  
+  // NEU: Skills & Rollen Hub
+  assignedRoles?: AssignedRole[];
+  technicalSkills?: AssignedTechnicalSkill[];
+  softSkills?: AssignedSoftSkill[];
+  
+  // Meta-Daten
+  createdAt?: string; // ISO Date
+  updatedAt?: string; // ISO Date
+}
+
 // ===== ERWEITERTE PROJEKT-TYPEN =====
 
 export interface ProjectRole {
