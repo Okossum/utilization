@@ -16,6 +16,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { addRoleToUtilizationData, getPersonSkillsRolesFromHub } from '../../lib/utilization-hub-services';
 
 interface Role {
   id: string;
@@ -143,25 +144,47 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
 
 
 
-  // Zugewiesene Rollen laden
+  // Zugewiesene Rollen aus utilizationData Hub laden
   const loadAssignedRoles = async () => {
     try {
-      const response = await fetch(`/api/employee-roles/${encodeURIComponent(employeeId)}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const rolesData = await response.json();
-      setAssignedRoles(rolesData);
+      console.log('🔄 Lade zugewiesene Rollen aus utilizationData Hub für:', employeeName);
       
+      const { assignedRoles: hubRoles } = await getPersonSkillsRolesFromHub(employeeName);
+      
+      // Konvertiere utilizationData Format zu Modal Format
+      const convertedRoles = hubRoles.map(role => ({
+        id: role.roleId,
+        roleId: role.roleId,
+        roleName: role.roleName,
+        level: role.level || 3,
+        assignedAt: role.assignedAt,
+        lastUpdated: role.updatedAt
+      }));
+      
+      console.log('✅ Rollen aus utilizationData Hub geladen:', convertedRoles);
+      setAssignedRoles(convertedRoles);
     } catch (error) {
-      setError('Fehler beim Laden der zugewiesenen Rollen');
+      console.error('❌ Fehler beim Laden der Rollen aus utilizationData Hub:', error);
+      // Fallback: Versuche Legacy API
+      try {
+        const response = await fetch(`/api/employee-roles/${encodeURIComponent(employeeId)}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const rolesData = await response.json();
+          console.log('📋 Fallback: Rollen aus Legacy API geladen:', rolesData);
+          setAssignedRoles(rolesData);
+        } else {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+      } catch (legacyError) {
+        console.error('❌ Auch Legacy API fehlgeschlagen:', legacyError);
+        setError('Fehler beim Laden der zugewiesenen Rollen');
+      }
     }
   };
 
@@ -299,25 +322,26 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
     setSuccessMessage(null);
     
     try {
-      // Neue erweiterte API für Rollen mit Tasks
-      const response = await fetch(`/api/employee-roles/${encodeURIComponent(employeeId)}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-          roleId, 
-          level,
-          categoryId,
-          selectedTasks: selectedTaskIds
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Fehler beim Zuweisen der Rolle');
+      // Prüfe ob Rolle bereits zugewiesen ist
+      const isAlreadyAssigned = assignedRoles.some(role => role.roleId === roleId);
+      if (isAlreadyAssigned) {
+        setError(`Die Rolle "${roleName}" ist bereits zugewiesen.`);
+        setIsSubmitting(false);
+        return;
       }
+      
+      // Speichere Rolle in utilizationData Hub
+      console.log('💾 Speichere Rolle in utilizationData Hub:', { employeeName, roleId, roleName, level });
+      
+      await addRoleToUtilizationData(employeeName, {
+        roleId,
+        roleName,
+        categoryName: categories.find(c => c.id === categoryId)?.name || 'Unbekannt',
+        level,
+        tasks: selectedTaskIds
+      });
+      
+      console.log('✅ Rolle erfolgreich in utilizationData Hub gespeichert');
 
       // Daten neu laden und Callback aufrufen
       await loadAssignedRoles();
