@@ -1089,39 +1089,55 @@ export function UtilizationReportView({
   }, []);
 
   // Auswahlzustände (persistiert)
-  const [selectedLoB, setSelectedLoB] = useState<string>('');
-  const [selectedBereich, setSelectedBereich] = useState<string>('');
-  const [selectedCC, setSelectedCC] = useState<string>('');
-  const [selectedTeam, setSelectedTeam] = useState<string>('');
+  const [selectedLoB, setSelectedLoB] = useState<string[]>([]);
+  const [selectedBereich, setSelectedBereich] = useState<string[]>([]);
+  const [selectedCC, setSelectedCC] = useState<string[]>([]);
+  const [selectedTeam, setSelectedTeam] = useState<string[]>([]);
   // Initialwerte aus Profil laden (nur wenn nicht "Alle Daten" aktiv)
   useEffect(() => {
     if (!profile || showAllData) return;
-    setSelectedLoB(String(profile.lob || ''));
-    setSelectedBereich(String((profile as any).bereich || ''));
-    setSelectedCC(String(profile.competenceCenter || ''));
-    setSelectedTeam(String(profile.team || ''));
+    const lob = String(profile.lob || '');
+    const bereich = String((profile as any).bereich || '');
+    const cc = String(profile.competenceCenter || '');
+    const team = String(profile.team || '');
+    if (lob) setSelectedLoB([lob]);
+    if (bereich) setSelectedBereich([bereich]);
+    if (cc) setSelectedCC([cc]);
+    if (team) setSelectedTeam([team]);
   }, [profile?.lob, (profile as any)?.bereich, profile?.competenceCenter, profile?.team, showAllData]);
   
   // Defaults: wenn nur eine Option vorhanden und nichts gewählt, automatisch setzen (nur wenn nicht "Alle Daten" aktiv)
-  useEffect(() => { if (!showAllData && !selectedLoB && lobOptions.length === 1) setSelectedLoB(lobOptions[0]); }, [lobOptions, showAllData]);
-  useEffect(() => { if (!showAllData && !selectedBereich && bereichOptions.length === 1) setSelectedBereich(bereichOptions[0]); }, [bereichOptions, showAllData]);
-  useEffect(() => { if (!showAllData && !selectedCC && ccOptions.length === 1) setSelectedCC(ccOptions[0]); }, [ccOptions, showAllData]);
-  useEffect(() => { if (!showAllData && !selectedTeam && teamOptions.length === 1) setSelectedTeam(teamOptions[0]); }, [teamOptions, showAllData]);
+  useEffect(() => { if (!showAllData && selectedLoB.length === 0 && lobOptions.length === 1) setSelectedLoB([lobOptions[0]]); }, [lobOptions, showAllData, selectedLoB.length]);
+  useEffect(() => { if (!showAllData && selectedBereich.length === 0 && bereichOptions.length === 1) setSelectedBereich([bereichOptions[0]]); }, [bereichOptions, showAllData, selectedBereich.length]);
+  useEffect(() => { if (!showAllData && selectedCC.length === 0 && ccOptions.length === 1) setSelectedCC([ccOptions[0]]); }, [ccOptions, showAllData, selectedCC.length]);
+  useEffect(() => { if (!showAllData && selectedTeam.length === 0 && teamOptions.length === 1) setSelectedTeam([teamOptions[0]]); }, [teamOptions, showAllData, selectedTeam.length]);
   
   // Wenn "Alle Daten" aktiviert wird, alle Header-Filter zurücksetzen
   useEffect(() => {
     if (showAllData) {
-      setSelectedLoB('');
-      setSelectedBereich('');
-      setSelectedCC('');
-      setSelectedTeam('');
+      setSelectedLoB([]);
+      setSelectedBereich([]);
+      setSelectedCC([]);
+      setSelectedTeam([]);
     }
   }, [showAllData]);
   // Korrigiere Auswahl, falls nicht mehr vorhanden
-  useEffect(() => { if (selectedLoB && !lobOptions.includes(selectedLoB)) setSelectedLoB(''); }, [lobOptions]);
-  useEffect(() => { if (selectedBereich && !bereichOptions.includes(selectedBereich)) setSelectedBereich(''); }, [bereichOptions]);
-  useEffect(() => { if (selectedCC && !ccOptions.includes(selectedCC)) setSelectedCC(''); }, [ccOptions]);
-  useEffect(() => { if (selectedTeam && !teamOptions.includes(selectedTeam)) setSelectedTeam(''); }, [teamOptions]);
+  useEffect(() => { 
+    const validLoB = selectedLoB.filter(lob => lobOptions.includes(lob));
+    if (validLoB.length !== selectedLoB.length) setSelectedLoB(validLoB);
+  }, [lobOptions, selectedLoB]);
+  useEffect(() => { 
+    const validBereich = selectedBereich.filter(bereich => bereichOptions.includes(bereich));
+    if (validBereich.length !== selectedBereich.length) setSelectedBereich(validBereich);
+  }, [bereichOptions, selectedBereich]);
+  useEffect(() => { 
+    const validCC = selectedCC.filter(cc => ccOptions.includes(cc));
+    if (validCC.length !== selectedCC.length) setSelectedCC(validCC);
+  }, [ccOptions, selectedCC]);
+  useEffect(() => { 
+    const validTeam = selectedTeam.filter(team => teamOptions.includes(team));
+    if (validTeam.length !== selectedTeam.length) setSelectedTeam(validTeam);
+  }, [teamOptions, selectedTeam]);
 
   const filteredData = useMemo(() => {
     let base = dataForUI;
@@ -1186,17 +1202,17 @@ export function UtilizationReportView({
     // Filter nach LoB/Bereich/CC/Team aus Header-Auswahl
     // Header-Auswahl-Filter nur anwenden, wenn nicht "Alle Daten" aktiv ist
     if (!showAllData) {
-      if (selectedLoB) {
-        base = base.filter(d => (personMeta.get(d.person) as any)?.lob === selectedLoB);
+      if (selectedLoB.length > 0) {
+        base = base.filter(d => selectedLoB.includes((personMeta.get(d.person) as any)?.lob));
       }
-      if (selectedBereich) {
-        base = base.filter(d => (personMeta.get(d.person) as any)?.bereich === selectedBereich);
+      if (selectedBereich.length > 0) {
+        base = base.filter(d => selectedBereich.includes((personMeta.get(d.person) as any)?.bereich));
       }
-      if (selectedCC) {
-        base = base.filter(d => (personMeta.get(d.person) as any)?.cc === selectedCC);
+      if (selectedCC.length > 0) {
+        base = base.filter(d => selectedCC.includes((personMeta.get(d.person) as any)?.cc));
       }
-      if (selectedTeam) {
-        base = base.filter(d => (personMeta.get(d.person) as any)?.team === selectedTeam);
+      if (selectedTeam.length > 0) {
+        base = base.filter(d => selectedTeam.includes((personMeta.get(d.person) as any)?.team));
       }
     }
 
@@ -1347,10 +1363,10 @@ export function UtilizationReportView({
       // Header-Auswahl-Filter (nur wenn nicht "Alle Daten")
       if (!showAllData) {
         const meta = personMeta.get(person);
-        if (selectedLoB && (meta as any)?.lob !== selectedLoB) return false;
-        if (selectedBereich && (meta as any)?.bereich !== selectedBereich) return false;
-        if (selectedCC && (meta as any)?.cc !== selectedCC) return false;
-        if (selectedTeam && (meta as any)?.team !== selectedTeam) return false;
+        if (selectedLoB.length > 0 && !selectedLoB.includes((meta as any)?.lob)) return false;
+        if (selectedBereich.length > 0 && !selectedBereich.includes((meta as any)?.bereich)) return false;
+        if (selectedCC.length > 0 && !selectedCC.includes((meta as any)?.cc)) return false;
+        if (selectedTeam.length > 0 && !selectedTeam.includes((meta as any)?.team)) return false;
       }
       
       // Scope-Filter (nur wenn nicht "Alle Daten" und Profil vorhanden)
@@ -1583,7 +1599,7 @@ export function UtilizationReportView({
               </div>
               
               {/* Bereich-Filter oberhalb von CC und LBS */}
-              <MultiSelectFilter label="Bereich" options={bereichOptions} selected={[selectedBereich].filter(Boolean)} onChange={(values) => setSelectedBereich(values[0] || '')} placeholder="Alle Bereiche" />
+              <MultiSelectFilter label="Bereich" options={bereichOptions} selected={selectedBereich} onChange={setSelectedBereich} placeholder="Alle Bereiche" />
               
               <MultiSelectFilter label="CC" options={ccOptions} selected={filterCC} onChange={setFilterCC} placeholder="Alle CC" />
               <MultiSelectFilter label="LBS" options={lbsOptions} selected={filterLBS} onChange={setFilterLBS} placeholder="Alle LBS" />
