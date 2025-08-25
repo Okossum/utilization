@@ -29,6 +29,9 @@ interface AppHeaderProps {
   onAuslastungserklaerungManagement?: () => void;
   onUserSettings?: () => void;
   onGeneralSettings?: () => void;
+  onUserRoleManagement?: () => void;
+  onAdminSetup?: () => void;
+  onRestoreAdmin?: () => void;
 }
 
 export function AppHeader({
@@ -54,9 +57,12 @@ export function AppHeader({
   onCustomerProjectsManagement,
   onAuslastungserklaerungManagement,
   onUserSettings,
-  onGeneralSettings
+  onGeneralSettings,
+  onUserRoleManagement,
+  onAdminSetup,
+  onRestoreAdmin
 }: AppHeaderProps) {
-  const { user, profile } = useAuth();
+  const { user, profile, role, canAccessView, canAccessSettings } = useAuth();
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({
@@ -120,50 +126,59 @@ export function AppHeader({
         </div>
         
         <div className="flex items-center gap-2" style={{ zIndex: 40 }}>
-          {/* Navigation Buttons - IMMER sichtbar */}
-          <button
-            onClick={() => setCurrentView('utilization')}
-            className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
-              currentView === 'utilization' 
-                ? 'text-blue-700 bg-blue-50 border-blue-200' 
-                : 'text-gray-700 bg-gray-50 border-gray-200 hover:bg-gray-100'
-            } border rounded-lg`}
-            style={{ zIndex: 40 }}
-            title="Auslastung Report"
-          >
-            <BarChart3 className="w-4 h-4" />
-            Auslastung
-          </button>
-          <button
-            onClick={() => setCurrentView('employees')}
-            className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
-              currentView === 'employees' 
-                ? 'text-blue-700 bg-blue-50 border-blue-200' 
-                : 'text-gray-700 bg-gray-50 border-gray-200 hover:bg-gray-100'
-            } border rounded-lg`}
-            style={{ zIndex: 40 }}
-            title="Mitarbeiter Liste"
-          >
-            <Users className="w-4 h-4" />
-            Mitarbeiter
-          </button>
-          {/* Detail (Neu) Button ausgeblendet */}
-          {/* Projekte Button ausgeblendet */}
-          {/* Knowledge Button ausgeblendet */}
-          {/* Kommentare Button ausgeblendet */}
-          <button
-            onClick={() => setCurrentView('sales')}
-            className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
-              currentView === 'sales' 
-                ? 'text-blue-700 bg-blue-50 border-blue-200' 
-                : 'text-gray-700 bg-gray-50 border-gray-200 hover:bg-gray-100'
-            } border rounded-lg`}
-            style={{ zIndex: 40 }}
-            title="Sales Team Overview"
-          >
-            <Target className="w-4 h-4" />
-            Sales View
-          </button>
+          {/* Navigation Buttons - temporär für alle sichtbar */}
+          {true && (
+            <button
+              onClick={() => setCurrentView('utilization')}
+              className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
+                currentView === 'utilization' 
+                  ? 'text-blue-700 bg-blue-50 border-blue-200' 
+                  : 'text-gray-700 bg-gray-50 border-gray-200 hover:bg-gray-100'
+              } border rounded-lg`}
+              style={{ zIndex: 40 }}
+              title="Auslastung Report"
+            >
+              <BarChart3 className="w-4 h-4" />
+              Auslastung
+            </button>
+          )}
+          
+          {true && (
+            <button
+              onClick={() => setCurrentView('employees')}
+              className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
+                currentView === 'employees' 
+                  ? 'text-blue-700 bg-blue-50 border-blue-200' 
+                  : 'text-gray-700 bg-gray-50 border-gray-200 hover:bg-gray-100'
+              } border rounded-lg`}
+              style={{ zIndex: 40 }}
+              title="Mitarbeiter Liste"
+            >
+              <Users className="w-4 h-4" />
+              Mitarbeiter
+            </button>
+          )}
+          
+          {true && (
+            <button
+              onClick={() => setCurrentView('sales')}
+              className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
+                currentView === 'sales' 
+                  ? 'text-blue-700 bg-blue-50 border-blue-200' 
+                  : 'text-gray-700 bg-gray-50 border-gray-200 hover:bg-gray-100'
+              } border rounded-lg`}
+              style={{ zIndex: 40 }}
+              title="Sales Team Overview"
+            >
+              <Target className="w-4 h-4" />
+              Sales View
+            </button>
+          )}
+          
+          {/* Debug-Info für Entwicklung */}
+          <div className="text-xs text-gray-500 ml-2">
+            Rolle: {role}
+          </div>
 
           {/* LoB als feststehender Chip - nur bei Utilization */}
           {currentView === 'utilization' && lobOptions.length === 1 && (
@@ -212,7 +227,7 @@ export function AppHeader({
                         )}
                         */}
                         
-                        {/* Excel Upload */}
+                        {/* Excel Upload - temporär für alle sichtbar */}
                         {onExcelUpload && (
                           <button
                             onClick={() => { onExcelUpload(); setIsSettingsMenuOpen(false); }}
@@ -259,7 +274,7 @@ export function AppHeader({
                   </div>
                 )}
 
-                {/* Management */}
+                {/* Management - temporär für alle sichtbar */}
                 {(onRoleManagement || onTechnicalSkillManagement || onSoftSkillManagement || onSoftSkillImport || onTechnicalSkillImport || onRoleTaskImport || onProjectRolesDemo || onProjectSkillsDemo || onCustomerProjectsManagement || onAuslastungserklaerungManagement || onUserSettings) && (
                   <div className="mb-3">
                     <button
@@ -358,6 +373,36 @@ export function AppHeader({
                             className="w-full px-3 py-2 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 text-left font-medium"
                           >
                             🎯 Benutzereinstellungen
+                          </button>
+                        )}
+                        
+                        {/* Benutzerverwaltung - für alle Rollen sichtbar (temporär) */}
+                        {onUserRoleManagement && (
+                          <button
+                            onClick={() => { onUserRoleManagement(); setIsSettingsMenuOpen(false); }}
+                            className="w-full px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 text-left font-medium"
+                          >
+                            👥 Benutzerverwaltung
+                          </button>
+                        )}
+
+                        {/* Admin Setup - für alle sichtbar (temporär) */}
+                        {onAdminSetup && (
+                          <button
+                            onClick={() => { onAdminSetup(); setIsSettingsMenuOpen(false); }}
+                            className="w-full px-3 py-2 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 text-left font-medium"
+                          >
+                            🛡️ Admin einrichten
+                          </button>
+                        )}
+
+                        {/* Admin Restore - NOTFALL für überschriebene Admin-Rolle */}
+                        {onRestoreAdmin && (
+                          <button
+                            onClick={() => { onRestoreAdmin(); setIsSettingsMenuOpen(false); }}
+                            className="w-full px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 text-left font-medium"
+                          >
+                            🚨 Admin-Rolle wiederherstellen
                           </button>
                         )}
                       </div>

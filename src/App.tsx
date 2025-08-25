@@ -17,6 +17,9 @@ import ProjectSkillSelectorDemo from './components/generated/ProjectSkillSelecto
 import { CustomerProjectsManager } from './components/generated/CustomerProjectsManager';
 import AuslastungserklaerungManagement from './components/generated/AuslastungserklaerungManagement';
 import { UserSettingsDemo } from './components/generated/UserSettingsDemo';
+import UserRoleManagement from './components/generated/UserRoleManagement';
+import AdminSetup from './components/generated/AdminSetup';
+import RestoreAdminRole from './components/generated/RestoreAdminRole';
 import { CustomerProvider } from './contexts/CustomerContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './contexts/AuthContext';
@@ -91,6 +94,9 @@ function App() {
     const [isAuslastungserklaerungManagementOpen, setIsAuslastungserklaerungManagementOpen] = useState(false);
     const [isGeneralSettingsOpen, setIsGeneralSettingsOpen] = useState(false);
     const [isUserSettingsOpen, setIsUserSettingsOpen] = useState(false);
+    const [isUserRoleManagementOpen, setIsUserRoleManagementOpen] = useState(false);
+  const [isAdminSetupOpen, setIsAdminSetupOpen] = useState(false);
+  const [isRestoreAdminOpen, setIsRestoreAdminOpen] = useState(false);
     
     // State für Upload Panel
 
@@ -240,6 +246,9 @@ function App() {
             onAuslastungserklaerungManagement={() => setIsAuslastungserklaerungManagementOpen(true)}
             onUserSettings={() => setIsUserSettingsOpen(true)}
             onGeneralSettings={() => setIsGeneralSettingsOpen(true)}
+            onUserRoleManagement={() => setIsUserRoleManagementOpen(true)}
+            onAdminSetup={() => setIsAdminSetupOpen(true)}
+            onRestoreAdmin={() => setIsRestoreAdminOpen(true)}
             onProjectRolesDemo={() => setCurrentView('project-roles-demo')}
             onProjectSkillsDemo={() => setCurrentView('project-skills-demo')}
             lobOptions={[]} // TODO: von UtilizationReportView holen
@@ -619,6 +628,66 @@ function App() {
                   <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                     <button
                       onClick={() => setIsUserSettingsOpen(false)}
+                      className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                    >
+                      Schließen
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* User Role Management Modal */}
+          {isUserRoleManagementOpen && (
+            <div className="fixed inset-0 z-50 overflow-y-auto">
+              <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setIsUserRoleManagementOpen(false)}></div>
+                <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-7xl sm:w-full">
+                  <UserRoleManagement />
+                  <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button
+                      onClick={() => setIsUserRoleManagementOpen(false)}
+                      className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                    >
+                      Schließen
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Admin Setup Modal */}
+          {isAdminSetupOpen && (
+            <div className="fixed inset-0 z-50 overflow-y-auto">
+              <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setIsAdminSetupOpen(false)}></div>
+                <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+                  <AdminSetup />
+                  <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button
+                      onClick={() => setIsAdminSetupOpen(false)}
+                      className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                    >
+                      Schließen
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Restore Admin Modal */}
+          {isRestoreAdminOpen && (
+            <div className="fixed inset-0 z-50 overflow-y-auto">
+              <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setIsRestoreAdminOpen(false)}></div>
+                <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+                  <RestoreAdminRole />
+                  <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button
+                      onClick={() => setIsRestoreAdminOpen(false)}
                       className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                     >
                       Schließen
