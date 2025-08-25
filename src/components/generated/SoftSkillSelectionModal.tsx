@@ -15,6 +15,7 @@ import {
   Heart
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { addSoftSkillToUtilizationData, getPersonSkillsRolesFromHub } from '../../lib/utilization-hub-services';
 
 interface SoftSkill {
   id: string;
@@ -131,34 +132,58 @@ const SoftSkillSelectionModal: React.FC<SoftSkillSelectionModalProps> = ({
   // Bereits zugewiesene Skills laden
   const loadAssignedSkills = async () => {
     try {
-      const response = await fetch(`/api/employees/${encodeURIComponent(employeeId)}/soft-skills`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          setError('Authentifizierung fehlgeschlagen. Bitte melden Sie sich erneut an.');
-          return;
-        }
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const assignedData = await response.json();
-      setAssignedSkills(assignedData);
+      console.log('🔄 Lade zugewiesene Soft Skills aus utilizationData Hub für:', employeeName);
+      
+      const { softSkills: hubSkills } = await getPersonSkillsRolesFromHub(employeeName);
+      
+      // Konvertiere utilizationData Format zu Modal Format
+      const convertedSkills = hubSkills.map(skill => ({
+        id: skill.skillId,
+        skillId: skill.skillId,
+        skillName: skill.skillName,
+        level: skill.rating,
+        assignedAt: skill.assessedAt,
+        lastUpdated: skill.updatedAt
+      }));
+      
+      console.log('✅ Soft Skills aus utilizationData Hub geladen:', convertedSkills);
+      setAssignedSkills(convertedSkills);
       
       // Skill-Level State initialisieren
       const initialLevels: Record<string, number> = {};
-      assignedData.forEach((assigned: AssignedSoftSkill) => {
+      convertedSkills.forEach((assigned: AssignedSoftSkill) => {
         initialLevels[assigned.skillId] = assigned.level;
       });
       setSkillLevels(initialLevels);
       
     } catch (error) {
-      console.error('Error loading assigned soft skills:', error);
-      setError('Fehler beim Laden der zugewiesenen Skills');
+      console.error('❌ Fehler beim Laden der Soft Skills aus utilizationData Hub:', error);
+      // Fallback: Versuche Legacy API
+      try {
+        const response = await fetch(`/api/employees/${encodeURIComponent(employeeId)}/soft-skills`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const assignedData = await response.json();
+          console.log('📋 Fallback: Soft Skills aus Legacy API geladen:', assignedData);
+          setAssignedSkills(assignedData);
+          
+          const initialLevels: Record<string, number> = {};
+          assignedData.forEach((assigned: AssignedSoftSkill) => {
+            initialLevels[assigned.skillId] = assigned.level;
+          });
+          setSkillLevels(initialLevels);
+        } else {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+      } catch (legacyError) {
+        console.error('❌ Auch Legacy API fehlgeschlagen:', legacyError);
+        setError('Fehler beim Laden der zugewiesenen Skills');
+      }
     }
   };
 
@@ -212,36 +237,36 @@ const SoftSkillSelectionModal: React.FC<SoftSkillSelectionModalProps> = ({
     setError(null);
 
     try {
-      const assignments = skillsToAssign.map(([skillId, level]) => ({
-        skillId,
-        level
-      }));
-
-      const response = await fetch(`/api/employees/${encodeURIComponent(employeeId)}/soft-skills`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ assignments })
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Authentifizierung fehlgeschlagen. Bitte melden Sie sich erneut an.');
+      // Speichere Soft Skills in utilizationData Hub
+      console.log('💾 Speichere Soft Skills in utilizationData Hub für:', employeeName);
+      
+      for (const [skillId, level] of skillsToAssign) {
+        const skill = skills.find(s => s.id === skillId);
+        const skillName = skill?.name || 'Unbekannter Skill';
+        
+        // Prüfe ob Skill bereits zugewiesen ist
+        const isAlreadyAssigned = assignedSkills.some(assigned => assigned.skillId === skillId);
+        if (isAlreadyAssigned) {
+          console.warn(`⚠️ Skill "${skillName}" bereits zugewiesen, überspringe`);
+          continue;
         }
-        const errorData = await response.text();
-        let errorMessage = `HTTP ${response.status}: ${errorData}`;
-        try {
-          const parsedError = JSON.parse(errorData);
-          errorMessage = parsedError.error || errorMessage;
-        } catch {
-          // Keep original error message if parsing fails
-        }
-        throw new Error(errorMessage);
+        
+        await addSoftSkillToUtilizationData(employeeName, {
+          skillId,
+          skillName,
+          categoryName: categories.find(c => c.id === skill?.categoryId)?.name || 'Unbekannt',
+          rating: level
+        });
+        
+        console.log('✅ Soft Skill gespeichert:', { skillId, skillName, level });
       }
+      
+      console.log('✅ Alle Soft Skills erfolgreich in utilizationData Hub gespeichert');
 
       setSuccessMessage(`${skillsToAssign.length} Soft Skills erfolgreich zugewiesen!`);
+      
+      // Daten neu laden
+      await loadAssignedSkills();
       
       // Parent benachrichtigen
       onSkillAssigned();

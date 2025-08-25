@@ -15,6 +15,7 @@ import {
   Code
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { addTechnicalSkillToUtilizationData, getPersonSkillsRolesFromHub } from '../../lib/utilization-hub-services';
 
 interface TechnicalSkill {
   id: string;
@@ -112,18 +113,44 @@ const TechnicalSkillSelectionModal: React.FC<TechnicalSkillSelectionModalProps> 
     }
   };
 
-  // Zugewiesene Skills laden
+  // Zugewiesene Skills aus utilizationData Hub laden
   const loadAssignedSkills = async () => {
     try {
-      const response = await fetch(`/api/employee-technical-skills/${employeeId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (!response.ok) { throw new Error(`HTTP ${response.status}: ${response.statusText}`); }
-      const assignedData = await response.json();
-      setAssignedSkills(assignedData);
+      console.log('🔄 Lade zugewiesene Technical Skills aus utilizationData Hub für:', employeeName);
+      
+      const { technicalSkills: hubSkills } = await getPersonSkillsRolesFromHub(employeeName);
+      
+      // Konvertiere utilizationData Format zu Modal Format
+      const convertedSkills = hubSkills.map(skill => ({
+        id: skill.skillId,
+        skillId: skill.skillId,
+        skillName: skill.skillName,
+        level: skill.rating,
+        assignedAt: skill.assessedAt,
+        lastUpdated: skill.updatedAt
+      }));
+      
+      console.log('✅ Technical Skills aus utilizationData Hub geladen:', convertedSkills);
+      setAssignedSkills(convertedSkills);
+      
     } catch (error) {
-      console.warn('Error loading assigned skills:', error);
-      setAssignedSkills([]);
+      console.error('❌ Fehler beim Laden der Technical Skills aus utilizationData Hub:', error);
+      // Fallback: Versuche Legacy API
+      try {
+        const response = await fetch(`/api/employee-technical-skills/${employeeId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) {
+          const assignedData = await response.json();
+          console.log('📋 Fallback: Technical Skills aus Legacy API geladen:', assignedData);
+          setAssignedSkills(assignedData);
+        } else {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+      } catch (legacyError) {
+        console.error('❌ Auch Legacy API fehlgeschlagen:', legacyError);
+        setAssignedSkills([]);
+      }
     }
   };
 
@@ -176,23 +203,25 @@ const TechnicalSkillSelectionModal: React.FC<TechnicalSkillSelectionModalProps> 
     setSuccessMessage(null);
 
     try {
-      const response = await fetch(`/api/employee-technical-skills/${employeeId}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          skillId: skillId,
-          level: level,
-          categoryId: categoryId
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Fehler beim Zuweisen des Skills');
+      // Prüfe ob Skill bereits zugewiesen ist
+      const isAlreadyAssigned = assignedSkills.some(skill => skill.skillId === skillId);
+      if (isAlreadyAssigned) {
+        setError(`Der Skill "${skillName}" ist bereits zugewiesen.`);
+        setIsSubmitting(false);
+        return;
       }
+
+      // Speichere Skill-Link in utilizationData Hub
+      console.log('💾 Speichere Technical Skill in utilizationData Hub:', { employeeName, skillId, skillName, level });
+      
+      await addTechnicalSkillToUtilizationData(employeeName, {
+        skillId,
+        skillName,
+        categoryName: categories.find(c => c.id === categoryId)?.name || 'Unbekannt',
+        rating: level
+      });
+      
+      console.log('✅ Technical Skill erfolgreich in utilizationData Hub gespeichert');
 
       // Success message setzen
       setSuccessMessage(`${skillName} wurde erfolgreich zugewiesen`);
