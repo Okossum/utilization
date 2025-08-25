@@ -27,6 +27,7 @@ interface AppHeaderProps {
   onProjectSkillsDemo?: () => void;
   onCustomerProjectsManagement?: () => void;
   onAuslastungserklaerungManagement?: () => void;
+  onUserSettings?: () => void;
   onGeneralSettings?: () => void;
 }
 
@@ -52,6 +53,7 @@ export function AppHeader({
   onProjectSkillsDemo,
   onCustomerProjectsManagement,
   onAuslastungserklaerungManagement,
+  onUserSettings,
   onGeneralSettings
 }: AppHeaderProps) {
   const { user, profile } = useAuth();
@@ -145,58 +147,10 @@ export function AppHeader({
             <Users className="w-4 h-4" />
             Mitarbeiter
           </button>
-          <button
-            onClick={() => setCurrentView('employee-detail')}
-            className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
-              currentView === 'employee-detail' 
-                ? 'text-blue-700 bg-blue-50 border-blue-200' 
-                : 'text-gray-700 bg-gray-50 border-gray-200 hover:bg-gray-100'
-            } border rounded-lg`}
-            style={{ zIndex: 40 }}
-            title="Mitarbeiter Detailansicht (Neue UI)"
-          >
-            <User className="w-4 h-4" />
-            Detail (Neu)
-          </button>
-          <button
-            onClick={() => setCurrentView('projects')}
-            className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
-              currentView === 'projects' 
-                ? 'text-blue-700 bg-blue-50 border-blue-200' 
-                : 'text-gray-700 bg-gray-50 border-gray-200 hover:bg-gray-100'
-            } border rounded-lg`}
-            style={{ zIndex: 40 }}
-            title="Projekt Management Dashboard"
-          >
-            <Target className="w-4 h-4" />
-            Projekte
-          </button>
-          <button
-            onClick={() => setCurrentView('knowledge')}
-            className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
-              currentView === 'knowledge' 
-                ? 'text-blue-700 bg-blue-50 border-blue-200' 
-                : 'text-gray-700 bg-gray-50 border-gray-200 hover:bg-gray-100'
-            } border rounded-lg`}
-            style={{ zIndex: 40 }}
-            title="Knowledge Upload Test"
-          >
-            <FileText className="w-4 h-4" />
-            Knowledge
-          </button>
-          <button
-            onClick={() => setCurrentView('auslastung-comments')}
-            className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
-              currentView === 'auslastung-comments' 
-                ? 'text-blue-700 bg-blue-50 border-blue-200' 
-                : 'text-gray-700 bg-gray-50 border-gray-200 hover:bg-gray-100'
-            } border rounded-lg`}
-            style={{ zIndex: 40 }}
-            title="Auslastung mit direkten Kommentaren"
-          >
-            <MessageSquare className="w-4 h-4" />
-            Kommentare
-          </button>
+          {/* Detail (Neu) Button ausgeblendet */}
+          {/* Projekte Button ausgeblendet */}
+          {/* Knowledge Button ausgeblendet */}
+          {/* Kommentare Button ausgeblendet */}
           <button
             onClick={() => setCurrentView('sales')}
             className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
@@ -246,14 +200,7 @@ export function AppHeader({
                     </button>
                     {expandedSections.dataUpload && (
                       <div className="space-y-2 mt-2">
-                        {onAdminUpload && (
-                          <button
-                            onClick={() => { onAdminUpload(); setIsSettingsMenuOpen(false); }}
-                            className="w-full px-3 py-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 text-left font-medium"
-                          >
-                            📊 Excel Upload
-                          </button>
-                        )}
+
                         {/* DISABLED: Employee Upload
                         {onEmployeeUpload && (
                           <button
@@ -313,7 +260,7 @@ export function AppHeader({
                 )}
 
                 {/* Management */}
-                {(onRoleManagement || onTechnicalSkillManagement || onSoftSkillManagement || onSoftSkillImport || onTechnicalSkillImport || onRoleTaskImport || onProjectRolesDemo || onProjectSkillsDemo || onCustomerProjectsManagement || onAuslastungserklaerungManagement) && (
+                {(onRoleManagement || onTechnicalSkillManagement || onSoftSkillManagement || onSoftSkillImport || onTechnicalSkillImport || onRoleTaskImport || onProjectRolesDemo || onProjectSkillsDemo || onCustomerProjectsManagement || onAuslastungserklaerungManagement || onUserSettings) && (
                   <div className="mb-3">
                     <button
                       onClick={() => toggleSection('management')}
@@ -402,6 +349,15 @@ export function AppHeader({
                             className="w-full px-3 py-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 text-left font-medium"
                           >
                             📋 Auslastungserklärung
+                          </button>
+                        )}
+
+                        {onUserSettings && (
+                          <button
+                            onClick={() => { onUserSettings(); setIsSettingsMenuOpen(false); }}
+                            className="w-full px-3 py-2 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 text-left font-medium"
+                          >
+                            🎯 Benutzereinstellungen
                           </button>
                         )}
                       </div>

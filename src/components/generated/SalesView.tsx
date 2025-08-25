@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { EmployeeOverview } from './EmployeeOverview';
 import { useUtilizationData } from '../../contexts/UtilizationDataContext';
+import { getISOWeek } from 'date-fns';
 
 interface Skill {
   id: string;
@@ -72,7 +73,7 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
 
     // Sammle alle Projekt-Einträge mit Wochen-Informationen (nur aktuelle und zukünftige Wochen)
     const projectWeeks: { [key: string]: { weeks: string[], utilizations: number[], entries: any[] } } = {};
-    const currentWeek = new Date().getWeek(); // Aktuelle Kalenderwoche
+    const currentWeek = getISOWeek(new Date()); // Aktuelle Kalenderwoche
     const currentYear = new Date().getFullYear();
     
     Object.entries(record.einsatzplan).forEach(([week, entries]: [string, any]) => {
@@ -281,17 +282,4 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
   return <EmployeeOverview employees={employees} />;
 };
 
-// Hilfsfunktion für Wochennummer (vereinfacht)
-declare global {
-  interface Date {
-    getWeek(): number;
-  }
-}
 
-Date.prototype.getWeek = function() {
-  const date = new Date(this.getTime());
-  date.setHours(0, 0, 0, 0);
-  date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
-  const week1 = new Date(date.getFullYear(), 0, 4);
-  return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
-};

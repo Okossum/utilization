@@ -1768,19 +1768,32 @@ app.get('/api/employees', authMiddleware, async (req, res) => {
   try {
     console.log('🔍 Loading employees from mitarbeiter collection...');
     
-    // Erst prüfen, was überhaupt in der Collection ist
-    const allSnapshot = await db.collection('mitarbeiter').limit(5).get();
-    console.log(`📊 Total documents in mitarbeiter collection: ${allSnapshot.size}`);
+    // DEBUG: Prüfe die gesamte Collection
+    const totalSnapshot = await db.collection('mitarbeiter').get();
+    console.log(`📊 TOTAL documents in mitarbeiter collection: ${totalSnapshot.size}`);
     
-    if (allSnapshot.size > 0) {
-      allSnapshot.forEach(doc => {
-        console.log(`📄 Sample doc ${doc.id}:`, doc.data());
-      });
+    // DEBUG: Prüfe wie viele isLatest haben
+    const latestSnapshot = await db.collection('mitarbeiter').where('isLatest', '==', true).get();
+    console.log(`📊 Documents with isLatest=true: ${latestSnapshot.size}`);
+    
+    // DEBUG: Prüfe Sample-Dokumente
+    const sampleSnapshot = await db.collection('mitarbeiter').limit(5).get();
+    console.log(`📄 Sample documents (first 5):`);
+    sampleSnapshot.forEach(doc => {
+      const data = doc.data();
+      console.log(`  - ${doc.id}: person="${data.person}", isLatest=${data.isLatest}, cc="${data.cc}", team="${data.team}"`);
+    });
+    
+    let snapshot;
+    if (latestSnapshot.size === 0) {
+      console.log('⚠️  No documents with isLatest=true found, loading ALL documents');
+      snapshot = await db.collection('mitarbeiter').get();
+    } else {
+      console.log('✅ Using documents with isLatest=true');
+      snapshot = latestSnapshot;
     }
     
-    // Lade nur die neuesten Mitarbeiter-Versionen
-    const snapshot = await db.collection('mitarbeiter').where('isLatest', '==', true).get();
-    console.log(`📊 Latest documents loaded: ${snapshot.size}`);
+    console.log(`📊 Final documents to process: ${snapshot.size}`);
     
     const employees = [];
     

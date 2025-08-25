@@ -16,6 +16,7 @@ import ProjectRoleTaskSelectorDemo from './components/generated/ProjectRoleTaskS
 import ProjectSkillSelectorDemo from './components/generated/ProjectSkillSelectorDemo';
 import { CustomerProjectsManager } from './components/generated/CustomerProjectsManager';
 import AuslastungserklaerungManagement from './components/generated/AuslastungserklaerungManagement';
+import { UserSettingsDemo } from './components/generated/UserSettingsDemo';
 import { CustomerProvider } from './contexts/CustomerContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './contexts/AuthContext';
@@ -89,6 +90,7 @@ function App() {
     const [isCustomerProjectsManagementOpen, setIsCustomerProjectsManagementOpen] = useState(false);
     const [isAuslastungserklaerungManagementOpen, setIsAuslastungserklaerungManagementOpen] = useState(false);
     const [isGeneralSettingsOpen, setIsGeneralSettingsOpen] = useState(false);
+    const [isUserSettingsOpen, setIsUserSettingsOpen] = useState(false);
     
     // State für Upload Panel
 
@@ -236,6 +238,7 @@ function App() {
               onRoleTaskImport={() => setIsRoleTaskImportOpen(true)}
             onCustomerProjectsManagement={() => setIsCustomerProjectsManagementOpen(true)}
             onAuslastungserklaerungManagement={() => setIsAuslastungserklaerungManagementOpen(true)}
+            onUserSettings={() => setIsUserSettingsOpen(true)}
             onGeneralSettings={() => setIsGeneralSettingsOpen(true)}
             onProjectRolesDemo={() => setCurrentView('project-roles-demo')}
             onProjectSkillsDemo={() => setCurrentView('project-skills-demo')}
@@ -596,6 +599,26 @@ function App() {
                   <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                     <button
                       onClick={() => setIsAuslastungserklaerungManagementOpen(false)}
+                      className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                    >
+                      Schließen
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* User Settings Modal */}
+          {isUserSettingsOpen && (
+            <div className="fixed inset-0 z-50 overflow-y-auto">
+              <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setIsUserSettingsOpen(false)}></div>
+                <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-6xl sm:w-full">
+                  <UserSettingsDemo />
+                  <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button
+                      onClick={() => setIsUserSettingsOpen(false)}
                       className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                     >
                       Schließen

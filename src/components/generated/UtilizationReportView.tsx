@@ -7,6 +7,7 @@ import { EinsatzplanView } from './EinsatzplanView';
 import { AuslastungView } from './AuslastungView';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUtilizationData } from '../../contexts/UtilizationDataContext';
+import { useUserSettings } from '../../hooks/useUserSettings';
 import { MultiSelectFilter } from './MultiSelectFilter';
 import { PersonFilterBar } from './PersonFilterBar';
 // DatabaseService removed - using direct Firebase calls and consolidation.ts
@@ -69,6 +70,16 @@ export function UtilizationReportView({
   setIsColumnsMenuOpen,
   onEmployeeDetailNavigation
 }: UtilizationReportViewProps) {
+  
+  // ===== USER SETTINGS INTEGRATION =====
+  const { 
+    filterSettings, 
+    viewSettings, 
+    uiSettings,
+    updateFilterSettings, 
+    updateViewSettings,
+    loading: settingsLoading 
+  } = useUserSettings();
   const { user, loading, profile, updateProfile } = useAuth();
   const { 
     databaseData, 
@@ -100,19 +111,22 @@ export function UtilizationReportView({
     setToasts(prev => prev.filter(toast => toast.id !== id));
   };
   
-  const [showAllData, setShowAllData] = useState<boolean>(() => {
-    try { return JSON.parse(localStorage.getItem('utilization_show_all_data') || 'false'); } catch { return false; }
-  });
-  useEffect(() => {
-    try { localStorage.setItem('utilization_show_all_data', JSON.stringify(showAllData)); } catch {}
-  }, [showAllData]);
+  // Show all data toggle (from user settings)
+  const showAllData = filterSettings.showAllData;
+  const setShowAllData = (value: boolean) => {
+    updateFilterSettings({ showAllData: value });
+  };
   // DISABLED: uploadedFiles State
   // const [uploadedFiles, setUploadedFiles] = useState<{
   //   auslastung?: UploadedFile;
   //   einsatzplan?: UploadedFile;
   // }>({});
   const [dataSource, setDataSource] = useState<'upload' | 'database'>('database');
-  const [selectedPersons, setSelectedPersons] = useState<string[]>([]);
+  // Selected persons (from user settings)
+  const selectedPersons = filterSettings.selectedPersons;
+  const setSelectedPersons = (persons: string[]) => {
+    updateFilterSettings({ selectedPersons: persons });
+  };
   const [planningForPerson, setPlanningForPerson] = useState<string | null>(null);
   const [planningForWeek, setPlanningForWeek] = useState<{ year: number; week: number } | null>(null);
   const [dossiersByPerson, setDossiersByPerson] = useState<Record<string, { projectOffers?: any[]; jiraTickets?: any[]; utilizationComment?: string; planningComment?: string }>>({});
@@ -281,12 +295,33 @@ export function UtilizationReportView({
   useEffect(() => { try { localStorage.setItem('utilization_person_travel_readiness_v1', JSON.stringify(personTravelReadiness)); } catch {} }, [personTravelReadiness]);
 
   // Fehlende Variablen hinzufügen
-  const [filterCC, setFilterCC] = useState<string[]>([]);
-  const [filterLBS, setFilterLBS] = useState<string[]>([]);
-  const [filterLBSExclude, setFilterLBSExclude] = useState<string[]>([]);
-  const [filterStatus, setFilterStatus] = useState<string[]>([]);
-  const [showActionItems, setShowActionItems] = useState<boolean>(false);
-  const [personSearchTerm, setPersonSearchTerm] = useState<string>('');
+  // Filter settings (from user settings)
+  const filterCC = filterSettings.selectedCC;
+  const setFilterCC = (cc: string[]) => {
+    updateFilterSettings({ selectedCC: cc });
+  };
+  const filterLBS = filterSettings.selectedLoB;
+  const setFilterLBS = (lob: string[]) => {
+    updateFilterSettings({ selectedLoB: lob });
+  };
+  const filterLBSExclude: string[] = []; // Not in user settings yet
+  const setFilterLBSExclude = (lob: string[]) => {
+    // TODO: Add to user settings if needed
+  };
+  const filterStatus: string[] = []; // Not in user settings yet
+  const setFilterStatus = (status: string[]) => {
+    // TODO: Add to user settings if needed
+  };
+  // Show action items (from user settings)
+  const showActionItems = filterSettings.showActionItems;
+  const setShowActionItems = (value: boolean) => {
+    updateFilterSettings({ showActionItems: value });
+  };
+  // Person search term (from user settings)
+  const personSearchTerm = filterSettings.personSearchTerm;
+  const setPersonSearchTerm = (term: string) => {
+    updateFilterSettings({ personSearchTerm: term });
+  };
   
   // ✅ KORRIGIERT: Verwende globalen actionItems State aus App.tsx
 
@@ -379,16 +414,11 @@ export function UtilizationReportView({
   
 
 
-  const [showWorkingStudents, setShowWorkingStudents] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('utilization_show_working_students') || 'true'); } catch { return true; }
-  });
-
-  // Save working students toggle state
-  useEffect(() => {
-    try {
-      localStorage.setItem('utilization_show_working_students', JSON.stringify(showWorkingStudents));
-    } catch {}
-  }, [showWorkingStudents]);
+  // Show working students (from user settings)
+  const showWorkingStudents = filterSettings.showWorkingStudents;
+  const setShowWorkingStudents = (value: boolean) => {
+    updateFilterSettings({ showWorkingStudents: value });
+  };
   
 
 
@@ -426,18 +456,11 @@ export function UtilizationReportView({
     planning: true,
     ticket: true
   };
-  const [visibleColumns, setVisibleColumns] = useState<VisibleColumns>(() => {
-    try {
-      const raw = localStorage.getItem(VISIBLE_COLUMNS_KEY);
-      const parsed = raw ? JSON.parse(raw) : {};
-      return { ...defaultVisibleColumns, ...(parsed || {}) } as VisibleColumns;
-    } catch {
-      return { ...defaultVisibleColumns } as VisibleColumns;
-    }
-  });
-  useEffect(() => {
-    try { localStorage.setItem(VISIBLE_COLUMNS_KEY, JSON.stringify(visibleColumns)); } catch {}
-  }, [visibleColumns]);
+  // Visible columns (from user settings)
+  const visibleColumns = viewSettings.visibleColumns;
+  const setVisibleColumns = (columns: any) => {
+    updateViewSettings({ visibleColumns: columns });
+  };
 
   const columnsMenuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -457,9 +480,19 @@ export function UtilizationReportView({
   const [salesOpportunitiesPerson, setSalesOpportunitiesPerson] = useState<string | null>(null);
   const currentWeek = getISOWeek(new Date());
   const currentIsoYear = getISOWeekYear(new Date());
-  const [forecastStartWeek, setForecastStartWeek] = useState(currentWeek);
-  const [lookbackWeeks, setLookbackWeeks] = useState(8);
-  const [forecastWeeks, setForecastWeeks] = useState(8);
+  // Forecast and lookback settings (from user settings)
+  const forecastStartWeek = viewSettings.forecastStartWeek || currentWeek;
+  const setForecastStartWeek = (week: number) => {
+    updateViewSettings({ forecastStartWeek: week });
+  };
+  const lookbackWeeks = viewSettings.lookbackWeeks;
+  const setLookbackWeeks = (weeks: number) => {
+    updateViewSettings({ lookbackWeeks: weeks });
+  };
+  const forecastWeeks = viewSettings.forecastWeeks;
+  const setForecastWeeks = (weeks: number) => {
+    updateViewSettings({ forecastWeeks: weeks });
+  };
 
   // Removed planned engagements & customers local storage keys
 
@@ -1060,19 +1093,30 @@ export function UtilizationReportView({
   const [selectedBereich, setSelectedBereich] = useState<string>('');
   const [selectedCC, setSelectedCC] = useState<string>('');
   const [selectedTeam, setSelectedTeam] = useState<string>('');
-  // Initialwerte aus Profil laden
+  // Initialwerte aus Profil laden (nur wenn nicht "Alle Daten" aktiv)
   useEffect(() => {
-    if (!profile) return;
+    if (!profile || showAllData) return;
     setSelectedLoB(String(profile.lob || ''));
     setSelectedBereich(String((profile as any).bereich || ''));
     setSelectedCC(String(profile.competenceCenter || ''));
     setSelectedTeam(String(profile.team || ''));
-  }, [profile?.lob, (profile as any)?.bereich, profile?.competenceCenter, profile?.team]);
-  // Defaults: wenn nur eine Option vorhanden und nichts gewählt, automatisch setzen
-  useEffect(() => { if (!selectedLoB && lobOptions.length === 1) setSelectedLoB(lobOptions[0]); }, [lobOptions]);
-  useEffect(() => { if (!selectedBereich && bereichOptions.length === 1) setSelectedBereich(bereichOptions[0]); }, [bereichOptions]);
-  useEffect(() => { if (!selectedCC && ccOptions.length === 1) setSelectedCC(ccOptions[0]); }, [ccOptions]);
-  useEffect(() => { if (!selectedTeam && teamOptions.length === 1) setSelectedTeam(teamOptions[0]); }, [teamOptions]);
+  }, [profile?.lob, (profile as any)?.bereich, profile?.competenceCenter, profile?.team, showAllData]);
+  
+  // Defaults: wenn nur eine Option vorhanden und nichts gewählt, automatisch setzen (nur wenn nicht "Alle Daten" aktiv)
+  useEffect(() => { if (!showAllData && !selectedLoB && lobOptions.length === 1) setSelectedLoB(lobOptions[0]); }, [lobOptions, showAllData]);
+  useEffect(() => { if (!showAllData && !selectedBereich && bereichOptions.length === 1) setSelectedBereich(bereichOptions[0]); }, [bereichOptions, showAllData]);
+  useEffect(() => { if (!showAllData && !selectedCC && ccOptions.length === 1) setSelectedCC(ccOptions[0]); }, [ccOptions, showAllData]);
+  useEffect(() => { if (!showAllData && !selectedTeam && teamOptions.length === 1) setSelectedTeam(teamOptions[0]); }, [teamOptions, showAllData]);
+  
+  // Wenn "Alle Daten" aktiviert wird, alle Header-Filter zurücksetzen
+  useEffect(() => {
+    if (showAllData) {
+      setSelectedLoB('');
+      setSelectedBereich('');
+      setSelectedCC('');
+      setSelectedTeam('');
+    }
+  }, [showAllData]);
   // Korrigiere Auswahl, falls nicht mehr vorhanden
   useEffect(() => { if (selectedLoB && !lobOptions.includes(selectedLoB)) setSelectedLoB(''); }, [lobOptions]);
   useEffect(() => { if (selectedBereich && !bereichOptions.includes(selectedBereich)) setSelectedBereich(''); }, [bereichOptions]);
@@ -1574,6 +1618,26 @@ export function UtilizationReportView({
                   <span className="text-sm font-medium text-gray-700">Working Students</span>
                 </label>
               </div>
+            </div>
+            
+            {/* Scope Filter Dropdown für "Alle Daten anzeigen" */}
+            <div className="mt-4 flex justify-end">
+              <ScopeFilterDropdown
+                lobOptions={lobOptions}
+                bereichOptions={bereichOptions}
+                ccOptions={ccOptions}
+                teamOptions={teamOptions}
+                selectedLoB={selectedLoB}
+                setSelectedLoB={setSelectedLoB}
+                selectedBereich={selectedBereich}
+                setSelectedBereich={setSelectedBereich}
+                selectedCC={selectedCC}
+                setSelectedCC={setSelectedCC}
+                selectedTeam={selectedTeam}
+                setSelectedTeam={setSelectedTeam}
+                showAllData={showAllData}
+                setShowAllData={setShowAllData}
+              />
             </div>
           </div>
           <div className="overflow-x-auto">

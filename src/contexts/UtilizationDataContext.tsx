@@ -42,8 +42,9 @@ interface UtilizationDataContextType {
 const UtilizationDataContext = createContext<UtilizationDataContextType | undefined>(undefined);
 
 const CACHE_KEY = 'utilization_data_cache';
-const CACHE_VERSION = '1.0';
+const CACHE_VERSION = '1.1'; // Version erhöht um alten Cache zu invalidieren
 const CACHE_DURATION = 30 * 60 * 1000; // 30 Minuten
+const APP_START_KEY = 'app_start_timestamp';
 
 interface CacheData {
   data: any;
@@ -79,6 +80,18 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
 
   const loadFromCache = (): any | null => {
     try {
+      // Prüfe ob App neu gestartet wurde
+      const currentAppStart = sessionStorage.getItem(APP_START_KEY);
+      const currentTime = Date.now();
+      
+      if (!currentAppStart) {
+        // Erste App-Ladung - setze Timestamp und lösche alten Cache
+        sessionStorage.setItem(APP_START_KEY, currentTime.toString());
+        sessionStorage.removeItem(CACHE_KEY);
+        console.log('🔄 App-Neustart erkannt - Cache geleert');
+        return null;
+      }
+      
       const cached = sessionStorage.getItem(CACHE_KEY);
       if (!cached) return null;
 
@@ -86,21 +99,21 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
       
       // Prüfe Cache-Version und Alter
       if (cacheData.version !== CACHE_VERSION) {
-        // console.log entfernt
+        console.log('🔄 Cache-Version veraltet - Cache geleert');
         sessionStorage.removeItem(CACHE_KEY);
         return null;
       }
       
-      if (Date.now() - cacheData.timestamp > CACHE_DURATION) {
-        // console.log entfernt
+      if (currentTime - cacheData.timestamp > CACHE_DURATION) {
+        console.log('🔄 Cache abgelaufen - Cache geleert');
         sessionStorage.removeItem(CACHE_KEY);
         return null;
       }
 
-      // console.log entfernt
+      console.log('📦 Cache-Daten geladen');
       return cacheData.data;
     } catch (error) {
-      // console.warn entfernt
+      console.warn('⚠️ Cache-Fehler:', error);
       return null;
     }
   };
@@ -127,7 +140,7 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // console.log entfernt
+      console.log('🔄 Lade frische Daten aus Firebase...');
 
       // Lade aus Firebase
       const utilizationSnapshot = await getDocs(collection(db, 'utilizationData'));
@@ -135,8 +148,10 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
         id: doc.id,
         ...doc.data()
       })) as any[];
+      
+      console.log(`📊 Loaded ${utilizationData.length} records from utilizationData collection`);
 
-      // Transformiere Daten
+      // Transformiere Daten - ZURÜCK ZUR FUNKTIONIERENDEN VERSION
       const transformedData = {
         utilizationData: utilizationData,
         auslastung: utilizationData.map(record => ({
