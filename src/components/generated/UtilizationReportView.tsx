@@ -139,6 +139,7 @@ export function UtilizationReportView({
   const [assignmentEditorPerson, setAssignmentEditorPerson] = useState<string | null>(null);
   const [isProjectCreationModalOpen, setIsProjectCreationModalOpen] = useState(false);
   const [projectCreationPerson, setProjectCreationPerson] = useState<string | null>(null);
+  const [plannedProjectsByPerson, setPlannedProjectsByPerson] = useState<Record<string, Array<{ projectName: string; customer: string }>>>({});
 
   // Assignments: Zugriff (Preload-Effekt wird weiter unten nach visiblePersons platziert)
   const { getAssignmentsForEmployee, assignmentsByEmployee } = useAssignments();
@@ -147,6 +148,44 @@ export function UtilizationReportView({
 
   // ✅ SCHRITT 5: localStorage-Fallback entfernt - Datenbank-Daten werden erfolgreich geladen
   // Kein localStorage-Fallback mehr nötig, da die Datenbank-Daten funktionieren
+
+  // Lade geplante Projekte für alle sichtbaren Personen
+  const loadPlannedProjects = async () => {
+    try {
+      const { collection, query, where, getDocs } = await import('firebase/firestore');
+      const { COLLECTIONS } = await import('../../lib/types');
+      
+      const projectsSnapshot = await getDocs(
+        query(
+          collection(db, COLLECTIONS.PROJECTS),
+          where('projectType', '==', 'planned')
+        )
+      );
+      
+      const projectsByPerson: Record<string, Array<{ projectName: string; customer: string }>> = {};
+      
+      projectsSnapshot.forEach(doc => {
+        const project = doc.data();
+        if (project.roles && Array.isArray(project.roles)) {
+          project.roles.forEach((role: any) => {
+            if (role.employeeName) {
+              if (!projectsByPerson[role.employeeName]) {
+                projectsByPerson[role.employeeName] = [];
+              }
+              projectsByPerson[role.employeeName].push({
+                projectName: project.projectName || 'Unbekanntes Projekt',
+                customer: project.customer || 'Unbekannter Kunde'
+              });
+            }
+          });
+        }
+      });
+      
+      setPlannedProjectsByPerson(projectsByPerson);
+    } catch (error) {
+      console.error('Fehler beim Laden der geplanten Projekte:', error);
+    }
+  };
 
   // Clean up old "student" status from database
   useEffect(() => {
@@ -413,6 +452,7 @@ export function UtilizationReportView({
   useEffect(() => {
     loadAuslastungserklaerungen();
     loadPersonAuslastungserklaerungen();
+    loadPlannedProjects();
   }, []);
   
 
@@ -2237,8 +2277,8 @@ export function UtilizationReportView({
                             >
                               <Link2 className="w-4 h-4" />
                               {(() => {
-                                const list = assignmentsByEmployee[person] || [];
-                                const count = list.length;
+                                const plannedProjects = plannedProjectsByPerson[person] || [];
+                                const count = plannedProjects.length;
                                 return count > 0 ? (
                                   <span className="absolute -top-1 -right-1 text-[10px] leading-none bg-indigo-600 text-white rounded-full min-w-[14px] h-[14px] px-[4px] flex items-center justify-center">
                                     {count}
@@ -2247,9 +2287,9 @@ export function UtilizationReportView({
                               })()}
                             </button>
                             {(() => {
-                              const list = assignmentsByEmployee[person] || [];
-                              if (list.length === 0) return null;
-                              const tooltip = list.map(a => `${a.projectName || a.projectId}${a.customer ? ` · ${a.customer}` : ''}`).join('\n');
+                              const plannedProjects = plannedProjectsByPerson[person] || [];
+                              if (plannedProjects.length === 0) return null;
+                              const tooltip = plannedProjects.map(p => `${p.projectName} · ${p.customer}`).join('\n');
                               return (
                                 <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-[10px] rounded px-2 py-1 whitespace-pre">
                                   {tooltip}
