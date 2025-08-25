@@ -222,6 +222,8 @@ export default function EmployeeDetailView({
         if (!cancelled && !s1.empty) {
           const doc = s1.docs[0];
           const d: any = doc.data();
+          console.log('🔍 Einsatzplan data found:', d);
+          console.log('🔍 LBS from einsatzplan:', d.lbs);
           setPersonName(String(d.person || ''));
           setMeta({ team: d.team, cc: d.cc, lbs: d.lbs, location: d.location, startDate: d.startDate });
           return;
@@ -232,6 +234,8 @@ export default function EmployeeDetailView({
         if (!cancelled && !s2.empty) {
           const doc = s2.docs[0];
           const d: any = doc.data();
+          console.log('🔍 Einsatzplan fallback data found:', d);
+          console.log('🔍 LBS from einsatzplan fallback:', d.lbs);
           setPersonName(String(d.person || ''));
           setMeta({ team: d.team, cc: d.cc, lbs: d.lbs, location: d.location, startDate: d.startDate });
           return;
@@ -343,11 +347,13 @@ export default function EmployeeDetailView({
         
         if (employeeRecord && !cancelled) {
           console.log('📊 Employee record found:', employeeRecord);
+          const lbsValue = (employeeRecord as any).lbs || (employeeRecord as any).careerLevel || (employeeRecord as any).career_level || '';
+          console.log('🔍 LBS value extracted:', lbsValue);
           setEmployeeData({
             email: (employeeRecord as any).email || (employeeRecord as any).mail || (employeeRecord as any).e_mail || '',
             startDate: (employeeRecord as any).startDate || (employeeRecord as any).eintrittsdatum || (employeeRecord as any).start_date || '',
             location: (employeeRecord as any).location || (employeeRecord as any).standort || (employeeRecord as any).ort || (employeeRecord as any).office || '',
-            lbs: (employeeRecord as any).lbs || (employeeRecord as any).careerLevel || (employeeRecord as any).career_level || ''
+            lbs: lbsValue
           });
         } else {
           console.log('❌ No employee record found for:', { employeeId, personName });
@@ -827,10 +833,17 @@ export default function EmployeeDetailView({
       }
   }, [dataForUI, employeeId, personName]);
 
+  // Debug LBS values
+  console.log('🔍 Debug LBS values:', {
+    employeeDataLbs: employeeData?.lbs,
+    metaLbs: meta?.lbs,
+    finalPosition: employeeData?.lbs || meta?.lbs || 'LBS nicht verfügbar'
+  });
+
   const employee: Employee | null = personName ? {
     id: employeeId,
     name: personName,
-    position: employeeData?.lbs || meta?.lbs || '', // Prefer mitarbeiter collection LBS
+    position: employeeData?.lbs || meta?.lbs || 'LBS nicht verfügbar', // Prefer mitarbeiter collection LBS
     team: meta?.team || '',
     email: employeeData?.email || '',
     phone: '', // Removed as requested
