@@ -38,6 +38,7 @@ interface Employee {
   name: string;
   position: string;
   team: string;
+  cc: string; // Competence Center
   email: string;
   phone: string;
   location: string;
@@ -830,6 +831,7 @@ export default function EmployeeDetailView({
     name: personName,
     position: meta?.lbs || 'LBS nicht verfügbar', // All data from utilizationData
     team: meta?.team || '',
+    cc: meta?.cc || '', // Competence Center
     email: '', // Will be added to utilizationData in future
     phone: '', // Removed as requested
     location: meta?.location || '',
@@ -1005,10 +1007,10 @@ export default function EmployeeDetailView({
                       <span className="text-sm text-gray-600">Seit {formatDate(employee.startDate)}</span>
                     </div>
                   )}
-                  {employee.team && (
+                  {employee.cc && (
                     <div className="flex items-center space-x-3">
-                      <UserPlus className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-600">Team {employee.team}</span>
+                      <Building className="w-4 h-4 text-gray-400" />
+                      <span className="text-sm text-gray-600">CC {employee.cc}</span>
                     </div>
                   )}
                 </div>
