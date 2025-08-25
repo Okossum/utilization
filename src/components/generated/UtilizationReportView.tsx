@@ -188,7 +188,7 @@ export function UtilizationReportView({
   };
 
   // Hilfsfunktion: Finde die richtige ID für eine Person aus den geladenen Daten
-  const findPersonId = (personName: string): string | null => {
+  const findId = (personName: string): string | null => {
     // Prüfe ob databaseData das richtige Format hat
     console.log('🔍 Debug databaseData:', { 
       type: typeof databaseData, 
@@ -205,7 +205,7 @@ export function UtilizationReportView({
     
     const personRecord = utilizationDataArray.find(record => record.person === personName);
     if (personRecord?.id) {
-      console.log('✅ Person ID gefunden:', { person: personName, id: personRecord.id });
+      console.log('✅ ID gefunden:', { person: personName, id: personRecord.id });
       return personRecord.id;
     }
     
@@ -223,8 +223,8 @@ export function UtilizationReportView({
       console.log('🔄 Speichere Projekt-Referenz in utilizationData für:', employeeName);
       
       // Finde die richtige ID für diese Person
-      const personId = findPersonId(employeeName);
-      if (!personId) {
+      const id = findId(employeeName);
+      if (!id) {
         console.error('❌ Keine ID für Person gefunden:', employeeName);
         showToast('error', `Keine ID für ${employeeName} gefunden`, 5000);
         return;
@@ -234,14 +234,14 @@ export function UtilizationReportView({
       // Suche nach 'id' (der konsolidierte Identifier)
       let utilizationQuery = query(
         collection(db, COLLECTIONS.UTILIZATION_DATA),
-        where('id', '==', personId)
+        where('id', '==', id)
       );
       
       let utilizationSnapshot = await getDocs(utilizationQuery);
       
       // Falls nicht gefunden, ist das ein Datenproblem
       if (utilizationSnapshot.empty) {
-        console.error('❌ Kein utilizationData Eintrag für Person ID gefunden:', { person: employeeName, id: personId });
+        console.error('❌ Kein utilizationData Eintrag für ID gefunden:', { person: employeeName, id: id });
         showToast('error', `Dateneintrag für ${employeeName} nicht gefunden`, 5000);
         return;
       }
