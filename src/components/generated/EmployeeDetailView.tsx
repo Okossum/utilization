@@ -95,7 +95,7 @@ export default function EmployeeDetailView({
   
 
   const { token } = useAuth();
-  const { databaseData } = useUtilizationData();
+  const { databaseData, personMeta } = useUtilizationData();
   
   // Create dataForUI similar to UtilizationReportView
   const dataForUI = useMemo(() => {
