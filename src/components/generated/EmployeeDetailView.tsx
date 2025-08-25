@@ -1119,7 +1119,7 @@ export default function EmployeeDetailView({
                 ) : (
                   <div className="space-y-1">
                     {assignedRoles.slice(0, 5).map((role: any) => (
-                      <div key={role.id} className="flex items-center justify-between py-1">
+                      <div key={role.roleId || role.id} className="flex items-center justify-between py-1">
                         <div className="flex-1">
                           <span className="text-xs font-medium text-gray-900">{role.roleName}</span>
                         </div>
@@ -1167,7 +1167,7 @@ export default function EmployeeDetailView({
                 ) : (
                   <div className="space-y-1">
                     {assignedSkills.slice(0, 5).map((skill: any) => (
-                      <div key={skill.id} className="flex items-center justify-between py-1">
+                      <div key={skill.skillId || skill.id} className="flex items-center justify-between py-1">
                         <div className="flex-1">
                           <span className="text-xs font-medium text-gray-900">{skill.skillName}</span>
                         </div>
@@ -1215,7 +1215,7 @@ export default function EmployeeDetailView({
                 ) : (
                   <div className="space-y-1">
                     {assignedSoftSkills.slice(0, 5).map((skill: any) => (
-                      <div key={skill.id} className="flex items-center justify-between py-1">
+                      <div key={skill.skillId || skill.id} className="flex items-center justify-between py-1">
                         <div className="flex-1">
                           <span className="text-xs font-medium text-gray-900">{skill.skillName}</span>
                         </div>
