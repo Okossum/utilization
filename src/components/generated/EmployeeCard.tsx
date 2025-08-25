@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, MapPin, Users, Briefcase, Award, Mail, ChefHat, ExternalLink, Phone, Calendar, Building, Clock, Star, TrendingUp, MessageSquare, Heart, ThumbsUp, User } from 'lucide-react';
+import { ChevronDown, ChevronUp, MapPin, Users, Briefcase, Award, Mail, ChefHat, ExternalLink, Phone, Calendar, Building, Clock, Star, TrendingUp, MessageSquare, Heart, ThumbsUp, User, Plus } from 'lucide-react';
 import { SkillRating } from './SkillRating';
 import { ProjectDetail } from './ProjectDetail';
 interface Skill {
@@ -54,6 +54,7 @@ interface EmployeeCardProps {
   onToggleActive?: (employeeId: string) => void;
   onAvatarClick?: (employee: Employee) => void;
   onOpenDetail?: () => void;
+  onCreateProject?: () => void;
 }
 
 // @component: EmployeeCard
@@ -62,7 +63,8 @@ export const EmployeeCard = ({
   isCompact = false,
   onToggleActive,
   onAvatarClick,
-  onOpenDetail
+  onOpenDetail,
+  onCreateProject
 }: EmployeeCardProps) => {
   const [showProjectHistory, setShowProjectHistory] = useState(false);
   const [showPlannedProjects, setShowPlannedProjects] = useState(false);
@@ -370,6 +372,20 @@ export const EmployeeCard = ({
                 <p className="text-sm text-blue-600">{employee.planningComment}</p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Neues Projekt erstellen Button (wie Opportunities-Spalte) */}
+        {onCreateProject && (
+          <div className="mb-4">
+            <button
+              onClick={onCreateProject}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              title="Neues Projekt erstellen"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Neues Projekt erstellen</span>
+            </button>
           </div>
         )}
 

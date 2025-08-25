@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { EmployeeOverview } from './EmployeeOverview';
+import { ProjectCreationModal } from './ProjectCreationModal';
 import { useUtilizationData } from '../../contexts/UtilizationDataContext';
 import { getISOWeek } from 'date-fns';
 
@@ -50,6 +51,8 @@ interface Employee {
   weaknesses?: string[];    // Schwächen
   utilizationComment?: string; // Auslastungskommentar
   planningComment?: string; // Planungskommentar
+  // Callback für Projekt-Erstellung
+  onCreateProject?: () => void;
 }
 
 interface SalesViewProps {
@@ -61,6 +64,10 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
   const { databaseData, personMeta, isLoading } = useUtilizationData();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [error, setError] = useState<string | null>(null);
+  
+  // Project Creation Modal States (wie in UtilizationReportView)
+  const [isProjectCreationModalOpen, setIsProjectCreationModalOpen] = useState(false);
+  const [projectCreationPerson, setProjectCreationPerson] = useState<string | null>(null);
 
   // Hilfsfunktion: Woche zu Datum konvertieren
   const weekToDate = (weekString: string, addDays: number = 0): string => {
@@ -280,7 +287,13 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
           
           // Projekte
           completedProjects: transformAuslastungToCompletedProjects(record),
-          plannedProjects: transformEinsatzplanToProjects(record)
+          plannedProjects: transformEinsatzplanToProjects(record),
+          
+          // Callback für Project Creation (exakt wie in UtilizationReportView)
+          onCreateProject: () => {
+            setProjectCreationPerson(record.person);
+            setIsProjectCreationModalOpen(true);
+          }
         };
 
         // Debug-Logging für erweiterte Daten
@@ -361,7 +374,23 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
   }
 
   // Erfolgreiche Darstellung mit echten Daten
-  return <EmployeeOverview employees={employees} />;
+  return (
+    <>
+      <EmployeeOverview employees={employees} />
+      
+      {/* Project Creation Modal (exakt wie in UtilizationReportView Opportunities) */}
+      <ProjectCreationModal
+        isOpen={isProjectCreationModalOpen}
+        onClose={() => {
+          setIsProjectCreationModalOpen(false);
+          setProjectCreationPerson(null);
+        }}
+        employeeId={projectCreationPerson || ''}
+        employeeName={projectCreationPerson || ''}
+        forceProjectType="planned"
+      />
+    </>
+  );
 };
 
 

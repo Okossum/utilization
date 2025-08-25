@@ -48,6 +48,8 @@ interface Employee {
   weaknesses?: string[];    // Schwächen
   utilizationComment?: string; // Auslastungskommentar
   planningComment?: string; // Planungskommentar
+  // Callback für Projekt-Erstellung
+  onCreateProject?: () => void;
 }
 type ViewMode = 'cards' | 'table' | 'grid';
 const defaultEmployeesData: Employee[] = [{
@@ -206,7 +208,7 @@ export const EmployeeOverview = ({ employees }: EmployeeOverviewProps) => {
         duration: 0.3
       }}>
           {viewMode === 'table' ? <EmployeeTable employees={displayEmployees} /> : <div className={`grid gap-6 ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1'}`}>
-              {displayEmployees.map(employee => <EmployeeCard key={employee.id} employee={employee} isCompact={viewMode === 'grid'} />)}
+              {displayEmployees.map(employee => <EmployeeCard key={employee.id} employee={employee} isCompact={viewMode === 'grid'} onCreateProject={employee.onCreateProject} />)}
             </div>}
         </motion.main>
       </div>
