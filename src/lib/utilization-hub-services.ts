@@ -6,18 +6,18 @@ import { COLLECTIONS, AssignedRole, AssignedTechnicalSkill, AssignedSoftSkill, U
 // ===== HELPER FUNCTIONS =====
 
 /**
- * Findet utilizationData Dokument für eine Person
+ * Findet utilizationData Dokument für eine Person über ID
  */
-export const findUtilizationDataDoc = async (personName: string) => {
+export const findUtilizationDataDoc = async (id: string) => {
   const utilizationQuery = query(
     collection(db, COLLECTIONS.UTILIZATION_DATA),
-    where('person', '==', personName)
+    where('id', '==', id)
   );
   
   const snapshot = await getDocs(utilizationQuery);
   
   if (snapshot.empty) {
-    throw new Error(`Kein utilizationData Eintrag für Person gefunden: ${personName}`);
+    throw new Error(`Kein utilizationData Eintrag für ID gefunden: ${id}`);
   }
   
   return {
@@ -42,10 +42,10 @@ export const updateUtilizationDataDoc = async (docId: string, updates: Partial<U
  * Fügt eine Rolle zu einer Person hinzu
  */
 export const addRoleToUtilizationData = async (
-  personName: string, 
+  id: string, 
   role: Omit<AssignedRole, 'assignedAt' | 'updatedAt'>
 ) => {
-  const { doc: utilizationDoc, data } = await findUtilizationDataDoc(personName);
+  const { doc: utilizationDoc, data } = await findUtilizationDataDoc(id);
   
   const newRole: AssignedRole = {
     ...role,
@@ -60,7 +60,7 @@ export const addRoleToUtilizationData = async (
     assignedRoles: updatedRoles
   });
   
-  console.log('✅ Rolle hinzugefügt zu utilizationData Hub:', { personName, role: newRole });
+  console.log('✅ Rolle hinzugefügt zu utilizationData Hub:', { id, role: newRole });
   return newRole;
 };
 
@@ -68,17 +68,17 @@ export const addRoleToUtilizationData = async (
  * Aktualisiert eine Rolle einer Person
  */
 export const updateRoleInUtilizationData = async (
-  personName: string,
+  id: string,
   roleId: string,
   updates: Partial<AssignedRole>
 ) => {
-  const { doc: utilizationDoc, data } = await findUtilizationDataDoc(personName);
+  const { doc: utilizationDoc, data } = await findUtilizationDataDoc(id);
   
   const existingRoles = data.assignedRoles || [];
   const roleIndex = existingRoles.findIndex(r => r.roleId === roleId);
   
   if (roleIndex === -1) {
-    throw new Error(`Rolle ${roleId} nicht gefunden für Person ${personName}`);
+    throw new Error(`Rolle ${roleId} nicht gefunden für Person ${id}`);
   }
   
   const updatedRoles = [...existingRoles];
@@ -92,15 +92,15 @@ export const updateRoleInUtilizationData = async (
     assignedRoles: updatedRoles
   });
   
-  console.log('✅ Rolle aktualisiert in utilizationData Hub:', { personName, roleId, updates });
+  console.log('✅ Rolle aktualisiert in utilizationData Hub:', { id, roleId, updates });
   return updatedRoles[roleIndex];
 };
 
 /**
  * Entfernt eine Rolle von einer Person
  */
-export const removeRoleFromUtilizationData = async (personName: string, roleId: string) => {
-  const { doc: utilizationDoc, data } = await findUtilizationDataDoc(personName);
+export const removeRoleFromUtilizationData = async (id: string, roleId: string) => {
+  const { doc: utilizationDoc, data } = await findUtilizationDataDoc(id);
   
   const existingRoles = data.assignedRoles || [];
   const updatedRoles = existingRoles.filter(r => r.roleId !== roleId);
@@ -109,7 +109,7 @@ export const removeRoleFromUtilizationData = async (personName: string, roleId: 
     assignedRoles: updatedRoles
   });
   
-  console.log('✅ Rolle entfernt aus utilizationData Hub:', { personName, roleId });
+  console.log('✅ Rolle entfernt aus utilizationData Hub:', { id, roleId });
 };
 
 // ===== TECHNICAL SKILLS MANAGEMENT =====
@@ -118,10 +118,10 @@ export const removeRoleFromUtilizationData = async (personName: string, roleId: 
  * Fügt einen Technical Skill zu einer Person hinzu
  */
 export const addTechnicalSkillToUtilizationData = async (
-  personName: string,
+  id: string,
   skill: Omit<AssignedTechnicalSkill, 'assessedAt' | 'updatedAt'>
 ) => {
-  const { doc: utilizationDoc, data } = await findUtilizationDataDoc(personName);
+  const { doc: utilizationDoc, data } = await findUtilizationDataDoc(id);
   
   const newSkill: AssignedTechnicalSkill = {
     ...skill,
@@ -136,7 +136,7 @@ export const addTechnicalSkillToUtilizationData = async (
     technicalSkills: updatedSkills
   });
   
-  console.log('✅ Technical Skill hinzugefügt zu utilizationData Hub:', { personName, skill: newSkill });
+  console.log('✅ Technical Skill hinzugefügt zu utilizationData Hub:', { id, skill: newSkill });
   return newSkill;
 };
 
@@ -144,17 +144,17 @@ export const addTechnicalSkillToUtilizationData = async (
  * Aktualisiert einen Technical Skill einer Person
  */
 export const updateTechnicalSkillInUtilizationData = async (
-  personName: string,
+  id: string,
   skillId: string,
   updates: Partial<AssignedTechnicalSkill>
 ) => {
-  const { doc: utilizationDoc, data } = await findUtilizationDataDoc(personName);
+  const { doc: utilizationDoc, data } = await findUtilizationDataDoc(id);
   
   const existingSkills = data.technicalSkills || [];
   const skillIndex = existingSkills.findIndex(s => s.skillId === skillId);
   
   if (skillIndex === -1) {
-    throw new Error(`Technical Skill ${skillId} nicht gefunden für Person ${personName}`);
+    throw new Error(`Technical Skill ${skillId} nicht gefunden für Person ${id}`);
   }
   
   const updatedSkills = [...existingSkills];
@@ -168,15 +168,15 @@ export const updateTechnicalSkillInUtilizationData = async (
     technicalSkills: updatedSkills
   });
   
-  console.log('✅ Technical Skill aktualisiert in utilizationData Hub:', { personName, skillId, updates });
+  console.log('✅ Technical Skill aktualisiert in utilizationData Hub:', { id, skillId, updates });
   return updatedSkills[skillIndex];
 };
 
 /**
  * Entfernt einen Technical Skill von einer Person
  */
-export const removeTechnicalSkillFromUtilizationData = async (personName: string, skillId: string) => {
-  const { doc: utilizationDoc, data } = await findUtilizationDataDoc(personName);
+export const removeTechnicalSkillFromUtilizationData = async (id: string, skillId: string) => {
+  const { doc: utilizationDoc, data } = await findUtilizationDataDoc(id);
   
   const existingSkills = data.technicalSkills || [];
   const updatedSkills = existingSkills.filter(s => s.skillId !== skillId);
@@ -185,7 +185,7 @@ export const removeTechnicalSkillFromUtilizationData = async (personName: string
     technicalSkills: updatedSkills
   });
   
-  console.log('✅ Technical Skill entfernt aus utilizationData Hub:', { personName, skillId });
+  console.log('✅ Technical Skill entfernt aus utilizationData Hub:', { id, skillId });
 };
 
 // ===== DOSSIER DATA MANAGEMENT =====
@@ -194,7 +194,7 @@ export const removeTechnicalSkillFromUtilizationData = async (personName: string
  * Speichert Dossier-Daten (Stärken, Schwächen, etc.) in utilizationData Hub
  */
 export const saveDossierDataToUtilizationHub = async (
-  personName: string, 
+  id: string, 
   dossierData: {
     strengths?: string;
     weaknesses?: string;
@@ -206,9 +206,9 @@ export const saveDossierDataToUtilizationHub = async (
   }
 ) => {
   try {
-    console.log('💾 Speichere Dossier-Daten in utilizationData Hub für:', personName);
+    console.log('💾 Speichere Dossier-Daten in utilizationData Hub für:', id);
     
-    const { doc: utilizationDoc } = await findUtilizationDataDoc(personName);
+    const { doc: utilizationDoc } = await findUtilizationDataDoc(id);
     
     const updateData = {
       ...dossierData,
@@ -228,11 +228,11 @@ export const saveDossierDataToUtilizationHub = async (
 /**
  * Lädt Dossier-Daten aus utilizationData Hub
  */
-export const getDossierDataFromUtilizationHub = async (personName: string) => {
+export const getDossierDataFromUtilizationHub = async (id: string) => {
   try {
-    console.log('🔄 Lade Dossier-Daten aus utilizationData Hub für:', personName);
+    console.log('🔄 Lade Dossier-Daten aus utilizationData Hub für:', id);
     
-    const { data } = await findUtilizationDataDoc(personName);
+    const { data } = await findUtilizationDataDoc(id);
     
     const dossierData = {
       strengths: data.strengths || '',
@@ -260,10 +260,10 @@ export const getDossierDataFromUtilizationHub = async (personName: string) => {
  * Fügt einen Soft Skill zu einer Person hinzu
  */
 export const addSoftSkillToUtilizationData = async (
-  personName: string,
+  id: string,
   skill: Omit<AssignedSoftSkill, 'assessedAt' | 'updatedAt'>
 ) => {
-  const { doc: utilizationDoc, data } = await findUtilizationDataDoc(personName);
+  const { doc: utilizationDoc, data } = await findUtilizationDataDoc(id);
   
   const newSkill: AssignedSoftSkill = {
     ...skill,
@@ -278,7 +278,7 @@ export const addSoftSkillToUtilizationData = async (
     softSkills: updatedSkills
   });
   
-  console.log('✅ Soft Skill hinzugefügt zu utilizationData Hub:', { personName, skill: newSkill });
+  console.log('✅ Soft Skill hinzugefügt zu utilizationData Hub:', { id, skill: newSkill });
   return newSkill;
 };
 
@@ -286,17 +286,17 @@ export const addSoftSkillToUtilizationData = async (
  * Aktualisiert einen Soft Skill einer Person
  */
 export const updateSoftSkillInUtilizationData = async (
-  personName: string,
+  id: string,
   skillId: string,
   updates: Partial<AssignedSoftSkill>
 ) => {
-  const { doc: utilizationDoc, data } = await findUtilizationDataDoc(personName);
+  const { doc: utilizationDoc, data } = await findUtilizationDataDoc(id);
   
   const existingSkills = data.softSkills || [];
   const skillIndex = existingSkills.findIndex(s => s.skillId === skillId);
   
   if (skillIndex === -1) {
-    throw new Error(`Soft Skill ${skillId} nicht gefunden für Person ${personName}`);
+    throw new Error(`Soft Skill ${skillId} nicht gefunden für Person ${id}`);
   }
   
   const updatedSkills = [...existingSkills];
@@ -310,15 +310,15 @@ export const updateSoftSkillInUtilizationData = async (
     softSkills: updatedSkills
   });
   
-  console.log('✅ Soft Skill aktualisiert in utilizationData Hub:', { personName, skillId, updates });
+  console.log('✅ Soft Skill aktualisiert in utilizationData Hub:', { id, skillId, updates });
   return updatedSkills[skillIndex];
 };
 
 /**
  * Entfernt einen Soft Skill von einer Person
  */
-export const removeSoftSkillFromUtilizationData = async (personName: string, skillId: string) => {
-  const { doc: utilizationDoc, data } = await findUtilizationDataDoc(personName);
+export const removeSoftSkillFromUtilizationData = async (id: string, skillId: string) => {
+  const { doc: utilizationDoc, data } = await findUtilizationDataDoc(id);
   
   const existingSkills = data.softSkills || [];
   const updatedSkills = existingSkills.filter(s => s.skillId !== skillId);
@@ -327,7 +327,7 @@ export const removeSoftSkillFromUtilizationData = async (personName: string, ski
     softSkills: updatedSkills
   });
   
-  console.log('✅ Soft Skill entfernt aus utilizationData Hub:', { personName, skillId });
+  console.log('✅ Soft Skill entfernt aus utilizationData Hub:', { id, skillId });
 };
 
 // ===== BULK OPERATIONS =====
@@ -336,12 +336,12 @@ export const removeSoftSkillFromUtilizationData = async (personName: string, ski
  * Migriert bestehende Skills/Rollen einer Person in den utilizationData Hub
  */
 export const migratePersonSkillsRolesToHub = async (
-  personName: string,
+  id: string,
   roles: AssignedRole[],
   technicalSkills: AssignedTechnicalSkill[],
   softSkills: AssignedSoftSkill[]
 ) => {
-  const { doc: utilizationDoc } = await findUtilizationDataDoc(personName);
+  const { doc: utilizationDoc } = await findUtilizationDataDoc(id);
   
   await updateUtilizationDataDoc(utilizationDoc.id, {
     assignedRoles: roles,
@@ -350,7 +350,7 @@ export const migratePersonSkillsRolesToHub = async (
   });
   
   console.log('✅ Skills/Rollen migriert zu utilizationData Hub:', { 
-    personName, 
+    id, 
     rolesCount: roles.length,
     technicalSkillsCount: technicalSkills.length,
     softSkillsCount: softSkills.length
@@ -360,10 +360,10 @@ export const migratePersonSkillsRolesToHub = async (
 // ===== GETTER FUNCTIONS =====
 
 /**
- * Lädt alle Skills/Rollen einer Person aus dem utilizationData Hub
+ * Lädt alle Skills/Rollen einer Person aus dem utilizationData Hub über ID
  */
-export const getPersonSkillsRolesFromHub = async (personName: string) => {
-  const { data } = await findUtilizationDataDoc(personName);
+export const getPersonSkillsRolesFromHub = async (id: string) => {
+  const { data } = await findUtilizationDataDoc(id);
   
   return {
     assignedRoles: data.assignedRoles || [],

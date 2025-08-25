@@ -147,9 +147,9 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
   // Zugewiesene Rollen aus utilizationData Hub laden
   const loadAssignedRoles = async () => {
     try {
-      console.log('🔄 Lade zugewiesene Rollen aus utilizationData Hub für:', employeeName);
+      console.log('🔄 Lade zugewiesene Rollen aus utilizationData Hub für ID:', employeeId);
       
-      const { assignedRoles: hubRoles } = await getPersonSkillsRolesFromHub(employeeName);
+      const { assignedRoles: hubRoles } = await getPersonSkillsRolesFromHub(employeeId);
       
       // Konvertiere utilizationData Format zu Modal Format
       const convertedRoles = hubRoles.map(role => ({
@@ -333,7 +333,7 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
       // Speichere Rolle in utilizationData Hub
       console.log('💾 Speichere Rolle in utilizationData Hub:', { employeeName, roleId, roleName, level });
       
-      await addRoleToUtilizationData(employeeName, {
+      await addRoleToUtilizationData(employeeId, {
         roleId,
         roleName,
         categoryName: categories.find(c => c.id === categoryId)?.name || 'Unbekannt',

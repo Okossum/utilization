@@ -118,7 +118,7 @@ const TechnicalSkillSelectionModal: React.FC<TechnicalSkillSelectionModalProps> 
     try {
       console.log('🔄 Lade zugewiesene Technical Skills aus utilizationData Hub für:', employeeName);
       
-      const { technicalSkills: hubSkills } = await getPersonSkillsRolesFromHub(employeeName);
+      const { technicalSkills: hubSkills } = await getPersonSkillsRolesFromHub(employeeId);
       
       // Konvertiere utilizationData Format zu Modal Format
       const convertedSkills = hubSkills.map(skill => ({
@@ -214,7 +214,7 @@ const TechnicalSkillSelectionModal: React.FC<TechnicalSkillSelectionModalProps> 
       // Speichere Skill-Link in utilizationData Hub
       console.log('💾 Speichere Technical Skill in utilizationData Hub:', { employeeName, skillId, skillName, level });
       
-      await addTechnicalSkillToUtilizationData(employeeName, {
+      await addTechnicalSkillToUtilizationData(employeeId, {
         skillId,
         skillName,
         categoryName: categories.find(c => c.id === categoryId)?.name || 'Unbekannt',

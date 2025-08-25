@@ -138,7 +138,8 @@ export function UtilizationReportView({
   const [isAssignmentEditorOpen, setIsAssignmentEditorOpen] = useState(false);
   const [assignmentEditorPerson, setAssignmentEditorPerson] = useState<string | null>(null);
   const [isProjectCreationModalOpen, setIsProjectCreationModalOpen] = useState(false);
-  const [projectCreationPerson, setProjectCreationPerson] = useState<string | null>(null);
+  const [projectCreationPersonId, setProjectCreationPersonId] = useState<string | null>(null);
+  const [projectCreationPersonName, setProjectCreationPersonName] = useState<string | null>(null);
   const [plannedProjectsByPerson, setPlannedProjectsByPerson] = useState<Record<string, Array<{ projectName: string; customer: string }>>>({});
 
   // Assignments: Zugriff (Preload-Effekt wird weiter unten nach visiblePersons platziert)
@@ -215,34 +216,28 @@ export function UtilizationReportView({
   };
 
   // Speichere Projekt-Referenz in utilizationData Collection (zentraler Hub)
-  const saveProjectToUtilizationData = async (projectData: any, employeeName: string) => {
+  const saveProjectToUtilizationData = async (projectData: any, employeeId: string) => {
     try {
       const { collection, query, where, getDocs, updateDoc, doc } = await import('firebase/firestore');
       const { COLLECTIONS } = await import('../../lib/types');
       
-      console.log('🔄 Speichere Projekt-Referenz in utilizationData für:', employeeName);
+      console.log('🔄 Speichere Projekt-Referenz in utilizationData für ID:', employeeId);
       
-      // Finde die richtige ID für diese Person
-      const id = findId(employeeName);
-      if (!id) {
-        console.error('❌ Keine ID für Person gefunden:', employeeName);
-        showToast('error', `Keine ID für ${employeeName} gefunden`, 5000);
-        return;
-      }
+      // Verwende direkt die employeeId (keine Konvertierung nötig)
       
       // Finde den utilizationData Eintrag für diese Person
       // Suche nach 'id' (der konsolidierte Identifier)
       let utilizationQuery = query(
         collection(db, COLLECTIONS.UTILIZATION_DATA),
-        where('id', '==', id)
+        where('id', '==', employeeId)
       );
       
       let utilizationSnapshot = await getDocs(utilizationQuery);
       
       // Falls nicht gefunden, ist das ein Datenproblem
       if (utilizationSnapshot.empty) {
-        console.error('❌ Kein utilizationData Eintrag für ID gefunden:', { person: employeeName, id: id });
-        showToast('error', `Dateneintrag für ${employeeName} nicht gefunden`, 5000);
+        console.error('❌ Kein utilizationData Eintrag für ID gefunden:', { employeeId });
+        showToast('error', `Dateneintrag für ID ${employeeId} nicht gefunden`, 5000);
         return;
       }
       
@@ -258,7 +253,7 @@ export function UtilizationReportView({
         customer: projectData.customer,
         projectType: projectData.projectType,
         addedAt: new Date().toISOString(),
-        roles: projectData.roles?.filter((role: any) => role.employeeName === employeeName) || []
+        roles: projectData.roles || [] // Alle Rollen des Projekts, da wir bereits für die richtige Person speichern
       };
       
       // Prüfe ob Projekt bereits referenziert ist
@@ -273,7 +268,7 @@ export function UtilizationReportView({
         });
         
         console.log('✅ Projekt-Referenz erfolgreich in utilizationData gespeichert');
-        showToast('success', `Projekt "${projectData.projectName}" wurde ${employeeName} zugeordnet`, 3000);
+        showToast('success', `Projekt "${projectData.projectName}" wurde erfolgreich zugeordnet`, 3000);
       } else {
         console.log('ℹ️ Projekt-Referenz bereits vorhanden');
         showToast('info', `Projekt "${projectData.projectName}" ist bereits zugeordnet`, 3000);
@@ -1920,13 +1915,7 @@ export function UtilizationReportView({
                     LBS
                   </SortableHeader>
 
-                  {/* Bereich-Spalte */}
-                  <SortableHeader 
-                    field="bereich" 
-                    className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100"
-                  >
-                    Bereich
-                  </SortableHeader>
+
                   {/* CC-Spalte */}
                   <SortableHeader 
                     field="cc" 
@@ -2281,18 +2270,7 @@ export function UtilizationReportView({
                         )}
                       </td>
 
-                      {/* Bereich-Spalte */}
-                      <td className={`px-0.5 py-0.5 text-sm ${
-                        hasNoManager 
-                          ? 'bg-yellow-100'
-                          : (actionItems[person]?.actionItem ? 'bg-blue-100' : 'bg-gray-50')
-                      } ${isTerminated ? 'line-through opacity-60' : ''}`} style={{padding: '2px 2px', minWidth: 'max-content'}}>
-                        {(personMeta.get(person) as any)?.bereich ? (
-                          <span className="text-xs text-gray-700 whitespace-nowrap">{(personMeta.get(person) as any)?.bereich}</span>
-                        ) : (
-                          <span className="text-xs text-gray-400">—</span>
-                        )}
-                      </td>
+
                       {/* CC-Spalte */}
                       <td className={`px-0.5 py-0.5 text-sm ${
                         hasNoManager 
@@ -2500,7 +2478,16 @@ export function UtilizationReportView({
 
                           <div className="relative group">
                             <button
-                              onClick={() => { setProjectCreationPerson(person); setIsProjectCreationModalOpen(true); }}
+                              onClick={() => { 
+                                const personId = findId(person);
+                                if (personId) {
+                                  setProjectCreationPersonId(personId);
+                                  setProjectCreationPersonName(person);
+                                  setIsProjectCreationModalOpen(true);
+                                } else {
+                                  showToast('error', `Keine ID für ${person} gefunden`, 3000);
+                                }
+                              }}
                               className="relative p-1 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded border border-indigo-300 transition-colors"
                               title="Neues Projekt erstellen"
                             >
@@ -2762,12 +2749,13 @@ export function UtilizationReportView({
          onSave={async (projectData) => {
            try {
              // Speichere Projekt-Referenz in utilizationData (zentraler Hub)
-             if (projectCreationPerson) {
-               await saveProjectToUtilizationData(projectData, projectCreationPerson);
+             if (projectCreationPersonId) {
+               await saveProjectToUtilizationData(projectData, projectCreationPersonId);
              }
              
              setIsProjectCreationModalOpen(false);
-             setProjectCreationPerson(null);
+             setProjectCreationPersonId(null);
+             setProjectCreationPersonName(null);
              
              // Refresh data after project creation and reference storage
              await refreshData();
@@ -2777,8 +2765,8 @@ export function UtilizationReportView({
              showToast('error', 'Fehler beim Speichern des Projekts', 5000);
            }
          }}
-         employeeId={projectCreationPerson || ''}
-         employeeName={projectCreationPerson || ''}
+         employeeId={projectCreationPersonId || ''}
+         employeeName={projectCreationPersonName || ''}
          forceProjectType="planned"
        />
 

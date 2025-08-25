@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUtilizationData } from '../../contexts/UtilizationDataContext';
@@ -32,14 +32,65 @@ export default function AutoRoleAssignment() {
   const [applying, setApplying] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+  const [creatingAdmin, setCreatingAdmin] = useState(false);
 
+  // ✅ Notfall-Funktion: Admin-Benutzer erstellen
+  const createEmergencyAdmin = async () => {
+    if (!user?.email) return;
+    
+    try {
+      setCreatingAdmin(true);
+      console.log('🚨 Erstelle Notfall-Admin für:', user.email);
+      
+      const adminData = {
+        person: user.displayName || 'Admin User',
+        email: user.email,
+        systemRole: 'admin',
+        hasSystemAccess: true,
+        cc: 'ADMIN',
+        team: 'ADMIN',
+        lob: 'ADMIN',
+        bereich: 'ADMIN',
+        isLatest: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        emergencyCreated: true,
+        emergencyCreatedAt: new Date().toISOString(),
+        emergencyReason: 'Notfall-Admin über Auto-Zuweisung erstellt'
+      };
+
+      const docId = user.email.replace(/[@.]/g, '_');
+      await setDoc(doc(db, 'utilizationData', docId), adminData);
+      
+      setMessage({ 
+        type: 'success', 
+        text: '✅ Admin-Benutzer erfolgreich erstellt! Seite wird neu geladen...' 
+      });
+      
+      setTimeout(() => window.location.reload(), 2000);
+      
+    } catch (error) {
+      console.error('❌ Fehler beim Erstellen des Admin-Benutzers:', error);
+      setMessage({ 
+        type: 'error', 
+        text: 'Fehler beim Erstellen: ' + (error as Error).message 
+      });
+    } finally {
+      setCreatingAdmin(false);
+    }
+  };
+
+  // ✅ TEMPORÄR: Berechtigung deaktiviert für Admin-Wiederherstellung
   // Nur für Admins verfügbar
-  if (!canManageUsers()) {
+  if (!canManageUsers() && role !== 'unknown') {
     return (
       <div className="p-6 text-center">
         <AlertTriangle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
         <h3 className="text-lg font-semibold text-gray-900 mb-2">Keine Berechtigung</h3>
         <p className="text-gray-600">Nur Administratoren können automatische Rollen-Zuweisungen durchführen.</p>
+        <div className="mt-4 text-sm text-gray-500">
+          Aktuelle Rolle: {role}
+        </div>
       </div>
     );
   }
@@ -283,7 +334,22 @@ export default function AutoRoleAssignment() {
           <p className="text-gray-600 mt-1">
             Basierend auf Geschäftsregeln: VG-Spalte (Führungskraft) und AT SAL Bereich (Sales)
           </p>
+          <div className="mt-2 text-sm text-gray-500">
+            Ihre aktuelle Rolle: <span className="font-semibold">{role === 'unknown' ? 'Keine Rolle' : role}</span>
+          </div>
         </div>
+        
+        {/* Notfall-Admin Button */}
+        {(role === 'unknown' || !canManageUsers()) && user?.email && (
+          <button
+            onClick={createEmergencyAdmin}
+            disabled={creatingAdmin}
+            className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+          >
+            <Shield className="w-4 h-4 mr-2" />
+            {creatingAdmin ? 'Erstelle Admin...' : 'Notfall-Admin erstellen'}
+          </button>
+        )}
       </div>
 
       {/* Nachricht */}

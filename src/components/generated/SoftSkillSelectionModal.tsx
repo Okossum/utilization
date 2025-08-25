@@ -134,7 +134,7 @@ const SoftSkillSelectionModal: React.FC<SoftSkillSelectionModalProps> = ({
     try {
       console.log('🔄 Lade zugewiesene Soft Skills aus utilizationData Hub für:', employeeName);
       
-      const { softSkills: hubSkills } = await getPersonSkillsRolesFromHub(employeeName);
+      const { softSkills: hubSkills } = await getPersonSkillsRolesFromHub(employeeId);
       
       // Konvertiere utilizationData Format zu Modal Format
       const convertedSkills = hubSkills.map(skill => ({
@@ -251,7 +251,7 @@ const SoftSkillSelectionModal: React.FC<SoftSkillSelectionModalProps> = ({
           continue;
         }
         
-        await addSoftSkillToUtilizationData(employeeName, {
+        await addSoftSkillToUtilizationData(employeeId, {
           skillId,
           skillName,
           categoryName: categories.find(c => c.id === skill?.categoryId)?.name || 'Unbekannt',

@@ -329,24 +329,23 @@ export async function uploadAuslastung(file: File, targetCollection = "auslastun
   const dataStartRow = 4;
   const chunk = 400;
   
-  const personDataList: any[] = [];
+  // ✅ NEUE KONSOLIDIERUNGSLOGIK: Sammle alle Zeilen nach Personalnummer
+  const rawDataByPersonalNumber = new Map<string, any[]>();
+  const rawDataWithoutPersonalNumber: any[] = [];
   
   for (let r = dataStartRow; r <= range.e.r; r++) {
-    const person = String((ws as any)[A1(r, 4)]?.v ?? "").trim() // Spalte E: "Mitarbeiter (ID)"
-      .replace(/\([^)]*\)\s*$/, "").trim();
-    if (!person) continue;
+    const personWithId = String((ws as any)[A1(r, 4)]?.v ?? "").trim(); // Spalte E: "Mitarbeiter (ID)"
+    if (!personWithId) continue;
+    
+    // ✅ Extrahiere Personalnummer aus Format "Nachname, Vorname (12345)"
+    const personalNumberMatch = personWithId.match(/\((\d+)\)\s*$/);
+    const personalNumber = personalNumberMatch ? personalNumberMatch[1] : null;
+    const person = personWithId.replace(/\([^)]*\)\s*$/, "").trim(); // Name ohne Personalnummer
     
     const cc = String((ws as any)[A1(r, 2)]?.v ?? "").trim(); // Spalte C: "Hierarchie Slicer - CC"
     
     // Parse Name in Nachname/Vorname
     const { nachname, vorname } = parsePersonName(person);
-
-    const res = matchPerson(person, cc, ix);
-    if (res.status !== "matched") {
-      (res.status === "ambiguous") ? ambiguous++ : unmatched++;
-      continue;
-    }
-    matched++;
 
     // Sammle Auslastungswerte für alle erkannten Wochen
     const values: Record<string, number> = {};
@@ -367,38 +366,134 @@ export async function uploadAuslastung(file: File, targetCollection = "auslastun
         }
         
         values[week] = percentValue;
-        
-        // Debug: Zeige Konvertierung für erste paar Einträge
-        if (written < 3 && num !== percentValue) {
-          logger.info("uploaders.auslastung", `🔄 Dezimal→Prozent Konvertierung für ${person}`, {
-            week,
-            originalValue: num,
-            convertedValue: percentValue,
-            conversionReason: num <= 2 ? "Dezimalwert erkannt" : "Bereits Prozentwert"
-          });
-        }
       }
     }
 
-    // Sammle Personendaten für Batch-Verarbeitung
-    personDataList.push({
+    const rowData = {
       person,
-      nachname, // ✅ Aufgeteilter Nachname
-      vorname, // ✅ Aufgeteilter Vorname
-      personId: res.personId,
+      personWithId,
+      personalNumber,
+      nachname,
+      vorname,
       cc,
       values,
+      rowIndex: r
+    };
+
+    // ✅ Gruppiere nach Personalnummer (falls vorhanden)
+    if (personalNumber) {
+      if (!rawDataByPersonalNumber.has(personalNumber)) {
+        rawDataByPersonalNumber.set(personalNumber, []);
+      }
+      rawDataByPersonalNumber.get(personalNumber)!.push(rowData);
+    } else {
+      rawDataWithoutPersonalNumber.push(rowData);
+    }
+  }
+
+  logger.info("uploaders.auslastung", "Daten nach Personalnummer gruppiert", {
+    withPersonalNumber: rawDataByPersonalNumber.size,
+    withoutPersonalNumber: rawDataWithoutPersonalNumber.length
+  });
+
+  // ✅ Konsolidiere Daten pro Personalnummer
+  const consolidatedPersonDataList: any[] = [];
+  
+  // Verarbeite Personen mit Personalnummer (konsolidiert)
+  for (const [personalNumber, rows] of rawDataByPersonalNumber) {
+    if (rows.length === 1) {
+      // Nur eine Zeile - keine Konsolidierung nötig
+      const row = rows[0];
+      const res = matchPerson(row.person, row.cc, ix);
+      if (res.status !== "matched") {
+        (res.status === "ambiguous") ? ambiguous++ : unmatched++;
+        continue;
+      }
+      matched++;
+
+      consolidatedPersonDataList.push({
+        person: row.person,
+        nachname: row.nachname,
+        vorname: row.vorname,
+        personId: res.personId,
+        personalNumber,
+        cc: row.cc,
+        values: row.values,
+        fileName: file.name,
+        updatedAt: new Date(),
+        matchStatus: "matched",
+        consolidatedFrom: 1
+      });
+    } else {
+      // Mehrere Zeilen - Konsolidierung erforderlich
+      logger.info("uploaders.auslastung", `🔄 Konsolidiere ${rows.length} Einträge für Personalnummer ${personalNumber}`);
+      
+      // Verwende die neueste/aktuellste Zeile für Stammdaten (CC, Team, etc.)
+      const latestRow = rows[rows.length - 1]; // Letzte Zeile = aktuellste
+      
+      // Konsolidiere alle Wochenwerte
+      const consolidatedValues: Record<string, number> = {};
+      for (const row of rows) {
+        for (const [week, value] of Object.entries(row.values)) {
+          if (value !== undefined && value !== null && typeof value === 'number') {
+            // Verwende den neuesten Wert für jede Woche (überschreibt ältere Werte)
+            consolidatedValues[week] = value;
+          }
+        }
+      }
+
+      const res = matchPerson(latestRow.person, latestRow.cc, ix);
+      if (res.status !== "matched") {
+        (res.status === "ambiguous") ? ambiguous++ : unmatched++;
+        continue;
+      }
+      matched++;
+
+      consolidatedPersonDataList.push({
+        person: latestRow.person,
+        nachname: latestRow.nachname,
+        vorname: latestRow.vorname,
+        personId: res.personId,
+        personalNumber,
+        cc: latestRow.cc,
+        values: consolidatedValues,
+        fileName: file.name,
+        updatedAt: new Date(),
+        matchStatus: "matched",
+        consolidatedFrom: rows.length
+      });
+    }
+  }
+
+  // Verarbeite Personen ohne Personalnummer (unkonsolidiert)
+  for (const row of rawDataWithoutPersonalNumber) {
+    const res = matchPerson(row.person, row.cc, ix);
+    if (res.status !== "matched") {
+      (res.status === "ambiguous") ? ambiguous++ : unmatched++;
+      continue;
+    }
+    matched++;
+
+    consolidatedPersonDataList.push({
+      person: row.person,
+      nachname: row.nachname,
+      vorname: row.vorname,
+      personId: res.personId,
+      personalNumber: null,
+      cc: row.cc,
+      values: row.values,
       fileName: file.name,
       updatedAt: new Date(),
-      matchStatus: "matched"
+      matchStatus: "matched",
+      consolidatedFrom: 1
     });
   }
 
-  // Batch-Verarbeitung
-  for (let i = 0; i < personDataList.length; i += chunk) {
+  // ✅ Batch-Verarbeitung mit konsolidierten Daten
+  for (let i = 0; i < consolidatedPersonDataList.length; i += chunk) {
     const batch = writeBatch(db);
-    for (let j = 0; j < Math.min(chunk, personDataList.length - i); j++) {
-      const personData = personDataList[i + j];
+    for (let j = 0; j < Math.min(chunk, consolidatedPersonDataList.length - i); j++) {
+      const personData = consolidatedPersonDataList[i + j];
       const ref = doc(collection(db, targetCollection), personData.personId);
       batch.set(ref, personData, { merge: true });
       written++;

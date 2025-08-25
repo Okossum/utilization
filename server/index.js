@@ -1081,12 +1081,26 @@ app.post('/api/consolidate', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Auslastung und Einsatzplan Daten erforderlich' });
     }
 
+    // ✅ Lade auch Mitarbeiter-Daten für vollständige Konsolidierung
+    const mitarbeiterSnap = await db.collection('mitarbeiter').where('isLatest', '==', true).get();
+    const mitarbeiterData = [];
+    mitarbeiterSnap.forEach(doc => {
+      const data = doc.data();
+      mitarbeiterData.push({
+        ...data,
+        id: doc.id
+      });
+    });
+
+    console.log(`📊 Geladene Daten: ${auslastungData.length} Auslastung, ${einsatzplanData.length} Einsatzplan, ${mitarbeiterData.length} Mitarbeiter`);
+
     const consolidatedData = [];
     
-    // Alle Personen sammeln
+    // ✅ Alle Personen aus allen drei Datenquellen sammeln
     const allPersons = new Set([
       ...auslastungData.map(row => row.person).filter(Boolean),
-      ...einsatzplanData.map(row => row.person).filter(Boolean)
+      ...einsatzplanData.map(row => row.person).filter(Boolean),
+      ...mitarbeiterData.map(row => row.person).filter(Boolean)
     ]);
 
     // Gruppiere Daten nach Person
@@ -1106,6 +1120,16 @@ app.post('/api/consolidate', requireAuth, async (req, res) => {
         einsatzplanByPerson.set(row.person, []);
       }
       einsatzplanByPerson.get(row.person).push(row);
+    });
+
+    // ✅ Gruppiere auch Mitarbeiter-Daten nach Person
+    const mitarbeiterByPerson = new Map();
+    mitarbeiterData.forEach(row => {
+      if (!row.person) return;
+      if (!mitarbeiterByPerson.has(row.person)) {
+        mitarbeiterByPerson.set(row.person, []);
+      }
+      mitarbeiterByPerson.get(row.person).push(row);
     });
 
             // Sammle alle verfügbaren Wochen-Keys aus beiden Datensets
@@ -1136,36 +1160,43 @@ app.post('/api/consolidate', requireAuth, async (req, res) => {
         
         // console.log entfernt
 
-    // Konsolidiere für jede Person und jede Woche
+    // ✅ Konsolidiere für jede Person und jede Woche (mit Mitarbeiter-Daten)
     for (const person of allPersons) {
       const ausRows = auslastungByPerson.get(person) || [];
       const einRows = einsatzplanByPerson.get(person) || [];
+      const mitRows = mitarbeiterByPerson.get(person) || [];
 
-      // Sammle Team/CC Kombinationen für diese Person
+      // ✅ NEUE LOGIK: Sammle CC Kombinationen für diese Person (ohne Team)
       const personCombinations = new Set();
       
       ausRows.forEach(row => {
-        const combo = `${row.team || 'unknown'}__${row.cc || 'unknown'}`;
-        personCombinations.add(combo);
+        const cc = row.cc || 'unknown';
+        personCombinations.add(cc);
       });
       einRows.forEach(row => {
-        const combo = `${row.team || 'unknown'}__${row.cc || 'unknown'}`;
-        personCombinations.add(combo);
+        const cc = row.cc || 'unknown';
+        personCombinations.add(cc);
+      });
+      mitRows.forEach(row => {
+        const cc = row.cc || 'unknown';
+        personCombinations.add(cc);
       });
 
       if (personCombinations.size === 0) {
-        personCombinations.add('unknown__unknown');
+        personCombinations.add('unknown');
       }
 
-      // Verarbeite jede Team/CC Kombination
-      for (const combo of personCombinations) {
-        const [team, cc] = combo.split('__');
+      // Verarbeite jede CC Kombination (ohne Team-Matching)
+      for (const cc of personCombinations) {
         
         const ausRow = ausRows.find(row => 
-          (row.team || 'unknown') === team && (row.cc || 'unknown') === cc
+          (row.cc || 'unknown') === cc
         );
         const einRow = einRows.find(row => 
-          (row.team || 'unknown') === team && (row.cc || 'unknown') === cc
+          (row.cc || 'unknown') === cc
+        );
+        const mitRow = mitRows.find(row => 
+          (row.cc || 'unknown') === cc
         );
 
         // Verarbeite jede verfügbare Woche
@@ -1193,7 +1224,7 @@ app.post('/api/consolidate', requireAuth, async (req, res) => {
             // console.log entfernt
           }
           
-          // Nur hinzufügen wenn mindestens ein Wert vorhanden ist
+          // Nur hinzufügen wenn mindestens ein Auslastungs- oder Einsatzplan-Wert vorhanden ist
           if (ausValue !== null || einValue !== null) {
             const finalValue = ausValue !== null ? ausValue : einValue;
             
@@ -1204,13 +1235,20 @@ app.post('/api/consolidate', requireAuth, async (req, res) => {
             
             consolidatedData.push({
               person,
-              personId: ausRow?.personId || einRow?.personId,
-              lob: ausRow?.lob || einRow?.lob,
-              bereich: ausRow?.bereich || einRow?.bereich,
-              cc: cc !== 'unknown' ? cc : (ausRow?.cc || einRow?.cc),
-              team: team !== 'unknown' ? team : (ausRow?.team || einRow?.team),
-              lbs: einRow?.lbs,
-              location: ausRow?.location || einRow?.location,
+              personId: ausRow?.personId || einRow?.personId || mitRow?.id,
+              // ✅ Mitarbeiter-Daten haben Priorität für Stammdaten
+              lob: mitRow?.lob || ausRow?.lob || einRow?.lob,
+              bereich: mitRow?.bereich || ausRow?.bereich || einRow?.bereich,
+              cc: cc !== 'unknown' ? cc : (mitRow?.cc || ausRow?.cc || einRow?.cc),
+              team: mitRow?.team || ausRow?.team || einRow?.team, // ✅ Team wird gespeichert aber nicht für Matching verwendet
+              lbs: mitRow?.lbs || einRow?.lbs,
+              location: mitRow?.location || ausRow?.location || einRow?.location,
+              // ✅ Weitere Mitarbeiter-Stammdaten
+              nachname: mitRow?.nachname,
+              vorname: mitRow?.vorname,
+              email: mitRow?.email,
+              careerLevel: mitRow?.careerLevel,
+              skills: mitRow?.skills,
               week: weekKey,
               year: year,
               weekNumber: weekNumber,
@@ -1220,7 +1258,7 @@ app.post('/api/consolidate', requireAuth, async (req, res) => {
               source: (ausValue !== null && einValue !== null) ? 'both' : 
                      (ausValue !== null ? 'auslastung' : 'einsatzplan'),
               isLatest: true,
-              compositeKey: `${person}__${team !== 'unknown' ? team : (ausRow?.team || einRow?.team || 'unknown')}__${cc !== 'unknown' ? cc : (ausRow?.cc || einRow?.cc || 'unknown')}`
+              compositeKey: `${person}__${cc !== 'unknown' ? cc : (mitRow?.cc || ausRow?.cc || einRow?.cc || 'unknown')}` // ✅ Nur Person + CC
             });
           }
         }
@@ -1238,7 +1276,7 @@ app.post('/api/consolidate', requireAuth, async (req, res) => {
     // Neue Daten speichern (mit Composite Key)
     const savedCount = [];
     for (const row of consolidatedData) {
-      // Verwende Composite Key: Person__Team__CC__Week für eindeutige Identifikation
+      // ✅ Verwende Composite Key: Person__CC__Week für eindeutige Identifikation (ohne Team)
       // ✅ OPTIMAL: Ersetze '/' nur für Document-ID, behalte Original-Format in Daten  
       const sanitizedWeek = row.week ? String(row.week).replace(/\//g, '|') : 'unknown';
       const docId = `${row.compositeKey}__${sanitizedWeek}`;

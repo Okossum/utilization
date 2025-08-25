@@ -10,7 +10,7 @@ export interface RolePermissions {
   canViewAllEmployees: boolean;
 }
 
-// Zentrale Berechtigungsmatrix
+// ✅ TEMPORÄR: Alle Rollen haben Admin-Rechte (für Datenbank-Wiederherstellung)
 export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
   admin: {
     views: ['utilization', 'employees', 'sales'],
@@ -21,31 +21,31 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
   },
   führungskraft: {
     views: ['utilization', 'employees', 'sales'], // ALLE Views
-    settings: ['excel-upload'], // Nur Excel-Upload im Settings
-    canManageUsers: false,
+    settings: ['all'], // ✅ TEMPORÄR: Vollzugriff
+    canManageUsers: true, // ✅ TEMPORÄR: Admin-Rechte
     canUploadData: true,
     canViewAllEmployees: true
   },
   sales: {
-    views: ['sales'],
-    settings: [], // Kein Settings-Zugriff
-    canManageUsers: false,
-    canUploadData: false,
-    canViewAllEmployees: false
+    views: ['utilization', 'employees', 'sales'], // ✅ TEMPORÄR: Alle Views
+    settings: ['all'], // ✅ TEMPORÄR: Vollzugriff
+    canManageUsers: true, // ✅ TEMPORÄR: Admin-Rechte
+    canUploadData: true, // ✅ TEMPORÄR: Upload-Rechte
+    canViewAllEmployees: true // ✅ TEMPORÄR: Vollzugriff
   },
   user: {
-    views: ['utilization'], // Nur Auslastungsansicht
-    settings: [], // Keine Settings
-    canManageUsers: false,
-    canUploadData: false,
-    canViewAllEmployees: false // Nur eigenes Profil später
+    views: ['utilization', 'employees', 'sales'], // ✅ TEMPORÄR: Alle Views
+    settings: ['all'], // ✅ TEMPORÄR: Vollzugriff
+    canManageUsers: true, // ✅ TEMPORÄR: Admin-Rechte
+    canUploadData: true, // ✅ TEMPORÄR: Upload-Rechte
+    canViewAllEmployees: true // ✅ TEMPORÄR: Vollzugriff
   },
   unknown: {
-    views: [],
-    settings: [],
-    canManageUsers: false,
-    canUploadData: false,
-    canViewAllEmployees: false
+    views: ['utilization', 'employees', 'sales'], // ✅ TEMPORÄR: Alle Views
+    settings: ['all'], // ✅ TEMPORÄR: Vollzugriff
+    canManageUsers: true, // ✅ TEMPORÄR: Admin-Rechte
+    canUploadData: true, // ✅ TEMPORÄR: Upload-Rechte
+    canViewAllEmployees: true // ✅ TEMPORÄR: Vollzugriff
   }
 };
 

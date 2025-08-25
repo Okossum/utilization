@@ -87,13 +87,6 @@ export const EmployeeOverview = ({ employees }: EmployeeOverviewProps) => {
   return <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-7xl mx-auto">
         <header className="mb-8">
-          <div className="flex items-center gap-3 mb-6">
-            <Users className="w-8 h-8 text-blue-600" />
-            <h1 className="text-3xl font-bold text-slate-800">
-              <span>Freelance Sales Team Overview</span>
-            </h1>
-          </div>
-          
           <div className="flex gap-2 bg-white rounded-xl p-2 shadow-sm border border-slate-200 w-fit">
             {viewModeButtons.map(({
             mode,

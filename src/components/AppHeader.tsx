@@ -112,7 +112,7 @@ export function AppHeader({
             {currentView === 'employees' && 'Mitarbeiter'}
             {currentView === 'knowledge' && 'Knowledge Library'}
             {currentView === 'auslastung-comments' && 'Auslastung mit Kommentaren'}
-            {currentView === 'sales' && 'Sales Team Overview'}
+            {currentView === 'sales' && 'Sales View'}
             {currentView === 'employee-detail' && 'Mitarbeiter Detail'}
             {currentView === 'projects' && 'Projekt Management'}
           </h1>
@@ -161,7 +161,7 @@ export function AppHeader({
                   : 'text-gray-700 bg-gray-50 border-gray-200 hover:bg-gray-100'
               } border rounded-lg`}
               style={{ zIndex: 40 }}
-              title="Sales Team Overview"
+              title="Sales View"
             >
               <Target className="w-4 h-4" />
               Sales View
@@ -390,9 +390,14 @@ export function AppHeader({
                         )}
 
                         {/* Admin Restore - NOTFALL für überschriebene Admin-Rolle */}
-                        {onRestoreAdmin && (
+                        {(onRestoreAdmin || role === 'unknown') && (
                           <button
-                            onClick={() => { onRestoreAdmin(); setIsSettingsMenuOpen(false); }}
+                            onClick={() => { 
+                              if (onRestoreAdmin) {
+                                onRestoreAdmin(); 
+                              }
+                              setIsSettingsMenuOpen(false); 
+                            }}
                             className="w-full px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 text-left font-medium"
                           >
                             🚨 Admin-Rolle wiederherstellen
@@ -473,6 +478,22 @@ export function AppHeader({
                     Benutzerverwaltung
                   </button>
                 )}
+                
+                {/* ✅ Admin-Rolle wiederherstellen - immer sichtbar wenn keine Admin-Rolle */}
+                {(role === 'unknown' || !profile?.role || profile?.role !== 'admin') && (
+                  <button
+                    onClick={() => { 
+                      if (onRestoreAdmin) {
+                        onRestoreAdmin(); 
+                      }
+                      setIsAccountMenuOpen(false); 
+                    }}
+                    className="w-full px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 mb-2"
+                  >
+                    🚨 Admin-Rolle wiederherstellen
+                  </button>
+                )}
+                
                 <button
                   onClick={async () => { setIsAccountMenuOpen(false); await logout(); }}
                   className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
