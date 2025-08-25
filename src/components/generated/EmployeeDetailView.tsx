@@ -211,41 +211,52 @@ export default function EmployeeDetailView({
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Resolve personName and meta from Firestore einsatzplan by personId, with safe fallbacks
+  // Load person data from utilizationData (central hub)
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       try {
-        // Try personId match
-        const q1 = query(collection(db, 'einsatzplan'), where('personId', '==', employeeId), limit(1));
-        const s1 = await getDocs(q1);
-        if (!cancelled && !s1.empty) {
-          const doc = s1.docs[0];
-          const d: any = doc.data();
-          console.log('🔍 Einsatzplan data found:', d);
-          console.log('🔍 LBS from einsatzplan:', d.lbs);
-          setPersonName(String(d.person || ''));
-          setMeta({ team: d.team, cc: d.cc, lbs: d.lbs, location: d.location, startDate: d.startDate });
+        // Get person data from UtilizationDataContext
+        const personData = personMeta.get(employeeId);
+        if (personData && !cancelled) {
+          console.log('🔍 UtilizationData person found:', personData);
+          console.log('🔍 LBS from utilizationData:', personData.lbs);
+          setPersonName(employeeId);
+          setMeta({ 
+            team: personData.team, 
+            cc: personData.cc, 
+            lbs: personData.lbs, 
+            location: personData.location, 
+            startDate: personData.startDate 
+          });
           return;
         }
-        // Fallback: person equals employeeId (legacy name-based)
-        const q2 = query(collection(db, 'einsatzplan'), where('person', '==', employeeId), limit(1));
-        const s2 = await getDocs(q2);
-        if (!cancelled && !s2.empty) {
-          const doc = s2.docs[0];
-          const d: any = doc.data();
-          console.log('🔍 Einsatzplan fallback data found:', d);
-          console.log('🔍 LBS from einsatzplan fallback:', d.lbs);
-          setPersonName(String(d.person || ''));
-          setMeta({ team: d.team, cc: d.cc, lbs: d.lbs, location: d.location, startDate: d.startDate });
-          return;
+        
+        // Fallback: Search by name in personMeta
+        for (const [personName, data] of personMeta.entries()) {
+          if (personName === employeeId && !cancelled) {
+            console.log('🔍 UtilizationData person found by name:', data);
+            console.log('🔍 LBS from utilizationData by name:', data.lbs);
+            setPersonName(personName);
+            setMeta({ 
+              team: data.team, 
+              cc: data.cc, 
+              lbs: data.lbs, 
+              location: data.location, 
+              startDate: data.startDate 
+            });
+            return;
+          }
         }
+        
         // Last resort: use id as name
         if (!cancelled) {
+          console.log('🔍 No person data found in utilizationData for:', employeeId);
           setPersonName(employeeId);
           setMeta(null);
         }
-      } catch {
+      } catch (error) {
+        console.error('🔍 Error loading person data from utilizationData:', error);
         if (!cancelled) {
           setPersonName(employeeId);
           setMeta(null);
@@ -254,120 +265,15 @@ export default function EmployeeDetailView({
     };
     load();
     return () => { cancelled = true; };
-  }, [employeeId]);
+  }, [employeeId, personMeta]);
 
-  // Load employee data from mitarbeiter collection
+  // Employee data is now loaded from utilizationData (no separate mitarbeiter collection needed)
+  // All data comes from the central utilizationData hub via personMeta
   useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      if (!personName) return; // Wait for personName to be resolved first
-      
-      try {
-        const employees = await DatabaseService.getEmployeeStammdaten();
-        if (cancelled || !Array.isArray(employees)) return;
-        
-        console.log('🔍 Loading employee data for:', { employeeId, personName });
-        console.log('📋 Available employees:', employees.length);
-        
-        // Debug: Show all employee names for comparison
-        console.log('👥 All employee names in mitarbeiter collection:');
-        employees.forEach((emp, index) => {
-          if (index < 10) { // Show first 10 for debugging
-            console.log(`  ${index + 1}. Name: "${emp.name}" | DisplayName: "${emp.displayName}" | PersonId: "${emp.personId}" | Id: "${emp.id}"`);
-          }
-        });
-        
-        // Try multiple matching strategies
-        let employeeRecord = null;
-        
-        // Strategy 1: Match by personId
-        if (employeeId) {
-          employeeRecord = employees.find(emp => 
-            emp.personId === employeeId || emp.id === employeeId
-          );
-          if (employeeRecord) console.log('✅ Found by personId:', employeeRecord);
-        }
-        
-        // Strategy 2: Match by name (exact)
-        if (!employeeRecord && personName) {
-          employeeRecord = employees.find(emp => 
-            emp.name === personName || emp.displayName === personName
-          );
-          if (employeeRecord) console.log('✅ Found by name (exact):', employeeRecord);
-        }
-        
-        // Strategy 3: Match by name (case insensitive)
-        if (!employeeRecord && personName) {
-          employeeRecord = employees.find(emp => 
-            (emp.name && emp.name.toLowerCase() === personName.toLowerCase()) ||
-            (emp.displayName && emp.displayName.toLowerCase() === personName.toLowerCase())
-          );
-          if (employeeRecord) console.log('✅ Found by name (case insensitive):', employeeRecord);
-        }
-        
-        // Strategy 4: Match by name format conversion (Vorname Nachname <-> Nachname, Vorname)
-        if (!employeeRecord && personName) {
-          const normalizeAndSplit = (name: string) => {
-            return name.toLowerCase().replace(/[,\s]+/g, ' ').trim().split(' ').filter(Boolean);
-          };
-          
-          const searchParts = normalizeAndSplit(personName);
-          console.log('🔍 Search name parts:', searchParts);
-          
-          employeeRecord = employees.find(emp => {
-            const empName = emp.name || emp.displayName || '';
-            const empParts = normalizeAndSplit(empName);
-            
-            // Check if all parts of search name are in employee name (in any order)
-            const allPartsMatch = searchParts.every(part => 
-              empParts.some(empPart => empPart.includes(part) || part.includes(empPart))
-            );
-            
-            // Also check reverse: all parts of employee name are in search name
-            const allEmpPartsMatch = empParts.every(empPart => 
-              searchParts.some(part => part.includes(empPart) || empPart.includes(part))
-            );
-            
-            return allPartsMatch && allEmpPartsMatch && searchParts.length >= 2 && empParts.length >= 2;
-          });
-          
-          if (employeeRecord) console.log('✅ Found by name format conversion:', employeeRecord);
-        }
-        
-        // Strategy 5: Match by partial name (fallback)
-        if (!employeeRecord && personName) {
-          employeeRecord = employees.find(emp => 
-            (emp.name && emp.name.toLowerCase().includes(personName.toLowerCase())) ||
-            (emp.displayName && emp.displayName.toLowerCase().includes(personName.toLowerCase())) ||
-            (personName.toLowerCase().includes((emp.name || '').toLowerCase())) ||
-            (personName.toLowerCase().includes((emp.displayName || '').toLowerCase()))
-          );
-          if (employeeRecord) console.log('✅ Found by partial name:', employeeRecord);
-        }
-        
-        if (employeeRecord && !cancelled) {
-          console.log('📊 Employee record found:', employeeRecord);
-          const lbsValue = (employeeRecord as any).lbs || (employeeRecord as any).careerLevel || (employeeRecord as any).career_level || '';
-          console.log('🔍 LBS value extracted:', lbsValue);
-          setEmployeeData({
-            email: (employeeRecord as any).email || (employeeRecord as any).mail || (employeeRecord as any).e_mail || '',
-            startDate: (employeeRecord as any).startDate || (employeeRecord as any).eintrittsdatum || (employeeRecord as any).start_date || '',
-            location: (employeeRecord as any).location || (employeeRecord as any).standort || (employeeRecord as any).ort || (employeeRecord as any).office || '',
-            lbs: lbsValue
-          });
-        } else {
-          console.log('❌ No employee record found for:', { employeeId, personName });
-          console.log('📋 Sample employee records:', employees.slice(0, 3));
-          if (!cancelled) setEmployeeData(null);
-        }
-      } catch (error) {
-        console.error('❌ Error loading employee data:', error);
-        if (!cancelled) setEmployeeData(null);
-      }
-    };
-    load();
-    return () => { cancelled = true; };
-  }, [employeeId, personName]);
+    // No longer needed - all employee data comes from utilizationData via personMeta
+    // Set employeeData to null since we get everything from meta now
+    setEmployeeData(null);
+  }, [personName]);
 
   // Extract skills and roles from dossierData
   useEffect(() => {
@@ -833,22 +739,21 @@ export default function EmployeeDetailView({
       }
   }, [dataForUI, employeeId, personName]);
 
-  // Debug LBS values
-  console.log('🔍 Debug LBS values:', {
-    employeeDataLbs: employeeData?.lbs,
+  // Debug LBS values from utilizationData
+  console.log('🔍 Debug LBS values from utilizationData:', {
     metaLbs: meta?.lbs,
-    finalPosition: employeeData?.lbs || meta?.lbs || 'LBS nicht verfügbar'
+    finalPosition: meta?.lbs || 'LBS nicht verfügbar'
   });
 
   const employee: Employee | null = personName ? {
     id: employeeId,
     name: personName,
-    position: employeeData?.lbs || meta?.lbs || 'LBS nicht verfügbar', // Prefer mitarbeiter collection LBS
+    position: meta?.lbs || 'LBS nicht verfügbar', // All data from utilizationData
     team: meta?.team || '',
-    email: employeeData?.email || '',
+    email: '', // Will be added to utilizationData in future
     phone: '', // Removed as requested
-    location: employeeData?.location || meta?.location || '',
-    startDate: employeeData?.startDate || meta?.startDate || '',
+    location: meta?.location || '',
+    startDate: meta?.startDate || '',
     status: 'active',
     utilization: utilization ?? 0,
     skills: [],
