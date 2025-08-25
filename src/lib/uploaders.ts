@@ -577,6 +577,12 @@ export async function uploadEinsatzplan(file: File, sheetName = "Einsatzplan", t
   const vgCol0 = findCol("vg");
   const verfAbCol0 = findColRegex(/verf.*ab/i);
   const staffbarCol0 = findColRegex(/verf.*staffing|staffbar/i);
+  
+  // Geschäftsstelle-Spalte erkennen (verschiedene Varianten)
+  const geschaeftsstelleCol0 = findCol("geschäftsstelle") !== -1 ? findCol("geschäftsstelle") :
+                               findCol("location") !== -1 ? findCol("location") :
+                               findCol("standort") !== -1 ? findCol("standort") :
+                               findCol("ort") !== -1 ? findCol("ort") : -1;
 
   let matched=0, ambiguous=0, unmatched=0, written=0;
 
@@ -649,8 +655,24 @@ export async function uploadEinsatzplan(file: File, sheetName = "Einsatzplan", t
           finalValue: verfuegbarFuerStaffing
         });
       }
+        }
+    
+    // ✅ Geschäftsstelle Feld
+    let geschaeftsstelle: string | undefined;
+    if (geschaeftsstelleCol0 >= 0) {
+      const cell: any = (ws as any)[A1(r, geschaeftsstelleCol0)];
+      geschaeftsstelle = cell?.v ? String(cell.v).trim() || undefined : undefined;
+      
+      // Debug: Zeige Geschäftsstelle für erste paar Einträge
+      if (written < 3) {
+        logger.info("uploaders.einsatzplan", `Geschäftsstelle für ${person}`, {
+          rawValue: cell?.v,
+          type: typeof cell?.v,
+          finalValue: geschaeftsstelle
+        });
+      }
     }
-
+    
     // Sammle alle Wochen-Daten für diese Person
     const values: Record<string, any[]> = {};
     for (const t of triples) {
@@ -707,6 +729,7 @@ export async function uploadEinsatzplan(file: File, sheetName = "Einsatzplan", t
       if (vg) personData.vg = vg;
       if (verfuegbarAb) personData.verfuegbarAb = verfuegbarAb;
       if (verfuegbarFuerStaffing !== undefined) personData.verfuegbarFuerStaffing = verfuegbarFuerStaffing;
+      if (geschaeftsstelle) personData.location = geschaeftsstelle; // ✅ Geschäftsstelle als location speichern
       
       personDataMap.set(res.personId, personData);
     }
@@ -730,7 +753,8 @@ export async function uploadEinsatzplan(file: File, sheetName = "Einsatzplan", t
     matched, ambiguous, unmatched, written, triplesCount: triples.length,
     spaltenGefunden: {
       verfuegbarAb: verfAbCol0 >= 0,
-      verfuegbarFuerStaffing: staffbarCol0 >= 0
+      verfuegbarFuerStaffing: staffbarCol0 >= 0,
+      geschaeftsstelle: geschaeftsstelleCol0 >= 0 // ✅ Geschäftsstelle-Spalte gefunden
     }
   });
   

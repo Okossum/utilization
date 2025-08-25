@@ -32,7 +32,8 @@ interface ConsolidatedUtilizationData {
   bereich: string;              // aus: einsatzplan (priorität) || mitarbeiter
   cc: string;                   // aus: mitarbeiter (priorität) || einsatzplan
   team: string;                 // aus: einsatzplan (priorität) || mitarbeiter
-  standort: string;             // aus: mitarbeiter
+  standort: string;             // aus: mitarbeiter.standort
+  location: string;             // aus: einsatzplan.location
   
   // === PERSONAL-INFORMATIONEN ===
   lbs: string;                  // aus: mitarbeiter (priorität) || einsatzplan
@@ -141,6 +142,7 @@ function mergePersonData(
     cc: mitarbeiterData?.cc || einsatzplanData?.cc || auslastungData?.cc || "",
     team: einsatzplanData?.team || mitarbeiterData?.team || "",
     standort: mitarbeiterData?.standort || "",
+    location: einsatzplanData?.location || "", // ✅ Geschäftsstelle aus Einsatzplan
     
     // Personal-Informationen
     lbs: mitarbeiterData?.lbs || einsatzplanData?.lbs || "",

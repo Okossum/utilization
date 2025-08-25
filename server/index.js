@@ -17,6 +17,58 @@ const db = admin.firestore();
 const FieldValue = admin.firestore.FieldValue;
 const PORT = process.env.PORT || 3001;
 
+// ==========================================
+// LOGGING & MONITORING SYSTEM
+// ==========================================
+
+// Logger-Funktionen für strukturierte Logs
+const logger = {
+  info: (message, data = {}) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] ℹ️  INFO: ${message}`, data);
+  },
+  success: (message, data = {}) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] ✅ SUCCESS: ${message}`, data);
+  },
+  warning: (message, data = {}) => {
+    const timestamp = new Date().toISOString();
+    console.warn(`[${timestamp}] ⚠️  WARNING: ${message}`, data);
+  },
+  error: (message, error = {}) => {
+    const timestamp = new Date().toISOString();
+    console.error(`[${timestamp}] ❌ ERROR: ${message}`, {
+      message: error.message,
+      stack: error.stack,
+      ...error
+    });
+  },
+  process: (operation, status, data = {}) => {
+    const timestamp = new Date().toISOString();
+    const emoji = status === 'start' ? '🚀' : status === 'complete' ? '✅' : status === 'error' ? '❌' : '⏳';
+    console.log(`[${timestamp}] ${emoji} PROCESS [${operation}]: ${status.toUpperCase()}`, data);
+  }
+};
+
+// Request-Logging Middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  logger.info(`${req.method} ${req.path}`, { 
+    ip: req.ip, 
+    userAgent: req.get('User-Agent')?.substring(0, 50) 
+  });
+  
+  // Response-Zeit loggen
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    const status = res.statusCode;
+    const emoji = status < 400 ? '✅' : status < 500 ? '⚠️' : '❌';
+    logger.info(`${emoji} ${req.method} ${req.path} - ${status} (${duration}ms)`);
+  });
+  
+  next();
+});
+
 // Middleware
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
@@ -26,7 +78,7 @@ app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 function removeUndefinedDeep(value, depth = 0) {
   // Verhindere Stack Overflow bei sehr tiefen Objekten
   if (depth > 10) {
-    // console.warn entfernt
+    logger.warning('removeUndefinedDeep: Maximum depth reached', { depth });
     return value;
   }
   
@@ -50,7 +102,7 @@ function removeUndefinedDeep(value, depth = 0) {
 function removeInvalidNumbersDeep(value, depth = 0) {
   // Verhindere Stack Overflow bei sehr tiefen Objekten
   if (depth > 10) {
-    // console.warn entfernt
+    logger.warning('removeInvalidNumbersDeep: Maximum depth reached', { depth });
     return value;
   }
   
@@ -78,9 +130,17 @@ function pickField(row, candidates) {
   for (const key of candidates) {
     if (row && Object.prototype.hasOwnProperty.call(row, key)) {
       const v = row[key];
-      if (typeof v === 'string' && v.trim()) return String(v);
+      // Akzeptiere alle Werte außer null, undefined und leeren Strings
+      if (v !== null && v !== undefined) {
+        const stringValue = String(v).trim();
+        if (stringValue) {
+          logger.info(`pickField found value for ${key}`, { value: stringValue, originalType: typeof v });
+          return stringValue;
+        }
+      }
     }
   }
+  logger.warning(`pickField: No value found for candidates`, { candidates, availableKeys: Object.keys(row || {}) });
   return undefined;
 }
 function parseBuAndBereich(raw) {
@@ -670,6 +730,14 @@ app.post('/api/einsatzplan', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Ungültige Daten' });
     }
 
+    // DEBUG: Zeige erste Row um Feldnamen zu analysieren
+    if (data.length > 0) {
+      console.log('🔍 DEBUG - Erste Row Analyse:', {
+        allKeys: Object.keys(data[0]),
+        sampleRow: data[0]
+      });
+    }
+
     // Upload-Historie speichern
     const historyRef = await db.collection('uploadHistory').add({
       fileName,
@@ -738,7 +806,18 @@ app.post('/api/einsatzplan', requireAuth, async (req, res) => {
           team: row.team ?? existing.data.team ?? null,
           lbs: row.lbs ?? existing.data.lbs ?? null,
           vg: pickField(row, ['VG', 'vg']) ?? existing.data.vg ?? null,
-          location: pickField(row, ['location', 'Geschäftsstelle', 'geschäftsstelle', 'standort', 'ort']) ?? existing.data.location ?? null,
+          location: (() => {
+            const locationValue = pickField(row, ['location', 'Geschäftsstelle', 'geschäftsstelle', 'standort', 'ort']) ?? existing.data.location ?? null;
+            logger.info('🔍 Location Update Debug', { 
+              person: row.person, 
+              locationValue, 
+              existingLocation: existing.data.location,
+              rowKeys: Object.keys(row),
+              geschaeftsstelleValue: row['Geschäftsstelle'],
+              geschaeftsstelleType: typeof row['Geschäftsstelle']
+            });
+            return locationValue;
+          })(),
           values: mergedValues,
           updatedAt: FieldValue.serverTimestamp(),
         });
@@ -768,7 +847,17 @@ app.post('/api/einsatzplan', requireAuth, async (req, res) => {
           team: row.team ?? null,
           lob: row.lob ?? null,
           bereich: row.bereich ?? null,
-          location: pickField(row, ['location', 'Geschäftsstelle', 'geschäftsstelle', 'standort', 'ort']) ?? null,
+          location: (() => {
+            const locationValue = pickField(row, ['location', 'Geschäftsstelle', 'geschäftsstelle', 'standort', 'ort']) ?? null;
+            logger.info('🔍 Location Create Debug', { 
+              person: row.person, 
+              locationValue,
+              rowKeys: Object.keys(row),
+              geschaeftsstelleValue: row['Geschäftsstelle'],
+              geschaeftsstelleType: typeof row['Geschäftsstelle']
+            });
+            return locationValue;
+          })(),
           values: newWeekValues,
           isLatest: true,
           createdAt: FieldValue.serverTimestamp(),
@@ -1823,16 +1912,79 @@ app.get('/api/employees', authMiddleware, async (req, res) => {
     res.json(employees);
     
   } catch (error) {
-    console.error('❌ Error loading employees:', error);
+    logger.error('Error loading employees', error);
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
 
+// ==========================================
+// HEALTH CHECK & MONITORING ENDPOINTS
+// ==========================================
+
+// Health Check Endpoint
+app.get('/api/health', async (req, res) => {
+  try {
+    logger.process('health-check', 'start');
+    
+    const healthStatus = {
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      port: PORT,
+      environment: process.env.NODE_ENV || 'development',
+      services: {}
+    };
+
+    // Firebase-Verbindung testen
+    try {
+      await db.collection('health-check').limit(1).get();
+      healthStatus.services.firebase = 'connected';
+      logger.success('Firebase connection test passed');
+    } catch (error) {
+      healthStatus.services.firebase = 'error';
+      healthStatus.status = 'degraded';
+      logger.error('Firebase connection test failed', error);
+    }
+
+    logger.process('health-check', 'complete', { status: healthStatus.status });
+    res.json(healthStatus);
+  } catch (error) {
+    logger.error('Health check failed', error);
+    res.status(500).json({ 
+      status: 'unhealthy', 
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// System Status Endpoint
+app.get('/api/system/status', (req, res) => {
+  logger.info('System status requested');
+  
+  const status = {
+    server: {
+      status: 'running',
+      port: PORT,
+      uptime: Math.floor(process.uptime()),
+      memory: {
+        used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+        total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024)
+      }
+    },
+    timestamp: new Date().toISOString()
+  };
+  
+  res.json(status);
+});
+
 // Server starten
 app.listen(PORT, () => {
-  // console.log entfernt
-  // console.log entfernt
-  // console.log entfernt
+  logger.success(`🚀 Server gestartet auf Port ${PORT}`);
+  logger.info(`📊 Health Check verfügbar unter: http://localhost:${PORT}/api/health`);
+  logger.info(`🔧 System Status verfügbar unter: http://localhost:${PORT}/api/system/status`);
+  logger.info(`💾 Memory Usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
 });
 
 // Skills API Endpoint - Alle verfügbaren Skills laden

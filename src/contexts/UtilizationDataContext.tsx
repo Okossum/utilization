@@ -185,10 +185,15 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
         }))
       };
 
-      // Erstelle PersonMeta
+      // Erstelle PersonMeta aus den RAW utilizationData (nicht transformiert)
       const personMetaMap = new Map<string, any>();
       utilizationData.forEach((row: any) => {
         if (row.person && !personMetaMap.has(row.person)) {
+          console.log('🔍 DEBUG: Creating personMeta for', row.person, {
+            standort: row.standort,
+            email: row.email,
+            allKeys: Object.keys(row)
+          });
           personMetaMap.set(row.person, {
             lob: row.lob,
             bereich: row.bereich,
@@ -196,7 +201,10 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
             team: row.team,
             lbs: row.lbs,
             careerLevel: row.careerLevel,
-            manager: row.vg
+            manager: row.vg,
+            standort: row.standort, // ✅ Standort aus utilizationData hinzufügen
+            email: row.email,       // ✅ E-Mail aus utilizationData hinzufügen
+            startDate: row.verfuegbarAb // ✅ Start-Datum aus utilizationData hinzufügen
           });
         }
       });

@@ -42,6 +42,7 @@ interface Employee {
   email: string;
   phone: string;
   location: string;
+  standort: string;
   startDate: string;
   status: string;
   utilization: number;
@@ -160,8 +161,8 @@ export default function EmployeeDetailView({
   
   console.log('🔑 Auth token status:', token ? 'present' : 'missing');
   const [personName, setPersonName] = useState<string>('');
-  const [meta, setMeta] = useState<{ team?: string; cc?: string; lbs?: string; location?: string; startDate?: string; email?: string } | null>(null);
-  const [employeeData, setEmployeeData] = useState<{ email?: string; startDate?: string; location?: string; lbs?: string } | null>(null);
+  const [meta, setMeta] = useState<{ team?: string; cc?: string; lbs?: string; standort?: string; startDate?: string; email?: string } | null>(null);
+  const [employeeData, setEmployeeData] = useState<{ email?: string; startDate?: string; standort?: string; lbs?: string } | null>(null);
   const [utilization, setUtilization] = useState<number | null>(null);
   const [averageUtilization, setAverageUtilization] = useState<number | null>(null);
   const [isTechSkillsOpen, setTechSkillsOpen] = useState(false);
@@ -226,7 +227,7 @@ export default function EmployeeDetailView({
     comments: '',
     email: '',
     phone: '',
-    location: '',
+    standort: '',
     position: '',
     team: ''
   });
@@ -243,13 +244,17 @@ export default function EmployeeDetailView({
         if (personData && !cancelled) {
           console.log('🔍 UtilizationData person found:', personData);
           console.log('🔍 LBS from utilizationData:', personData.lbs);
+          console.log('🔍 STANDORT from utilizationData:', personData.standort);
+          console.log('🔍 EMAIL from utilizationData:', personData.email);
+          console.log('🔍 ALL KEYS:', Object.keys(personData));
           setPersonName(employeeId);
           setMeta({ 
             team: personData.team, 
             cc: personData.cc, 
             lbs: personData.lbs, 
-            location: personData.location, 
-            startDate: personData.startDate 
+            standort: personData.standort, 
+            startDate: personData.startDate,
+            email: personData.email // ✅ E-Mail aus utilizationData hinzufügen
           });
           return;
         }
@@ -264,8 +269,9 @@ export default function EmployeeDetailView({
               team: data.team, 
               cc: data.cc, 
               lbs: data.lbs, 
-              location: data.location, 
-              startDate: data.startDate 
+              standort: data.standort, 
+              startDate: data.startDate,
+              email: data.email // ✅ E-Mail aus utilizationData hinzufügen
             });
             return;
           }
@@ -344,7 +350,7 @@ export default function EmployeeDetailView({
         weaknesses: personData.weaknesses || '',
         comments: personData.comments || '',
         phone: personData.phone || '',
-        location: personData.location || employeeData?.location || '',
+        standort: personData.standort || employeeData?.standort || '',
         position: personData.position || employeeData?.lbs || '',
         email: personData.email || employeeData?.email || ''
       }));
@@ -400,7 +406,7 @@ export default function EmployeeDetailView({
               comments: loadedDossierData.comments || '',
               email: loadedDossierData.email || employeeData?.email || '',
               phone: loadedDossierData.phone || '',
-              location: loadedDossierData.location || employeeData?.location || '',
+              standort: loadedDossierData.standort || employeeData?.standort || '',
               position: loadedDossierData.position || employeeData?.lbs || '',
               team: loadedDossierData.team || meta?.team || ''
             });
@@ -412,7 +418,7 @@ export default function EmployeeDetailView({
             setFormData(prev => ({
               ...prev,
               email: employeeData?.email || '',
-              location: employeeData?.location || '',
+              standort: employeeData?.standort || '',
               position: employeeData?.lbs || '',
               team: meta?.team || ''
             }));
@@ -496,7 +502,7 @@ export default function EmployeeDetailView({
         weaknesses: formData.weaknesses,
         comments: formData.comments,
         phone: formData.phone,
-        location: formData.location,
+        standort: formData.standort,
         position: formData.position,
         email: formData.email
       });
@@ -821,20 +827,25 @@ export default function EmployeeDetailView({
   }, [dataForUI, employeeId, personName]);
 
   // Debug LBS values from utilizationData
-  console.log('🔍 Debug LBS values from utilizationData:', {
+  console.log('🔍 Debug values from utilizationData:', {
     metaLbs: meta?.lbs,
-    finalPosition: meta?.lbs || 'LBS nicht verfügbar'
+    metaStandort: meta?.standort,
+    metaEmail: meta?.email,
+    metaCC: meta?.cc,
+    finalPosition: meta?.lbs || 'LBS nicht verfügbar',
+    finalLocation: meta?.standort || 'Standort nicht verfügbar'
   });
 
   const employee: Employee | null = personName ? {
     id: employeeId,
     name: personName,
-    position: meta?.lbs || 'LBS nicht verfügbar', // All data from utilizationData
+    position: meta?.lbs || 'LBS nicht verfügbar', // ✅ LBS aus utilizationData
     team: meta?.team || '',
-    cc: meta?.cc || '', // Competence Center
-    email: formData.email || meta?.email || '', // E-Mail aus formData oder meta
+    cc: meta?.cc || '', // ✅ CC aus utilizationData
+    email: meta?.email || formData.email || '', // ✅ E-Mail prioritär aus utilizationData
     phone: formData.phone || '', // Phone aus formData
-    location: formData.location || meta?.location || '', // Location aus formData oder meta
+    location: formData.standort || '', // Location aus formData (aber eigentlich standort)
+    standort: meta?.standort || formData.standort || '', // ✅ Standort prioritär aus utilizationData
     startDate: meta?.startDate || '',
     status: 'active',
     utilization: utilization ?? 0,
@@ -988,19 +999,24 @@ export default function EmployeeDetailView({
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  {employee.location && (
+                <div className="space-y-3">
+                  {/* ✅ Standort */}
+                  {employee.standort && (
                     <div className="flex items-center space-x-3">
                       <MapPin className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-600">{employee.location}</span>
+                      <span className="text-sm text-gray-600">{employee.standort}</span>
                     </div>
                   )}
+                  
+                  {/* ✅ E-Mail Adresse */}
                   {employee.email && (
                     <div className="flex items-center space-x-3">
                       <Mail className="w-4 h-4 text-gray-400" />
                       <span className="text-sm text-gray-600">{employee.email}</span>
                     </div>
                   )}
+                  
+                  {/* ✅ CC (Competence Center) */}
                   {employee.cc && (
                     <div className="flex items-center space-x-3">
                       <Building className="w-4 h-4 text-gray-400" />
