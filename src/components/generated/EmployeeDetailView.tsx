@@ -182,12 +182,71 @@ export default function EmployeeDetailView({
   const [dossierLoading, setDossierLoading] = useState(false);
   const [dossierData, setDossierData] = useState<any>(null);
 
-  // Projekte nach Typen filtern - JETZT AUS UTILIZATION DATA HUB
+  // Projekte nach Typen filtern - DIREKT AUS FIRESTORE (KEIN CACHE)
+  const [freshPersonData, setFreshPersonData] = useState<any>(null);
+  
+  // Lade Person direkt aus Firestore (ohne Cache)
+  useEffect(() => {
+    const loadFreshPersonData = async () => {
+      if (!employeeId) return;
+      
+      try {
+        console.log('🔄 Loading fresh person data from Firestore for:', employeeId);
+        const { collection, query, where, getDocs } = await import('firebase/firestore');
+        const { COLLECTIONS } = await import('../../lib/types');
+        
+        const personQuery = query(
+          collection(db, COLLECTIONS.UTILIZATION_DATA),
+          where('id', '==', employeeId)
+        );
+        
+        const snapshot = await getDocs(personQuery);
+        if (!snapshot.empty) {
+          const personDoc = snapshot.docs[0];
+          const personData = { id: personDoc.id, ...personDoc.data() };
+          
+          console.log('✅ Fresh person data loaded:', {
+            id: personData.id,
+            person: personData.person,
+            hasProjectReferences: !!personData.projectReferences,
+            projectReferencesCount: personData.projectReferences?.length || 0,
+            allKeys: Object.keys(personData)
+          });
+          
+          setFreshPersonData(personData);
+        } else {
+          console.log('❌ Person not found in Firestore:', employeeId);
+          setFreshPersonData(null);
+        }
+      } catch (error) {
+        console.error('❌ Error loading fresh person data:', error);
+        setFreshPersonData(null);
+      }
+    };
+    
+    loadFreshPersonData();
+  }, [employeeId]);
+
   const projectsByType: ProjectsByType = React.useMemo(() => {
-    // Finde die Person in utilizationData
-    const personData = databaseData?.utilizationData?.find(record => 
-      record.person === employeeId || record.id === employeeId
-    );
+    console.log('🔍 DEBUG: projectsByType useMemo triggered with fresh data:', {
+      employeeId,
+      hasFreshData: !!freshPersonData,
+      hasProjectReferences: !!freshPersonData?.projectReferences,
+      projectReferencesCount: freshPersonData?.projectReferences?.length || 0
+    });
+    
+    // Verwende frische Daten statt Cache
+    const personData = freshPersonData;
+    
+    console.log('🔍 DEBUG: PersonData found:', !!personData);
+    if (personData) {
+      console.log('🔍 DEBUG: PersonData details:', {
+        id: personData.id,
+        person: personData.person,
+        hasProjectReferences: !!personData.projectReferences,
+        projectReferencesLength: personData.projectReferences?.length || 0
+      });
+    }
     
     const projects = personData?.projectReferences || [];
     console.log('🔍 DEBUG: Raw projects from utilizationData Hub:', projects);
@@ -215,9 +274,9 @@ export default function EmployeeDetailView({
     }));
     
     const filtered = filterProjectsByType(convertedProjects);
-    console.log('🔍 DEBUG: Filtered projects by type from utilizationData:', filtered);
+    console.log('🔍 DEBUG: Filtered projects by type from fresh Firestore data:', filtered);
     return filtered;
-  }, [databaseData?.utilizationData, employeeId]);
+  }, [freshPersonData, employeeId]);
 
   // Toast-System für Benachrichtigungen
   const { notification, showToast, hideToast } = useProjectToast();
@@ -348,8 +407,7 @@ export default function EmployeeDetailView({
     });
     
     const personData = databaseData?.utilizationData?.find(record => 
-      record.person === employeeId || record.id === employeeId || 
-      record.person === personName || record.id === personName
+      record.id === employeeId
     );
     
     console.log('🔍 DEBUG: Person gefunden:', !!personData);
@@ -529,12 +587,37 @@ export default function EmployeeDetailView({
   };
 
   const refreshUtilizationData = async () => {
-    console.log('🔄 Refreshing utilizationData Hub...');
+    console.log('🔄 Refreshing fresh person data...');
     try {
-      await refreshData(); // Lädt utilizationData neu
-      console.log('✅ UtilizationData Hub erfolgreich aktualisiert');
+      // Lade frische Person-Daten neu (statt Cache)
+      if (!employeeId) return;
+      
+      const { collection, query, where, getDocs } = await import('firebase/firestore');
+      const { COLLECTIONS } = await import('../../lib/types');
+      
+      const personQuery = query(
+        collection(db, COLLECTIONS.UTILIZATION_DATA),
+        where('id', '==', employeeId)
+      );
+      
+      const snapshot = await getDocs(personQuery);
+      if (!snapshot.empty) {
+        const personDoc = snapshot.docs[0];
+        const personData = { id: personDoc.id, ...personDoc.data() };
+        
+        console.log('✅ Fresh person data refreshed:', {
+          id: personData.id,
+          person: personData.person,
+          hasProjectReferences: !!personData.projectReferences,
+          projectReferencesCount: personData.projectReferences?.length || 0
+        });
+        
+        setFreshPersonData(personData);
+      }
+      
+      console.log('✅ Fresh person data erfolgreich aktualisiert');
     } catch (error) {
-      console.error('❌ Fehler beim Aktualisieren der utilizationData:', error);
+      console.error('❌ Fehler beim Aktualisieren der fresh person data:', error);
     }
   };
 
@@ -631,10 +714,10 @@ export default function EmployeeDetailView({
       const { collection, query, where, getDocs, updateDoc, doc } = await import('firebase/firestore');
       const { COLLECTIONS } = await import('../../lib/types');
       
-      // Finde utilizationData Eintrag für diese Person
+      // Finde utilizationData Eintrag für diese Person über ID
       const utilizationQuery = query(
         collection(db, COLLECTIONS.UTILIZATION_DATA),
-        where('person', '==', personName)
+        where('id', '==', employeeId)
       );
       
       const utilizationSnapshot = await getDocs(utilizationQuery);
@@ -643,23 +726,34 @@ export default function EmployeeDetailView({
         const utilizationDoc = utilizationSnapshot.docs[0];
         const currentData = utilizationDoc.data();
         
+        console.log('🔍 DEBUG: Found utilizationDoc for save:', {
+          docId: utilizationDoc.id,
+          hasProjectReferences: !!currentData.projectReferences,
+          projectReferencesCount: currentData.projectReferences?.length || 0,
+          allKeys: Object.keys(currentData)
+        });
+        
         // Aktualisiere oder füge Projekt-Referenz hinzu
         const existingProjectRefs = currentData.projectReferences || [];
-        const projectRef = {
+        
+        // Erstelle projectRef ohne undefined Werte (Firestore erlaubt keine undefined Werte)
+        const projectRef: any = {
           projectId: project.id,
-          projectName: project.projectName,
-          customer: project.customer,
-          projectType: project.projectType,
-          description: project.description,
-          startDate: project.startDate,
-          endDate: project.endDate,
-          duration: project.duration,
-          roles: project.roles,
-          skills: project.skills,
-          activities: project.activities,
           addedAt: editingProject ? existingProjectRefs.find(ref => ref.projectId === project.id)?.addedAt : new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
+        
+        // Nur definierte Werte hinzufügen
+        if (project.projectName !== undefined) projectRef.projectName = project.projectName;
+        if (project.customer !== undefined) projectRef.customer = project.customer;
+        if (project.projectType !== undefined) projectRef.projectType = project.projectType;
+        if (project.description !== undefined) projectRef.description = project.description;
+        if (project.startDate !== undefined) projectRef.startDate = project.startDate;
+        if (project.endDate !== undefined) projectRef.endDate = project.endDate;
+        if (project.duration !== undefined) projectRef.duration = project.duration;
+        if (project.roles !== undefined) projectRef.roles = project.roles;
+        if (project.skills !== undefined) projectRef.skills = project.skills;
+        if (project.activities !== undefined) projectRef.activities = project.activities;
         
         let updatedProjectRefs;
         if (editingProject) {
@@ -680,19 +774,25 @@ export default function EmployeeDetailView({
         
         console.log('✅ Project reference saved to utilizationData Hub successfully');
         
+        // Warte kurz, damit Firestore das Update verarbeiten kann
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Aktualisiere utilizationData Context
+        await refreshUtilizationData();
+        
         // Show success notification
         const notificationEvent = editingProject ? 'updated' : 'created';
         const toast = createProjectNotification(notificationEvent, project);
         showToast(toast);
         
       } else {
-        console.error('❌ No utilizationData entry found for person:', personName);
-        showToast({ type: 'error', message: 'Kein Dateneintrag für Person gefunden' });
+        console.error('❌ No utilizationData entry found for employeeId:', employeeId);
+        showToast({ type: 'error', title: 'Fehler', message: 'Kein Dateneintrag für Employee-ID gefunden' });
       }
       
     } catch (error) {
       console.error('❌ Error saving project to utilizationData Hub:', error);
-      showToast({ type: 'error', message: 'Fehler beim Speichern des Projekts' });
+      showToast({ type: 'error', title: 'Fehler', message: 'Fehler beim Speichern des Projekts' });
     }
     
     // Close modal and reset editing state
@@ -708,10 +808,10 @@ export default function EmployeeDetailView({
       const { collection, query, where, getDocs, updateDoc, doc } = await import('firebase/firestore');
       const { COLLECTIONS } = await import('../../lib/types');
       
-      // Finde utilizationData Eintrag für diese Person
+      // Finde utilizationData Eintrag für diese Person über ID
       const utilizationQuery = query(
         collection(db, COLLECTIONS.UTILIZATION_DATA),
-        where('person', '==', personName)
+        where('id', '==', employeeId)
       );
       
       const utilizationSnapshot = await getDocs(utilizationQuery);
@@ -732,6 +832,12 @@ export default function EmployeeDetailView({
         
         console.log('✅ Project reference deleted from utilizationData Hub successfully');
         
+        // Warte kurz, damit Firestore das Update verarbeiten kann
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Aktualisiere utilizationData Context
+        await refreshUtilizationData();
+        
         // Show deletion notification
         const deletedProject = existingProjectRefs.find(ref => ref.projectId === projectId);
         if (deletedProject) {
@@ -745,13 +851,13 @@ export default function EmployeeDetailView({
         }
         
       } else {
-        console.error('❌ No utilizationData entry found for person:', personName);
-        showToast({ type: 'error', message: 'Kein Dateneintrag für Person gefunden' });
+        console.error('❌ No utilizationData entry found for employeeId:', employeeId);
+        showToast({ type: 'error', title: 'Fehler', message: 'Kein Dateneintrag für Person gefunden' });
       }
       
     } catch (error) {
       console.error('❌ Error deleting project from utilizationData Hub:', error);
-      showToast({ type: 'error', message: 'Fehler beim Löschen des Projekts' });
+      showToast({ type: 'error', title: 'Fehler', message: 'Fehler beim Löschen des Projekts' });
     }
   };
 
@@ -1411,7 +1517,7 @@ export default function EmployeeDetailView({
                     <div>
                     <h4 className="text-sm font-medium text-gray-900 mb-2">Auslastungskommentar</h4>
                     <UtilizationComment
-                      personId={employee.name}
+                      personId={employeeId}
                       initialValue=""
                       onLocalChange={() => {}}
                     />
@@ -1421,7 +1527,7 @@ export default function EmployeeDetailView({
                   <div>
                     <h4 className="text-sm font-medium text-gray-900 mb-2">Einsatzplan-Kommentar</h4>
                     <PlanningComment
-                      personId={employee.name}
+                      personId={employeeId}
                       initialValue=""
                       onLocalChange={() => {}}
                     />

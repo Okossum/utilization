@@ -24,9 +24,9 @@ export function UtilizationComment({ personId, initialValue, onLocalChange, clas
       setLoading(true);
       setError(null);
       try {
-        // Direct Firebase call to utilizationData collection
+        // Direct Firebase call to utilizationData collection - only search by ID
         const utilizationSnapshot = await getDocs(collection(db, 'utilizationData'));
-        const utilizationDoc = utilizationSnapshot.docs.find(doc => doc.data().person === personId || doc.id === personId);
+        const utilizationDoc = utilizationSnapshot.docs.find(doc => doc.data().id === personId);
         const utilizationData = utilizationDoc?.data();
         if (!cancelled && utilizationData) {
           const v = String(utilizationData.utilizationComment || '');
@@ -47,9 +47,9 @@ export function UtilizationComment({ personId, initialValue, onLocalChange, clas
     setSaving(true);
     setError(null);
     try {
-      // Direct Firebase call to utilizationData collection
+      // Direct Firebase call to utilizationData collection - only search by ID
       const utilizationSnapshot = await getDocs(collection(db, 'utilizationData'));
-      const existingDoc = utilizationSnapshot.docs.find(doc => doc.data().person === personId || doc.id === personId);
+      const existingDoc = utilizationSnapshot.docs.find(doc => doc.data().id === personId);
       const existing = existingDoc?.data();
       
       if (existing) {
@@ -80,9 +80,9 @@ export function UtilizationComment({ personId, initialValue, onLocalChange, clas
     setSaving(true);
     setError(null);
     try {
-      // Direct Firebase call to utilizationData collection
+      // Direct Firebase call to utilizationData collection - only search by ID
       const utilizationSnapshot = await getDocs(collection(db, 'utilizationData'));
-      const existingDoc = utilizationSnapshot.docs.find(doc => doc.data().person === personId || doc.id === personId);
+      const existingDoc = utilizationSnapshot.docs.find(doc => doc.data().id === personId);
       const existing = existingDoc?.data();
       
       if (existing) {
