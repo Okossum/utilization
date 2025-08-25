@@ -196,20 +196,20 @@ export function UtilizationReportView({
       console.log('🔄 Speichere Projekt-Referenz in utilizationData für:', employeeName);
       
       // Finde den utilizationData Eintrag für diese Person
-      // Versuche zuerst nach 'person' zu suchen
+      // Suche nach 'id' (der konsolidierte Identifier)
       let utilizationQuery = query(
         collection(db, COLLECTIONS.UTILIZATION_DATA),
-        where('person', '==', employeeName)
+        where('id', '==', employeeName)
       );
       
       let utilizationSnapshot = await getDocs(utilizationQuery);
       
-      // Falls nicht gefunden, versuche nach 'id' zu suchen (falls employeeName eine ID ist)
+      // Falls nicht gefunden, versuche nach 'person' zu suchen (Fallback für Legacy-Daten)
       if (utilizationSnapshot.empty) {
-        console.log('🔍 Suche nach person fehlgeschlagen, versuche nach id...');
+        console.log('🔍 Suche nach id fehlgeschlagen, versuche nach person (Legacy-Fallback)...');
         utilizationQuery = query(
           collection(db, COLLECTIONS.UTILIZATION_DATA),
-          where('id', '==', employeeName)
+          where('person', '==', employeeName)
         );
         utilizationSnapshot = await getDocs(utilizationQuery);
       }
@@ -219,9 +219,9 @@ export function UtilizationReportView({
         console.log('🔍 Lade alle utilizationData Einträge für Debug...');
         const allDocsSnapshot = await getDocs(collection(db, COLLECTIONS.UTILIZATION_DATA));
         const allPersons = allDocsSnapshot.docs.map(doc => ({
-          id: doc.id,
+          docId: doc.id,
           person: doc.data().person,
-          dataId: doc.data().id
+          id: doc.data().id
         }));
         console.log('👥 Verfügbare Personen in utilizationData:', allPersons.slice(0, 10));
         console.log('🔍 Suche nach:', employeeName);
@@ -230,14 +230,14 @@ export function UtilizationReportView({
         const similarPerson = allPersons.find(p => 
           p.person?.includes(employeeName) || 
           employeeName.includes(p.person) ||
-          p.dataId === employeeName
+          p.id === employeeName
         );
         
         if (similarPerson) {
           console.log('🎯 Ähnliche Person gefunden:', similarPerson);
           utilizationQuery = query(
             collection(db, COLLECTIONS.UTILIZATION_DATA),
-            where('person', '==', similarPerson.person)
+            where('id', '==', similarPerson.id)
           );
           utilizationSnapshot = await getDocs(utilizationQuery);
         }
