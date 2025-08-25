@@ -698,7 +698,8 @@ app.post('/api/einsatzplan', requireAuth, async (req, res) => {
       const weekValues = {};
       for (const [key, value] of Object.entries(row)) {
         if (key !== 'person' && key !== 'personId' && key !== 'lbs' && key !== 'vg' && key !== 'VG' && 
-            key !== 'lob' && key !== 'cc' && key !== 'team' && key !== 'bereich' &&
+            key !== 'lob' && key !== 'cc' && key !== 'team' && key !== 'bereich' && 
+            key !== 'Geschäftsstelle' && key !== 'geschäftsstelle' && key !== 'location' && key !== 'standort' && key !== 'ort' &&
             typeof value === 'number' && Number.isFinite(value)) {
           weekValues[key] = value;
         }
