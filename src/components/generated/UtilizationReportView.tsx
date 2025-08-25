@@ -187,6 +187,64 @@ export function UtilizationReportView({
     }
   };
 
+  // Speichere Projekt-Referenz in utilizationData Collection (zentraler Hub)
+  const saveProjectToUtilizationData = async (projectData: any, employeeName: string) => {
+    try {
+      const { collection, query, where, getDocs, updateDoc, doc } = await import('firebase/firestore');
+      const { COLLECTIONS } = await import('../../lib/types');
+      
+      console.log('🔄 Speichere Projekt-Referenz in utilizationData für:', employeeName);
+      
+      // Finde den utilizationData Eintrag für diese Person
+      const utilizationQuery = query(
+        collection(db, COLLECTIONS.UTILIZATION_DATA),
+        where('person', '==', employeeName)
+      );
+      
+      const utilizationSnapshot = await getDocs(utilizationQuery);
+      
+      if (!utilizationSnapshot.empty) {
+        const utilizationDoc = utilizationSnapshot.docs[0];
+        const currentData = utilizationDoc.data();
+        
+        // Füge Projekt-Referenz zu den bestehenden Projekt-Referenzen hinzu
+        const existingProjectRefs = currentData.projectReferences || [];
+        const newProjectRef = {
+          projectId: projectData.id,
+          projectName: projectData.projectName,
+          customer: projectData.customer,
+          projectType: projectData.projectType,
+          addedAt: new Date().toISOString(),
+          roles: projectData.roles?.filter((role: any) => role.employeeName === employeeName) || []
+        };
+        
+        // Prüfe ob Projekt bereits referenziert ist
+        const existingRef = existingProjectRefs.find((ref: any) => ref.projectId === projectData.id);
+        if (!existingRef) {
+          const updatedProjectRefs = [...existingProjectRefs, newProjectRef];
+          
+          // Aktualisiere utilizationData Dokument
+          await updateDoc(doc(db, COLLECTIONS.UTILIZATION_DATA, utilizationDoc.id), {
+            projectReferences: updatedProjectRefs,
+            updatedAt: new Date().toISOString()
+          });
+          
+          console.log('✅ Projekt-Referenz erfolgreich in utilizationData gespeichert');
+          showToast('success', `Projekt "${projectData.projectName}" wurde ${employeeName} zugeordnet`, 3000);
+        } else {
+          console.log('ℹ️ Projekt-Referenz bereits vorhanden');
+          showToast('info', `Projekt "${projectData.projectName}" ist bereits zugeordnet`, 3000);
+        }
+      } else {
+        console.warn('⚠️ Kein utilizationData Eintrag für Person gefunden:', employeeName);
+        showToast('error', `Kein Dateneintrag für ${employeeName} gefunden`, 5000);
+      }
+    } catch (error) {
+      console.error('❌ Fehler beim Speichern der Projekt-Referenz:', error);
+      showToast('error', 'Fehler beim Speichern der Projekt-Zuordnung', 5000);
+    }
+  };
+
   // Clean up old "student" status from database
   useEffect(() => {
     try {
@@ -2554,11 +2612,23 @@ export function UtilizationReportView({
        <ProjectCreationModal
          isOpen={isProjectCreationModalOpen}
          onClose={() => setIsProjectCreationModalOpen(false)}
-         onSave={() => {
-           setIsProjectCreationModalOpen(false);
-           setProjectCreationPerson(null);
-           // Refresh data after project creation
-           refreshData();
+         onSave={async (projectData) => {
+           try {
+             // Speichere Projekt-Referenz in utilizationData (zentraler Hub)
+             if (projectCreationPerson) {
+               await saveProjectToUtilizationData(projectData, projectCreationPerson);
+             }
+             
+             setIsProjectCreationModalOpen(false);
+             setProjectCreationPerson(null);
+             
+             // Refresh data after project creation and reference storage
+             await refreshData();
+             await loadPlannedProjects(); // Reload planned projects to show updated count
+           } catch (error) {
+             console.error('❌ Fehler beim Speichern des Projekts:', error);
+             showToast('error', 'Fehler beim Speichern des Projekts', 5000);
+           }
          }}
          employeeId={projectCreationPerson || ''}
          employeeName={projectCreationPerson || ''}
