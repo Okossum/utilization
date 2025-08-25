@@ -189,14 +189,28 @@ export function UtilizationReportView({
 
   // Hilfsfunktion: Finde die richtige ID für eine Person aus den geladenen Daten
   const findPersonId = (personName: string): string | null => {
-    // Suche in databaseData nach der Person und gib die ID zurück
-    const personRecord = databaseData.find(record => record.person === personName);
+    // Prüfe ob databaseData das richtige Format hat
+    console.log('🔍 Debug databaseData:', { 
+      type: typeof databaseData, 
+      isArray: Array.isArray(databaseData),
+      keys: databaseData ? Object.keys(databaseData) : 'null'
+    });
+    
+    // Suche in databaseData.utilizationData (das ist das Array)
+    const utilizationDataArray = databaseData?.utilizationData;
+    if (!Array.isArray(utilizationDataArray)) {
+      console.error('❌ utilizationData ist kein Array:', utilizationDataArray);
+      return null;
+    }
+    
+    const personRecord = utilizationDataArray.find(record => record.person === personName);
     if (personRecord?.id) {
       console.log('✅ Person ID gefunden:', { person: personName, id: personRecord.id });
       return personRecord.id;
     }
     
     console.warn('⚠️ Keine ID für Person gefunden:', personName);
+    console.log('🔍 Verfügbare Personen:', utilizationDataArray.slice(0, 5).map(r => ({ person: r.person, id: r.id })));
     return null;
   };
 
