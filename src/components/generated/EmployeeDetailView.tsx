@@ -95,7 +95,7 @@ export default function EmployeeDetailView({
   
 
   const { token } = useAuth();
-  const { databaseData, personMeta } = useUtilizationData();
+  const { databaseData, personMeta, refreshData } = useUtilizationData();
   
   // Create dataForUI similar to UtilizationReportView
   const dataForUI = useMemo(() => {
@@ -303,15 +303,42 @@ export default function EmployeeDetailView({
     );
     
     if (personData) {
-      // Lade Skills/Rollen aus utilizationData Hub
-      setAssignedSkills(personData.technicalSkills || []);
-      setAssignedSoftSkills(personData.softSkills || []);
-      setAssignedRoles(personData.assignedRoles || []);
+      // Lade Skills/Rollen aus utilizationData Hub und konvertiere Format
+      const convertedTechnicalSkills = (personData.technicalSkills || []).map(skill => ({
+        id: skill.skillId,
+        skillId: skill.skillId,
+        skillName: skill.skillName,
+        level: skill.rating,
+        assignedAt: skill.assessedAt,
+        lastUpdated: skill.updatedAt
+      }));
       
-      console.log('🎯 Skills/Rollen aus utilizationData Hub geladen:', {
-        technicalSkills: personData.technicalSkills?.length || 0,
-        softSkills: personData.softSkills?.length || 0,
-        assignedRoles: personData.assignedRoles?.length || 0
+      const convertedSoftSkills = (personData.softSkills || []).map(skill => ({
+        id: skill.skillId,
+        skillId: skill.skillId,
+        skillName: skill.skillName,
+        level: skill.rating,
+        assignedAt: skill.assessedAt,
+        lastUpdated: skill.updatedAt
+      }));
+      
+      const convertedRoles = (personData.assignedRoles || []).map(role => ({
+        id: role.roleId,
+        roleId: role.roleId,
+        roleName: role.roleName,
+        level: role.level || 3,
+        assignedAt: role.assignedAt,
+        lastUpdated: role.updatedAt
+      }));
+      
+      setAssignedSkills(convertedTechnicalSkills);
+      setAssignedSoftSkills(convertedSoftSkills);
+      setAssignedRoles(convertedRoles);
+      
+      console.log('🎯 Skills/Rollen aus utilizationData Hub geladen und konvertiert:', {
+        technicalSkills: convertedTechnicalSkills.length,
+        softSkills: convertedSoftSkills.length,
+        assignedRoles: convertedRoles.length
       });
     } else {
       // Fallback: Lade aus separaten APIs (Legacy)
@@ -417,6 +444,16 @@ export default function EmployeeDetailView({
       console.error('Error refreshing dossier data:', error);
     } finally {
       setDossierLoading(false);
+    }
+  };
+
+  const refreshUtilizationData = async () => {
+    console.log('🔄 Refreshing utilizationData Hub...');
+    try {
+      await refreshData(); // Lädt utilizationData neu
+      console.log('✅ UtilizationData Hub erfolgreich aktualisiert');
+    } catch (error) {
+      console.error('❌ Fehler beim Aktualisieren der utilizationData:', error);
     }
   };
 
@@ -1545,14 +1582,14 @@ export default function EmployeeDetailView({
         onClose={() => setTechSkillsOpen(false)}
         employeeId={employeeId}
         employeeName={employee.name}
-        onSkillAssigned={refreshDossierData}
+        onSkillAssigned={refreshUtilizationData}
       />
       <SoftSkillSelectionModal
         isOpen={isSoftSkillsOpen}
         onClose={() => setSoftSkillsOpen(false)}
         employeeId={employeeId}
         employeeName={employee.name}
-        onSkillAssigned={refreshDossierData}
+        onSkillAssigned={refreshUtilizationData}
       />
       <RoleSelectionModal
         isOpen={isRoleAssignOpen}
