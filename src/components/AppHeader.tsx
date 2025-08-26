@@ -387,13 +387,11 @@ export function AppHeader({
                           </button>
                         )}
 
-                        {/* Admin Restore - NOTFALL für überschriebene Admin-Rolle */}
-                        {(onRestoreAdmin || role === 'unknown') && (
+                        {/* 🚨 SICHERHEIT: Admin Restore - NUR für echte Admins */}
+                        {role === 'admin' && onRestoreAdmin && (
                           <button
                             onClick={() => { 
-                              if (onRestoreAdmin) {
-                                onRestoreAdmin(); 
-                              }
+                              onRestoreAdmin(); 
                               setIsSettingsMenuOpen(false); 
                             }}
                             className="w-full px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 text-left font-medium"
@@ -477,13 +475,11 @@ export function AppHeader({
                   </button>
                 )}
                 
-                {/* ✅ Admin-Rolle wiederherstellen - immer sichtbar wenn keine Admin-Rolle */}
-                {(role === 'unknown' || !profile?.role || profile?.role !== 'admin') && (
+                {/* 🚨 SICHERHEIT: Admin-Rolle wiederherstellen - NUR für echte Admins oder bei kritischen Fehlern */}
+                {role === 'admin' && onRestoreAdmin && (
                   <button
                     onClick={() => { 
-                      if (onRestoreAdmin) {
-                        onRestoreAdmin(); 
-                      }
+                      onRestoreAdmin(); 
                       setIsAccountMenuOpen(false); 
                     }}
                     className="w-full px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 mb-2"
