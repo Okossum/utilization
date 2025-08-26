@@ -508,7 +508,7 @@ export function ProjectHistoryEditorModal({
           isOpen={isRoleModalOpen}
           onClose={() => setRoleModalOpen(false)}
           onRoleSelected={(role) => {
-            console.log('🎯 Projekt-Rolle ausgewählt:', role);
+            console.log('🎯 Projekt-Rolle ausgewählt:', JSON.stringify(role, null, 2));
             setSelectedRoles(prev => [...prev, role]);
             setRoleModalOpen(false);
           }}
@@ -518,7 +518,7 @@ export function ProjectHistoryEditorModal({
           isOpen={isSkillModalOpen}
           onClose={() => setSkillModalOpen(false)}
           onSkillSelected={(skill) => {
-            console.log('🛠️ Projekt-Skill ausgewählt:', skill);
+            console.log('🛠️ Projekt-Skill ausgewählt:', JSON.stringify(skill, null, 2));
             setSelectedSkills(prev => [...prev, skill]);
             setSkillModalOpen(false);
           }}

@@ -61,13 +61,74 @@ interface SalesViewProps {
 
 // @component: SalesView
 export const SalesView = ({ actionItems }: SalesViewProps) => {
-  const { databaseData, personMeta, isLoading } = useUtilizationData();
+  const { databaseData, personMeta, isLoading, refreshData } = useUtilizationData();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [error, setError] = useState<string | null>(null);
   
   // Project Creation Modal States (wie in UtilizationReportView)
   const [isProjectCreationModalOpen, setIsProjectCreationModalOpen] = useState(false);
-  const [projectCreationPerson, setProjectCreationPerson] = useState<string | null>(null);
+  const [projectCreationPersonId, setProjectCreationPersonId] = useState<string | null>(null);
+  const [projectCreationPersonName, setProjectCreationPersonName] = useState<string | null>(null);
+
+  // Speichere Projekt-Referenz in utilizationData Collection (zentraler Hub)
+  const saveProjectToUtilizationData = async (projectData: any, employeeId: string) => {
+    try {
+      const { collection, query, where, getDocs, updateDoc, doc } = await import('firebase/firestore');
+      const { COLLECTIONS } = await import('../../lib/types');
+      const { db } = await import('../../lib/firebase');
+      
+      console.log('🔄 SalesView: Speichere Projekt-Referenz in utilizationData für ID:', employeeId);
+      
+      // Finde den utilizationData Eintrag für diese Person
+      let utilizationQuery = query(
+        collection(db, COLLECTIONS.UTILIZATION_DATA),
+        where('id', '==', employeeId)
+      );
+      
+      let utilizationSnapshot = await getDocs(utilizationQuery);
+      
+      // Falls nicht gefunden, ist das ein Datenproblem
+      if (utilizationSnapshot.empty) {
+        console.error('❌ SalesView: Kein utilizationData Eintrag für ID gefunden:', { employeeId });
+        return;
+      }
+      
+      // Dokument gefunden - speichere Projekt-Referenz
+      const utilizationDoc = utilizationSnapshot.docs[0];
+      const currentData = utilizationDoc.data();
+      
+      // Füge Projekt-Referenz zu den bestehenden Projekt-Referenzen hinzu
+      const existingProjectRefs = currentData.projectReferences || [];
+      const newProjectRef = {
+        projectId: projectData.id,
+        projectName: projectData.projectName,
+        customer: projectData.customer,
+        projectType: projectData.projectType,
+        addedAt: new Date().toISOString(),
+        roles: projectData.roles || []
+      };
+      
+      // Prüfe ob Projekt bereits referenziert ist
+      const existingRef = existingProjectRefs.find((ref: any) => ref.projectId === projectData.id);
+      if (!existingRef) {
+        const updatedProjectRefs = [...existingProjectRefs, newProjectRef];
+        
+        // Aktualisiere utilizationData Dokument
+        await updateDoc(doc(db, COLLECTIONS.UTILIZATION_DATA, utilizationDoc.id), {
+          projectReferences: updatedProjectRefs,
+          updatedAt: new Date().toISOString()
+        });
+        
+        console.log('✅ SalesView: Projekt-Referenz erfolgreich gespeichert:', newProjectRef);
+      } else {
+        console.log('ℹ️ SalesView: Projekt-Referenz bereits vorhanden:', projectData.id);
+      }
+      
+    } catch (error) {
+      console.error('❌ SalesView: Fehler beim Speichern der Projekt-Referenz:', error);
+      throw error;
+    }
+  };
 
   // Hilfsfunktion: Woche zu Datum konvertieren
   const weekToDate = (weekString: string, addDays: number = 0): string => {
@@ -106,7 +167,7 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
           endDate: ref.endDate || '',
           description: ref.description || 'Planned project assignment',
           skillsUsed: ref.skills || [],
-          employeeRole: ref.roles?.[0] || 'Consultant',
+          employeeRole: ref.roles?.[0]?.name || 'Consultant',
           utilization: ref.utilization || undefined,
           averageUtilization: ref.averageUtilization || undefined,
           probability: (ref.probability as any) || 'Planned'
@@ -198,7 +259,7 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
       endDate: ref.endDate || '',
       description: ref.description || 'Completed project assignment',
       skillsUsed: ref.skills || [],
-      employeeRole: ref.roles?.[0] || 'Consultant',
+      employeeRole: ref.roles?.[0]?.name || 'Consultant',
       utilization: ref.utilization || undefined,
       averageUtilization: ref.averageUtilization || undefined,
       probability: 'Commissioned' as const
@@ -437,10 +498,13 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
           
           // Callback für Project Creation (exakt wie in UtilizationReportView)
           onCreateProject: () => {
-            setProjectCreationPerson(record.person);
+            setProjectCreationPersonId(record.id);  // ✅ KORREKT: Verwende ID statt Name!
+            setProjectCreationPersonName(record.person);
             setIsProjectCreationModalOpen(true);
           }
         };
+
+        // Debug-Logging entfernt - Problem behoben
 
         // Debug-Logging für erweiterte Daten
         console.log('🔍 Sales View - Employee erweiterte Daten:', {
@@ -541,10 +605,28 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
         isOpen={isProjectCreationModalOpen}
         onClose={() => {
           setIsProjectCreationModalOpen(false);
-          setProjectCreationPerson(null);
+          setProjectCreationPersonId(null);
+          setProjectCreationPersonName(null);
         }}
-        employeeId={projectCreationPerson || ''}
-        employeeName={projectCreationPerson || ''}
+        onSave={async (projectData) => {
+          try {
+            // Speichere Projekt-Referenz in utilizationData (zentraler Hub)
+            if (projectCreationPersonId) {
+              await saveProjectToUtilizationData(projectData, projectCreationPersonId);  // ✅ KORREKT: ID verwenden!
+            }
+            
+            setIsProjectCreationModalOpen(false);
+            setProjectCreationPersonId(null);
+            setProjectCreationPersonName(null);
+            
+            // Refresh data after project creation and reference storage
+            await refreshData();
+          } catch (error) {
+            console.error('❌ SalesView: Fehler beim Speichern des Projekts:', error);
+          }
+        }}
+        employeeId={projectCreationPersonId || ''}  // ✅ KORREKT: ID verwenden!
+        employeeName={projectCreationPersonName || ''}  // ✅ KORREKT: Name verwenden!
         forceProjectType="planned"
       />
     </>

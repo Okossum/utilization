@@ -198,7 +198,7 @@ export const ProjectSkillSelectionModal: React.FC<ProjectSkillSelectionModalProp
       level: level
     };
 
-    console.log('🛠️ Projekt-Skill ausgewählt:', projectSkill);
+    console.log('🛠️ Projekt-Skill ausgewählt:', JSON.stringify(projectSkill, null, 2));
     onSkillSelected(projectSkill);
   };
 

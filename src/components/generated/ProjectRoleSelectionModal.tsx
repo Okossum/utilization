@@ -270,7 +270,7 @@ export const ProjectRoleSelectionModal: React.FC<ProjectRoleSelectionModalProps>
       level: roleLevels[roleId] || 3
     };
 
-    console.log('🎯 Projekt-Rolle ausgewählt:', projectRole);
+    console.log('🎯 Projekt-Rolle ausgewählt:', JSON.stringify(projectRole, null, 2));
     onRoleSelected(projectRole);
   };
 

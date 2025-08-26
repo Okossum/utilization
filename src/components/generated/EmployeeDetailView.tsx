@@ -102,7 +102,7 @@ export default function EmployeeDetailView({
   
 
   const { token } = useAuth();
-  const { databaseData, personMeta, refreshData } = useUtilizationData();
+  const { databaseData, personMeta, refreshData: refreshUtilizationDataContext } = useUtilizationData();
   
   // Create dataForUI similar to UtilizationReportView
   const dataForUI = useMemo(() => {
@@ -595,7 +595,7 @@ export default function EmployeeDetailView({
     try {
       // ✅ FIX: Aktualisiere utilizationData Hub ZUERST (wo Rollen gespeichert werden)
       console.log('🔄 Refreshing utilizationData Hub for roles/skills...');
-      await refreshUtilizationData();
+      await refreshUtilizationDataContext();
       
       // Load employee dossier data (includes legacy data)
       try {
@@ -685,7 +685,7 @@ export default function EmployeeDetailView({
       console.log('✅ Dossier-Daten erfolgreich in utilizationData Hub gespeichert');
       
       // Aktualisiere utilizationData Context
-      await refreshUtilizationData();
+      await refreshUtilizationDataContext();
       
       setIsEditing(false);
     } catch (error) {
@@ -847,7 +847,7 @@ export default function EmployeeDetailView({
         await new Promise(resolve => setTimeout(resolve, 500));
         
         // Aktualisiere utilizationData Context
-        await refreshUtilizationData();
+        await refreshUtilizationDataContext();
         
         // Show success notification
         const notificationEvent = editingProject ? 'updated' : 'created';
@@ -905,7 +905,7 @@ export default function EmployeeDetailView({
         await new Promise(resolve => setTimeout(resolve, 500));
         
         // Aktualisiere utilizationData Context
-        await refreshUtilizationData();
+        await refreshUtilizationDataContext();
         
         // Show deletion notification
         const deletedProject = existingProjectRefs.find(ref => ref.projectId === projectId);
@@ -1805,14 +1805,14 @@ export default function EmployeeDetailView({
         onClose={() => setTechSkillsOpen(false)}
         employeeId={employeeId}
         employeeName={employee.name}
-        onSkillAssigned={refreshUtilizationData}
+        onSkillAssigned={refreshUtilizationDataContext}
       />
       <SoftSkillSelectionModal
         isOpen={isSoftSkillsOpen}
         onClose={() => setSoftSkillsOpen(false)}
         employeeId={employeeId}
         employeeName={employee.name}
-        onSkillAssigned={refreshUtilizationData}
+        onSkillAssigned={refreshUtilizationDataContext}
       />
       <RoleSelectionModal
         isOpen={isRoleAssignOpen}

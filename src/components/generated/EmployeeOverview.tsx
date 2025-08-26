@@ -68,7 +68,7 @@ export const EmployeeOverview = ({ employees }: EmployeeOverviewProps) => {
   
   // Verwende gefilterte Daten oder alle Daten
   const displayEmployees = filteredEmployees.length > 0 ? filteredEmployees : employeesData;
-  console.log('🔍 EmployeeOverview - Display Employees:', displayEmployees.length, displayEmployees);
+  console.log('🔍 EmployeeOverview - Display Employees:', displayEmployees.length, '(', displayEmployees.length, ')');
   const viewModeButtons = [{
     mode: 'cards' as ViewMode,
     icon: List,
