@@ -1678,11 +1678,11 @@ export function UtilizationReportView({
         {/* <UtilizationTrendChart data={filteredData as any} forecastStartWeek={forecastStartWeek} lookbackWeeks={lookbackWeeks} forecastWeeks={forecastWeeks} isoYear={currentIsoYear} /> */}
 
         {/* Table Section */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden w-full max-w-screen">
+          <div className="px-6 py-2 border-b border-gray-200">
             
             {/* Alle Filter in einer Reihe - Personen, Bereich, CC, LBS, Status und Action */}
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
+            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
               {/* Personen-Filter mit Suchfunktion */}
               <div className="w-full">
                 <label className="block text-xs font-medium text-gray-600 mb-1">Personen</label>
@@ -1717,13 +1717,13 @@ export function UtilizationReportView({
               <MultiSelectFilter label="Bereich" options={bereichOptions} selected={selectedBereich} onChange={setSelectedBereich} placeholder="Alle Bereiche" />
               
               <MultiSelectFilter label="CC" options={ccOptions} selected={filterCC} onChange={setFilterCC} placeholder="Alle CC" />
+              <MultiSelectFilter label="Team" options={teamOptions} selected={selectedTeam} onChange={setSelectedTeam} placeholder="Alle Teams" />
               <MultiSelectFilter label="LBS" options={lbsOptions} selected={filterLBS} onChange={setFilterLBS} placeholder="Alle LBS" />
               <MultiSelectFilter label="LBS (Ausblenden)" options={lbsOptions} selected={filterLBSExclude} onChange={setFilterLBSExclude} placeholder="Alle LBS" />
               <MultiSelectFilter label="Status" options={statusOptions} selected={filterStatus} onChange={setFilterStatus} placeholder="Alle Status" />
               
               {/* Act Filter - Checkbox für jede Person */}
               <div className="w-full">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Act</label>
                 <div className="flex items-center justify-center">
                   <label className="flex items-center space-x-2 cursor-pointer">
                     <input
@@ -1852,7 +1852,7 @@ export function UtilizationReportView({
             )}
 
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-w-full">
             <table className="w-full" style={{tableLayout: 'auto', minWidth: 'max-content'}}>
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
@@ -1865,7 +1865,7 @@ export function UtilizationReportView({
                     const weekKey = `${yy}/${String(adjustedWeek).padStart(2, '0')}`;
                     
                     return (
-                      <th key={`view-week-${i}`} className="px-0.5 py-1 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-8">
+                      <th key={`view-week-${i}`} className="px-0.5 py-1 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
                         {weekKey}
                       </th>
                     );
@@ -1879,13 +1879,10 @@ export function UtilizationReportView({
                     </div>
                   </th>
 
-                  {/* Auslastungserklärung Spalte */}
-                  <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
-                    Auslastungserklärung
-                  </th>
+
 
                   {/* Act-Spalte */}
-                  <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
+                  <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', minWidth: 'max-content'}}>
                     Act
                   </th>
 
@@ -1893,17 +1890,19 @@ export function UtilizationReportView({
                   <SortableHeader
                     field="manager"
                     className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100"
+                    style={{width: 'auto', minWidth: 'max-content'}}
                   >
                     FK
                   </SortableHeader>
                   {/* Info-Spalte für Career Level Icons */}
-                  <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
+                  <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', minWidth: 'max-content'}}>
                     Info
                   </th>
                   {/* Name-Spalte zwischen Auslastung und Einsatzplan */}
                   <SortableHeader
                     field="name"
                     className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100"
+                    style={{width: 'auto', minWidth: 'max-content'}}
                   >
                     Name
                   </SortableHeader>
@@ -1911,6 +1910,7 @@ export function UtilizationReportView({
                   <SortableHeader 
                     field="lbs" 
                     className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100"
+                    style={{width: 'auto', minWidth: 'max-content'}}
                   >
                     LBS
                   </SortableHeader>
@@ -1920,6 +1920,7 @@ export function UtilizationReportView({
                   <SortableHeader 
                     field="cc" 
                     className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100"
+                    style={{width: 'auto', minWidth: 'max-content'}}
                   >
                     CC
                   </SortableHeader>
@@ -1927,23 +1928,25 @@ export function UtilizationReportView({
                   <SortableHeader 
                     field="team" 
                     className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100"
+                    style={{width: 'auto', minWidth: 'max-content'}}
                   >
                     Team
                   </SortableHeader>
                   {/* Details-Spalte für Mitarbeiter-Dossier */}
-                  <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
+                  <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', minWidth: 'max-content'}}>
                     Details
                   </th>
                   {/* Status-Spalte */}
                   <SortableHeader 
                     field="status" 
                     className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100"
+                    style={{width: 'auto', minWidth: 'max-content'}}
                   >
                     Status
                   </SortableHeader>
 
                   {/* Planning Comments Spalte */}
-                  <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', whiteSpace: 'nowrap'}}>
+                  <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-100" style={{width: 'auto', minWidth: 'max-content'}}>
                     <div className="flex items-center justify-center gap-1">
                       <MessageSquare className="w-3 h-3" />
                       <ArrowRight className="w-3 h-3" />
@@ -1952,13 +1955,13 @@ export function UtilizationReportView({
 
                   {/* Forecast-Wochen aus dem Einsatzplan (startet nach der letzten Auslastungswoche) */}
                   {visibleColumns.forecastWeeks && availableWeeksFromData.slice(0, forecastWeeks).map((week, i) => (
-                    <th key={`forecast-${i}`} className="px-0.5 py-1 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-8">
-                      {week}
-                    </th>
+                                      <th key={`forecast-${i}`} className="px-0.5 py-1 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                    {week}
+                  </th>
                   ))}
 
                   {/* Opport.-Spalte */}
-                  <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-8">
+                  <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: 'auto', minWidth: 'max-content'}}>
                     Opport.
                   </th>
                 </tr>
@@ -2035,58 +2038,7 @@ export function UtilizationReportView({
                         </div>
                       </td>
 
-                      {/* Auslastungserklärung Spalte */}
-                      <td className={`px-0.5 py-0.5 text-sm ${
-                        hasNoManager 
-                          ? 'bg-yellow-100'
-                          : (actionItems[person]?.actionItem ? 'bg-blue-100' : 'bg-gray-50')
-                      }`} style={{padding: '2px 2px'}}>
-                        <div className="flex items-center justify-center">
-                          <div className="relative group">
-                            <select
-                              value={personAuslastungserklaerungen[person] || ''}
-                              onChange={(e) => {
-                                const selectedStatus = e.target.value;
-                                if (selectedStatus) {
-                                  savePersonAuslastungserklaerung(person, selectedStatus);
-                                }
-                              }}
-                              className="text-xs border border-gray-300 rounded px-1 py-0.5 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                            >
-                              <option value="">-</option>
-                              {auslastungserklaerungen.map(status => (
-                                <option key={status.id} value={status.name}>
-                                  {status.name}
-                                </option>
-                              ))}
-                              <option value="__ADD_NEW__">+ Neuer Status</option>
-                            </select>
-                            {/* Inline-Edit für neue Status */}
-                            {personAuslastungserklaerungen[person] === '__ADD_NEW__' && (
-                              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded shadow-lg p-2 z-20 min-w-32">
-                                <input
-                                  type="text"
-                                  placeholder="Neuer Status..."
-                                  className="w-full text-xs border border-gray-300 rounded px-2 py-1 mb-2"
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      const newStatus = e.currentTarget.value.trim();
-                                      if (newStatus) {
-                                        addAuslastungserklaerung(newStatus);
-                                        savePersonAuslastungserklaerung(person, newStatus);
-                                      }
-                                    }
-                                  }}
-                                  autoFocus
-                                />
-                                <div className="text-xs text-gray-500">
-                                  Enter drücken zum Speichern
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </td>
+
 
                       {/* Act-Spalte */}
                       <td className={`px-0.5 py-0.5 text-sm ${
@@ -2264,7 +2216,7 @@ export function UtilizationReportView({
                           : (actionItems[person]?.actionItem ? 'bg-blue-100' : 'bg-gray-50')
                       } ${isTerminated ? 'line-through opacity-60' : ''}`} style={{padding: '2px 2px', minWidth: 'max-content'}}>
                         {personMeta.get(person)?.lbs ? (
-                          <span className="text-xs text-gray-700 whitespace-nowrap">{personMeta.get(person)?.lbs}</span>
+                          <span className="text-xs text-gray-700 whitespace-nowrap">{(personMeta.get(person)?.lbs || '').replace(/ - (Senior Director|Director|Senior Manager)$/, '')}</span>
                         ) : (
                           <span className="text-xs text-gray-400">—</span>
                         )}
@@ -2278,7 +2230,7 @@ export function UtilizationReportView({
                           : (actionItems[person]?.actionItem ? 'bg-blue-100' : 'bg-gray-50')
                       } ${isTerminated ? 'line-through opacity-60' : ''}`} style={{padding: '2px 2px', minWidth: 'max-content'}}>
                         {(personMeta.get(person) as any)?.cc ? (
-                          <span className="text-xs text-gray-700 whitespace-nowrap">{(personMeta.get(person) as any)?.cc}</span>
+                          <span className="text-xs text-gray-700 whitespace-nowrap">{((personMeta.get(person) as any)?.cc || '').replace(/^CC AT-/, '')}</span>
                         ) : (
                           <span className="text-xs text-gray-400">—</span>
                         )}
@@ -2290,7 +2242,7 @@ export function UtilizationReportView({
                           : (actionItems[person]?.actionItem ? 'bg-blue-100' : 'bg-gray-50')
                       } ${isTerminated ? 'line-through opacity-60' : ''}`} style={{padding: '2px 2px', minWidth: 'max-content'}}>
                         {(personMeta.get(person) as any)?.team ? (
-                          <span className="text-xs text-gray-700 whitespace-nowrap">{(personMeta.get(person) as any)?.team}</span>
+                          <span className="text-xs text-gray-700 whitespace-nowrap">{((personMeta.get(person) as any)?.team || '').replace(/^T AT-/, '')}</span>
                         ) : (
                           <span className="text-xs text-gray-400">—</span>
                         )}
