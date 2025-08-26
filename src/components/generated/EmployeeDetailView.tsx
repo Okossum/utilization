@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { ArrowLeft, User, Mail, MapPin, Calendar, Clock, Star, TrendingUp, MessageSquare, Edit3, Video, UserPlus, FileText, ChevronDown, Award, Edit, Trash2, Plus, ThumbsUp, ThumbsDown, Briefcase, Building, Pencil, Grid3X3, List, BarChart3, Heart } from 'lucide-react';
 import { collection, getDocs, limit, query, where } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
@@ -21,8 +22,9 @@ import { UtilizationComment } from './UtilizationComment';
 import { PlanningComment } from './PlanningComment';
 // ProjectHistoryEditorModal removed - using ProjectCreationModal for both create and edit
 import { ProjectCreationModal } from './ProjectCreationModal';
-import { ProjectCard, CompactProjectCard } from './ProjectCard';
+import { ProjectCard, CompactProjectCard, MiniProjectCard } from './ProjectCard';
 import { ProjectTable } from './ProjectTable';
+import { ProjectDetailModal } from './ProjectDetailModal';
 import { ProjectToast, useProjectToast } from './ProjectToast';
 import type { ProjectHistoryItem } from '../../lib/types';
 import { ProjectsByType } from '../../types/projects';
@@ -171,6 +173,9 @@ export default function EmployeeDetailView({
   const [isSoftSkillsOpen, setSoftSkillsOpen] = useState(false);
   const [isRoleAssignOpen, setRoleAssignOpen] = useState(false);
   // isProjectHistoryModalOpen removed - using ProjectCreationModal for both create and edit
+  const [isProjectDetailModalOpen, setIsProjectDetailModalOpen] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<ProjectHistoryItem | null>(null);
+  const [selectedProjectType, setSelectedProjectType] = useState<'active' | 'planned' | 'historical'>('historical');
   const [isProjectCreationModalOpen, setProjectCreationModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<ProjectHistoryItem | null>(null);
   const [newProjectType, setNewProjectType] = useState<'historical' | 'planned'>('historical');
@@ -250,27 +255,54 @@ export default function EmployeeDetailView({
     
     const projects = personData?.projectReferences || [];
     console.log('🔍 DEBUG: Raw projects from utilizationData Hub:', projects);
-    console.log('🔍 DEBUG: Projects structure:', projects.map(p => ({ 
+    console.log('🔍 DEBUG: Projects structure with ALL fields:', projects.map(p => ({ 
       id: p.projectId, 
       projectName: p.projectName, 
       projectType: p.projectType,
       customer: p.customer,
-      addedAt: p.addedAt
+      dailyRate: p.dailyRate,
+      probability: p.probability,
+      internalContact: p.internalContact,
+      customerContact: p.customerContact,
+      projectSource: p.projectSource,
+      jiraTicketId: p.jiraTicketId,
+      addedAt: p.addedAt,
+      allKeys: Object.keys(p)
     })));
     
-    // Konvertiere projectReferences zu ProjectHistoryItem Format
+    // Konvertiere projectReferences zu ProjectHistoryItem Format - ALLE Felder übernehmen
     const convertedProjects = projects.map(ref => ({
       id: ref.projectId,
       projectName: ref.projectName,
       customer: ref.customer,
       projectType: ref.projectType || 'planned',
       description: ref.description || '',
+      
+      // Finanzielle Details
+      dailyRate: ref.dailyRate,
+      probability: ref.probability,
+      
+      // Kontaktinformationen
+      internalContact: ref.internalContact,
+      customerContact: ref.customerContact,
+      
+      // Projekt-Details
+      projectSource: ref.projectSource,
+      jiraTicketId: ref.jiraTicketId,
+      
+      // Zeitraum
       startDate: ref.startDate || '',
       endDate: ref.endDate || '',
       duration: ref.duration || '',
+      
+      // Rollen & Skills
       roles: ref.roles || [],
       skills: ref.skills || [],
-      activities: ref.activities || []
+      activities: ref.activities || [],
+      
+      // Metadaten
+      createdAt: ref.addedAt,
+      updatedAt: ref.updatedAt
     }));
     
     const filtered = filterProjectsByType(convertedProjects);
@@ -706,6 +738,14 @@ export default function EmployeeDetailView({
     setProjectCreationModalOpen(true);  // Use new modal for editing too!
   };
 
+  const handleViewProject = (project: ProjectHistoryItem) => {
+    setSelectedProject(project);
+    // Determine project type based on project data
+    const projectType = project.projectType || 'historical';
+    setSelectedProjectType(projectType as 'active' | 'planned' | 'historical');
+    setIsProjectDetailModalOpen(true);
+  };
+
   const handleSaveProject = async (project: ProjectHistoryItem) => {
     console.log('💾 Saving project to utilizationData Hub:', project);
     
@@ -743,17 +783,46 @@ export default function EmployeeDetailView({
           updatedAt: new Date().toISOString()
         };
         
-        // Nur definierte Werte hinzufügen
+        // Alle Felder aus ProjectCreationModal speichern
         if (project.projectName !== undefined) projectRef.projectName = project.projectName;
         if (project.customer !== undefined) projectRef.customer = project.customer;
         if (project.projectType !== undefined) projectRef.projectType = project.projectType;
         if (project.description !== undefined) projectRef.description = project.description;
+        
+        // Projekt-Details (geplante Projekte)
+        if (project.probability !== undefined) projectRef.probability = project.probability;
+        if (project.dailyRate !== undefined) projectRef.dailyRate = project.dailyRate;
+        // plannedUtilization ist nicht Teil von ProjectHistoryItem - entfernt
         if (project.startDate !== undefined) projectRef.startDate = project.startDate;
         if (project.endDate !== undefined) projectRef.endDate = project.endDate;
+        if (project.internalContact !== undefined) projectRef.internalContact = project.internalContact;
+        if (project.customerContact !== undefined) projectRef.customerContact = project.customerContact;
+        if (project.jiraTicketId !== undefined) projectRef.jiraTicketId = project.jiraTicketId;
+        
+        // Projekt-Quelle
+        if (project.projectSource !== undefined) projectRef.projectSource = project.projectSource;
+        
+        // Historische Projekte
         if (project.duration !== undefined) projectRef.duration = project.duration;
+        if (project.activities !== undefined) projectRef.activities = project.activities;
+        
+        // Rollen & Skills
         if (project.roles !== undefined) projectRef.roles = project.roles;
         if (project.skills !== undefined) projectRef.skills = project.skills;
-        if (project.activities !== undefined) projectRef.activities = project.activities;
+        
+        console.log('💾 DEBUG: Saving complete project data:', {
+          projectId: project.id,
+          projectName: project.projectName,
+          customer: project.customer,
+          projectType: project.projectType,
+          probability: project.probability,
+          dailyRate: project.dailyRate,
+          internalContact: project.internalContact,
+          customerContact: project.customerContact,
+          jiraTicketId: project.jiraTicketId,
+          projectSource: project.projectSource,
+          allFieldsInProjectRef: Object.keys(projectRef)
+        });
         
         let updatedProjectRefs;
         if (editingProject) {
@@ -1517,7 +1586,7 @@ export default function EmployeeDetailView({
                     <div>
                     <h4 className="text-sm font-medium text-gray-900 mb-2">Auslastungskommentar</h4>
                     <UtilizationComment
-                      personId={employeeId}
+                      personId={employee.name}
                       initialValue=""
                       onLocalChange={() => {}}
                     />
@@ -1527,7 +1596,7 @@ export default function EmployeeDetailView({
                   <div>
                     <h4 className="text-sm font-medium text-gray-900 mb-2">Einsatzplan-Kommentar</h4>
                     <PlanningComment
-                      personId={employeeId}
+                      personId={employee.name}
                       initialValue=""
                       onLocalChange={() => {}}
                     />
@@ -1551,35 +1620,11 @@ export default function EmployeeDetailView({
                     Projektvergangenheit
                   </h3>
                   <div className="flex items-center space-x-2">
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs font-medium text-white bg-blue-500 px-2 py-0.5 rounded-full">
                       {projectsByType.historical.length}
-                          </span>
+                    </span>
                     
-                    {/* View Toggle Buttons */}
-                    <div className="flex items-center bg-gray-100 rounded p-0.5">
-                      <button
-                        onClick={() => setProjectViews(prev => ({ ...prev, historical: 'card' }))}
-                        className={`p-1 rounded transition-colors ${
-                          projectViews.historical === 'card' 
-                            ? 'bg-white text-blue-600 shadow-sm' 
-                            : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                        title="Kartenansicht"
-                      >
-                        <Grid3X3 className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={() => setProjectViews(prev => ({ ...prev, historical: 'table' }))}
-                        className={`p-1 rounded transition-colors ${
-                          projectViews.historical === 'table' 
-                            ? 'bg-white text-blue-600 shadow-sm' 
-                            : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                        title="Tabellenansicht"
-                      >
-                        <List className="w-3 h-3" />
-                      </button>
-                        </div>
+                    
                     
                     <button 
                       onClick={handleAddHistoricalProject}
@@ -1598,29 +1643,20 @@ export default function EmployeeDetailView({
               </div>
 
                 {expandedSections.historicalProjects && (
-                  <div className="max-h-48 overflow-y-auto">
+                  <div className="max-h-96 overflow-y-auto">
                     {projectsByType.historical.length > 0 ? (
-                      projectViews.historical === 'card' ? (
-                        <div className="space-y-2">
-                          {projectsByType.historical.map((project: ProjectHistoryItem) => (
-                            <CompactProjectCard
-                              key={project.id}
-                              project={project}
-                              type="historical"
-                              onEdit={handleEditProject}
-                              onDelete={handleDeleteProject}
-                            />
-                          ))}
-                        </div>
-                      ) : (
-                        <ProjectTable
-                          projects={projectsByType.historical}
-                          type="historical"
-                          onEdit={handleEditProject}
-                          onDelete={handleDeleteProject}
-                          compact={true}
-                        />
-                      )
+                      <div className="space-y-1">
+                        {projectsByType.historical.map((project: ProjectHistoryItem) => (
+                          <MiniProjectCard
+                            key={project.id}
+                            project={project}
+                            type="historical"
+                            onEdit={handleEditProject}
+                            onDelete={handleDeleteProject}
+                            onView={handleViewProject}
+                          />
+                        ))}
+                      </div>
                     ) : (
                       <div className="text-center py-4 text-gray-500">
                         <FileText className="w-8 h-8 text-gray-300 mx-auto mb-1" />
@@ -1639,35 +1675,11 @@ export default function EmployeeDetailView({
                     Aktive Projekte
                   </h3>
                   <div className="flex items-center space-x-2">
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs font-medium text-white bg-green-500 px-2 py-0.5 rounded-full">
                       {projectsByType.active.length}
                     </span>
                     
-                    {/* View Toggle Buttons */}
-                    <div className="flex items-center bg-gray-100 rounded p-0.5">
-                      <button
-                        onClick={() => setProjectViews(prev => ({ ...prev, active: 'card' }))}
-                        className={`p-1 rounded transition-colors ${
-                          projectViews.active === 'card' 
-                            ? 'bg-white text-blue-600 shadow-sm' 
-                            : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                        title="Kartenansicht"
-                      >
-                        <Grid3X3 className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={() => setProjectViews(prev => ({ ...prev, active: 'table' }))}
-                        className={`p-1 rounded transition-colors ${
-                          projectViews.active === 'table' 
-                            ? 'bg-white text-blue-600 shadow-sm' 
-                            : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                        title="Tabellenansicht"
-                      >
-                        <List className="w-3 h-3" />
-                      </button>
-                    </div>
+
                     
                     <button 
                       onClick={() => toggleSection('projects')} 
@@ -1679,29 +1691,20 @@ export default function EmployeeDetailView({
                 </div>
                 
                 {expandedSections.projects && (
-                  <div className="max-h-48 overflow-y-auto">
+                  <div className="max-h-96 overflow-y-auto">
                     {projectsByType.active.length > 0 ? (
-                      projectViews.active === 'card' ? (
-                        <div className="space-y-2">
-                          {projectsByType.active.map(project => (
-                            <CompactProjectCard
-                              key={project.id}
-                              project={project}
-                              type="active"
-                              onEdit={handleEditProject}
-                              onDelete={handleDeleteProject}
-                            />
-                          ))}
-                        </div>
-                      ) : (
-                        <ProjectTable
-                          projects={projectsByType.active}
-                          type="active"
-                          onEdit={handleEditProject}
-                          onDelete={handleDeleteProject}
-                          compact={true}
-                        />
-                      )
+                      <div className="space-y-1">
+                        {projectsByType.active.map(project => (
+                          <MiniProjectCard
+                            key={project.id}
+                            project={project}
+                            type="active"
+                            onEdit={handleEditProject}
+                            onDelete={handleDeleteProject}
+                            onView={handleViewProject}
+                          />
+                        ))}
+                      </div>
                     ) : (
                       <div className="p-3 text-center text-gray-500 text-xs">
                         Keine aktiven Projekte
@@ -1719,35 +1722,11 @@ export default function EmployeeDetailView({
                     Geplante Projekte
                   </h3>
                   <div className="flex items-center space-x-2">
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs font-medium text-white bg-blue-500 px-2 py-0.5 rounded-full">
                       {projectsByType.planned.length}
                     </span>
                     
-                    {/* View Toggle Buttons */}
-                    <div className="flex items-center bg-gray-100 rounded p-0.5">
-                      <button
-                        onClick={() => setProjectViews(prev => ({ ...prev, planned: 'card' }))}
-                        className={`p-1 rounded transition-colors ${
-                          projectViews.planned === 'card' 
-                            ? 'bg-white text-blue-600 shadow-sm' 
-                            : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                        title="Kartenansicht"
-                      >
-                        <Grid3X3 className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={() => setProjectViews(prev => ({ ...prev, planned: 'table' }))}
-                        className={`p-1 rounded transition-colors ${
-                          projectViews.planned === 'table' 
-                            ? 'bg-white text-blue-600 shadow-sm' 
-                            : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                        title="Tabellenansicht"
-                      >
-                        <List className="w-3 h-3" />
-                      </button>
-                    </div>
+
                     
                     <button 
                       onClick={handleAddPlannedProject}
@@ -1766,29 +1745,20 @@ export default function EmployeeDetailView({
                 </div>
                 
                 {expandedSections.plannedProjects && (
-                  <div className="max-h-48 overflow-y-auto">
+                  <div className="max-h-96 overflow-y-auto">
                     {projectsByType.planned.length > 0 ? (
-                      projectViews.planned === 'card' ? (
-                        <div className="space-y-2">
-                          {projectsByType.planned.map(project => (
-                            <CompactProjectCard
-                              key={project.id}
-                              project={project}
-                              type="planned"
-                              onEdit={handleEditProject}
-                              onDelete={handleDeleteProject}
-                            />
-                          ))}
-                        </div>
-                      ) : (
-                        <ProjectTable
-                          projects={projectsByType.planned}
-                          type="planned"
-                          onEdit={handleEditProject}
-                          onDelete={handleDeleteProject}
-                          compact={true}
-                        />
-                      )
+                      <div className="space-y-1">
+                        {projectsByType.planned.map(project => (
+                          <MiniProjectCard
+                            key={project.id}
+                            project={project}
+                            type="planned"
+                            onEdit={handleEditProject}
+                            onDelete={handleDeleteProject}
+                            onView={handleViewProject}
+                          />
+                        ))}
+                      </div>
                     ) : (
                       <div className="p-3 text-center text-gray-500 text-xs">
                         Keine geplanten Projekte
@@ -1865,6 +1835,18 @@ export default function EmployeeDetailView({
         employeeName={employee?.name || personName || 'Unknown'}
         project={editingProject || undefined}
       />
+
+      {/* Project Detail Modal */}
+      <AnimatePresence>
+        {isProjectDetailModalOpen && (
+          <ProjectDetailModal
+            isOpen={isProjectDetailModalOpen}
+            onClose={() => setIsProjectDetailModalOpen(false)}
+            project={selectedProject}
+            type={selectedProjectType}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Toast Notifications */}
       <ProjectToast

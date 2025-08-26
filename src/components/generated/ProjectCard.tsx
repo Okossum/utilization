@@ -21,6 +21,7 @@ export function ProjectCard({
   type, 
   onEdit, 
   onDelete, 
+  onView,
   compact = false 
 }: ProjectCardProps) {
 
@@ -76,27 +77,29 @@ export function ProjectCard({
           </div>
         </div>
         
-        {/* Action Buttons */}
-        <div className="flex space-x-1 ml-2">
-          {onEdit && (
-            <button
-              onClick={() => onEdit(project)}
-              className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-white rounded transition-colors"
-              title="Bearbeiten"
-            >
-              <Pencil className="w-4 h-4" />
-            </button>
-          )}
-          {onDelete && (
-            <button
-              onClick={() => onDelete(project.id)}
-              className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-white rounded transition-colors"
-              title="Löschen"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+        {/* Action Buttons - nur in normaler Version, nicht in kompakter */}
+        {!compact && (
+          <div className="flex space-x-1 ml-2">
+            {onEdit && (
+              <button
+                onClick={() => onEdit(project)}
+                className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-white rounded transition-colors"
+                title="Bearbeiten"
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
+            )}
+            {onDelete && (
+              <button
+                onClick={() => onDelete(project.id)}
+                className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-white rounded transition-colors"
+                title="Löschen"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Project Details Grid */}
@@ -257,11 +260,46 @@ export function ProjectCard({
           </span>
         </div>
         
-        {project.comment && (
-          <span className="truncate max-w-32" title={project.comment}>
-            {project.comment}
-          </span>
-        )}
+        <div className="flex items-center space-x-1">
+          {project.comment && (
+            <span className="truncate max-w-24 mr-2" title={project.comment}>
+              {project.comment}
+            </span>
+          )}
+          
+          {/* Action Buttons - nur in kompakter Version */}
+          {compact && (
+            <div className="flex items-center space-x-1">
+              {onView && (
+                <button
+                  onClick={() => onView(project)}
+                  className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                  title="Projekt anzeigen"
+                >
+                  <User className="w-3 h-3" />
+                </button>
+              )}
+              {onEdit && (
+                <button
+                  onClick={() => onEdit(project)}
+                  className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                  title="Projekt bearbeiten"
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  onClick={() => onDelete(project.id)}
+                  className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                  title="Projekt löschen"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -272,30 +310,97 @@ export function CompactProjectCard(props: ProjectCardProps) {
   return <ProjectCard {...props} compact={true} />;
 }
 
-// Mini-Version für Übersichten
-export function MiniProjectCard({ project, type, onEdit }: ProjectCardProps) {
+// Mini-Version für Übersichten - Kompakte einzeilige Darstellung
+export function MiniProjectCard({ project, type, onEdit, onView, onDelete }: ProjectCardProps) {
+  // Erste Rolle für Anzeige verwenden
+  const primaryRole = project.roles && project.roles.length > 0 ? project.roles[0].name : null;
+  
+  // Datum formatieren (nur MM/YY)
+  const formatShortDate = (dateStr?: string) => {
+    if (!dateStr) return null;
+    try {
+      const date = new Date(dateStr);
+      return `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getFullYear()).slice(-2)}`;
+    } catch {
+      return null;
+    }
+  };
+  
+  const startDate = formatShortDate(project.startDate);
+  const endDate = formatShortDate(project.endDate);
+  const dateRange = startDate && endDate ? `${startDate}-${endDate}` : startDate || endDate;
+  
+  // JIRA-Ticket anzeigen wenn Projektquelle "jira" ist
+  const showJiraTicket = project.projectSource === 'jira' && project.jiraTicketId;
+  const isJiraProject = project.projectSource === 'jira';
+  
   return (
-    <div className={`rounded border p-2 ${getProjectTypeColor(type)}`}>
-      <div className="flex items-center justify-between">
-        <div className="flex-1 min-w-0">
-          <div className="font-medium text-sm truncate">{project.projectName}</div>
-          <div className="text-xs text-gray-600 truncate">{project.customer}</div>
+    <div className={`rounded border p-2 ${isJiraProject ? 'bg-yellow-50 border-yellow-200' : getProjectTypeColor(type)}`}>
+      <div className="flex items-center justify-between gap-2">
+        {/* Hauptinformationen in einer Zeile */}
+        <div className="flex-1 min-w-0 flex items-center gap-2 text-sm">
+          <span className="font-medium truncate">{project.customer}</span>
+          <span className="text-gray-400">•</span>
+          <span className="font-medium truncate">{project.projectName}</span>
+          {primaryRole && (
+            <>
+              <span className="text-gray-400">•</span>
+              <span className="text-gray-600 truncate">{primaryRole}</span>
+            </>
+          )}
+          {dateRange && (
+            <>
+              <span className="text-gray-400">•</span>
+              <span className="text-gray-500 text-xs font-mono">{dateRange}</span>
+            </>
+          )}
+          {showJiraTicket && (
+            <>
+              <span className="text-gray-400">•</span>
+              <span className="text-blue-600 text-xs font-mono bg-blue-50 px-1.5 py-0.5 rounded">
+                {project.jiraTicketId}
+              </span>
+            </>
+          )}
         </div>
         
+        {/* Wahrscheinlichkeit */}
         {project.probability && (
-          <div className={`ml-2 px-1.5 py-0.5 rounded text-xs ${getProbabilityColor(project.probability)}`}>
+          <div className={`px-2 py-0.5 rounded text-xs font-medium ${getProbabilityColor(project.probability)}`}>
             {project.probability}%
           </div>
         )}
         
-        {onEdit && (
-          <button
-            onClick={() => onEdit(project)}
-            className="ml-1 p-1 text-gray-400 hover:text-blue-600"
-          >
-            <Pencil className="w-3 h-3" />
-          </button>
-        )}
+        {/* Action Buttons */}
+        <div className="flex items-center space-x-1">
+          {onView && (
+            <button
+              onClick={() => onView(project)}
+              className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+              title="Projekt anzeigen"
+            >
+              <User className="w-3 h-3" />
+            </button>
+          )}
+          {onEdit && (
+            <button
+              onClick={() => onEdit(project)}
+              className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+              title="Projekt bearbeiten"
+            >
+              <Pencil className="w-3 h-3" />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={() => onDelete(project.id)}
+              className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+              title="Projekt löschen"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

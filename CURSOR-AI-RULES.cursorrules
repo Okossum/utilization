@@ -100,6 +100,42 @@ Vor jeder größeren Änderung prüfe:
 - "Ist das eine Annahme oder ein Fakt?"
 - "Sollte ich den User nochmal fragen?"
 
+## 🔧 MODAL & COMPONENT DEBUGGING REGELN
+
+### NIEMALS sofort fixen - IMMER erst vollständig analysieren:
+1. **Vollständige Analyse ZUERST**: Schaue dir funktionierende Komponenten derselben Art an
+2. **Pattern-Vergleich**: Vergleiche kaputte Komponente mit funktionierenden Implementierungen
+3. **Root-Cause-Analysis**: Finde die ECHTE Ursache, nicht nur Symptome
+4. **Einfache Lösung bevorzugen**: Verwende bewährte Patterns aus der Codebase
+
+### Modal-spezifische Regeln:
+- **NIEMALS** komplexe Portal-Lösungen ohne Grund implementieren
+- **IMMER** schauen wie andere Modals in der Codebase funktionieren
+- **AnimatePresence** gehört in die Parent-Komponente, NICHT ins Modal
+- **Early Return** mit `if (!isOpen) return null;` VOR AnimatePresence
+- **Einfache Struktur**: `fixed inset-0` → `motion.div` → Content
+- **Event Handling**: Backdrop `onClick={onClose}`, Modal `onClick={stopPropagation}`
+
+### Bei UI-Problemen (Modal schließt sich, etc.):
+1. **STOPP** - Nicht sofort Code ändern
+2. **Analysiere** funktionierende Beispiele derselben Art
+3. **Identifiziere** den Unterschied zwischen funktionierend und kaputt
+4. **Implementiere** die einfachste Lösung basierend auf funktionierenden Patterns
+5. **Teste** die Lösung bevor weitere Änderungen
+
+### Verbotene Aktionen bei Modal-Problemen:
+- ❌ Sofort z-index ändern ohne Analyse
+- ❌ Komplexe Event-Handling-Logik hinzufügen
+- ❌ Portal-Rendering ohne klaren Grund
+- ❌ State-Preservation-Hacks implementieren
+- ❌ Multiple Lösungsansätze gleichzeitig probieren
+
+### Erlaubte Aktionen:
+- ✅ Funktionierende Modal-Implementierungen studieren
+- ✅ Einfache Struktur nach bewährtem Muster implementieren
+- ✅ Syntax-Fehler beheben durch komplettes Neuschreiben
+- ✅ Eine Lösung nach der anderen testen
+
 ## 🎨 CODE-STIL PRÄFERENZEN
 
 ### React/TypeScript:

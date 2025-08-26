@@ -59,6 +59,7 @@ export interface ProjectCardProps {
   type: ProjectType;
   onEdit?: (project: ProjectHistoryItem) => void;
   onDelete?: (projectId: string) => void;
+  onView?: (project: ProjectHistoryItem) => void;
   compact?: boolean;
 }
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Edit, Trash2 } from 'lucide-react';
+import { Edit, Trash2, User } from 'lucide-react';
 import type { ProjectHistoryItem } from '../../lib/types';
 
 interface ProjectTableProps {
@@ -7,10 +7,11 @@ interface ProjectTableProps {
   type: 'active' | 'planned' | 'historical';
   onEdit?: (project: ProjectHistoryItem) => void;
   onDelete?: (projectId: string) => void;
+  onView?: (project: ProjectHistoryItem) => void;
   compact?: boolean;
 }
 
-export function ProjectTable({ projects, type, onEdit, onDelete, compact = false }: ProjectTableProps) {
+export function ProjectTable({ projects, type, onEdit, onDelete, onView, compact = false }: ProjectTableProps) {
   if (projects.length === 0) {
     return (
       <div className="text-center py-6 text-gray-500">
@@ -32,7 +33,7 @@ export function ProjectTable({ projects, type, onEdit, onDelete, compact = false
         { key: 'duration', label: 'Zeitraum', width: 'w-1/5' },
         { key: 'roles', label: 'Rollen', width: 'w-1/5' },
         { key: 'skills', label: 'Skills', width: 'w-1/5' },
-        { key: 'actions', label: '', width: 'w-12' }
+        { key: 'actions', label: '', width: 'w-16' }
       ];
     }
 
@@ -43,7 +44,7 @@ export function ProjectTable({ projects, type, onEdit, onDelete, compact = false
         { key: 'probability', label: 'Wahrscheinlichkeit', width: 'w-1/8' },
         { key: 'dailyRate', label: 'Tagessatz', width: 'w-1/8' },
         { key: 'contact', label: 'Kontakt', width: 'w-1/6' },
-        { key: 'actions', label: '', width: 'w-12' }
+        { key: 'actions', label: '', width: 'w-16' }
       ];
     }
 
@@ -242,10 +243,19 @@ export function ProjectTable({ projects, type, onEdit, onDelete, compact = false
               {/* Actions */}
               <td className="px-3 py-2">
                 <div className="flex items-center gap-1">
+                  {onView && (
+                    <button
+                      onClick={() => onView(project)}
+                      className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                      title="Projekt anzeigen"
+                    >
+                      <User className="w-3 h-3" />
+                    </button>
+                  )}
                   {onEdit && (
                     <button
                       onClick={() => onEdit(project)}
-                      className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                      className="p-1 text-gray-400 hover:text-green-600 transition-colors"
                       title="Bearbeiten"
                     >
                       <Edit className="w-3 h-3" />
