@@ -147,11 +147,7 @@ export async function uploadMitarbeiter(file: File, sheetName = "Search Results"
   const ws = wb.Sheets[sheetName] ?? wb.Sheets[wb.SheetNames[0]];
   const range = rangeOf(ws);
 
-  logger.debug("uploaders.mitarbeiter", "Workbook gelesen", { 
-    sheetName, 
-    availableSheets: wb.SheetNames,
-    range: range 
-  });
+
 
   // Header-Zeile robust finden (Zeile mit "Vorname" & "E-Mail")
   let headerRow0 = 0;
@@ -162,12 +158,7 @@ export async function uploadMitarbeiter(file: File, sheetName = "Search Results"
   }
   const dataStart0 = headerRow0 + 1;
 
-  logger.debug("uploaders.mitarbeiter", "Header gefunden", { 
-    headerRow0, 
-    dataStart0,
-    vornameCell: ws[A1(headerRow0,0)]?.v,
-    emailCell: ws[A1(headerRow0,2)]?.v
-  });
+
 
   // Spalten lokalisieren
   const findCol = (re: RegExp) => {
@@ -210,7 +201,7 @@ export async function uploadMitarbeiter(file: File, sheetName = "Search Results"
     // Parse Name in Nachname/Vorname
     const { nachname, vorname } = parsePersonName(personDisplay);
     
-    // Debug: Zeige Namens-Aufteilung für erste paar Einträge
+
     if (written < 3) {
       logger.info("uploaders.mitarbeiter", `Namens-Aufteilung`, {
         original: personDisplay,
@@ -235,12 +226,7 @@ export async function uploadMitarbeiter(file: File, sheetName = "Search Results"
       
 
       
-      logger.debug("uploaders.mitarbeiter", `Verfügbar ab für ${personDisplay}`, {
-        rawValue: cell?.v,
-        type: typeof cell?.v,
-        cellType: cell?.t,
-        finalValue: verfuegbarAb
-      });
+
     }
 
     const payload: any = {
@@ -298,10 +284,7 @@ export async function uploadAuslastung(file: File, targetCollection = "auslastun
   const ws = wb.Sheets[wb.SheetNames[0]];
   const range = rangeOf(ws);
   
-  logger.debug("uploaders.auslastung", "Workbook gelesen", { 
-    sheetName: wb.SheetNames[0], 
-    range: range 
-  });
+
 
   // Erkenne Wochen-Header aus Zeile 3 (0-basiert = Zeile 2)
   const weekColumns: { col: number; week: string }[] = [];
@@ -637,11 +620,7 @@ export async function uploadEinsatzplan(file: File, sheetName = "Einsatzplan", t
   const ws = wb.Sheets[sheetName] ?? wb.Sheets[wb.SheetNames[0]];
   const range = rangeOf(ws);
 
-  logger.debug("uploaders.einsatzplan", "Workbook gelesen", { 
-    sheetName, 
-    availableSheets: wb.SheetNames,
-    range: range 
-  });
+
 
   const det = detectHeaderRowAndStart(ws);
   const triples = getWeeklyTriples(ws, det.headerRow0, det.firstProjektCol0);
@@ -725,7 +704,7 @@ export async function uploadEinsatzplan(file: File, sheetName = "Einsatzplan", t
       const cell: any = (ws as any)[A1(r, verfAbCol0)];
       verfuegbarAb = cellToIsoDate(cell, wb);
       
-      // Debug: Zeige Datumskonvertierung für erste paar Einträge
+
       if (written < 3) {
         logger.info("uploaders.einsatzplan", `Verfügbar ab für ${person}`, {
           rawValue: cell?.v,
@@ -742,7 +721,7 @@ export async function uploadEinsatzplan(file: File, sheetName = "Einsatzplan", t
       const cell: any = (ws as any)[A1(r, staffbarCol0)];
       verfuegbarFuerStaffing = toBooleanOrUndef(cell?.v);
       
-      // Debug: Zeige Boolean-Konvertierung für erste paar Einträge
+
       if (written < 3) {
         logger.info("uploaders.einsatzplan", `Staffbar für ${person}`, {
           rawValue: cell?.v,
@@ -758,7 +737,7 @@ export async function uploadEinsatzplan(file: File, sheetName = "Einsatzplan", t
       const cell: any = (ws as any)[A1(r, geschaeftsstelleCol0)];
       geschaeftsstelle = cell?.v ? String(cell.v).trim() || undefined : undefined;
       
-      // Debug: Zeige Geschäftsstelle für erste paar Einträge
+
       if (written < 3) {
         logger.info("uploaders.einsatzplan", `Geschäftsstelle für ${person}`, {
           rawValue: cell?.v,
@@ -782,7 +761,7 @@ export async function uploadEinsatzplan(file: File, sheetName = "Einsatzplan", t
       // Konvertiere NKV (Nicht-Auslastung) zu tatsächlicher Auslastung
       const auslastungProzent = nkvProzent !== undefined ? 100 - nkvProzent : undefined;
       
-      // Debug: Zeige Konvertierung für erste paar Einträge
+
       if (written < 3 && nkvProzent !== undefined) {
         logger.info("uploaders.einsatzplan", `NKV-Konvertierung für ${person}`, {
           kw: t.kw,

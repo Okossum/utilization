@@ -30,10 +30,10 @@ export function EmployeeSkillAssignment({
   employeeName, 
   onSkillsChange 
 }: EmployeeSkillAssignmentProps) {
-  console.log('🏗️ EmployeeSkillAssignment rendered for:', { employeeId, employeeName });
+
   
   const { user, token } = useAuth();
-  console.log('🔑 EmployeeSkillAssignment token status:', token ? 'present' : 'missing');
+
   
   const [assignedSkills, setAssignedSkills] = useState<EmployeeSkill[]>([]);
   const [availableSkills, setAvailableSkills] = useState<AvailableSkill[]>([]);
@@ -77,7 +77,7 @@ export function EmployeeSkillAssignment({
         return;
       }
       
-      console.log('🔄 EmployeeSkillAssignment: Loading skill categories');
+      
       const response = await fetch('/api/technical-skill-categories', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -87,7 +87,7 @@ export function EmployeeSkillAssignment({
       
       if (response.ok) {
         const categories = await response.json();
-        console.log('✅ EmployeeSkillAssignment: Loaded categories:', categories);
+
         setSkillCategories(categories);
       } else {
         console.error('❌ EmployeeSkillAssignment: Failed to load categories:', response.status);
@@ -148,7 +148,7 @@ export function EmployeeSkillAssignment({
         return;
       }
       
-      console.log('🔄 EmployeeSkillAssignment: Loading assigned skills for:', employeeId);
+      
       const response = await fetch(`/api/employee-technical-skills/${employeeId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -158,7 +158,7 @@ export function EmployeeSkillAssignment({
       
       if (response.ok) {
         const skills = await response.json();
-        console.log('✅ EmployeeSkillAssignment: Loaded assigned skills:', skills);
+
         setAssignedSkills(skills);
         onSkillsChange?.(skills);
       } else {
@@ -504,7 +504,7 @@ export function EmployeeSkillAssignment({
         employeeId={employeeId}
         employeeName={employeeName}
         onSkillAssigned={() => {
-          console.log('🔄 EmployeeSkillAssignment: Skill assigned, reloading...');
+  
           loadAssignedSkills();
         }}
       />

@@ -136,21 +136,7 @@ export function AppHeader({
             </button>
           )}
           
-          {canAccessView('employees') && (
-            <button
-              onClick={() => setCurrentView('employees')}
-              className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
-                currentView === 'employees' 
-                  ? 'text-blue-700 bg-blue-50 border-blue-200' 
-                  : 'text-gray-700 bg-gray-50 border-gray-200 hover:bg-gray-100'
-              } border rounded-lg`}
-              style={{ zIndex: 40 }}
-              title="Mitarbeiter Liste"
-            >
-              <Users className="w-4 h-4" />
-              Mitarbeiter
-            </button>
-          )}
+
           
           {canAccessView('sales') && (
             <button
@@ -168,10 +154,7 @@ export function AppHeader({
             </button>
           )}
           
-          {/* Debug-Info für Entwicklung */}
-          <div className="text-xs text-gray-500 ml-2">
-            Rolle: {role}
-          </div>
+
 
           {/* LoB als feststehender Chip - nur bei Utilization */}
           {currentView === 'utilization' && lobOptions.length === 1 && (

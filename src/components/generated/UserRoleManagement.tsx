@@ -118,7 +118,7 @@ export default function UserRoleManagement() {
   const updateUserRole = async (userId: string, newRole: UserRole, hasAccess: boolean) => {
     try {
       setSaving(userId);
-      console.log('🔄 Update Rolle für Benutzer:', userId, 'Neue Rolle:', newRole);
+      
       
       const docRef = doc(db, 'utilizationData', userId);
       await updateDoc(docRef, {

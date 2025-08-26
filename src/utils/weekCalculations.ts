@@ -20,12 +20,12 @@ export function getWeeksBetweenDates(startDate: string, endDate: string): string
     const end = parseISO(endDate);
     
     if (!isValid(start) || !isValid(end)) {
-      console.warn('Invalid dates provided:', { startDate, endDate });
+  
       return [];
     }
     
     if (start > end) {
-      console.warn('Start date is after end date:', { startDate, endDate });
+  
       return [];
     }
     
@@ -45,7 +45,7 @@ export function getWeeksBetweenDates(startDate: string, endDate: string): string
     
     return weeks.sort();
   } catch (error) {
-    console.error('Error calculating weeks between dates:', error);
+
     return [];
   }
 }

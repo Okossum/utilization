@@ -159,7 +159,7 @@ export function useUserSettings(): UseUserSettingsReturn {
       await userSettingsService.saveSettings(defaultSettings);
       setSettings(defaultSettings);
       
-      console.log('✅ Settings reset to defaults');
+      
     } catch (err) {
       console.error('Error resetting settings:', err);
       setError(err instanceof Error ? err.message : 'Failed to reset settings');

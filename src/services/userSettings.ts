@@ -162,7 +162,7 @@ export class UserSettingsService {
       // Update cache
       this.cache.set(settings.userId, dataToSave);
       
-      console.log('✅ User settings saved successfully');
+      
     } catch (error) {
       console.error('❌ Error saving user settings:', error);
       throw error;
@@ -258,7 +258,7 @@ export class UserSettingsService {
 
       // Save migrated settings if any exist
       if (Object.keys(localSettings).length > 0) {
-        console.log('🔄 Migrating localStorage settings to user settings');
+
         
         if (localSettings.showWorkingStudents !== undefined || localSettings.showAllData !== undefined) {
           await this.updateFilterSettings(userId, {
@@ -273,7 +273,7 @@ export class UserSettingsService {
           });
         }
 
-        console.log('✅ Migration completed');
+
       }
     } catch (error) {
       console.error('Error migrating localStorage settings:', error);

@@ -77,7 +77,7 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
       const { COLLECTIONS } = await import('../../lib/types');
       const { db } = await import('../../lib/firebase');
       
-      console.log('🔄 SalesView: Speichere Projekt-Referenz in utilizationData für ID:', employeeId);
+      
       
       // Finde den utilizationData Eintrag für diese Person
       let utilizationQuery = query(
@@ -89,7 +89,7 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
       
       // Falls nicht gefunden, ist das ein Datenproblem
       if (utilizationSnapshot.empty) {
-        console.error('❌ SalesView: Kein utilizationData Eintrag für ID gefunden:', { employeeId });
+
         return;
       }
       
@@ -119,13 +119,13 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
           updatedAt: new Date().toISOString()
         });
         
-        console.log('✅ SalesView: Projekt-Referenz erfolgreich gespeichert:', newProjectRef);
+
       } else {
-        console.log('ℹ️ SalesView: Projekt-Referenz bereits vorhanden:', projectData.id);
+
       }
       
     } catch (error) {
-      console.error('❌ SalesView: Fehler beim Speichern der Projekt-Referenz:', error);
+
       throw error;
     }
   };
@@ -325,11 +325,7 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
         return;
       }
 
-      console.log('🔍 Sales View - Transformiere UtilizationData:', {
-        utilizationData: databaseData.utilizationData?.length || 0,
-        personMeta: personMeta.size || 0,
-        dataForUI: dataForUI.length
-      });
+
 
       // Mitarbeiter-Daten aus utilizationData transformieren
       const transformedEmployees: Employee[] = [];
@@ -437,28 +433,14 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
             return { currentUtilization, averageUtilization };
             
           } catch (error) {
-            console.error('🔍 Error calculating utilization KPIs:', error);
+
             return { currentUtilization: null, averageUtilization: null };
           }
         };
 
         const { currentUtilization, averageUtilization } = calculateUtilizationKPIs(record);
 
-        // Debug-Logging für alle Mitarbeiter mit ACT-Toggle
-        if (record.person && actionItems[record.person]?.actionItem === true) {
-          console.log(`🔍 Sales View - ${record.person} Auslastungsberechnung:`, {
-            person: record.person,
-            currentUtilization,
-            averageUtilization,
-            hasAuslastung: !!record.auslastung,
-            hasEinsatzplan: !!record.einsatzplan,
-            auslastungKeys: record.auslastung ? Object.keys(record.auslastung).length : 0,
-            einsatzplanKeys: record.einsatzplan ? Object.keys(record.einsatzplan).length : 0,
-            sampleAuslastung: record.auslastung ? Object.entries(record.auslastung).slice(0, 2) : [],
-            sampleEinsatzplan: record.einsatzplan ? Object.entries(record.einsatzplan).slice(0, 2) : [],
-            recordKeys: Object.keys(record)
-          });
-        }
+
 
         const employee: Employee = {
           id: record.id,
@@ -506,42 +488,14 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
 
         // Debug-Logging entfernt - Problem behoben
 
-        // Debug-Logging für erweiterte Daten
-        console.log('🔍 Sales View - Employee erweiterte Daten:', {
-          name: employee.name,
-          utilization: employee.utilization,
-          averageUtilization: employee.averageUtilization,
-          completedProjects: employee.completedProjects.length,
-          plannedProjects: employee.plannedProjects.length,
-          strengths: employee.strengths?.length || 0,
-          weaknesses: employee.weaknesses?.length || 0,
-          utilizationComment: !!employee.utilizationComment,
-          planningComment: !!employee.planningComment,
-          technicalSkills: employee.technicalSkills?.length || 0,
-          softSkills: employee.softSkills?.length || 0
-        });
+
 
         transformedEmployees.push(employee);
         
-        // Debug: Zeige finale Employee-Daten
-        if (record.person && actionItems[record.person]?.actionItem === true) {
-          console.log(`🔍 Sales View - ${record.person} finale Employee-Daten:`, {
-            name: employee.name,
-            utilization: employee.utilization,
-            averageUtilization: employee.averageUtilization,
-            hasSkills: employee.skills?.length || 0,
-            hasTechnicalSkills: employee.technicalSkills?.length || 0,
-            hasSoftSkills: employee.softSkills?.length || 0
-          });
-        }
+
       });
 
-      console.log('🔍 Sales View - ACT-Filter angewendet:', {
-        totalRecords: databaseData.utilizationData.length,
-        filteredEmployees: transformedEmployees.length,
-        actionItemsCount: Object.keys(actionItems).length,
-        activeActToggles: Object.values(actionItems).filter(item => item.actionItem === true).length
-      });
+
       
       setEmployees(transformedEmployees);
 
@@ -622,7 +576,7 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
             // Refresh data after project creation and reference storage
             await refreshData();
           } catch (error) {
-            console.error('❌ SalesView: Fehler beim Speichern des Projekts:', error);
+
           }
         }}
         employeeId={projectCreationPersonId || ''}  // ✅ KORREKT: ID verwenden!

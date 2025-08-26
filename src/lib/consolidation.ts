@@ -195,12 +195,7 @@ export async function consolidatePersonData(personId: string): Promise<void> {
     const auslastungData = auslastungDoc.docs[0]?.data();
     const einsatzplanData = einsatzplanDoc.docs[0]?.data();
     
-    logger.debug("consolidation.consolidatePersonData", "Geladene Daten", {
-      personId,
-      hasMitarbeiter: !!mitarbeiterData,
-      hasAuslastung: !!auslastungData,
-      hasEinsatzplan: !!einsatzplanData
-    });
+
     
     // Skip wenn keine Daten vorhanden
     if (!mitarbeiterData && !auslastungData && !einsatzplanData) {

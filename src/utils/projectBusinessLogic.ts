@@ -53,7 +53,7 @@ export async function handleProbabilityChange(
     };
 
   } catch (error) {
-    console.error('Error upgrading project:', error);
+    
     return {
       success: false,
       message: 'Fehler beim Überführen des Projekts'
@@ -122,7 +122,7 @@ export async function saveProjectWithBusinessLogic(
     };
 
   } catch (error) {
-    console.error('Error saving project with business logic:', error);
+    
     return {
       success: false,
       message: 'Fehler beim Speichern des Projekts'

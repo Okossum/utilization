@@ -25,7 +25,7 @@ export default function RestoreAdminRole() {
       
       if (oliverData) {
         console.log('✅ Oliver gefunden:', oliverData.person, oliverData.email);
-        console.log('📋 Aktuelle Rolle:', oliverData.systemRole);
+
         
         await updateDoc(doc(db, 'utilizationData', oliverData.id), {
           systemRole: 'admin',

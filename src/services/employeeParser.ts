@@ -236,7 +236,7 @@ export class EmployeeExcelParser {
       // Header extrahieren
       const headers = this.extractHeaders(worksheet, headerRowIndex);
 
-      // Zeige gefundene Header für Debugging
+  
       if (headers.size === 0) {
         return { success: false, error: 'Keine gültigen Header gefunden' };
       }

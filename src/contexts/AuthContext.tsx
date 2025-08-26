@@ -5,7 +5,7 @@ import { setAuthTokenProvider } from '../services/database';
 // DatabaseService removed - using direct Firebase calls
 import { db } from '../lib/firebase';
 import { doc, getDoc, setDoc, collection, getDocs, query, where } from 'firebase/firestore';
-import { UserRole, canAccessView, canAccessSettings, canManageUsers, canUploadData, canViewAllEmployees, debugPermissions } from '../lib/permissions';
+import { UserRole, canAccessView, canAccessSettings, canManageUsers, canUploadData, canViewAllEmployees } from '../lib/permissions';
 
 interface AuthContextValue {
   user: User | null;
@@ -116,8 +116,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (nextUser.email) {
             const userRole = await loadUserRoleFromUtilizationData(nextUser.email);
             setRole(userRole);
-            console.log('🎭 Rolle beim Login gesetzt:', userRole);
-            debugPermissions(userRole); // Debug-Output für Entwicklung
+
+
           } else {
             setRole('unknown');
           }

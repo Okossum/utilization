@@ -60,7 +60,7 @@ export const addRoleToUtilizationData = async (
     assignedRoles: updatedRoles
   });
   
-  console.log('✅ Rolle hinzugefügt zu utilizationData Hub:', { id, role: newRole });
+  
   return newRole;
 };
 
@@ -92,7 +92,7 @@ export const updateRoleInUtilizationData = async (
     assignedRoles: updatedRoles
   });
   
-  console.log('✅ Rolle aktualisiert in utilizationData Hub:', { id, roleId, updates });
+  
   return updatedRoles[roleIndex];
 };
 
@@ -109,7 +109,7 @@ export const removeRoleFromUtilizationData = async (id: string, roleId: string) 
     assignedRoles: updatedRoles
   });
   
-  console.log('✅ Rolle entfernt aus utilizationData Hub:', { id, roleId });
+  
 };
 
 // ===== TECHNICAL SKILLS MANAGEMENT =====
@@ -136,7 +136,7 @@ export const addTechnicalSkillToUtilizationData = async (
     technicalSkills: updatedSkills
   });
   
-  console.log('✅ Technical Skill hinzugefügt zu utilizationData Hub:', { id, skill: newSkill });
+  
   return newSkill;
 };
 
@@ -168,7 +168,7 @@ export const updateTechnicalSkillInUtilizationData = async (
     technicalSkills: updatedSkills
   });
   
-  console.log('✅ Technical Skill aktualisiert in utilizationData Hub:', { id, skillId, updates });
+  
   return updatedSkills[skillIndex];
 };
 
@@ -185,7 +185,7 @@ export const removeTechnicalSkillFromUtilizationData = async (id: string, skillI
     technicalSkills: updatedSkills
   });
   
-  console.log('✅ Technical Skill entfernt aus utilizationData Hub:', { id, skillId });
+  
 };
 
 // ===== DOSSIER DATA MANAGEMENT =====
@@ -206,7 +206,7 @@ export const saveDossierDataToUtilizationHub = async (
   }
 ) => {
   try {
-    console.log('💾 Speichere Dossier-Daten in utilizationData Hub für:', id);
+    
     
     const { doc: utilizationDoc } = await findUtilizationDataDoc(id);
     
@@ -217,7 +217,7 @@ export const saveDossierDataToUtilizationHub = async (
     
     await updateDoc(utilizationDoc.ref, updateData);
     
-    console.log('✅ Dossier-Daten erfolgreich in utilizationData Hub gespeichert');
+    
     
   } catch (error) {
     console.error('❌ Fehler beim Speichern der Dossier-Daten:', error);
@@ -230,7 +230,7 @@ export const saveDossierDataToUtilizationHub = async (
  */
 export const getDossierDataFromUtilizationHub = async (id: string) => {
   try {
-    console.log('🔄 Lade Dossier-Daten aus utilizationData Hub für:', id);
+    
     
     const { data } = await findUtilizationDataDoc(id);
     
@@ -244,7 +244,7 @@ export const getDossierDataFromUtilizationHub = async (id: string) => {
       email: data.email || ''
     };
     
-    console.log('✅ Dossier-Daten aus utilizationData Hub geladen:', dossierData);
+    
     
     return dossierData;
     
@@ -278,7 +278,7 @@ export const addSoftSkillToUtilizationData = async (
     softSkills: updatedSkills
   });
   
-  console.log('✅ Soft Skill hinzugefügt zu utilizationData Hub:', { id, skill: newSkill });
+  
   return newSkill;
 };
 
@@ -310,7 +310,7 @@ export const updateSoftSkillInUtilizationData = async (
     softSkills: updatedSkills
   });
   
-  console.log('✅ Soft Skill aktualisiert in utilizationData Hub:', { id, skillId, updates });
+  
   return updatedSkills[skillIndex];
 };
 
@@ -327,7 +327,7 @@ export const removeSoftSkillFromUtilizationData = async (id: string, skillId: st
     softSkills: updatedSkills
   });
   
-  console.log('✅ Soft Skill entfernt aus utilizationData Hub:', { id, skillId });
+  
 };
 
 // ===== BULK OPERATIONS =====
@@ -349,12 +349,7 @@ export const migratePersonSkillsRolesToHub = async (
     softSkills: softSkills
   });
   
-  console.log('✅ Skills/Rollen migriert zu utilizationData Hub:', { 
-    id, 
-    rolesCount: roles.length,
-    technicalSkillsCount: technicalSkills.length,
-    softSkillsCount: softSkills.length
-  });
+
 };
 
 // ===== GETTER FUNCTIONS =====

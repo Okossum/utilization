@@ -86,7 +86,4 @@ export const ALL_SETTINGS = [
   'auslastungserklaerung'
 ] as const;
 
-// Debug-Funktion für Entwicklung
-export const debugPermissions = (role: UserRole) => {
-  console.log(`🎭 Berechtigungen für Rolle "${role}":`, ROLE_PERMISSIONS[role]);
-};
+

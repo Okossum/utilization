@@ -53,7 +53,7 @@ interface CacheData {
 }
 
 export function UtilizationDataProvider({ children }: { children: ReactNode }) {
-  console.log('🔧 UtilizationDataProvider wird gerendert');
+  
   
   const [databaseData, setDatabaseData] = useState<{
     auslastung?: any[];
@@ -90,7 +90,7 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
         // Erste App-Ladung - setze Timestamp und lösche alten Cache
         sessionStorage.setItem(APP_START_KEY, currentTime.toString());
         sessionStorage.removeItem(CACHE_KEY);
-        console.log('🔄 App-Neustart erkannt - Cache geleert');
+
         return null;
       }
       
@@ -101,27 +101,27 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
       
       // Prüfe Cache-Version und Alter
       if (cacheData.version !== CACHE_VERSION) {
-        console.log('🔄 Cache-Version veraltet - Cache geleert');
+
         sessionStorage.removeItem(CACHE_KEY);
         return null;
       }
       
       if (currentTime - cacheData.timestamp > CACHE_DURATION) {
-        console.log('🔄 Cache abgelaufen - Cache geleert');
+
         sessionStorage.removeItem(CACHE_KEY);
         return null;
       }
 
-      console.log('📦 Cache-Daten geladen');
+      
       return cacheData.data;
     } catch (error) {
-      console.warn('⚠️ Cache-Fehler:', error);
+      
       return null;
     }
   };
 
   const clearCache = () => {
-    console.log('🗑️ Cache wird geleert');
+    
     sessionStorage.removeItem(CACHE_KEY);
   };
 
@@ -142,7 +142,7 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      console.log('🔄 Lade frische Daten aus Firebase...');
+      
 
       // Lade aus Firebase
       const utilizationSnapshot = await getDocs(collection(db, 'utilizationData'));
@@ -151,33 +151,9 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
         ...doc.data()
       })) as any[];
       
-      console.log(`📊 Loaded ${utilizationData.length} records from utilizationData collection`);
       
-      // Debug: Prüfe ob projectReferences geladen werden
-      const recordsWithProjects = utilizationData.filter(record => record.projectReferences && record.projectReferences.length > 0);
-      console.log(`🔍 DEBUG: ${recordsWithProjects.length} records have projectReferences`);
-      if (recordsWithProjects.length > 0) {
-        console.log('🔍 DEBUG: Sample record with projectReferences:', {
-          id: recordsWithProjects[0].id,
-          person: recordsWithProjects[0].person,
-          projectReferencesCount: recordsWithProjects[0].projectReferences?.length || 0,
-          sampleProject: recordsWithProjects[0].projectReferences?.[0]
-        });
-      }
       
-      // Debug: Spezifisch für Duc Nguyen
-      const ducRecord = utilizationData.find(record => record.id === '09ef8650e5773db86c940c8645e3eda8c1c4bd35');
-      if (ducRecord) {
-        console.log('🔍 DEBUG: Duc Nguyen record loaded:', {
-          id: ducRecord.id,
-          person: ducRecord.person,
-          hasProjectReferences: !!ducRecord.projectReferences,
-          projectReferencesCount: ducRecord.projectReferences?.length || 0,
-          allKeys: Object.keys(ducRecord)
-        });
-      } else {
-        console.log('❌ DEBUG: Duc Nguyen record NOT found in loaded data');
-      }
+
 
       // Transformiere Daten - ZURÜCK ZUR FUNKTIONIERENDEN VERSION
       const transformedData = {
@@ -217,12 +193,6 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
       const personMetaMap = new Map<string, any>();
       utilizationData.forEach((row: any) => {
         if (row.person) {
-          console.log('🔍 DEBUG: Creating personMeta for', row.person, {
-            id: row.id,
-            standort: row.standort,
-            email: row.email,
-            allKeys: Object.keys(row)
-          });
           
           const personData = {
             id: row.id,  // ✅ ID hinzugefügt für korrekte Identifikation in EmployeeDetailView
@@ -277,7 +247,7 @@ export function UtilizationDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshData = async () => {
-    console.log('🔄 refreshData called - clearing cache and loading fresh data');
+    
     clearCache();
     await loadDatabaseData(false);
   };
