@@ -4286,6 +4286,58 @@ app.post('/api/role-categories/:id/reassign', requireAuth, async (req, res) => {
   }
 });
 
+// ===== PLANNED PROJECTS API =====
+
+// GET /api/planned-projects - Alle geplanten Projekte für Einsatzplan-Visualisierung abrufen
+app.get('/api/planned-projects', requireAuth, async (req, res) => {
+  try {
+    console.log('🔍 Loading planned projects for calendar visualization...');
+    
+    // Lade alle geplanten Projekte aus utilizationData
+    const snap = await db.collection('utilizationData')
+      .where('isLatest', '==', true)
+      .get();
+    
+    const plannedProjects = [];
+    
+    snap.docs.forEach(doc => {
+      const data = doc.data();
+      
+      // Prüfe ob der Mitarbeiter geplante Projekte hat
+      if (data.plannedProjects && Array.isArray(data.plannedProjects)) {
+        data.plannedProjects.forEach(project => {
+          // Nur geplante Projekte mit Startdatum, Enddatum und Auslastung
+          if (project.projectType === 'planned' && 
+              project.startDate && 
+              project.endDate && 
+              project.plannedUtilization) {
+            
+            plannedProjects.push({
+              employeeId: data.id,
+              employeeName: data.person,
+              projectId: project.id,
+              projectName: project.projectName,
+              customer: project.customer,
+              startDate: project.startDate,
+              endDate: project.endDate,
+              plannedUtilization: project.plannedUtilization,
+              probability: project.probability || 75,
+              createdAt: project.createdAt
+            });
+          }
+        });
+      }
+    });
+    
+    console.log(`✅ Found ${plannedProjects.length} planned projects`);
+    res.json(plannedProjects);
+    
+  } catch (error) {
+    console.error('❌ Error loading planned projects:', error);
+    res.status(500).json({ error: 'Fehler beim Laden der geplanten Projekte' });
+  }
+});
+
 // GET /api/role-tasks - Alle Tasks abrufen (optional gefiltert nach roleId)
 app.get('/api/role-tasks', requireAuth, async (req, res) => {
   try {

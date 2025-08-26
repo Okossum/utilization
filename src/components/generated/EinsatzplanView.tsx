@@ -3,6 +3,11 @@ import { motion } from 'framer-motion';
 import { Database, Download, FileSpreadsheet, RefreshCw, Search, Filter, Calendar, User, Building, Users, Target } from 'lucide-react';
 import DatabaseService from '../../services/database';
 import { useAuth } from '../../contexts/AuthContext';
+import { PlannedUtilizationBadge } from './PlannedUtilizationBar';
+import { 
+  PlannedProjectData, 
+  calculatePlannedUtilizationByWeek 
+} from '../../utils/weekCalculations';
 
 interface EinsatzplanData {
   person: string;
@@ -15,9 +20,11 @@ interface EinsatzplanData {
 }
 
 export function EinsatzplanView() {
-  const { user, loading } = useAuth();
+  const { user, loading, token } = useAuth();
   const [einsatzplanData, setEinsatzplanData] = useState<EinsatzplanData[]>([]);
+  const [plannedProjects, setPlannedProjects] = useState<PlannedProjectData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingPlanned, setIsLoadingPlanned] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCC, setFilterCC] = useState<string[]>([]);
   const [filterLBS, setFilterLBS] = useState<string[]>([]);
@@ -43,12 +50,40 @@ export function EinsatzplanView() {
     }
   };
 
+  // Lade geplante Projekte für Kalendervisualisierung
+  const loadPlannedProjects = async () => {
+    if (!user || !token) return;
+    
+    setIsLoadingPlanned(true);
+    try {
+      const response = await fetch('http://localhost:3001/api/planned-projects', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setPlannedProjects(data);
+        console.log('✅ Loaded planned projects:', data.length);
+      } else {
+        console.error('❌ Failed to load planned projects:', response.status);
+      }
+    } catch (error) {
+      console.error('❌ Error loading planned projects:', error);
+    } finally {
+      setIsLoadingPlanned(false);
+    }
+  };
+
   // Lade Daten beim ersten Render
   useEffect(() => {
-    if (!loading && user) {
+    if (!loading && user && token) {
       loadEinsatzplanData();
+      loadPlannedProjects();
     }
-  }, [loading, user]);
+  }, [loading, user, token]);
 
   // Verfügbare Wochen aus den Daten extrahieren
   const availableWeeks = useMemo(() => {
@@ -87,6 +122,11 @@ export function EinsatzplanView() {
     });
     return Array.from(teams).sort();
   }, [einsatzplanData]);
+
+  // Berechne geplante Auslastung pro Woche und Mitarbeiter
+  const plannedUtilizationByWeek = useMemo(() => {
+    return calculatePlannedUtilizationByWeek(plannedProjects);
+  }, [plannedProjects]);
 
   // Gefilterte und sortierte Daten
   const filteredAndSortedData = useMemo(() => {
@@ -205,11 +245,14 @@ export function EinsatzplanView() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={loadEinsatzplanData}
-              disabled={isLoading}
+              onClick={() => {
+                loadEinsatzplanData();
+                loadPlannedProjects();
+              }}
+              disabled={isLoading || isLoadingPlanned}
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
             >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${(isLoading || isLoadingPlanned) ? 'animate-spin' : ''}`} />
               Aktualisieren
             </button>
             <button
@@ -238,7 +281,7 @@ export function EinsatzplanView() {
                   Datenbank Status
                 </h3>
                 <p className="text-sm text-gray-600">
-                  {isLoading ? 'Lade Daten...' : `${einsatzplanData.length} Einträge geladen`}
+                  {(isLoading || isLoadingPlanned) ? 'Lade Daten...' : `${einsatzplanData.length} Einträge, ${plannedProjects.length} geplante Projekte`}
                 </p>
               </div>
             </div>
@@ -466,32 +509,53 @@ export function EinsatzplanView() {
                     
                     {/* Wochen-Werte */}
                     {availableWeeks.map(week => {
-                      const value = item.values?.[week];
+                      const einsatzplanValue = item.values?.[week];
+                      const plannedData = plannedUtilizationByWeek[item.person]?.[week];
+                      
+                      // Einsatzplan-Werte (historisch/geplant)
                       let bgColor = 'bg-gray-100';
                       let textColor = 'text-gray-700';
                       
-                      if (value !== undefined && value !== null) {
-                        if (value > 90) {
+                      if (einsatzplanValue !== undefined && einsatzplanValue !== null) {
+                        if (einsatzplanValue > 90) {
                           bgColor = 'bg-green-100';
                           textColor = 'text-green-800';
-                        } else if (value > 80) {
+                        } else if (einsatzplanValue > 80) {
                           bgColor = 'bg-yellow-100';
                           textColor = 'text-yellow-800';
-                        } else if (value > 0) {
+                        } else if (einsatzplanValue > 0) {
                           bgColor = 'bg-red-100';
                           textColor = 'text-red-800';
                         }
                       }
                       
                       return (
-                        <td key={week} className="px-2 py-4 text-center text-sm">
-                          {value !== undefined && value !== null ? (
-                            <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${bgColor} ${textColor}`}>
-                              {value}%
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">—</span>
-                          )}
+                        <td key={week} className="px-2 py-4 text-center text-sm relative">
+                          <div className="space-y-1">
+                            {/* Einsatzplan-Wert (oben) */}
+                            {einsatzplanValue !== undefined && einsatzplanValue !== null ? (
+                              <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${bgColor} ${textColor}`}>
+                                {einsatzplanValue}%
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-xs">—</span>
+                            )}
+                            
+                            {/* Geplante Projekte (unten, blau) */}
+                            {plannedData && (
+                              <div className="mt-1">
+                                <PlannedUtilizationBadge
+                                  utilization={plannedData.utilization}
+                                  projects={plannedData.projects.map(p => ({
+                                    projectName: p.projectName,
+                                    customer: p.customer,
+                                    plannedUtilization: p.plannedUtilization,
+                                    probability: p.probability
+                                  }))}
+                                />
+                              </div>
+                            )}
+                          </div>
                         </td>
                       );
                     })}

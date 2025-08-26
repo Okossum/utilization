@@ -26,6 +26,11 @@ import { SalesOpportunities } from './SalesOpportunities';
 import { useAssignments } from '../../contexts/AssignmentsContext';
 import { AssignmentEditorModal } from './AssignmentEditorModal';
 import { ProjectCreationModal } from './ProjectCreationModal';
+import { PlannedUtilizationBadge } from './PlannedUtilizationBar';
+import { 
+  PlannedProjectData, 
+  calculatePlannedUtilizationByWeek 
+} from '../../utils/weekCalculations';
 
 import { auslastungserklaerungService, personAuslastungserklaerungService, personActionItemService } from '../../lib/firebase-services';
 interface UtilizationData {
@@ -81,7 +86,51 @@ export function UtilizationReportView({
     updateViewSettings,
     loading: settingsLoading 
   } = useUserSettings();
-  const { user, loading, profile, updateProfile } = useAuth();
+  const { user, loading, profile, updateProfile, token } = useAuth();
+  
+  // State für geplante Projekte
+  const [plannedProjects, setPlannedProjects] = useState<PlannedProjectData[]>([]);
+  const [isLoadingPlanned, setIsLoadingPlanned] = useState(false);
+
+  // Lade geplante Projekte für Kalendervisualisierung
+  const loadPlannedProjectsForUtilization = async () => {
+    if (!user || !token) return;
+    
+    setIsLoadingPlanned(true);
+    try {
+      const response = await fetch('http://localhost:3001/api/planned-projects', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setPlannedProjects(data);
+        console.log('✅ Loaded planned projects for utilization view:', data.length);
+      } else {
+        console.error('❌ Failed to load planned projects:', response.status);
+      }
+    } catch (error) {
+      console.error('❌ Error loading planned projects:', error);
+    } finally {
+      setIsLoadingPlanned(false);
+    }
+  };
+
+  // Lade geplante Projekte beim ersten Render
+  useEffect(() => {
+    if (user && token) {
+      loadPlannedProjectsForUtilization();
+    }
+  }, [user, token]);
+
+  // Berechne geplante Auslastung pro Woche und Mitarbeiter
+  const plannedUtilizationByWeek = useMemo(() => {
+    return calculatePlannedUtilizationByWeek(plannedProjects);
+  }, [plannedProjects]);
+
   const { 
     databaseData, 
     personMeta, 
@@ -2309,6 +2358,7 @@ export function UtilizationReportView({
                       {visibleColumns.forecastWeeks && availableWeeksFromData.slice(0, forecastWeeks).map((week, i) => {
                         const weekData = personData.find(item => item.week === week);
                         const utilization = weekData?.utilization;
+                        const plannedData = plannedUtilizationByWeek[person]?.[week];
                         
                         // Debug Forecast-Werte entfernt
                         
@@ -2326,6 +2376,7 @@ export function UtilizationReportView({
                             hasNoManager ? 'bg-yellow-100' : bgColor
                           }`}>
                             <div className={`flex flex-col items-center gap-1 ${isTerminated ? 'line-through opacity-60' : ''}`}>
+                              {/* Einsatzplan-Wert (oben) */}
                               {utilization !== null && utilization !== undefined ? (
                                 <span className={`flex items-center justify-center gap-1 text-gray-900 ${isTerminated ? 'line-through opacity-60' : ''}`}>
                                   {utilization}%
@@ -2333,6 +2384,22 @@ export function UtilizationReportView({
                                 </span>
                               ) : (
                                 <span className={`text-gray-400 ${isTerminated ? 'line-through opacity-60' : ''}`}>—</span>
+                              )}
+                              
+                              {/* Geplante Projekte (unten, blau) */}
+                              {plannedData && (
+                                <div className="w-full">
+                                  <PlannedUtilizationBadge
+                                    utilization={plannedData.utilization}
+                                    projects={plannedData.projects.map(p => ({
+                                      projectName: p.projectName,
+                                      customer: p.customer,
+                                      plannedUtilization: p.plannedUtilization,
+                                      probability: p.probability
+                                    }))}
+                                    className="text-xs"
+                                  />
+                                </div>
                               )}
                               {(() => {
                                 const dossier = dossiersByPerson[person] || { projectOffers: [], jiraTickets: [] };
