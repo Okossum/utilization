@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import app from '../lib/firebase';
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, User } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, User, setPersistence, browserSessionPersistence } from 'firebase/auth';
 import { setAuthTokenProvider } from '../services/database';
 // DatabaseService removed - using direct Firebase calls
 import { db } from '../lib/firebase';
@@ -48,6 +48,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+
+  // 🔒 SICHERHEIT: Session-Persistenz konfigurieren - User wird beim Schließen des Tabs ausgeloggt
+  useEffect(() => {
+    const configurePersistence = async () => {
+      try {
+        await setPersistence(auth, browserSessionPersistence);
+        console.log('🔒 Session-Persistenz konfiguriert: User wird beim Schließen des Tabs ausgeloggt');
+      } catch (error) {
+        console.error('❌ Fehler beim Konfigurieren der Session-Persistenz:', error);
+      }
+    };
+    configurePersistence();
+  }, [auth]);
 
   // Neue Funktion: Rolle aus utilizationData Collection laden
   const loadUserRoleFromUtilizationData = useCallback(async (userEmail: string): Promise<UserRole> => {
