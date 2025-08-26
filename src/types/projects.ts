@@ -26,6 +26,7 @@ export interface ProjectFormData {
   // Schritt 4: Projekt-Details (nur bei planned)
   probability?: ProbabilityLevel;
   dailyRate?: number;
+  plannedUtilization?: number;
   startDate?: string;
   endDate?: string;
   internalContact?: string;

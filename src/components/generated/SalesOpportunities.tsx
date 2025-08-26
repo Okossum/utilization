@@ -67,10 +67,18 @@ export function SalesOpportunities({ isOpen, onClose, personId, personName }: Sa
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="mb-6">
-            <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2 mb-4">
-              <Building2 className="w-5 h-5 text-blue-600" />
-              Kunden und Projektmöglichkeiten
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-medium text-gray-900 flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-blue-600" />
+                Kunden und Projektmöglichkeiten
+              </h2>
+              <button
+                onClick={() => setAssignmentEditorOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
+              >
+                <Link2 className="w-4 h-4" /> Neue Sales Opportunity erstellen
+              </button>
+            </div>
             <p className="text-sm text-gray-600">
               Hier können Sie bestehende Kunden verwalten und dem Mitarbeiter {personName} 
               neue Projektmöglichkeiten zuweisen.

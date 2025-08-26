@@ -80,8 +80,12 @@ export const ProjectRoleSelectionModal: React.FC<ProjectRoleSelectionModalProps>
 
   // Kategorien laden
   const loadCategories = async () => {
+    if (!token) {
+      throw new Error('Kein Authentifizierungstoken verfügbar');
+    }
+    
     try {
-      const response = await fetch('/api/role-categories', {
+      const response = await fetch('http://localhost:3001/api/role-categories', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -102,8 +106,12 @@ export const ProjectRoleSelectionModal: React.FC<ProjectRoleSelectionModalProps>
 
   // Rollen laden
   const loadRoles = async () => {
+    if (!token) {
+      throw new Error('Kein Authentifizierungstoken verfügbar');
+    }
+    
     try {
-      const response = await fetch('/api/roles', {
+      const response = await fetch('http://localhost:3001/api/roles', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -124,8 +132,12 @@ export const ProjectRoleSelectionModal: React.FC<ProjectRoleSelectionModalProps>
 
   // Alle Tasks für alle Rollen laden
   const loadAllRoleTasks = async () => {
+    if (!token) {
+      throw new Error('Kein Authentifizierungstoken verfügbar');
+    }
+    
     try {
-      const response = await fetch('/api/role-tasks', {
+      const response = await fetch('http://localhost:3001/api/role-tasks', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -184,15 +196,19 @@ export const ProjectRoleSelectionModal: React.FC<ProjectRoleSelectionModalProps>
 
   // Daten laden beim Öffnen
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && token) {
       console.log('🔄 ProjectRoleSelectionModal: Lade Daten...');
+      console.log('🔑 Token verfügbar:', !!token, 'Länge:', token?.length);
       loadAllData();
       
       // Reset bei Öffnung
       setExpandedCategories(new Set());
       setSearchTerm('');
+    } else if (isOpen && !token) {
+      console.log('❌ ProjectRoleSelectionModal: Kein Token verfügbar');
+      setError('Authentifizierung erforderlich');
     }
-  }, [isOpen]);
+  }, [isOpen, !!token]);
 
   // Kategorie expandieren/kollabieren
   const toggleCategory = (categoryId: string) => {

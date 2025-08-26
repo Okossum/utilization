@@ -23,13 +23,6 @@ export function ProbabilitySelector({
 
   return (
     <div className="space-y-2">
-      {/* Label */}
-      {label && (
-        <label className="block text-sm font-medium text-gray-700">
-          {label}
-        </label>
-      )}
-
       {/* Probability Options Grid */}
       <div className="grid grid-cols-2 gap-3">
         {PROBABILITY_OPTIONS.map(option => {
@@ -41,7 +34,7 @@ export function ProbabilitySelector({
               type="button"
               onClick={() => onChange(option.value)}
               className={`
-                relative p-4 rounded-lg border-2 transition-all duration-200
+                relative px-4 py-2 rounded-lg border-2 transition-all duration-200
                 ${isSelected 
                   ? 'border-blue-500 bg-blue-50 shadow-md' 
                   : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
@@ -87,30 +80,6 @@ export function ProbabilitySelector({
           );
         })}
       </div>
-
-      {/* Selected Value Display */}
-      {selectedOption && (
-        <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-          <div className="flex items-center space-x-2">
-            <div className={`p-1.5 rounded-full ${selectedOption.color}`}>
-              {getIcon(selectedOption.value)}
-            </div>
-            <div>
-              <span className="text-sm font-medium">
-                Ausgewählt: {selectedOption.label}
-              </span>
-              {showPercentage && (
-                <span className="text-sm text-gray-600 ml-2">
-                  ({selectedOption.value}%)
-                </span>
-              )}
-            </div>
-          </div>
-          <p className="text-xs text-gray-600 mt-1 ml-8">
-            {selectedOption.description}
-          </p>
-        </div>
-      )}
     </div>
   );
 }

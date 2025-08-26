@@ -3,7 +3,6 @@ import { X, AlertCircle } from 'lucide-react';
 
 // Components
 import { CustomerManager } from './CustomerManager';
-import { EmployeeDropdown } from './EmployeeDropdown';
 import { ProbabilitySelector } from './ProbabilitySelector';
 import { ProjectRoleSelectionModal } from './ProjectRoleSelectionModal';
 import { ProjectSkillSelectionModal } from './ProjectSkillSelectionModal';
@@ -334,9 +333,6 @@ export function ProjectCreationModal({
                 <h3 className="text-lg font-semibold text-gray-900">
                   {project ? 'Projekt bearbeiten' : 'Neues Projekt erstellen'}
                 </h3>
-                <p className="text-sm text-gray-600">
-                  Alle Projektinformationen in einem Formular
-                </p>
               </div>
               <button
                 onClick={onClose}
@@ -402,13 +398,7 @@ export function ProjectCreationModal({
                   {/* Wenn Projekt-Typ erzwungen ist, zeige Info */}
                   {forceProjectType && (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <h4 className="text-lg font-medium mb-2">Projekt-Typ: {PROJECT_TYPE_LABELS[forceProjectType]}</h4>
-                      <p className="text-sm text-blue-700">
-                        {forceProjectType === 'planned' 
-                          ? 'Es wird automatisch ein geplantes Projekt erstellt.'
-                          : 'Es wird automatisch ein historisches Projekt erstellt.'
-                        }
-                      </p>
+                      <h4 className="text-lg font-medium">Projekt-Typ: {PROJECT_TYPE_LABELS[forceProjectType]}</h4>
                     </div>
                   )}
 
@@ -486,6 +476,20 @@ export function ProjectCreationModal({
                         />
                       </div>
 
+                      {/* Customer Contact */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Kunden-Ansprechpartner
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.customerContact || ''}
+                          onChange={e => updateFormData({ customerContact: e.target.value })}
+                          placeholder="Name des Ansprechpartners beim Kunden"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+
                       {/* Project Description */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -524,7 +528,6 @@ export function ProjectCreationModal({
                   
                   {/* Projekt-Details */}
                   <div>
-                    <h4 className="text-lg font-medium mb-4">Projekt-Details</h4>
                     
                     {formData.projectType === 'planned' ? (
                       <div className="space-y-4">
@@ -560,40 +563,54 @@ export function ProjectCreationModal({
                           </div>
                         </div>
 
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Tagessatz (€)
-                          </label>
-                          <input
-                            type="number"
-                            value={formData.dailyRate || ''}
-                            onChange={e => updateFormData({ dailyRate: Number(e.target.value) })}
-                            placeholder="z.B. 800"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-
-                        {/* Contacts */}
-                        <div className="space-y-4">
-                          <EmployeeDropdown
-                            value={formData.internalContact}
-                            onChange={(employeeId) => updateFormData({ internalContact: employeeId })}
-                            filterBy={['bereich', 'cc', 'team']}
-                            label="Interner Ansprechpartner"
-                            placeholder="Ansprechpartner auswählen..."
-                          />
+                        <div className="grid grid-cols-2 gap-4">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Kunden-Ansprechpartner
+                              Tagessatz (€)
                             </label>
                             <input
-                              type="text"
-                              value={formData.customerContact || ''}
-                              onChange={e => updateFormData({ customerContact: e.target.value })}
-                              placeholder="Name des Ansprechpartners beim Kunden"
+                              type="number"
+                              value={formData.dailyRate || ''}
+                              onChange={e => updateFormData({ dailyRate: Number(e.target.value) })}
+                              placeholder="z.B. 800"
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                           </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Geplante Auslastung
+                            </label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                placeholder="75"
+                                value={formData.plannedUtilization || ''}
+                                onChange={e => {
+                                  const value = e.target.value.replace(/[^0-9]/g, '');
+                                  const numValue = value ? Math.min(100, Math.max(0, Number(value))) : '';
+                                  updateFormData({ plannedUtilization: numValue ? Number(numValue) : undefined });
+                                }}
+                                className="w-20 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                              <span className="text-gray-600 text-sm">%</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Internal Contact */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Interner Ansprechpartner
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.internalContact || ''}
+                            onChange={e => updateFormData({ internalContact: e.target.value })}
+                            placeholder="Name des internen Ansprechpartners"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
                         </div>
                       </div>
                     ) : (
@@ -677,7 +694,6 @@ export function ProjectCreationModal({
 
                   {/* Rollen & Skills */}
                   <div>
-                    <h4 className="text-lg font-medium mb-4">Rollen & Skills</h4>
                     
                     {/* Roles Section */}
                     <div className="mb-6">

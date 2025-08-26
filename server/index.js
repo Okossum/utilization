@@ -165,12 +165,12 @@ async function authMiddleware(req, _res, next) {
   }
   
   try {
-    // console.log entfernt
+    console.log('🔍 Verifying token, length:', token.length);
     const decoded = await admin.auth().verifyIdToken(token);
     req.user = decoded;
-    // console.log entfernt
+    console.log('✅ Token verified for user:', decoded.uid);
   } catch (error) {
-    // console.log entfernt
+    console.log('❌ Token verification failed:', error.message);
     req.user = null;
   }
   next();
