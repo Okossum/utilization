@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings, Database, TrendingUp, Target, User, Ticket, BarChart3, Users, FileText, ChevronDown, LogOut, Minus, Plus, MessageSquare } from 'lucide-react';
+import { Settings, Database, TrendingUp, Target, User, Ticket, BarChart3, Users, FileText, ChevronDown, LogOut, Minus, Plus, MessageSquare, HelpCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface AppHeaderProps {
@@ -15,6 +15,7 @@ interface AppHeaderProps {
   onAuslastungView?: () => void;
   onEinsatzplanView?: () => void;
   onSettings?: () => void;
+  onHelp?: () => void;
   lobOptions?: string[];
   // Management Buttons
   onRoleManagement?: () => void;
@@ -46,6 +47,7 @@ export function AppHeader({
   onAuslastungView,
   onEinsatzplanView,
   onSettings,
+  onHelp,
   lobOptions = [],
   onRoleManagement,
   onTechnicalSkillManagement,
@@ -164,6 +166,19 @@ export function AppHeader({
           )}
 
 
+
+          {/* Help Button - IMMER sichtbar */}
+          {onHelp && (
+            <button 
+              onClick={onHelp}
+              className="inline-flex items-center gap-2 p-2 text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors" 
+              style={{ zIndex: 40 }}
+              title="Hilfe & Anleitung"
+            >
+              <HelpCircle className="w-4 h-4" />
+              Hilfe
+            </button>
+          )}
 
           {/* Settings Menu - IMMER sichtbar */}
           <div className="relative" ref={settingsMenuRef}>

@@ -1,5 +1,5 @@
 /**
- * Setzt Oliver Koss als Administrator
+ * Prüft Oliver Koss' aktuelle Rolle in der Datenbank
  */
 
 const admin = require('firebase-admin');
@@ -42,9 +42,9 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
-async function setOliverAsAdmin() {
+async function checkOliverRole() {
   try {
-    console.log('🔍 Suche nach Oliver Koss in utilizationData...');
+    console.log('🔍 Prüfe Oliver Koss\' Rolle in der Datenbank...');
     
     const snapshot = await db.collection('utilizationData').get();
     let oliverDoc = null;
@@ -58,31 +58,32 @@ async function setOliverAsAdmin() {
     });
     
     if (oliverDoc) {
-      console.log('✅ Oliver gefunden:', oliverDoc.person);
+      console.log('✅ Oliver gefunden:');
       console.log('📧 E-Mail:', oliverDoc.email);
+      console.log('👤 Person:', oliverDoc.person);
+      console.log('🔑 System-Rolle:', oliverDoc.systemRole);
+      console.log('🚪 System-Zugriff:', oliverDoc.hasSystemAccess);
+      console.log('⏰ Rolle zugewiesen am:', oliverDoc.roleAssignedAt);
+      console.log('👨‍💼 Zugewiesen von:', oliverDoc.roleAssignedBy);
       
-      // Admin-Rolle setzen
-      await db.collection('utilizationData').doc(oliverDoc.id).update({
-        systemRole: 'admin',
-        hasSystemAccess: true,
-        roleAssignedAt: admin.firestore.FieldValue.serverTimestamp(),
-        roleAssignedBy: 'manual-admin-setup'
-      });
+      // Prüfe auch in users Collection
+      console.log('\n🔍 Prüfe auch users Collection...');
+      const usersSnapshot = await db.collection('users').where('email', '==', 'oliver.koss@adesso.de').get();
       
-      console.log('🎉 Oliver Koss wurde erfolgreich als Administrator eingerichtet!');
-      console.log('🔑 Rolle: admin');
-      console.log('✅ System-Zugriff: aktiviert');
+      if (!usersSnapshot.empty) {
+        usersSnapshot.docs.forEach(doc => {
+          const userData = doc.data();
+          console.log('👤 User-Dokument gefunden:');
+          console.log('📧 E-Mail:', userData.email);
+          console.log('🔑 System-Rolle:', userData.systemRole);
+          console.log('🚪 System-Zugriff:', userData.hasSystemAccess);
+        });
+      } else {
+        console.log('❌ Kein User-Dokument in users Collection gefunden');
+      }
       
     } else {
       console.log('❌ Oliver Koss nicht in utilizationData gefunden');
-      console.log('📋 Verfügbare Personen:');
-      
-      snapshot.docs.forEach(doc => {
-        const data = doc.data();
-        if (data.person && data.person.toLowerCase().includes('koss')) {
-          console.log(`  - ${data.person} (${data.email || 'keine E-Mail'})`);
-        }
-      });
     }
     
   } catch (error) {
@@ -90,4 +91,4 @@ async function setOliverAsAdmin() {
   }
 }
 
-setOliverAsAdmin();
+checkOliverRole();

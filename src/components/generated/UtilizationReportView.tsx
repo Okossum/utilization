@@ -33,6 +33,7 @@ import {
 } from '../../utils/weekCalculations';
 
 import { auslastungserklaerungService, personAuslastungserklaerungService, personActionItemService } from '../../lib/firebase-services';
+import { RoleBasedSettingsModal } from './RoleBasedSettingsModal';
 interface UtilizationData {
   person: string;
   week: string;
@@ -2546,9 +2547,23 @@ export function UtilizationReportView({
 
 
 
-      {/* Settings Modal */}
+      {/* Role-Based Settings Modal */}
+      <RoleBasedSettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        onOpenExcelUpload={() => setIsAdminUploadModalOpen(true)}
+        onOpenUserManagement={() => {/* TODO: Implement */}}
+        onOpenRoleManagement={() => {/* TODO: Implement */}}
+        onOpenTechnicalSkills={() => {/* TODO: Implement */}}
+        onOpenSoftSkills={() => {/* TODO: Implement */}}
+        onOpenHierarchicalRoles={() => {/* TODO: Implement */}}
+        onOpenCustomerProjects={() => {/* TODO: Implement */}}
+        onOpenAuslastungserklaerung={() => {/* TODO: Implement */}}
+      />
+
+      {/* Old Settings Modal - Hidden */}
       <AnimatePresence>
-        {isSettingsModalOpen && <motion.div initial={{
+        {false && isSettingsModalOpen && <motion.div initial={{
         opacity: 0
       }} animate={{
         opacity: 1

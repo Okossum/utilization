@@ -10,7 +10,7 @@ export interface RolePermissions {
   canViewAllEmployees: boolean;
 }
 
-// ✅ TEMPORÄR: Alle Rollen haben Admin-Rechte (für Datenbank-Wiederherstellung)
+// 🎯 PRODUKTIVE BERECHTIGUNGEN: Rollenbasierte Zugriffskontrolle
 export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
   admin: {
     views: ['utilization', 'employees', 'sales'],
@@ -20,32 +20,32 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewAllEmployees: true
   },
   führungskraft: {
-    views: ['utilization', 'employees', 'sales'], // ALLE Views
-    settings: ['all'], // ✅ TEMPORÄR: Vollzugriff
-    canManageUsers: true, // ✅ TEMPORÄR: Admin-Rechte
-    canUploadData: true,
-    canViewAllEmployees: true
+    views: ['utilization', 'employees', 'sales'],
+    settings: ['excel-upload', 'help'], // Excel-Upload und Help erlaubt
+    canManageUsers: false,
+    canUploadData: true, // Darf Excel-Daten hochladen
+    canViewAllEmployees: true // Kann alle Mitarbeiter sehen
   },
   sales: {
-    views: ['utilization', 'employees', 'sales'], // ✅ TEMPORÄR: Alle Views
-    settings: ['all'], // ✅ TEMPORÄR: Vollzugriff
-    canManageUsers: true, // ✅ TEMPORÄR: Admin-Rechte
-    canUploadData: true, // ✅ TEMPORÄR: Upload-Rechte
-    canViewAllEmployees: true // ✅ TEMPORÄR: Vollzugriff
+    views: ['sales'], // Nur Sales View - kein Zugriff auf 'utilization' oder 'employees'
+    settings: ['help'], // Nur Help-Berechtigung
+    canManageUsers: false,
+    canUploadData: false,
+    canViewAllEmployees: false // Nur eigenen Bereich
   },
   user: {
-    views: ['utilization', 'employees', 'sales'], // ✅ TEMPORÄR: Alle Views
-    settings: ['all'], // ✅ TEMPORÄR: Vollzugriff
-    canManageUsers: true, // ✅ TEMPORÄR: Admin-Rechte
-    canUploadData: true, // ✅ TEMPORÄR: Upload-Rechte
-    canViewAllEmployees: true // ✅ TEMPORÄR: Vollzugriff
+    views: ['utilization'],
+    settings: ['help'], // Nur Help-Berechtigung
+    canManageUsers: false,
+    canUploadData: false,
+    canViewAllEmployees: false
   },
   unknown: {
-    views: ['utilization', 'employees', 'sales'], // ✅ TEMPORÄR: Alle Views
-    settings: ['all'], // ✅ TEMPORÄR: Vollzugriff
-    canManageUsers: true, // ✅ TEMPORÄR: Admin-Rechte
-    canUploadData: true, // ✅ TEMPORÄR: Upload-Rechte
-    canViewAllEmployees: true // ✅ TEMPORÄR: Vollzugriff
+    views: [],
+    settings: [],
+    canManageUsers: false,
+    canUploadData: false,
+    canViewAllEmployees: false
   }
 };
 
@@ -83,7 +83,50 @@ export const ALL_SETTINGS = [
   'soft-skills',
   'hierarchical-roles',
   'customer-projects',
-  'auslastungserklaerung'
+  'auslastungserklaerung',
+  'general-settings',
+  'data-management',
+  'help'
 ] as const;
+
+// Settings-Kategorien für UI-Gruppierung
+export const SETTINGS_CATEGORIES = {
+  'help': {
+    title: 'Hilfe & Anleitung',
+    icon: 'HelpCircle',
+    settings: ['help'],
+    description: 'Benutzeranleitung und Support'
+  },
+  'data': {
+    title: 'Daten-Management',
+    icon: 'Database',
+    settings: ['excel-upload', 'data-management'],
+    description: 'Excel-Upload und Datenmanagement'
+  },
+  'users': {
+    title: 'Benutzerverwaltung',
+    icon: 'Users',
+    settings: ['user-management', 'role-management'],
+    description: 'Benutzer- und Rollenverwaltung'
+  },
+  'skills': {
+    title: 'Skills & Rollen',
+    icon: 'Star',
+    settings: ['technical-skills', 'soft-skills', 'hierarchical-roles'],
+    description: 'Skill- und Rollenverwaltung'
+  },
+  'projects': {
+    title: 'Projekte',
+    icon: 'Briefcase',
+    settings: ['customer-projects', 'auslastungserklaerung'],
+    description: 'Projekt- und Auslastungsverwaltung'
+  },
+  'general': {
+    title: 'Allgemeine Einstellungen',
+    icon: 'Settings',
+    settings: ['general-settings'],
+    description: 'Allgemeine App-Einstellungen'
+  }
+} as const;
 
 

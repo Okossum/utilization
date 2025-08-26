@@ -138,7 +138,7 @@ export const SalesFilterBar = ({ employees, onFilterChange }: SalesFilterBarProp
       <div 
         key={key}
         className="relative"
-        ref={el => dropdownRefs.current[key] = el}
+        ref={el => { dropdownRefs.current[key] = el; }}
       >
         <button
           onClick={() => setOpenDropdown(isOpen ? null : key)}

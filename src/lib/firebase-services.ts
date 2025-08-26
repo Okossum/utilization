@@ -27,7 +27,9 @@ import {
   PersonStatus,
   PersonTravelReadiness,
   Customer,
-  AssignmentDoc
+  AssignmentDoc,
+  PersonActionItem,
+  FirestorePersonActionItem
 } from './types';
 import { FirestoreSkill, SkillDoc, FirestoreEmployeeSkill, EmployeeSkillDoc } from './types';
 
@@ -270,7 +272,7 @@ export const personActionItemService = {
         updatedBy: updatedBy || null
       });
     } else {
-      await this.save({ person, actionItem, source, updatedAt: new Date(), updatedBy: updatedBy || null });
+      await this.save({ person, actionItem, source, updatedAt: new Date(), updatedBy: updatedBy || undefined });
     }
   }
 };

@@ -25,12 +25,14 @@ import FirebaseAuthBulkSetup from './components/generated/FirebaseAuthBulkSetup'
 import { CustomerProvider } from './contexts/CustomerContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './contexts/AuthContext';
+// Entfernt: import { canAccessView } from './lib/permissions'; - verwende nur AuthContext
 import { GlobalModalProvider } from './contexts/GlobalModalContext';
 import { LoginForm } from './components/LoginForm';
 import { User as UserIcon, ChevronDown, LogOut, Users, BarChart3, FileText, X } from 'lucide-react';
 import AdminUserManagementModal from './components/generated/AdminUserManagementModal';
 import { AdminDataUploadModal } from './components/generated/AdminDataUploadModal';
 import { ExcelUploadModal } from './components/generated/ExcelUploadModal';
+import { HelpModal } from './components/generated/HelpModal';
 
 import { AssignmentsProvider } from './contexts/AssignmentsContext';
 import { RoleProvider } from './contexts/RoleContext';
@@ -72,10 +74,17 @@ function App() {
     
     // Standard-View basierend auf Benutzerrolle setzen
     const getDefaultView = (): 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects' => {
-      if (role === 'sales') {
-        return 'sales'; // Sales-Mitarbeiter sehen nur Sales View
+      // Prüfe verfügbare Views für die aktuelle Rolle
+      if (canAccessView('sales')) {
+        return 'sales'; // Sales-View wenn verfügbar
       }
-      return 'utilization'; // Einfacher Fallback für alle anderen
+      if (canAccessView('utilization')) {
+        return 'utilization'; // Utilization-View wenn verfügbar
+      }
+      if (canAccessView('employees')) {
+        return 'employees'; // Employee-View als Fallback
+      }
+      return 'utilization'; // Letzter Fallback
     };
     
     const [currentView, setCurrentView] = useState<'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects'>(getDefaultView());
@@ -104,12 +113,18 @@ function App() {
         'projects': 'utilization'
       };
       
-      // Vereinfachte Berechtigung - temporär deaktiviert für Stabilität
-      // const requiredPermission = viewPermissionMap[view];
-      // if (requiredPermission && !canAccessView(requiredPermission)) {
-      //   console.warn(`⚠️ Zugriff verweigert auf View "${view}" für Rolle "${role}"`);
-      //   return;
-      // }
+      // Zugriffskontrolle aktiviert
+      const requiredPermission = viewPermissionMap[view];
+      if (requiredPermission && !canAccessView(requiredPermission)) {
+        console.warn(`⚠️ Zugriff verweigert auf View "${view}" für Rolle "${role}"`);
+        // Fallback auf erlaubte View
+        const allowedViews = ['utilization', 'employees', 'sales'].filter(v => canAccessView(v));
+        if (allowedViews.length > 0) {
+          console.log(`🔄 Weiterleitung zu erlaubter View: ${allowedViews[0]}`);
+          setCurrentView(allowedViews[0] as typeof currentView);
+        }
+        return;
+      }
       
       setCurrentView(view);
     };
@@ -143,6 +158,9 @@ function App() {
   const [isAdminSetupOpen, setIsAdminSetupOpen] = useState(false);
   const [isRestoreAdminOpen, setIsRestoreAdminOpen] = useState(false);
   const [isFirebaseAuthSetupOpen, setIsFirebaseAuthSetupOpen] = useState(false);
+    
+    // Help Modal State
+    const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
     
     // State für Upload Panel
 
@@ -277,6 +295,7 @@ function App() {
             logout={logout}
             setAdminModalOpen={setAdminModalOpen}
             onSettings={() => setIsSettingsModalOpen(true)}
+            onHelp={() => setIsHelpModalOpen(true)}
             onAdminUpload={() => {}}
             onEmployeeUpload={() => {}}
             onExcelUpload={() => setIsExcelUploadModalOpen(true)}
@@ -302,7 +321,7 @@ function App() {
           />
 
           {/* Main Content */}
-                    {currentView === 'utilization' && (
+                    {currentView === 'utilization' && canAccessView('utilization') && (
             <>
               <UtilizationReportView
                 actionItems={actionItems}
@@ -323,11 +342,29 @@ function App() {
             </>
           )}
           
-          {currentView === 'employees' && (
+          {currentView === 'employees' && canAccessView('employees') && (
             <EmployeeOverviewDashboard 
               onEmployeeClick={handleEmployeeSelected}
               onBackToOverview={() => safeSetCurrentView('utilization')}
             />
+          )}
+
+          {/* Fallback für nicht-berechtigte Employee View */}
+          {currentView === 'employees' && !canAccessView('employees') && (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+              <div className="text-center max-w-md">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Users className="w-8 h-8 text-red-600" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Zugriff verweigert</h2>
+                <p className="text-gray-600 mb-4">
+                  Sie haben keine Berechtigung für die Mitarbeiteransicht.
+                </p>
+                <p className="text-sm text-gray-500">
+                  Rolle: <span className="font-medium capitalize">{role}</span>
+                </p>
+              </div>
+            </div>
           )}
           
           {currentView === 'knowledge' && (
@@ -338,8 +375,26 @@ function App() {
             <AuslastungCommentView />
           )}
           
-          {currentView === 'sales' && (
+          {currentView === 'sales' && canAccessView('sales') && (
             <SalesView actionItems={actionItems} />
+          )}
+
+          {/* Fallback für nicht-berechtigte Views */}
+          {currentView === 'utilization' && !canAccessView('utilization') && (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+              <div className="text-center max-w-md">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <X className="w-8 h-8 text-red-600" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Zugriff verweigert</h2>
+                <p className="text-gray-600 mb-4">
+                  Sie haben keine Berechtigung für die Auslastungsansicht.
+                </p>
+                <p className="text-sm text-gray-500">
+                  Rolle: <span className="font-medium capitalize">{role}</span>
+                </p>
+              </div>
+            </div>
           )}
 
           {currentView === 'project-roles-demo' && (
@@ -800,6 +855,12 @@ function App() {
             onImportComplete={() => {
               // Refresh any relevant data if needed
             }}
+          />
+
+          {/* Help Modal */}
+          <HelpModal 
+            isOpen={isHelpModalOpen}
+            onClose={() => setIsHelpModalOpen(false)}
           />
 
           {/* Employee Selection Modal */}

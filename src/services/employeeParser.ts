@@ -238,7 +238,7 @@ export class EmployeeExcelParser {
 
   
       if (headers.size === 0) {
-        return { success: false, error: 'Keine gültigen Header gefunden' };
+        return { success: false, errors: ['Keine gültigen Header gefunden'], warnings: [], data: [], stats: { totalRows: 0, validRows: 0, invalidRows: 0, headerRowIndex: -1 } };
       }
 
       // Datenzeilen extrahieren
@@ -312,6 +312,8 @@ export class EmployeeExcelParser {
       return {
         success: true,
         data: result.data,
+        errors: [],
+        warnings: [],
         stats: {
           totalRows: result.stats.totalRows,
           validRows: result.stats.validRows,
@@ -322,8 +324,10 @@ export class EmployeeExcelParser {
     } catch (error) {
       return {
         success: false,
-        error: `Excel Parsing Fehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`,
-        data: []
+        errors: [`Excel Parsing Fehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`],
+        warnings: [],
+        data: [],
+        stats: { totalRows: 0, validRows: 0, invalidRows: 0, headerRowIndex: -1 }
       };
     }
   }

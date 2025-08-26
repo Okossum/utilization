@@ -21,12 +21,9 @@ interface Project {
   averageUtilization?: number; // Durchschnittliche Auslastung über konsolidierte Wochen
   probability?: 'Prospect' | 'Offered' | 'Planned' | 'Commissioned' | 'On-Hold' | 'Rejected';
 }
-interface Employee {
-  id: string;
-  name: string;
-  lbs: string;              // Karrierestufe (wird als Untertitel angezeigt)
-  cc: string;               // Competence Center
-  team: string;
+import { Employee } from '../../lib/types';
+
+interface EmployeeCardEmployee extends Employee {
   role: string;             // Hauptrolle (Projektleiter, Requirements Engineer, etc.)
   email?: string;           // E-Mail-Adresse
   vg?: string;              // Vorgesetzter
@@ -190,7 +187,7 @@ export const EmployeeCard = ({
                 {employee.technicalSkills.map(skill => (
                   <div key={skill.id} className="flex items-center justify-between">
                     <span className="text-sm text-slate-600">{skill.name}</span>
-                    <SkillRating rating={skill.rating} />
+                    <SkillRating rating={skill.rating || 0} />
                   </div>
                 ))}
               </div>
@@ -205,7 +202,7 @@ export const EmployeeCard = ({
                 {employee.softSkills.map(skill => (
                   <div key={skill.id} className="flex items-center justify-between">
                     <span className="text-sm text-slate-600">{skill.name}</span>
-                    <SkillRating rating={skill.rating} />
+                    <SkillRating rating={skill.rating || 0} />
                   </div>
                 ))}
               </div>

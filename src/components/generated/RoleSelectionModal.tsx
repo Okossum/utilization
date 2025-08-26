@@ -491,7 +491,7 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
               <div className="mx-6 mt-4 p-4 bg-green-100 border-2 border-green-300 rounded-lg text-sm text-green-800 flex items-center gap-2 shadow-lg">
                 <CheckCircle2 className="w-5 h-5 text-green-600" />
                 <span className="font-medium">{successMessage}</span>
-                {console.log('SUCCESS MESSAGE RENDERED AT TOP:', successMessage)}
+                {/* DEBUG: SUCCESS MESSAGE RENDERED AT TOP: {successMessage} */}
               </div>
             )}
 

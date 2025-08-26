@@ -25,12 +25,9 @@ interface Project {
   probability?: 'Prospect' | 'Offered' | 'Planned' | 'Commissioned' | 'On-Hold' | 'Rejected';
 }
 
-interface Employee {
-  id: string;
-  name: string;
-  lbs: string;              // Karrierestufe (wird als Untertitel angezeigt)
-  cc: string;               // Competence Center
-  team: string;
+import { Employee } from '../../lib/types';
+
+interface SalesEmployee extends Employee {
   mainRole: string;         // Hauptrolle (Projektleiter, Requirements Engineer, etc.)
   email?: string;           // E-Mail-Adresse
   vg?: string;              // Vorgesetzter
@@ -62,7 +59,7 @@ interface SalesViewProps {
 // @component: SalesView
 export const SalesView = ({ actionItems }: SalesViewProps) => {
   const { databaseData, personMeta, isLoading, refreshData } = useUtilizationData();
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employees, setEmployees] = useState<SalesEmployee[]>([]);
   const [error, setError] = useState<string | null>(null);
   
   // Project Creation Modal States (wie in UtilizationReportView)
@@ -328,7 +325,7 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
 
 
       // Mitarbeiter-Daten aus utilizationData transformieren
-      const transformedEmployees: Employee[] = [];
+      const transformedEmployees: SalesEmployee[] = [];
       
       databaseData.utilizationData.forEach((record: any) => {
         const meta = personMeta.get(record.person);
@@ -442,13 +439,14 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
 
 
 
-        const employee: Employee = {
+        const employee: SalesEmployee = {
           id: record.id,
           name: record.person,
           lbs: meta?.careerLevel || record.lbs || 'Consultant',
           cc: meta?.cc || record.cc || 'Unknown CC',
           team: meta?.team || record.team || 'Unknown Team',
           mainRole: meta?.mainRole || record.mainRole || 'Consultant',
+          role: meta?.mainRole || record.mainRole || 'Consultant',
           email: meta?.email || record.email || undefined,
           vg: meta?.manager || record.vg || undefined,
           profileUrl: record.linkZumProfilUrl || undefined,
@@ -458,8 +456,8 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
           location: meta?.standort || record.standort || undefined,
           startDate: meta?.startDate || record.startDate || undefined,
           status: meta?.status || record.status || 'active',
-          utilization: currentUtilization,
-          averageUtilization: averageUtilization,
+          utilization: currentUtilization ?? undefined,
+          averageUtilization: averageUtilization ?? undefined,
           
           // Skills nur aus echten Daten - KEINE Mock-Daten
           skills: [], // Leer lassen - wird durch technicalSkills/softSkills ersetzt
@@ -538,7 +536,7 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
             <h3 className="text-red-800 font-semibold mb-2">Fehler beim Laden der Daten</h3>
             <p className="text-red-600">{error}</p>
             <button
-              onClick={loadSalesData}
+              onClick={() => window.location.reload()}
               className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
             >
               Erneut versuchen

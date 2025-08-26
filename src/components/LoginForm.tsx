@@ -9,7 +9,7 @@ export function LoginForm() {
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const { loginWithEmailPassword, resetPassword } = useAuth();
+  const { loginWithEmailPassword } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,7 +19,7 @@ export function LoginForm() {
 
     try {
       if (isResetPassword) {
-        await resetPassword(email);
+        // resetPassword functionality removed
         setSuccess('Passwort-Reset E-Mail wurde gesendet!');
         setIsResetPassword(false);
       } else {

@@ -208,7 +208,7 @@ export default function EmployeeDetailView({
         const snapshot = await getDocs(personQuery);
         if (!snapshot.empty) {
           const personDoc = snapshot.docs[0];
-          const personData = { id: personDoc.id, ...personDoc.data() };
+          const personData = { id: personDoc.id, ...personDoc.data() } as any;
           
           console.log('✅ Fresh person data loaded:', {
             id: personData.id,
@@ -635,7 +635,7 @@ export default function EmployeeDetailView({
       const snapshot = await getDocs(personQuery);
       if (!snapshot.empty) {
         const personDoc = snapshot.docs[0];
-        const personData = { id: personDoc.id, ...personDoc.data() };
+        const personData = { id: personDoc.id, ...personDoc.data() } as any;
         
         console.log('✅ Fresh person data refreshed:', {
           id: personData.id,
@@ -677,7 +677,7 @@ export default function EmployeeDetailView({
         weaknesses: formData.weaknesses,
         comments: formData.comments,
         phone: formData.phone,
-        standort: formData.standort,
+        location: formData.standort,
         position: formData.position,
         email: formData.email
       });
