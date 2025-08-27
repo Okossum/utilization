@@ -18,7 +18,7 @@ import {
 
 // API-Basis-URL für Backend-Server
 const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://your-production-domain.com/api' 
+  ? 'https://us-central1-ressourceutilization.cloudfunctions.net/api' 
   : 'http://localhost:3001/api';
 
 // API-Service für Backend-Kommunikation

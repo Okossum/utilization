@@ -3,7 +3,7 @@ import { GenericDataArray, GenericDataObject } from '../types/database';
 // Knowledge-Datenbank-Service für Mitarbeiter Knowledge und Branchen Know-How
 class KnowledgeService {
   private static API_BASE_URL = process.env.NODE_ENV === 'production' 
-    ? 'https://your-production-domain.com/api' 
+    ? 'https://us-central1-ressourceutilization.cloudfunctions.net/api' 
     : 'http://localhost:3001/api';
 
   private static authTokenProvider: (() => Promise<string | null>) | null = null;
