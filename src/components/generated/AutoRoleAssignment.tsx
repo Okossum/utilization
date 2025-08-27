@@ -4,6 +4,8 @@ import { db } from '../../lib/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUtilizationData } from '../../contexts/UtilizationDataContext';
 import { UserRole } from '../../lib/permissions';
+import { UserManagementService } from '../../services/userManagement';
+import { COLLECTIONS } from '../../lib/types';
 import { Play, Eye, CheckCircle, AlertTriangle, Users, Zap, BarChart3, Shield, User } from 'lucide-react';
 
 interface RoleAssignment {
@@ -194,7 +196,8 @@ export default function AutoRoleAssignment() {
         currentRole: user.systemRole || 'keine',
         newRole,
         reason,
-        needsUpdate: user.systemRole !== newRole || !user.hasSystemAccess
+        needsUpdate: user.systemRole !== newRole || !user.hasSystemAccess || 
+                    (newRole !== 'user' && newRole !== 'unknown') // Migriere alle Führungskräfte und Sales
       });
     });
 
@@ -238,12 +241,24 @@ export default function AutoRoleAssignment() {
       if (oliverData) {
         console.log('✅ Oliver gefunden:', oliverData.person);
         
-        await updateDoc(doc(db, 'utilizationData', oliverData.id), {
-          systemRole: 'admin',
-          hasSystemAccess: true,
-          roleAssignedAt: new Date(),
-          roleAssignedBy: 'manual-admin-setup'
-        });
+        // 🔐 Neue User-Management: Rolle in users Collection setzen
+        if (oliverData.email) {
+          await UserManagementService.createOrUpdateUser({
+            uid: oliverData.email, // Temporär, wird bei Firebase Auth ersetzt
+            email: oliverData.email,
+            displayName: oliverData.person,
+            systemRole: 'admin',
+            hasSystemAccess: true,
+            employeeId: oliverData.id,
+            lob: oliverData.lob,
+            bereich: oliverData.bereich,
+            cc: oliverData.cc,
+            team: oliverData.team,
+            roleAssignedBy: 'manual-admin-setup'
+          });
+        }
+        
+        // Legacy-Update entfernt - nur noch users Collection verwenden
         
         setMessage({ 
           type: 'success', 
@@ -281,14 +296,34 @@ export default function AutoRoleAssignment() {
     let errors = 0;
 
     try {
+      // 🔄 Utilization Data neu laden für die Migration
+      const utilizationDataSnapshot = await getDocs(collection(db, COLLECTIONS.UTILIZATION_DATA));
+      const utilizationDataArray = utilizationDataSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as any[];
+
       for (const assignment of updatesNeeded) {
         try {
-          await updateDoc(doc(db, 'utilizationData', assignment.id), {
-            systemRole: assignment.newRole,
-            hasSystemAccess: true,
-            roleAssignedAt: new Date(),
-            roleAssignedBy: user?.email || 'auto-assignment'
-          });
+          // 🔐 Neue User-Management: Rolle in users Collection setzen
+          const utilizationUser = utilizationDataArray.find(u => u.id === assignment.id);
+          if (utilizationUser?.email) {
+            await UserManagementService.createOrUpdateUser({
+              uid: utilizationUser.email, // Temporär, wird bei Firebase Auth ersetzt
+              email: utilizationUser.email,
+              displayName: utilizationUser.person,
+              systemRole: assignment.newRole,
+              hasSystemAccess: true,
+              employeeId: utilizationUser.id,
+              lob: utilizationUser.lob,
+              bereich: utilizationUser.bereich,
+              cc: utilizationUser.cc,
+              team: utilizationUser.team,
+              roleAssignedBy: user?.email || 'auto-assignment'
+            });
+          }
+          
+          // Legacy-Update entfernt - nur noch users Collection verwenden
           updated++;
         } catch (error) {
           console.error(`❌ Fehler bei ${assignment.person}:`, error);

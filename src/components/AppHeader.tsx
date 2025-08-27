@@ -34,6 +34,7 @@ interface AppHeaderProps {
   onAdminSetup?: () => void;
   onRestoreAdmin?: () => void;
   onFirebaseAuthSetup?: () => void;
+
 }
 
 export function AppHeader({
@@ -376,6 +377,8 @@ export function AppHeader({
                             👥 Benutzerverwaltung
                           </button>
                         )}
+                        
+
 
                         {/* Admin Setup - nur für Admins */}
                         {canAccessSettings('user-management') && onAdminSetup && (
@@ -387,11 +390,13 @@ export function AppHeader({
                           </button>
                         )}
 
-                        {/* 🚨 SICHERHEIT: Admin Restore - NUR für echte Admins */}
-                        {role === 'admin' && onRestoreAdmin && (
+                        {/* Admin Restore - NOTFALL für überschriebene Admin-Rolle */}
+                        {(onRestoreAdmin || role === 'unknown') && (
                           <button
                             onClick={() => { 
-                              onRestoreAdmin(); 
+                              if (onRestoreAdmin) {
+                                onRestoreAdmin(); 
+                              }
                               setIsSettingsMenuOpen(false); 
                             }}
                             className="w-full px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 text-left font-medium"
@@ -464,9 +469,9 @@ export function AppHeader({
                 <div className="mb-3">
                   <div className="text-xs text-gray-500">Angemeldet als</div>
                   <div className="text-sm font-medium text-gray-900 truncate">{profile?.displayName || user?.email || '—'}</div>
-                  <div className="text-xs text-gray-600">Rolle: {String(role || 'unknown')}</div>
+                  <div className="text-xs text-gray-600">Rolle: {String(profile?.role || 'unknown')}</div>
                 </div>
-                {role === 'admin' && (
+                {profile?.role === 'admin' && (
                   <button
                     onClick={() => { setAdminModalOpen(true); setIsAccountMenuOpen(false); }}
                     className="w-full px-3 py-2 text-sm text-white bg-purple-600 rounded-lg hover:bg-purple-700 mb-2"
@@ -475,11 +480,13 @@ export function AppHeader({
                   </button>
                 )}
                 
-                {/* 🚨 SICHERHEIT: Admin-Rolle wiederherstellen - NUR für echte Admins oder bei kritischen Fehlern */}
+                {/* ✅ Admin-Rolle wiederherstellen - nur für Admins */}
                 {role === 'admin' && onRestoreAdmin && (
                   <button
                     onClick={() => { 
-                      onRestoreAdmin(); 
+                      if (onRestoreAdmin) {
+                        onRestoreAdmin(); 
+                      }
                       setIsAccountMenuOpen(false); 
                     }}
                     className="w-full px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 mb-2"

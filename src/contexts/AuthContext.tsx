@@ -6,6 +6,8 @@ import { setAuthTokenProvider } from '../services/database';
 import { db } from '../lib/firebase';
 import { doc, getDoc, setDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { UserRole, canAccessView, canAccessSettings, canManageUsers, canUploadData, canViewAllEmployees } from '../lib/permissions';
+import { UserManagementService } from '../services/userManagement';
+import { COLLECTIONS } from '../lib/types';
 
 interface AuthContextValue {
   user: User | null;
@@ -62,43 +64,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     configurePersistence();
   }, [auth]);
 
-  // Neue Funktion: Rolle aus utilizationData Collection laden
-  const loadUserRoleFromUtilizationData = useCallback(async (userEmail: string): Promise<UserRole> => {
+  // 🔐 Neue Funktion: Rolle aus separater users Collection laden
+  const loadUserRoleFromUserManagement = useCallback(async (userUid: string, userEmail: string): Promise<UserRole> => {
     try {
-      console.log('🔍 Lade Rolle für E-Mail:', userEmail);
+      console.log('🔍 Lade Rolle für UID/E-Mail:', userUid, userEmail);
       
-      // Suche in utilizationData Collection nach der E-Mail
-      const utilizationQuery = query(
-        collection(db, 'utilizationData'),
-        where('email', '==', userEmail)
-      );
+      // Primär: Suche nach UID in users Collection
+      let userProfile = await UserManagementService.getUserByUid(userUid);
       
-      const querySnapshot = await getDocs(utilizationQuery);
-      
-      if (!querySnapshot.empty) {
-        const userData = querySnapshot.docs[0].data();
-        const systemRole = userData.systemRole;
-        const hasSystemAccess = userData.hasSystemAccess;
-        
-        console.log('📋 Gefundene Daten:', { systemRole, hasSystemAccess });
-        
-        // Prüfe ob Benutzer System-Zugriff hat
-        if (hasSystemAccess && systemRole) {
-          console.log('✅ Rolle zugewiesen:', systemRole);
-          return systemRole as UserRole;
-        } else {
-          console.log('❌ Kein System-Zugriff oder keine Rolle');
-          return 'unknown';
-        }
-      } else {
-        console.log('📭 Keine Daten in utilizationData gefunden für:', userEmail);
-        console.log('🔍 Mögliche Ursachen:');
-        console.log('  - E-Mail nicht in utilizationData vorhanden');
-        console.log('  - Groß-/Kleinschreibung unterschiedlich');
-        console.log('  - Benutzer hat keine Rolle zugewiesen');
-        
-        return 'unknown'; // Kein Zugriff wenn nicht in System
+      // Fallback: Suche nach E-Mail in users Collection
+      if (!userProfile && userEmail) {
+        userProfile = await UserManagementService.getUserByEmail(userEmail);
       }
+      
+      // Fallback: Suche in utilizationData Collection (Legacy)
+      if (!userProfile && userEmail) {
+        console.log('🔄 Fallback: Suche in utilizationData Collection');
+        const utilizationQuery = query(
+          collection(db, COLLECTIONS.UTILIZATION_DATA),
+          where('email', '==', userEmail)
+        );
+        
+        const querySnapshot = await getDocs(utilizationQuery);
+        
+        if (!querySnapshot.empty) {
+          const userData = querySnapshot.docs[0].data();
+          const systemRole = userData.systemRole;
+          const hasSystemAccess = userData.hasSystemAccess;
+          
+          console.log('📋 Legacy-Daten gefunden:', { systemRole, hasSystemAccess });
+          
+          if (hasSystemAccess && systemRole) {
+            console.log('✅ Legacy-Rolle zugewiesen:', systemRole);
+            return systemRole as UserRole;
+          }
+        }
+      }
+      
+      if (userProfile && userProfile.hasSystemAccess && userProfile.systemRole) {
+        console.log('✅ Rolle aus users Collection:', userProfile.systemRole);
+        
+        // Update last login
+        await UserManagementService.updateLastLogin(userUid);
+        
+        return userProfile.systemRole as UserRole;
+      } else {
+        console.log('❌ Kein System-Zugriff oder keine Rolle gefunden');
+        return 'unknown';
+      }
+      
     } catch (error) {
       console.error('❌ Fehler beim Laden der Rolle:', error);
       return 'unknown';
@@ -125,12 +139,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           });
           
-          // Rolle aus utilizationData Collection laden
-          if (nextUser.email) {
-            const userRole = await loadUserRoleFromUtilizationData(nextUser.email);
+          // Rolle aus users Collection laden (mit Legacy-Fallback)
+          if (nextUser.uid && nextUser.email) {
+            const userRole = await loadUserRoleFromUserManagement(nextUser.uid, nextUser.email);
             setRole(userRole);
-
-
           } else {
             setRole('unknown');
           }
@@ -157,7 +169,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, [auth, loadUserRoleFromUtilizationData]);
+  }, [auth, loadUserRoleFromUserManagement]);
 
   const refreshProfile = useCallback(async () => {
     try {
@@ -167,9 +179,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const me = userDoc.exists() ? { id: userDoc.id, ...userDoc.data() } : null;
       setProfile(me || null);
       
-      // Rolle aus utilizationData laden
-      if (user.email) {
-        const userRole = await loadUserRoleFromUtilizationData(user.email);
+      // Rolle aus users Collection laden
+      if (user.uid && user.email) {
+        const userRole = await loadUserRoleFromUserManagement(user.uid, user.email);
         setRole(userRole);
         console.log('🎭 Rolle gesetzt:', userRole);
       }
@@ -177,7 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(null);
       setRole('unknown');
     }
-  }, [user, loadUserRoleFromUtilizationData]);
+  }, [user, loadUserRoleFromUserManagement]);
 
   const updateProfile = useCallback(async (data: Partial<UserProfile & { canViewAll: boolean }>) => {
     // Direct Firebase call instead of DatabaseService

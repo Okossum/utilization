@@ -34,8 +34,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canViewAllEmployees: false // Nur eigenen Bereich
   },
   user: {
-    views: ['utilization'],
-    settings: ['help'], // Nur Help-Berechtigung
+    views: [], // Kein Zugriff auf Views
+    settings: [], // Kein Zugriff auf Settings
     canManageUsers: false,
     canUploadData: false,
     canViewAllEmployees: false

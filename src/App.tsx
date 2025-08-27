@@ -23,6 +23,7 @@ import AdminSetup from './components/generated/AdminSetup';
 import RestoreAdminRole from './components/generated/RestoreAdminRole';
 import EmergencyAdminCreator from './components/generated/EmergencyAdminCreator';
 import FirebaseAuthBulkSetup from './components/generated/FirebaseAuthBulkSetup';
+
 import { CustomerProvider } from './contexts/CustomerContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './contexts/AuthContext';
@@ -57,15 +58,6 @@ function App() {
   }
 
   setTheme(theme);
-
-  const generatedComponent = useMemo(() => {
-    // ✅ SCHRITT 3: RootRouter außerhalb von useMemo definieren
-    return (
-      <AuthProvider>
-        <RootRouter />
-      </AuthProvider>
-    );
-  }, []);
 
   // ✅ SCHRITT 3: RootRouter als separate Komponente definieren
   function RootRouter() {
@@ -160,6 +152,7 @@ function App() {
   const [isAdminSetupOpen, setIsAdminSetupOpen] = useState(false);
   const [isRestoreAdminOpen, setIsRestoreAdminOpen] = useState(false);
   const [isFirebaseAuthSetupOpen, setIsFirebaseAuthSetupOpen] = useState(false);
+
     
     // Help Modal State
     const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
@@ -317,6 +310,7 @@ function App() {
             onAdminSetup={() => setIsAdminSetupOpen(true)}
             onRestoreAdmin={() => setIsRestoreAdminOpen(true)}
             onFirebaseAuthSetup={() => setIsFirebaseAuthSetupOpen(true)}
+
             onProjectRolesDemo={() => safeSetCurrentView('project-roles-demo')}
             onProjectSkillsDemo={() => safeSetCurrentView('project-skills-demo')}
             lobOptions={[]} // TODO: von UtilizationReportView holen
@@ -841,6 +835,8 @@ function App() {
             </div>
           )}
 
+
+
                     <AdminUserManagementModal isOpen={isAdminModalOpen} onClose={() => setAdminModalOpen(false)} />
 
 
@@ -933,11 +929,17 @@ function App() {
   if (container === 'centered') {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center">
-        {generatedComponent}
+        <AuthProvider>
+          <RootRouter />
+        </AuthProvider>
       </div>
     );
   } else {
-    return generatedComponent;
+    return (
+    <AuthProvider>
+      <RootRouter />
+    </AuthProvider>
+  );
   }
 }
 

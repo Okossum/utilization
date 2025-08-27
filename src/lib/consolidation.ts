@@ -1,6 +1,6 @@
 // file: src/lib/consolidation.ts
 import {
-  collection, doc, getDocs, query, setDoc, writeBatch, where
+  collection, doc, getDoc, getDocs, query, setDoc, writeBatch, where
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { logger } from "./logger";
@@ -203,12 +203,31 @@ export async function consolidatePersonData(personId: string): Promise<void> {
       return;
     }
     
+    // 🔐 WICHTIG: Bestehende User-Rollen vor Überschreibung schützen
+    const docRef = doc(collection(db, "utilizationData"), personId);
+    const existingDoc = await docRef.get();
+    const existingUserRoles = existingDoc.exists() ? {
+      systemRole: existingDoc.data()?.systemRole,
+      hasSystemAccess: existingDoc.data()?.hasSystemAccess,
+      roleAssignedBy: existingDoc.data()?.roleAssignedBy,
+      roleAssignedAt: existingDoc.data()?.roleAssignedAt,
+      lastRoleUpdate: existingDoc.data()?.lastRoleUpdate,
+      roleHistory: existingDoc.data()?.roleHistory
+    } : {};
+    
     // Merge Daten
     const consolidatedData = mergePersonData(mitarbeiterData, auslastungData, einsatzplanData);
     
+    // 🔐 User-Rollen wieder hinzufügen (überschreibt nicht!)
+    const finalData = {
+      ...consolidatedData,
+      ...Object.fromEntries(
+        Object.entries(existingUserRoles).filter(([_, value]) => value !== undefined)
+      )
+    };
+    
     // Speichere in utilizationData Collection
-    const docRef = doc(collection(db, "utilizationData"), personId);
-    await setDoc(docRef, consolidatedData, { merge: true });
+    await setDoc(docRef, finalData, { merge: true });
     
     // logger statement entfernt
     

@@ -3,18 +3,16 @@ import { collection, getDocs, doc, updateDoc, query, where } from 'firebase/fire
 import { db } from '../../lib/firebase';
 import { UserRole } from '../../lib/permissions';
 import { useAuth } from '../../contexts/AuthContext';
+import { UserManagementService } from '../../services/userManagement';
+import { COLLECTIONS, UserProfile } from '../../lib/types';
 import { Users, Shield, CheckCircle, AlertCircle, Save, Filter, X, Zap } from 'lucide-react';
 import AutoRoleAssignment from './AutoRoleAssignment';
 
-interface UserData {
-  id: string;
-  person: string;
-  email: string;
-  systemRole?: UserRole;
-  hasSystemAccess?: boolean;
-  lbs?: string;
-  cc?: string;
-}
+// Verwende UserProfile aus types.ts
+type UserData = UserProfile & {
+  person: string; // Alias für displayName
+  lbs?: string;   // Legacy-Felder für Kompatibilität
+};
 
 export default function UserRoleManagement() {
   const { user, role, canManageUsers } = useAuth();
@@ -82,22 +80,45 @@ export default function UserRoleManagement() {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      console.log('🔍 Lade alle Benutzer aus utilizationData...');
+      console.log('🔍 Lade alle Benutzer aus users Collection...');
       
-      const snapshot = await getDocs(collection(db, 'utilizationData'));
-      const userData: UserData[] = [];
+      // Primär: Lade aus users Collection
+      const activeUsers = await UserManagementService.getAllActiveUsers();
+      const userData: UserData[] = activeUsers.map(user => ({
+        ...user,
+        person: user.displayName || 'Unbekannt'
+      }));
       
-      snapshot.forEach((doc) => {
+      // Fallback: Ergänze aus utilizationData (für noch nicht migrierte User)
+      console.log('🔄 Ergänze aus utilizationData (Legacy)...');
+      const utilizationSnapshot = await getDocs(
+        query(
+          collection(db, COLLECTIONS.UTILIZATION_DATA),
+          where('systemRole', '!=', null)
+        )
+      );
+      
+      utilizationSnapshot.forEach((doc) => {
         const data = doc.data();
-        if (data.email) { // Nur Benutzer mit E-Mail
+        if (data.email && !userData.find(u => u.email === data.email)) {
+          // Nur hinzufügen wenn noch nicht in users Collection
           userData.push({
-            id: doc.id,
-            person: data.person || 'Unbekannt',
+            id: data.email, // Temporäre ID
+            uid: data.email,
             email: data.email,
+            person: data.person || 'Unbekannt',
+            displayName: data.person || 'Unbekannt',
             systemRole: data.systemRole,
-            hasSystemAccess: data.hasSystemAccess,
+            hasSystemAccess: data.hasSystemAccess || false,
+            employeeId: doc.id,
+            lob: data.lob,
+            bereich: data.bereich,
+            cc: data.cc,
+            team: data.team,
             lbs: data.lbs,
-            cc: data.cc
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date()
           });
         }
       });
@@ -105,7 +126,7 @@ export default function UserRoleManagement() {
       // Sortiere nach E-Mail
       userData.sort((a, b) => a.email.localeCompare(b.email));
       setUsers(userData);
-      console.log('✅ Benutzer geladen:', userData.length);
+      console.log('✅ Benutzer geladen:', userData.length, '(davon', activeUsers.length, 'aus users Collection)');
       
     } catch (error) {
       console.error('❌ Fehler beim Laden der Benutzer:', error);
@@ -119,14 +140,39 @@ export default function UserRoleManagement() {
     try {
       setSaving(userId);
       
+      const targetUser = users.find(u => u.id === userId);
+      if (!targetUser) {
+        throw new Error('User nicht gefunden');
+      }
       
-      const docRef = doc(db, 'utilizationData', userId);
-      await updateDoc(docRef, {
-        systemRole: newRole,
-        hasSystemAccess: hasAccess,
-        roleAssignedBy: user?.email || 'unknown',
-        lastRoleUpdate: new Date()
-      });
+      // 🔐 Neue User-Management: Rolle in users Collection setzen
+      if (targetUser.uid && targetUser.uid !== targetUser.email) {
+        // User hat echte Firebase UID
+        await UserManagementService.updateUserRole(
+          targetUser.uid,
+          newRole,
+          hasAccess,
+          user?.email || 'unknown',
+          'Manual role assignment'
+        );
+      } else {
+        // Legacy User oder temporäre ID - erstelle/aktualisiere User
+        await UserManagementService.createOrUpdateUser({
+          uid: targetUser.email, // Temporär, wird bei Firebase Auth ersetzt
+          email: targetUser.email,
+          displayName: targetUser.person,
+          systemRole: newRole,
+          hasSystemAccess: hasAccess,
+          employeeId: targetUser.employeeId,
+          lob: targetUser.lob,
+          bereich: targetUser.bereich,
+          cc: targetUser.cc,
+          team: targetUser.team,
+          roleAssignedBy: user?.email || 'unknown'
+        });
+      }
+      
+      // Legacy-Update entfernt - nur noch users Collection verwenden
       
       // Update lokalen State
       setUsers(prev => prev.map(u => 
@@ -136,7 +182,7 @@ export default function UserRoleManagement() {
       ));
       
       setMessage({ type: 'success', text: 'Rolle erfolgreich aktualisiert' });
-      console.log('✅ Rolle aktualisiert');
+      console.log('✅ Rolle aktualisiert in users Collection');
       
     } catch (error) {
       console.error('❌ Fehler beim Update der Rolle:', error);

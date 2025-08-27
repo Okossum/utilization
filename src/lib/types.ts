@@ -116,7 +116,8 @@ export const COLLECTIONS = {
   EMPLOYEE_SKILLS: 'employee_skills',
   ASSIGNMENTS: 'assignments',
   AUSLASTUNGSERKLAERUNGEN: 'auslastungserklaerungen',
-  PERSON_AUSLASTUNGSERKLAERUNGEN: 'person_auslastungserklaerungen'
+  PERSON_AUSLASTUNGSERKLAERUNGEN: 'person_auslastungserklaerungen',
+  USERS: 'users' // 🔐 Separate User-Management Collection
 
 } as const;
 
@@ -332,6 +333,40 @@ export interface FirestoreProjectHistoryItem extends ProjectHistoryItem, Firesto
 
 export interface FirestoreProjectOffer extends ProjectOffer, FirestoreDocument {
   userId?: string;
+}
+
+// 🔐 User Management Types
+export interface UserProfile extends FirestoreDocument {
+  uid: string; // Firebase Auth UID
+  email: string;
+  displayName?: string;
+  
+  // System Access & Roles
+  systemRole: 'admin' | 'führungskraft' | 'sales' | 'user' | 'unknown';
+  hasSystemAccess: boolean;
+  
+  // Organizational Data (optional, for reference)
+  employeeId?: string; // Link to utilizationData
+  lob?: string;
+  bereich?: string;
+  cc?: string;
+  team?: string;
+  
+  // Role Management Metadata
+  roleAssignedBy?: string;
+  roleAssignedAt?: Date;
+  lastRoleUpdate?: Date;
+  roleHistory?: Array<{
+    role: string;
+    assignedBy: string;
+    assignedAt: Date;
+    reason?: string;
+  }>;
+  
+  // Account Status
+  isActive: boolean;
+  lastLoginAt?: Date;
+  accountCreatedBy?: string;
 }
 
 
