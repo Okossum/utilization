@@ -25,15 +25,19 @@ interface Project {
   probability?: 'Prospect' | 'Offered' | 'Planned' | 'Commissioned' | 'On-Hold' | 'Rejected';
 }
 
-import { Employee } from '../../lib/types';
-
-interface SalesEmployee extends Employee {
+interface Employee {
+  id: string;
+  name: string;
+  lbs: string;              // Karrierestufe (wird als Untertitel angezeigt)
+  cc: string;               // Competence Center
+  team: string;
   mainRole: string;         // Hauptrolle (Projektleiter, Requirements Engineer, etc.)
   email?: string;           // E-Mail-Adresse
   vg?: string;              // Vorgesetzter
   profileUrl?: string;      // Link zum Profil
   skills: Skill[];
   completedProjects: Project[];
+  activeProjects: Project[];
   plannedProjects: Project[];
   // Zusätzliche Felder aus EmployeeDetailView
   phone?: string;           // Telefonnummer
@@ -59,7 +63,7 @@ interface SalesViewProps {
 // @component: SalesView
 export const SalesView = ({ actionItems }: SalesViewProps) => {
   const { databaseData, personMeta, isLoading, refreshData } = useUtilizationData();
-  const [employees, setEmployees] = useState<SalesEmployee[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [error, setError] = useState<string | null>(null);
   
   // Project Creation Modal States (wie in UtilizationReportView)
@@ -167,7 +171,19 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
           employeeRole: ref.roles?.[0]?.name || 'Consultant',
           utilization: ref.utilization || undefined,
           averageUtilization: ref.averageUtilization || undefined,
-          probability: (ref.probability as any) || 'Planned'
+          probability: (ref.probability as any) || 'Planned',
+          // Erweiterte Felder aus projectReferences
+          projectType: ref.projectType || 'planned',
+          projectSource: ref.projectSource || 'regular',
+          dailyRate: ref.dailyRate || undefined,
+          plannedUtilization: ref.plannedUtilization || undefined,
+          internalContact: ref.internalContact || undefined,
+          customerContact: ref.customerContact || undefined,
+          jiraTicketId: ref.jiraTicketId || undefined,
+          duration: ref.duration || undefined,
+          activities: ref.activities || [],
+          roles: ref.roles || [],
+          skills: ref.skills || []
         });
       });
     }
@@ -231,12 +247,56 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
           employeeRole: 'Consultant',
           utilization: averageUtilization,
           averageUtilization: averageUtilization,
-          probability: 'Planned'
+          probability: 'Planned',
+          // Erweiterte Felder für Einsatzplan-Projekte
+          projectType: 'planned',
+          projectSource: 'regular',
+          plannedUtilization: averageUtilization,
+          duration: `${weeks.length} Wochen`,
+          activities: [`Einsatz bei ${firstEntry.projekt}`, `Standort: ${firstEntry.ort || 'Remote'}`],
+          roles: [],
+          skills: []
         });
       });
     }
 
     return plannedProjects;
+  };
+
+  // Aktive Projekte aus projectReferences in utilizationData laden
+  const transformToActiveProjects = (record: any): Project[] => {
+    if (!record.projectReferences) return [];
+
+    // Filtere aktive Projekte (projectType: 'active')
+    const activeProjects = record.projectReferences.filter((ref: any) => 
+      ref.projectType === 'active'
+    );
+
+    return activeProjects.map((ref: any) => ({
+      id: ref.projectId || `active-${Math.random().toString(36).substr(2, 9)}`,
+      customer: ref.customer || 'Unknown Customer',
+      projectName: ref.projectName || 'Active Project',
+      startDate: ref.startDate || '',
+      endDate: ref.endDate || '',
+      description: ref.description || 'Active project assignment',
+      skillsUsed: ref.skills || [],
+      employeeRole: ref.roles?.[0]?.name || 'Consultant',
+      utilization: ref.utilization || undefined,
+      averageUtilization: ref.averageUtilization || undefined,
+      probability: 'Commissioned' as const,
+      // Erweiterte Felder aus projectReferences
+      projectType: ref.projectType || 'active',
+      projectSource: ref.projectSource || 'regular',
+      dailyRate: ref.dailyRate || undefined,
+      plannedUtilization: ref.plannedUtilization || undefined,
+      internalContact: ref.internalContact || undefined,
+      customerContact: ref.customerContact || undefined,
+      jiraTicketId: ref.jiraTicketId || undefined,
+      duration: ref.duration || undefined,
+      activities: ref.activities || [],
+      roles: ref.roles || [],
+      skills: ref.skills || []
+    }));
   };
 
   // Historische Projekte aus projectReferences in utilizationData laden
@@ -259,7 +319,19 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
       employeeRole: ref.roles?.[0]?.name || 'Consultant',
       utilization: ref.utilization || undefined,
       averageUtilization: ref.averageUtilization || undefined,
-      probability: 'Commissioned' as const
+      probability: 'Commissioned' as const,
+      // Erweiterte Felder aus projectReferences
+      projectType: ref.projectType || 'historical',
+      projectSource: ref.projectSource || 'regular',
+      dailyRate: ref.dailyRate || undefined,
+      plannedUtilization: ref.plannedUtilization || undefined,
+      internalContact: ref.internalContact || undefined,
+      customerContact: ref.customerContact || undefined,
+      jiraTicketId: ref.jiraTicketId || undefined,
+      duration: ref.duration || undefined,
+      activities: ref.activities || [],
+      roles: ref.roles || [],
+      skills: ref.skills || []
     }));
   };
 
@@ -325,7 +397,7 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
 
 
       // Mitarbeiter-Daten aus utilizationData transformieren
-      const transformedEmployees: SalesEmployee[] = [];
+      const transformedEmployees: Employee[] = [];
       
       databaseData.utilizationData.forEach((record: any) => {
         const meta = personMeta.get(record.person);
@@ -439,7 +511,7 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
 
 
 
-        const employee: SalesEmployee = {
+        const employee: Employee = {
           id: record.id,
           name: record.person,
           lbs: meta?.careerLevel || record.lbs || 'Consultant',
@@ -456,8 +528,8 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
           location: meta?.standort || record.standort || undefined,
           startDate: meta?.startDate || record.startDate || undefined,
           status: meta?.status || record.status || 'active',
-          utilization: currentUtilization ?? undefined,
-          averageUtilization: averageUtilization ?? undefined,
+          utilization: currentUtilization,
+          averageUtilization: averageUtilization,
           
           // Skills nur aus echten Daten - KEINE Mock-Daten
           skills: [], // Leer lassen - wird durch technicalSkills/softSkills ersetzt
@@ -474,6 +546,7 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
           
           // Projekte
           completedProjects: transformAuslastungToCompletedProjects(record),
+          activeProjects: transformToActiveProjects(record),
           plannedProjects: transformEinsatzplanToProjects(record),
           
           // Callback für Project Creation (exakt wie in UtilizationReportView)
@@ -536,7 +609,7 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
             <h3 className="text-red-800 font-semibold mb-2">Fehler beim Laden der Daten</h3>
             <p className="text-red-600">{error}</p>
             <button
-              onClick={() => window.location.reload()}
+              onClick={loadSalesData}
               className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
             >
               Erneut versuchen

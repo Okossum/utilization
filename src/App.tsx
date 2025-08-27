@@ -7,6 +7,7 @@ import { SalesView } from './components/generated/SalesView';
 import EmployeeSelectionModal from './components/generated/EmployeeSelectionModal';
 import EmployeeDetailView from './components/generated/EmployeeDetailView';
 import HierarchicalRoleManagement from './components/generated/HierarchicalRoleManagement';
+import RoleManagement from './components/generated/RoleManagement';
 import TechnicalSkillManagement from './components/generated/TechnicalSkillManagement';
 import SoftSkillManagement from './components/generated/SoftSkillManagement';
 import { SoftSkillBulkUploadModal } from './components/generated/SoftSkillBulkUploadModal';
@@ -145,6 +146,7 @@ function App() {
     
     // States für Management Modals
     const [isHierarchicalRoleManagementOpen, setIsHierarchicalRoleManagementOpen] = useState(false);
+    const [isRoleManagementOpen, setIsRoleManagementOpen] = useState(false);
     const [isTechnicalSkillManagementOpen, setIsTechnicalSkillManagementOpen] = useState(false);
     const [isSoftSkillManagementOpen, setIsSoftSkillManagementOpen] = useState(false);
     const [isSoftSkillImportOpen, setIsSoftSkillImportOpen] = useState(false);
@@ -301,7 +303,7 @@ function App() {
             onExcelUpload={() => setIsExcelUploadModalOpen(true)}
             onAuslastungView={() => setIsAuslastungViewOpen(true)}
             onEinsatzplanView={() => setIsEinsatzplanViewOpen(true)}
-            onRoleManagement={() => setIsHierarchicalRoleManagementOpen(true)}
+            onRoleManagement={() => setIsRoleManagementOpen(true)}
             onTechnicalSkillManagement={() => setIsTechnicalSkillManagementOpen(true)}
             onSoftSkillManagement={() => setIsSoftSkillManagementOpen(true)}
             onSoftSkillImport={() => setIsSoftSkillImportOpen(true)}
@@ -643,6 +645,25 @@ function App() {
             isOpen={isHierarchicalRoleManagementOpen} 
             onClose={() => setIsHierarchicalRoleManagementOpen(false)} 
           />
+
+          {isRoleManagementOpen && (
+            <div className="fixed inset-0 z-50 overflow-y-auto">
+              <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
+                <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-6xl sm:w-full">
+                  <RoleManagement />
+                  <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button
+                      onClick={() => setIsRoleManagementOpen(false)}
+                      className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                    >
+                      Schließen
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {isTechnicalSkillManagementOpen && (
             <div className="fixed inset-0 z-50 overflow-y-auto">

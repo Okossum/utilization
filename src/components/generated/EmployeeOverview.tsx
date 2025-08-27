@@ -22,8 +22,35 @@ interface Project {
   averageUtilization?: number; // Durchschnittliche Auslastung über konsolidierte Wochen
   probability?: 'Prospect' | 'Offered' | 'Planned' | 'Commissioned' | 'On-Hold' | 'Rejected';
 }
-
-import { Employee } from '../../lib/types';
+interface Employee {
+  id: string;
+  name: string;
+  lbs: string;              // Karrierestufe (wird als Untertitel angezeigt)
+  cc: string;               // Competence Center
+  team: string;
+  mainRole: string;         // Hauptrolle (Projektleiter, Requirements Engineer, etc.)
+  email?: string;           // E-Mail-Adresse
+  vg?: string;              // Vorgesetzter
+  profileUrl?: string;      // Link zum Profil
+  skills: Skill[];
+  completedProjects: Project[];
+  plannedProjects: Project[];
+  // Zusätzliche Felder aus EmployeeDetailView
+  phone?: string;           // Telefonnummer
+  location?: string;        // Standort
+  startDate?: string;       // Startdatum
+  status?: string;          // Status (aktiv, inaktiv, etc.)
+  utilization?: number;     // Aktuelle Auslastung
+  averageUtilization?: number; // Durchschnittliche Auslastung
+  softSkills?: Skill[];     // Soft Skills
+  technicalSkills?: Skill[]; // Technical Skills
+  strengths?: string[];     // Stärken
+  weaknesses?: string[];    // Schwächen
+  utilizationComment?: string; // Auslastungskommentar
+  planningComment?: string; // Planungskommentar
+  // Callback für Projekt-Erstellung
+  onCreateProject?: () => void;
+}
 
 interface EmployeeOverviewProps {
   employees: Employee[];

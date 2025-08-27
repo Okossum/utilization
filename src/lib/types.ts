@@ -79,7 +79,7 @@ export interface AssignmentDoc {
   offeredSkill?: string;
   plannedAllocationPct?: number; // 0-100
   role?: string;
-  status?: 'prospect' | 'planned' | 'active' | 'onHold' | 'closed' | 'proposed';
+  status?: 'prospect' | 'planned' | 'active' | 'onHold' | 'closed';
   comment?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -89,75 +89,6 @@ export interface SkillDoc {
   name: string;
   createdAt: Date;
   updatedAt: Date;
-}
-
-// Skill Interface für Employee
-export interface Skill {
-  id: string;
-  name: string;
-  level?: number;
-  rating?: number;      // Für SkillRating Kompatibilität
-  categoryId?: string;  // Für EmployeeSkillAssignment Kompatibilität
-}
-
-// Project Interface für Employee (kompatibel mit ProjectHistoryItem)
-export interface Project {
-  id: string;
-  name: string;
-  projectName?: string;     // Alias für name
-  customer?: string;
-  role?: string;
-  startDate?: string;
-  endDate?: string;
-  status?: string;
-  activities?: string[];
-  description?: string;
-  skillsUsed?: string[];
-  employeeRole?: string;
-}
-
-// Einheitliche Employee Interface für alle Komponenten
-export interface Employee {
-  id: string;
-  name: string;
-  lbs: string;              // Karrierestufe (wird als Untertitel angezeigt)
-  cc: string;               // Competence Center
-  team: string;
-  role: string;             // Für EmployeeCard Kompatibilität
-  bereich?: string;         // Optional für erweiterte Filterung
-  lob?: string;             // Line of Business
-  displayName?: string;     // Optional für erweiterte Anzeige
-  email?: string;           // Optional für Kontakt
-  position?: string;        // Optional für Position
-  
-  // Erweiterte Properties für EmployeeCard
-  mainRole?: string;        // Hauptrolle
-  profileUrl?: string;      // Link zum Profil
-  vg?: string;              // Vorgesetzter
-  phone?: string;           // Telefonnummer
-  location?: string;        // Standort
-  startDate?: string;       // Startdatum
-  status?: string;          // Status (aktiv, inaktiv, etc.)
-  utilization?: number;     // Aktuelle Auslastung
-  averageUtilization?: number; // Durchschnittliche Auslastung
-  
-  // Skills und Projekte
-  skills?: Skill[];
-  technicalSkills?: Skill[];
-  softSkills?: Skill[];
-  completedProjects?: Project[];
-  plannedProjects?: Project[];
-  
-  // Stärken/Schwächen
-  strengths?: string[];
-  weaknesses?: string[];
-  
-  // Kommentare
-  utilizationComment?: string;
-  planningComment?: string;
-  
-  // Callback für Projekt-Erstellung
-  onCreateProject?: () => void;
 }
 
 export interface EmployeeSkillDoc {
@@ -185,8 +116,8 @@ export const COLLECTIONS = {
   EMPLOYEE_SKILLS: 'employee_skills',
   ASSIGNMENTS: 'assignments',
   AUSLASTUNGSERKLAERUNGEN: 'auslastungserklaerungen',
-  PERSON_AUSLASTUNGSERKLAERUNGEN: 'person_auslastungserklaerungen',
-  PERSON_STANDARD_STATUSES: 'person_standard_statuses'
+  PERSON_AUSLASTUNGSERKLAERUNGEN: 'person_auslastungserklaerungen'
+
 } as const;
 
 // Firestore Document IDs
@@ -401,10 +332,6 @@ export interface FirestoreProjectHistoryItem extends ProjectHistoryItem, Firesto
 
 export interface FirestoreProjectOffer extends ProjectOffer, FirestoreDocument {
   userId?: string;
-}
-
-export interface FirestorePersonActionItem extends PersonActionItem, FirestoreDocument {
-  // Zusätzliche Firestore-spezifische Felder falls nötig
 }
 
 

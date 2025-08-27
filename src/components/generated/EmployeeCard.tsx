@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, MapPin, Users, Briefcase, Award, Mail, ChefHat, ExternalLink, Phone, Calendar, Building, Clock, Star, TrendingUp, MessageSquare, Heart, ThumbsUp, User, Plus } from 'lucide-react';
+import { ChevronDown, ChevronUp, MapPin, Users, Briefcase, Award, Mail, ChefHat, ExternalLink, Phone, Calendar, Building, Clock, Star, TrendingUp, MessageSquare, Heart, ThumbsUp, User, Plus, FileText } from 'lucide-react';
 import { SkillRating } from './SkillRating';
 import { ProjectDetail } from './ProjectDetail';
 interface Skill {
@@ -21,7 +21,35 @@ interface Project {
   averageUtilization?: number; // Durchschnittliche Auslastung über konsolidierte Wochen
   probability?: 'Prospect' | 'Offered' | 'Planned' | 'Commissioned' | 'On-Hold' | 'Rejected';
 }
-import { Employee } from '../../lib/types';
+interface Employee {
+  id: string;
+  name: string;
+  lbs: string;
+  cc: string;
+  team: string;
+  mainRole: string;
+  role: string;
+  email?: string;
+  vg?: string;
+  profileUrl?: string;
+  skills: Skill[];
+  completedProjects: Project[];
+  activeProjects: Project[];
+  plannedProjects: Project[];
+  phone?: string;
+  location?: string;
+  startDate?: string;
+  status?: string;
+  utilization?: number;
+  averageUtilization?: number;
+  softSkills?: Skill[];
+  technicalSkills?: Skill[];
+  strengths?: string[];
+  weaknesses?: string[];
+  utilizationComment?: string;
+  planningComment?: string;
+  onCreateProject?: () => void;
+}
 
 interface EmployeeCardEmployee extends Employee {
   role: string;             // Hauptrolle (Projektleiter, Requirements Engineer, etc.)
@@ -30,6 +58,7 @@ interface EmployeeCardEmployee extends Employee {
   profileUrl?: string;      // Link zum Profil
   skills: Skill[];
   completedProjects: Project[];
+  activeProjects: Project[];
   plannedProjects: Project[];
   // Zusätzliche Felder aus EmployeeDetailView
   phone?: string;           // Telefonnummer
@@ -64,6 +93,7 @@ export const EmployeeCard = ({
   onCreateProject
 }: EmployeeCardProps) => {
   const [showProjectHistory, setShowProjectHistory] = useState(false);
+  const [showActiveProjects, setShowActiveProjects] = useState(false);
   const [showPlannedProjects, setShowPlannedProjects] = useState(false);
   const [showAdditionalInfo, setShowAdditionalInfo] = useState(false);
 
@@ -288,16 +318,16 @@ export const EmployeeCard = ({
         {employee.completedProjects && employee.completedProjects.length > 0 && (
           <button 
             onClick={() => setShowProjectHistory(!showProjectHistory)} 
-            className="flex items-center justify-between w-full p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors duration-200 mb-3"
+            className="flex items-center justify-between w-full p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors duration-200 mb-3 border border-blue-200"
           >
             <div className="flex items-center gap-2">
-              <Briefcase className="w-4 h-4 text-slate-600" />
-              <span className="font-medium text-slate-700">Projekthistorie</span>
-              <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600">
+              <FileText className="w-4 h-4 text-blue-600" />
+              <span className="font-medium text-blue-700">Projekthistorie</span>
+              <span className="text-xs bg-blue-200 px-2 py-1 rounded-full text-blue-700">
                 {employee.completedProjects.length}
               </span>
             </div>
-            {showProjectHistory ? <ChevronUp className="w-4 h-4 text-slate-600" /> : <ChevronDown className="w-4 h-4 text-slate-600" />}
+            {showProjectHistory ? <ChevronUp className="w-4 h-4 text-blue-600" /> : <ChevronDown className="w-4 h-4 text-blue-600" />}
           </button>
         )}
 
@@ -317,20 +347,53 @@ export const EmployeeCard = ({
           )}
         </AnimatePresence>
 
+        {/* Aktive Projekte */}
+        {employee.activeProjects && employee.activeProjects.length > 0 && (
+          <button 
+            onClick={() => setShowActiveProjects(!showActiveProjects)} 
+            className="flex items-center justify-between w-full p-3 bg-green-50 rounded-lg hover:bg-green-100 transition-colors duration-200 mb-3 border border-green-200"
+          >
+            <div className="flex items-center gap-2">
+              <Briefcase className="w-4 h-4 text-green-600" />
+              <span className="font-medium text-green-700">Aktive Projekte</span>
+              <span className="text-xs bg-green-200 px-2 py-1 rounded-full text-green-700">
+                {employee.activeProjects.length}
+              </span>
+            </div>
+            {showActiveProjects ? <ChevronUp className="w-4 h-4 text-green-600" /> : <ChevronDown className="w-4 h-4 text-green-600" />}
+          </button>
+        )}
+
+        <AnimatePresence>
+          {showActiveProjects && employee.activeProjects && employee.activeProjects.length > 0 && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }} 
+              animate={{ opacity: 1, height: 'auto' }} 
+              exit={{ opacity: 0, height: 0 }} 
+              transition={{ duration: 0.2 }} 
+              className="mb-4 space-y-2"
+            >
+              {employee.activeProjects.map(project => (
+                <ProjectDetail key={project.id} project={project} type="active" />
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Geplante Projekte */}
         {employee.plannedProjects && employee.plannedProjects.length > 0 && (
           <button 
             onClick={() => setShowPlannedProjects(!showPlannedProjects)} 
-            className="flex items-center justify-between w-full p-3 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors duration-200 mb-3 border border-emerald-200"
+            className="flex items-center justify-between w-full p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors duration-200 mb-3 border border-blue-200"
           >
             <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-emerald-600" />
-              <span className="font-medium text-emerald-700">Geplante Projekte</span>
-              <span className="text-xs bg-emerald-200 px-2 py-1 rounded-full text-emerald-700">
+              <Calendar className="w-4 h-4 text-blue-600" />
+              <span className="font-medium text-blue-700">Geplante Projekte</span>
+              <span className="text-xs bg-blue-200 px-2 py-1 rounded-full text-blue-700">
                 {employee.plannedProjects.length}
               </span>
             </div>
-            {showPlannedProjects ? <ChevronUp className="w-4 h-4 text-emerald-600" /> : <ChevronDown className="w-4 h-4 text-emerald-600" />}
+            {showPlannedProjects ? <ChevronUp className="w-4 h-4 text-blue-600" /> : <ChevronDown className="w-4 h-4 text-blue-600" />}
           </button>
         )}
 
