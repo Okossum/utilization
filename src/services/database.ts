@@ -17,9 +17,7 @@ import {
 } from '../types/database';
 
 // API-Basis-URL für Backend-Server
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://us-central1-ressourceutilization.cloudfunctions.net/api' 
-  : 'http://localhost:3001/api';
+const API_BASE_URL = 'http://localhost:3001/api';
 
 // API-Service für Backend-Kommunikation
 let authTokenProvider: (() => Promise<string | null>) | null = null;
