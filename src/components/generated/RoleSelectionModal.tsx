@@ -15,7 +15,7 @@ import {
   CheckSquare,
   CheckCircle2
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { addRoleToUtilizationData, getPersonSkillsRolesFromHub } from '../../lib/utilization-hub-services';
 
 interface Role {
@@ -73,7 +73,7 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
   employeeName,
   onRoleAssigned,
 }) => {
-  const { token } = useAuth();
+  const { token, loading: authLoading } = useAuth();
   
   // State für hierarchische Auswahl
   const [categories, setCategories] = useState<RoleCategory[]>([]);
@@ -411,10 +411,13 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({
 
   // Beim Öffnen des Modals Daten laden
   useEffect(() => {
-    if (isOpen && token && employeeId) {
+    if (isOpen && token && employeeId && !authLoading) {
+      console.log('🔄 Loading data for RoleSelectionModal - Auth ready');
       loadData();
+    } else if (isOpen && authLoading) {
+      console.log('⏳ Waiting for auth to complete before loading data');
     }
-  }, [isOpen, token, employeeId]);
+  }, [isOpen, token, employeeId, authLoading]);
 
   // Success-Message Timeout verwalten
   useEffect(() => {
