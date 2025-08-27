@@ -392,7 +392,18 @@ export const projectService = {
     return snap.docs.map(d => ({ id: d.id, ...d.data(), createdAt: convertTimestamp(d.data().createdAt), updatedAt: convertTimestamp(d.data().updatedAt) })) as any[];
   },
 
-  async update(id: string, updates: Partial<{ name: string; customer: string }>): Promise<void> {
+  async update(id: string, updates: Partial<{ 
+    name: string; 
+    customer: string; 
+    projectName: string;
+    description: string;
+    startDate: string;
+    endDate: string;
+    probability: string;
+    plannedAllocationPct: number;
+    comment: string;
+    updatedBy: string;
+  }>): Promise<void> {
     const docRef = doc(db, COLLECTIONS.PROJECTS, id);
     await updateDoc(docRef, { ...updates, updatedAt: new Date() });
   },

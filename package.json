@@ -13,7 +13,12 @@
     "server:dev": "GOOGLE_APPLICATION_CREDENTIALS=\"/Users/oliver.koss/Projekte/Ressource Utilization/ressourceutilization-firebase-adminsdk-fbsvc-e8129f7d59.json\" nodemon server/index.js",
     "start": "concurrently \"npm run server\" \"npm run dev\"",
     "start:dev": "concurrently \"npm run server:dev\" \"npm run dev\"",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "firebase:emulators": "firebase emulators:start",
+    "firebase:dev": "concurrently \"npm run firebase:emulators\" \"npm run dev\"",
+    "firebase:build": "npm run build && firebase deploy --only hosting",
+    "firebase:preview": "npm run build && firebase hosting:channel:deploy preview",
+    "firebase:functions": "firebase deploy --only functions"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

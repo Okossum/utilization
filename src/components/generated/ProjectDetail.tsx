@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, Building, User, TrendingUp, AlertCircle, Euro, Phone, ExternalLink, Activity, Star, Award, MapPin } from 'lucide-react';
+import { Calendar, Building, User, TrendingUp, AlertCircle, Euro, Phone, ExternalLink, Activity, Star, Award, MapPin, Edit3 } from 'lucide-react';
 
 interface ProjectRole {
   id: string;
@@ -44,6 +44,8 @@ interface Project {
 interface ProjectDetailProps {
   project: Project;
   type: 'completed' | 'planned' | 'active';
+  onEdit?: () => void;
+  showEditButton?: boolean;
 }
 const probabilityColors = {
   'Prospect': 'bg-purple-100 text-purple-700 border-purple-200',
@@ -57,7 +59,9 @@ const probabilityColors = {
 // @component: ProjectDetail
 export const ProjectDetail = ({
   project,
-  type
+  type,
+  onEdit,
+  showEditButton = false
 }: ProjectDetailProps) => {
   const formatDate = (dateString: string) => {
     if (!dateString) return 'Nicht angegeben';
@@ -98,11 +102,22 @@ export const ProjectDetail = ({
           </div>
         </div>
         <div className="flex flex-col items-end gap-1 ml-2">
-          {type === 'planned' && project.probability && (
-            <div className={`px-2 py-1 rounded-full text-xs font-medium border ${probabilityColors[project.probability]}`}>
-              <span>{project.probability}</span>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {type === 'planned' && project.probability && (
+              <div className={`px-2 py-1 rounded-full text-xs font-medium border ${probabilityColors[project.probability]}`}>
+                <span>{project.probability}</span>
+              </div>
+            )}
+            {showEditButton && onEdit && type === 'planned' && (
+              <button
+                onClick={onEdit}
+                className="p-1.5 text-green-600 hover:text-green-700 hover:bg-green-100 rounded-lg transition-colors"
+                title="Projekt bearbeiten"
+              >
+                <Edit3 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
           {project.dailyRate && (
             <div className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
               <Euro className="w-3 h-3" />

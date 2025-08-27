@@ -37,11 +37,13 @@ interface Employee {
 }
 interface EmployeeTableProps {
   employees: Employee[];
+  onEditProject?: (project: Project) => void;
 }
 
 // @component: EmployeeTable
 export const EmployeeTable = ({
-  employees
+  employees,
+  onEditProject
 }: EmployeeTableProps) => {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const toggleRow = (employeeId: string) => {
@@ -156,7 +158,15 @@ export const EmployeeTable = ({
                                   <span>Planned Projects</span>
                                 </h4>
                                 <div className="space-y-3">
-                                  {employee.plannedProjects.map(project => <ProjectDetail key={project.id} project={project} type="planned" />)}
+                                  {employee.plannedProjects.map(project => (
+                                    <ProjectDetail 
+                                      key={project.id} 
+                                      project={project} 
+                                      type="planned" 
+                                      onEdit={onEditProject ? () => onEditProject(project) : undefined}
+                                      showEditButton={!!onEditProject}
+                                    />
+                                  ))}
                                 </div>
                               </div>}
                           </div>

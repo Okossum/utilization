@@ -61,7 +61,8 @@ function App() {
 
   // ✅ SCHRITT 3: RootRouter als separate Komponente definieren
   function RootRouter() {
-    const { user, loading, profile, logout, role, canAccessView } = useAuth();
+    try {
+      const { user, loading, profile, logout, role, canAccessView } = useAuth();
     const [isAdminModalOpen, setAdminModalOpen] = useState(false);
     const [isMenuOpen, setMenuOpen] = useState(false);
     
@@ -924,6 +925,17 @@ function App() {
         </CustomerProvider>
       </GlobalModalProvider>
     );
+    } catch (error) {
+      console.error('AuthProvider Error:', error);
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Authentifizierung wird geladen...</h2>
+            <p className="text-gray-600">Bitte warten Sie einen Moment.</p>
+          </div>
+        </div>
+      );
+    }
   }
 
   if (container === 'centered') {

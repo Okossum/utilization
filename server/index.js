@@ -4291,50 +4291,304 @@ app.post('/api/role-categories/:id/reassign', requireAuth, async (req, res) => {
 // GET /api/planned-projects - Alle geplanten Projekte für Einsatzplan-Visualisierung abrufen
 app.get('/api/planned-projects', requireAuth, async (req, res) => {
   try {
-    console.log('🔍 Loading planned projects for calendar visualization...');
+    console.log('🔍 Loading planned projects from new projects Collection architecture...');
     
-    // Lade alle geplanten Projekte aus utilizationData
-    const snap = await db.collection('utilizationData')
+    // SCHRITT 1: Lade alle Mitarbeiter mit Projekt-Referenzen
+    const utilizationSnap = await db.collection('utilizationData')
       .where('isLatest', '==', true)
       .get();
     
-    const plannedProjects = [];
+    // SCHRITT 2: Sammle alle Projekt-IDs und Mitarbeiter-Referenzen
+    const projectIds = new Set();
+    const employeeProjectMap = new Map(); // employeeId -> {employeeName, projectReferences}
     
-    snap.docs.forEach(doc => {
+    utilizationSnap.docs.forEach(doc => {
       const data = doc.data();
       
-      // Prüfe ob der Mitarbeiter geplante Projekte hat
+      // NEU: Prüfe auf projectReferences statt plannedProjects
+      if (data.projectReferences && Array.isArray(data.projectReferences)) {
+        data.projectReferences.forEach(ref => {
+          projectIds.add(ref.projectId);
+        });
+        
+        employeeProjectMap.set(data.id, {
+          employeeName: data.person,
+          projectReferences: data.projectReferences
+        });
+      }
+      
+      // FALLBACK: Unterstütze alte plannedProjects während Migration
       if (data.plannedProjects && Array.isArray(data.plannedProjects)) {
         data.plannedProjects.forEach(project => {
-          // Nur geplante Projekte mit Startdatum, Enddatum und Auslastung
-          if (project.projectType === 'planned' && 
-              project.startDate && 
-              project.endDate && 
-              project.plannedUtilization) {
-            
-            plannedProjects.push({
-              employeeId: data.id,
-              employeeName: data.person,
-              projectId: project.id,
-              projectName: project.projectName,
-              customer: project.customer,
-              startDate: project.startDate,
-              endDate: project.endDate,
-              plannedUtilization: project.plannedUtilization,
-              probability: project.probability || 75,
-              createdAt: project.createdAt
-            });
+          if (project.id) {
+            projectIds.add(project.id);
           }
         });
+        
+        // Konvertiere alte plannedProjects zu projectReferences Format
+        if (!employeeProjectMap.has(data.id)) {
+          const legacyReferences = data.plannedProjects.map(project => ({
+            projectId: project.id,
+            plannedUtilization: project.plannedUtilization || project.plannedAllocationPct || 100,
+            assignedWeeks: project.assignedWeeks || [],
+            role: project.role,
+            assignedAt: project.createdAt || new Date(),
+            updatedAt: new Date()
+          }));
+          
+          employeeProjectMap.set(data.id, {
+            employeeName: data.person,
+            projectReferences: legacyReferences
+          });
+        }
       }
     });
     
-    console.log(`✅ Found ${plannedProjects.length} planned projects`);
+    console.log(`📊 Found ${projectIds.size} unique project IDs from ${employeeProjectMap.size} employees`);
+    
+    // SCHRITT 3: Lade alle referenzierten Projekte aus projects Collection
+    const projectsMap = new Map();
+    
+    if (projectIds.size > 0) {
+      // Firestore 'in' Query Limit: 10 IDs pro Query
+      const projectIdChunks = Array.from(projectIds).reduce((chunks, id, index) => {
+        const chunkIndex = Math.floor(index / 10);
+        if (!chunks[chunkIndex]) chunks[chunkIndex] = [];
+        chunks[chunkIndex].push(id);
+        return chunks;
+      }, []);
+      
+      for (const chunk of projectIdChunks) {
+        try {
+          const projectsSnap = await db.collection('projects')
+            .where(FieldValue.documentId(), 'in', chunk)
+            .get();
+          
+          projectsSnap.docs.forEach(doc => {
+            projectsMap.set(doc.id, { id: doc.id, ...doc.data() });
+          });
+        } catch (error) {
+          console.warn(`⚠️ Could not load projects chunk:`, chunk, error.message);
+          // Fallback: Lade Projekte einzeln
+          for (const projectId of chunk) {
+            try {
+              const projectDoc = await db.collection('projects').doc(projectId).get();
+              if (projectDoc.exists) {
+                projectsMap.set(projectId, { id: projectId, ...projectDoc.data() });
+              }
+            } catch (singleError) {
+              console.warn(`⚠️ Could not load project ${projectId}:`, singleError.message);
+            }
+          }
+        }
+      }
+    }
+    
+    console.log(`📋 Loaded ${projectsMap.size} projects from projects Collection`);
+    
+    // SCHRITT 4: Kombiniere Projekt-Daten mit Mitarbeiter-Referenzen
+    const plannedProjects = [];
+    
+    for (const [employeeId, employeeData] of employeeProjectMap) {
+      for (const reference of employeeData.projectReferences) {
+        const project = projectsMap.get(reference.projectId);
+        
+        if (project && project.projectType === 'planned') {
+          plannedProjects.push({
+            employeeId: employeeId,
+            employeeName: employeeData.employeeName,
+            projectId: project.id,
+            projectName: project.projectName,
+            customer: project.customer,
+            startDate: project.startDate,
+            endDate: project.endDate,
+            plannedUtilization: reference.plannedUtilization,
+            probability: project.probability || 75,
+            role: reference.role,
+            createdAt: project.createdAt,
+            assignedWeeks: reference.assignedWeeks || []
+          });
+        }
+      }
+    }
+    
+    console.log(`✅ Found ${plannedProjects.length} planned projects from ${projectsMap.size} total projects`);
     res.json(plannedProjects);
     
   } catch (error) {
     console.error('❌ Error loading planned projects:', error);
     res.status(500).json({ error: 'Fehler beim Laden der geplanten Projekte' });
+  }
+});
+
+// ==========================================
+// PROJECTS API ENDPOINTS
+// ==========================================
+
+// GET /api/projects/:id - Einzelnes Projekt laden
+app.get('/api/projects/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const projectDoc = await db.collection('projects').doc(id).get();
+    
+    if (!projectDoc.exists) {
+      return res.status(404).json({ error: 'Projekt nicht gefunden' });
+    }
+    
+    res.json({ id: projectDoc.id, ...projectDoc.data() });
+  } catch (error) {
+    console.error('Error loading project:', error);
+    res.status(500).json({ error: 'Fehler beim Laden des Projekts' });
+  }
+});
+
+// PUT /api/projects/:id - Projekt aktualisieren
+app.put('/api/projects/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    
+    // Validierung
+    if (!updates.projectName || !updates.customer) {
+      return res.status(400).json({ error: 'Projektname und Kunde sind erforderlich' });
+    }
+    
+    // Update mit Metadaten
+    const updateData = {
+      ...updates,
+      updatedAt: new Date(),
+      updatedBy: req.user.email || 'unknown'
+    };
+    
+    await db.collection('projects').doc(id).update(updateData);
+    
+    console.log(`✅ Projekt aktualisiert: ${id}`);
+    res.json({ success: true, id });
+    
+  } catch (error) {
+    console.error('Error updating project:', error);
+    res.status(500).json({ error: 'Fehler beim Aktualisieren des Projekts' });
+  }
+});
+
+// POST /api/projects - Neues Projekt erstellen
+app.post('/api/projects', requireAuth, async (req, res) => {
+  try {
+    const projectData = req.body;
+    
+    // Validierung
+    if (!projectData.projectName || !projectData.customer) {
+      return res.status(400).json({ error: 'Projektname und Kunde sind erforderlich' });
+    }
+    
+    // Verwende vorgegebene ID oder generiere neue
+    const projectId = projectData.id || `project_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Prüfe ob Projekt bereits existiert
+    const existingProject = await db.collection('projects').doc(projectId).get();
+    if (existingProject.exists) {
+      return res.status(409).json({ error: 'Projekt mit dieser ID existiert bereits' });
+    }
+    
+    const newProject = {
+      id: projectId,
+      projectName: projectData.projectName,
+      customer: projectData.customer,
+      projectType: projectData.projectType || 'planned',
+      probability: projectData.probability || 'Prospect',
+      startDate: projectData.startDate,
+      endDate: projectData.endDate,
+      description: projectData.description,
+      comment: projectData.comment,
+      plannedAllocationPct: projectData.plannedAllocationPct || 100,
+      
+      // Skills & Rollen
+      roles: projectData.roles || [],
+      skills: projectData.skills || [],
+      
+      // Metadaten
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      createdBy: req.user.email || 'unknown'
+    };
+    
+    await db.collection('projects').doc(projectId).set(newProject);
+    
+    console.log(`✅ Neues Projekt erstellt: ${projectId}`);
+    res.json({ success: true, id: projectId, project: newProject });
+    
+  } catch (error) {
+    console.error('Error creating project:', error);
+    res.status(500).json({ error: 'Fehler beim Erstellen des Projekts' });
+  }
+});
+
+// GET /api/projects - Alle Projekte laden (mit optionalen Filtern)
+app.get('/api/projects', requireAuth, async (req, res) => {
+  try {
+    const { projectType, customer, employeeId } = req.query;
+    
+    let query = db.collection('projects');
+    
+    // Filter anwenden
+    if (projectType) {
+      query = query.where('projectType', '==', projectType);
+    }
+    
+    if (customer) {
+      query = query.where('customer', '==', customer);
+    }
+    
+    const projectsSnap = await query.get();
+    const projects = projectsSnap.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    // Wenn employeeId Filter gesetzt, lade nur Projekte für diesen Mitarbeiter
+    if (employeeId) {
+      const employeeDoc = await db.collection('utilizationData').doc(employeeId).get();
+      if (employeeDoc.exists) {
+        const employeeData = employeeDoc.data();
+        const employeeProjectIds = employeeData.projectReferences?.map(ref => ref.projectId) || [];
+        const filteredProjects = projects.filter(project => employeeProjectIds.includes(project.id));
+        return res.json(filteredProjects);
+      }
+    }
+    
+    res.json(projects);
+    
+  } catch (error) {
+    console.error('Error loading projects:', error);
+    res.status(500).json({ error: 'Fehler beim Laden der Projekte' });
+  }
+});
+
+// DELETE /api/projects/:id - Projekt löschen
+app.delete('/api/projects/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Prüfe ob Projekt noch referenziert wird
+    const utilizationSnap = await db.collection('utilizationData')
+      .where('projectReferences', 'array-contains', { projectId: id })
+      .get();
+    
+    if (!utilizationSnap.empty) {
+      return res.status(400).json({ 
+        error: 'Projekt kann nicht gelöscht werden - es wird noch von Mitarbeitern referenziert',
+        referencedBy: utilizationSnap.docs.map(doc => doc.data().person)
+      });
+    }
+    
+    await db.collection('projects').doc(id).delete();
+    
+    console.log(`✅ Projekt gelöscht: ${id}`);
+    res.json({ success: true, id });
+    
+  } catch (error) {
+    console.error('Error deleting project:', error);
+    res.status(500).json({ error: 'Fehler beim Löschen des Projekts' });
   }
 });
 

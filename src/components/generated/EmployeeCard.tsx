@@ -81,6 +81,7 @@ interface EmployeeCardProps {
   onAvatarClick?: (employee: Employee) => void;
   onOpenDetail?: () => void;
   onCreateProject?: () => void;
+  onEditProject?: (project: Project) => void;
 }
 
 // @component: EmployeeCard
@@ -90,7 +91,8 @@ export const EmployeeCard = ({
   onToggleActive,
   onAvatarClick,
   onOpenDetail,
-  onCreateProject
+  onCreateProject,
+  onEditProject
 }: EmployeeCardProps) => {
   const [showProjectHistory, setShowProjectHistory] = useState(false);
   const [showActiveProjects, setShowActiveProjects] = useState(false);
@@ -407,7 +409,13 @@ export const EmployeeCard = ({
               className="mb-4 space-y-2"
             >
               {employee.plannedProjects.map(project => (
-                <ProjectDetail key={project.id} project={project} type="planned" />
+                <ProjectDetail 
+                  key={project.id} 
+                  project={project} 
+                  type="planned" 
+                  onEdit={onEditProject ? () => onEditProject(project) : undefined}
+                  showEditButton={!!onEditProject}
+                />
               ))}
             </motion.div>
           )}

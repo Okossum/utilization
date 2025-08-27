@@ -54,11 +54,12 @@ interface Employee {
 
 interface EmployeeOverviewProps {
   employees: Employee[];
+  onEditProject?: (project: Project) => void;
 }
 type ViewMode = 'cards' | 'table' | 'grid';
 
 // @component: EmployeeOverview
-export const EmployeeOverview = ({ employees }: EmployeeOverviewProps) => {
+export const EmployeeOverview = ({ employees, onEditProject }: EmployeeOverviewProps) => {
   const [viewMode, setViewMode] = useState<ViewMode>('cards');
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   
@@ -114,8 +115,8 @@ export const EmployeeOverview = ({ employees }: EmployeeOverviewProps) => {
       }} transition={{
         duration: 0.3
       }}>
-          {viewMode === 'table' ? <EmployeeTable employees={displayEmployees} /> : <div className={`grid gap-6 ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1'}`}>
-              {displayEmployees.map(employee => <EmployeeCard key={employee.id} employee={employee} isCompact={viewMode === 'grid'} onCreateProject={employee.onCreateProject} />)}
+          {viewMode === 'table' ? <EmployeeTable employees={displayEmployees} onEditProject={onEditProject} /> : <div className={`grid gap-6 ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1'}`}>
+              {displayEmployees.map(employee => <EmployeeCard key={employee.id} employee={employee} isCompact={viewMode === 'grid'} onCreateProject={employee.onCreateProject} onEditProject={onEditProject} />)}
             </div>}
         </motion.main>
       </div>
