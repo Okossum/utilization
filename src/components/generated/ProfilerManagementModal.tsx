@@ -8,6 +8,14 @@ import {
   CheckCircle, 
   XCircle, 
   AlertCircle,
+  Mail, 
+  MapPin, 
+  Calendar, 
+  Briefcase, 
+  Building, 
+  Award, 
+  BookOpen, 
+  Code,
   Users,
   Download,
   RefreshCw,
@@ -16,6 +24,163 @@ import {
   Link2
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+
+// Komponente für detaillierte Datenvorschau
+function ProfileDataPreview({ data }: { data: any }) {
+  if (!data) return <div className="text-gray-500 text-sm">Keine Daten verfügbar</div>;
+
+  return (
+    <div className="space-y-3 text-sm">
+      {/* Persönliche Daten */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <div className="flex items-center gap-1 text-gray-600 mb-1">
+            <User className="w-3 h-3" />
+            <span className="font-medium">Name:</span>
+          </div>
+          <div className="text-gray-900">{data.name || 'Nicht verfügbar'}</div>
+        </div>
+        <div>
+          <div className="flex items-center gap-1 text-gray-600 mb-1">
+            <Mail className="w-3 h-3" />
+            <span className="font-medium">E-Mail:</span>
+          </div>
+          <div className="text-gray-900">{data.email || 'Nicht verfügbar'}</div>
+        </div>
+        <div>
+          <div className="flex items-center gap-1 text-gray-600 mb-1">
+            <Briefcase className="w-3 h-3" />
+            <span className="font-medium">Position:</span>
+          </div>
+          <div className="text-gray-900">{data.position || 'Nicht verfügbar'}</div>
+        </div>
+        <div>
+          <div className="flex items-center gap-1 text-gray-600 mb-1">
+            <Building className="w-3 h-3" />
+            <span className="font-medium">Abteilung:</span>
+          </div>
+          <div className="text-gray-900">{data.department || 'Nicht verfügbar'}</div>
+        </div>
+        <div>
+          <div className="flex items-center gap-1 text-gray-600 mb-1">
+            <MapPin className="w-3 h-3" />
+            <span className="font-medium">Standort:</span>
+          </div>
+          <div className="text-gray-900">{data.location || 'Nicht verfügbar'}</div>
+        </div>
+        <div>
+          <div className="flex items-center gap-1 text-gray-600 mb-1">
+            <Calendar className="w-3 h-3" />
+            <span className="font-medium">Startdatum:</span>
+          </div>
+          <div className="text-gray-900">{data.startDate || 'Nicht verfügbar'}</div>
+        </div>
+      </div>
+
+      {/* Statistiken */}
+      <div className="grid grid-cols-4 gap-2 pt-2 border-t border-gray-200">
+        <div className="text-center p-2 bg-blue-50 rounded">
+          <div className="text-lg font-semibold text-blue-600">{data.skills?.length || 0}</div>
+          <div className="text-xs text-blue-600">Skills</div>
+        </div>
+        <div className="text-center p-2 bg-green-50 rounded">
+          <div className="text-lg font-semibold text-green-600">{data.projects?.length || 0}</div>
+          <div className="text-xs text-green-600">Projekte</div>
+        </div>
+        <div className="text-center p-2 bg-purple-50 rounded">
+          <div className="text-lg font-semibold text-purple-600">{data.certifications?.length || 0}</div>
+          <div className="text-xs text-purple-600">Zertifikate</div>
+        </div>
+        <div className="text-center p-2 bg-orange-50 rounded">
+          <div className="text-lg font-semibold text-orange-600">{data.languages?.length || 0}</div>
+          <div className="text-xs text-orange-600">Sprachen</div>
+        </div>
+      </div>
+
+      {/* Top Skills */}
+      {data.skills && data.skills.length > 0 && (
+        <div>
+          <div className="flex items-center gap-1 text-gray-600 mb-2">
+            <Code className="w-3 h-3" />
+            <span className="font-medium">Top Skills:</span>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {data.skills.slice(0, 5).map((skill: any, index: number) => (
+              <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                {skill.name} {skill.level ? `(${skill.level})` : ''}
+              </span>
+            ))}
+            {data.skills.length > 5 && (
+              <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
+                +{data.skills.length - 5} weitere
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Recent Projects */}
+      {data.projects && data.projects.length > 0 && (
+        <div>
+          <div className="flex items-center gap-1 text-gray-600 mb-2">
+            <Briefcase className="w-3 h-3" />
+            <span className="font-medium">Aktuelle Projekte:</span>
+          </div>
+          <div className="space-y-1">
+            {data.projects.slice(0, 2).map((project: any, index: number) => (
+              <div key={index} className="p-2 bg-gray-50 rounded text-xs">
+                <div className="font-medium">{project.name}</div>
+                <div className="text-gray-600">{project.customer} • {project.role}</div>
+              </div>
+            ))}
+            {data.projects.length > 2 && (
+              <div className="text-xs text-gray-500">+{data.projects.length - 2} weitere Projekte</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Certifications */}
+      {data.certifications && data.certifications.length > 0 && (
+        <div>
+          <div className="flex items-center gap-1 text-gray-600 mb-2">
+            <Award className="w-3 h-3" />
+            <span className="font-medium">Zertifizierungen:</span>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {data.certifications.slice(0, 3).map((cert: any, index: number) => (
+              <span key={index} className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">
+                {cert.name || cert}
+              </span>
+            ))}
+            {data.certifications.length > 3 && (
+              <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
+                +{data.certifications.length - 3} weitere
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Languages */}
+      {data.languages && data.languages.length > 0 && (
+        <div>
+          <div className="flex items-center gap-1 text-gray-600 mb-2">
+            <Globe className="w-3 h-3" />
+            <span className="font-medium">Sprachen:</span>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {data.languages.map((lang: any, index: number) => (
+              <span key={index} className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded">
+                {lang.name || lang} {lang.level ? `(${lang.level})` : ''}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 import { useUtilizationData } from '../../contexts/UtilizationDataContext';
 
 interface ProfilerManagementModalProps {
@@ -118,15 +283,15 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
       // Lade erst die Mitarbeiter mit URLs
       await loadEmployeesWithProfilerUrls();
       
-      // Teste die ersten 3 Mitarbeiter mit echten API-Calls
-      const testEmployees = employees.slice(0, 3);
-      const testResults = [];
+      // Teste die ersten 2 Mitarbeiter mit vollständiger Daten-Preview
+      const testEmployees = employees.slice(0, 2);
+      const testResults: any[] = [];
       
-      console.log(`🧪 Teste Preview mit ${testEmployees.length} Mitarbeitern...`);
+      console.log(`🧪 Lade vollständige Preview-Daten für ${testEmployees.length} Mitarbeiter...`);
       
       for (const employee of testEmployees) {
         try {
-          console.log(`🔍 Teste API-Call für ${employee.employeeName}...`);
+          console.log(`🔍 Lade Preview-Daten für ${employee.employeeName}...`);
           
           const requestBody: any = {
             profileUrl: employee.profilerUrl,
@@ -137,11 +302,10 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
           if (useTokenAuth) {
             requestBody.authToken = authToken;
           } else {
-            // Für Preview verwenden wir eine Mock-Cookie-Anfrage
-            requestBody.authToken = 'preview-test';
+            requestBody.profilerCookies = profilerCookies;
           }
 
-          const response = await fetch('http://localhost:3001/api/profiler/import', {
+          const response = await fetch('http://localhost:3001/api/profiler/preview', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -152,18 +316,33 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
 
           const result = await response.json();
           
-          testResults.push({
-            employee: employee.employeeName,
-            profileUrl: employee.profilerUrl,
-            success: response.ok,
-            status: response.status,
-            message: result.message || result.error || 'Unbekannt',
-            authMethod: result.importedData?.authMethod || 'unknown'
-          });
+          if (response.ok && result.success) {
+            testResults.push({
+              employee: employee.employeeName,
+              employeeId: employee.employeeId,
+              profileUrl: employee.profilerUrl,
+              success: true,
+              status: response.status,
+              message: result.message,
+              authMethod: result.previewData?.authMethod || 'unknown',
+              previewData: result.previewData // Vollständige Daten!
+            });
+          } else {
+            testResults.push({
+              employee: employee.employeeName,
+              employeeId: employee.employeeId,
+              profileUrl: employee.profilerUrl,
+              success: false,
+              status: response.status,
+              message: result.error || 'Unbekannter Fehler',
+              authMethod: 'error'
+            });
+          }
           
         } catch (error) {
           testResults.push({
             employee: employee.employeeName,
+            employeeId: employee.employeeId,
             profileUrl: employee.profilerUrl,
             success: false,
             status: 0,
@@ -477,49 +656,47 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
             )}
           </div>
 
-          {/* Preview Results */}
+          {/* Detailed Preview Results */}
           {previewResults.length > 0 && (
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+            <div className="mb-6 p-4 bg-white border border-gray-200 rounded-lg max-h-96 overflow-y-auto">
               <div className="flex items-center gap-2 mb-3">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-                <h3 className="font-medium text-gray-900">API-Test Ergebnisse</h3>
+                <Database className="w-5 h-5 text-purple-600" />
+                <h3 className="font-medium text-gray-900">Vollständige Daten-Vorschau ({previewResults.length} Mitarbeiter)</h3>
               </div>
               
-              <div className="space-y-2">
+              <div className="space-y-4">
                 {previewResults.map((result, index) => (
                   <div 
                     key={index}
-                    className={`p-3 rounded-lg border ${
+                    className={`p-4 rounded-lg border ${
                       result.success 
                         ? 'bg-green-50 border-green-200' 
                         : 'bg-red-50 border-red-200'
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium text-sm">
-                          {result.employee}
-                        </div>
-                        <div className="text-xs text-gray-500 truncate max-w-xs">
-                          {result.profileUrl}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className={`text-sm font-medium ${
-                          result.success ? 'text-green-700' : 'text-red-700'
-                        }`}>
-                          {result.success ? '✅ Erfolgreich' : '❌ Fehler'}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          Status: {result.status} | {result.authMethod}
-                        </div>
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="font-medium text-gray-900">{result.employee}</div>
+                      <div className="flex items-center gap-2">
+                        {result.success ? (
+                          <CheckCircle className="w-4 h-4 text-green-600" />
+                        ) : (
+                          <XCircle className="w-4 h-4 text-red-600" />
+                        )}
+                        <span className={`text-sm ${result.success ? 'text-green-600' : 'text-red-600'}`}>
+                          HTTP {result.status}
+                        </span>
                       </div>
                     </div>
-                    {result.message && (
-                      <div className="mt-2 text-xs text-gray-600">
-                        {result.message}
-                      </div>
+
+                    {/* Detaillierte Daten oder Fehlermeldung */}
+                    {result.success && result.previewData ? (
+                      <ProfileDataPreview data={result.previewData} />
+                    ) : (
+                      <div className="text-sm text-red-600">{result.message}</div>
                     )}
+                    
+                    <div className="mt-2 text-xs text-gray-500">Auth: {result.authMethod}</div>
                   </div>
                 ))}
               </div>

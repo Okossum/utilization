@@ -1325,6 +1325,53 @@ app.get('/api/utilization-data', requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/profiler/preview - Vorschau der Profiler-Daten ohne Speicherung
+app.post('/api/profiler/preview', requireAuth, async (req, res) => {
+  try {
+    const { profileUrl, employeeId, authToken } = req.body;
+
+    console.log('🔍 Profiler-Preview Request:', {
+      employeeId,
+      profileUrl,
+      hasAuthToken: !!authToken
+    });
+
+    // Validierung
+    if (!profileUrl || !employeeId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'profileUrl und employeeId sind erforderlich' 
+      });
+    }
+
+    if (!authToken) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'authToken ist erforderlich' 
+      });
+    }
+
+    // Profiler-Daten abrufen (OHNE Speicherung)
+    const profileData = await fetchProfilerDataWithToken(profileUrl, authToken);
+    
+    console.log(`✅ Preview-Daten erfolgreich abgerufen für ${employeeId}`);
+    
+    res.json({
+      success: true,
+      message: 'Preview-Daten erfolgreich abgerufen',
+      previewData: profileData, // Vollständige Daten für Preview
+      employeeId: employeeId
+    });
+
+  } catch (error) {
+    console.error('❌ Fehler beim Profiler-Preview:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || 'Interner Server-Fehler' 
+    });
+  }
+});
+
 // Profiler Import Route
 app.post('/api/profiler/import', requireAuth, async (req, res) => {
   try {
