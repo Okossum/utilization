@@ -131,7 +131,7 @@ function ProfileDataPreview({ data }: { data: any }) {
           <div className="space-y-1 max-h-32 overflow-y-auto">
             {data.projects.map((project: any, index: number) => (
               <div key={index} className="p-2 bg-gray-50 rounded text-xs border">
-                <div className="font-medium">{project.name || project.title || 'Unbenanntes Projekt'}</div>
+                <div className="font-medium">{typeof project === 'string' ? project : (project.name || project.title || 'Unbenanntes Projekt')}</div>
                 <div className="text-gray-600">
                   {project.customer && <span>Kunde: {project.customer}</span>}
                   {project.role && <span> • Rolle: {project.role}</span>}
@@ -163,7 +163,7 @@ function ProfileDataPreview({ data }: { data: any }) {
           <div className="space-y-1 max-h-24 overflow-y-auto">
             {data.certifications.map((cert: any, index: number) => (
               <div key={index} className="p-2 bg-purple-50 rounded text-xs border">
-                <div className="font-medium">{cert.name || cert.title || cert}</div>
+                <div className="font-medium">{typeof cert === 'string' ? cert : (cert.name || cert.title || JSON.stringify(cert))}</div>
                 {cert.issuer && <div className="text-gray-600">Aussteller: {cert.issuer}</div>}
                 {cert.date && <div className="text-gray-600">Datum: {cert.date}</div>}
                 {cert.validUntil && <div className="text-gray-600">Gültig bis: {cert.validUntil}</div>}
@@ -183,7 +183,7 @@ function ProfileDataPreview({ data }: { data: any }) {
           <div className="flex flex-wrap gap-1">
             {data.languages.map((lang: any, index: number) => (
               <span key={index} className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded">
-                {lang.name || lang} {lang.level ? `(${lang.level})` : ''}
+                {typeof lang === 'string' ? lang : (lang.name || lang.language || JSON.stringify(lang))} {lang.level ? `(${lang.level})` : ''}
               </span>
             ))}
           </div>
