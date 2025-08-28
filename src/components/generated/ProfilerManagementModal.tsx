@@ -181,11 +181,31 @@ function ProfileDataPreview({ data }: { data: any }) {
             <span className="font-medium">Sprachen:</span>
           </div>
           <div className="flex flex-wrap gap-1">
-            {data.languages.map((lang: any, index: number) => (
-              <span key={index} className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded">
-                {typeof lang === 'string' ? lang : (lang.name || lang.language || JSON.stringify(lang))} {lang.level ? `(${lang.level})` : ''}
-              </span>
-            ))}
+            {data.languages.map((lang: any, index: number) => {
+              // Sichere Extraktion des Sprach-Namens
+              let languageName = 'Unbekannte Sprache';
+              
+              if (typeof lang === 'string') {
+                languageName = lang;
+              } else if (lang && typeof lang === 'object') {
+                if (lang.name && typeof lang.name === 'string') {
+                  languageName = lang.name;
+                } else if (lang.language) {
+                  if (typeof lang.language === 'string') {
+                    languageName = lang.language;
+                  } else if (typeof lang.language === 'object' && lang.language !== null) {
+                    // Objekt mit Übersetzungen: {de: "Deutsch", en: "English"}
+                    languageName = lang.language.de || lang.language.en || Object.values(lang.language)[0] || 'Unbekannte Sprache';
+                  }
+                }
+              }
+              
+              return (
+                <span key={index} className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded">
+                  {languageName} {lang && lang.level ? `(${lang.level})` : ''}
+                </span>
+              );
+            })}
           </div>
         </div>
       )}

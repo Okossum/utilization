@@ -5182,6 +5182,19 @@ async function fetchProfilerDataWithToken(profileUrl, authToken) {
       sample: JSON.stringify(rawData.user).substring(0, 200) + '...'
     } : 'NICHT VORHANDEN');
     
+    // DETAILLIERTE EMPLOYEE-OBJEKT ANALYSE
+    console.log(`👤 employee-Objekt:`, rawData.user?.employee ? {
+      keys: Object.keys(rawData.user.employee),
+      id: rawData.user.employee.id,
+      globalExternalId: rawData.user.employee.globalExternalId,
+      email: rawData.user.employee.email,
+      emailAddress: rawData.user.employee.emailAddress,
+      firstName: rawData.user.employee.firstName,
+      lastName: rawData.user.employee.lastName,
+      displayName: rawData.user.employee.displayName,
+      fullSample: JSON.stringify(rawData.user.employee).substring(0, 500) + '...'
+    } : 'NICHT VORHANDEN');
+    
     console.log(`📚 projects-Array:`, rawData.projects ? {
       length: rawData.projects.length,
       firstProject: rawData.projects[0] ? Object.keys(rawData.projects[0]) : 'LEER',
