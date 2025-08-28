@@ -33,6 +33,7 @@ interface RoleBasedSettingsModalProps {
   onOpenHierarchicalRoles: () => void;
   onOpenCustomerProjects: () => void;
   onOpenAuslastungserklaerung: () => void;
+  onOpenProfilerImport: () => void;
 }
 
 const iconMap = {
@@ -61,7 +62,8 @@ export function RoleBasedSettingsModal({
   onOpenSoftSkills,
   onOpenHierarchicalRoles,
   onOpenCustomerProjects,
-  onOpenAuslastungserklaerung
+  onOpenAuslastungserklaerung,
+  onOpenProfilerImport
 }: RoleBasedSettingsModalProps) {
   const { role } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -77,6 +79,7 @@ export function RoleBasedSettingsModal({
     'hierarchical-roles': onOpenHierarchicalRoles,
     'customer-projects': onOpenCustomerProjects,
     'auslastungserklaerung': onOpenAuslastungserklaerung,
+    'profiler-import': onOpenProfilerImport,
     'general-settings': () => {}, // Placeholder
     'data-management': () => {}, // Placeholder
     'help': () => setIsHelpModalOpen(true)
@@ -246,17 +249,53 @@ export function RoleBasedSettingsModal({
                     
                     <div className="p-6">
                       <div className="space-y-3">
-                        {availableSettings.map(setting => (
-                          <button
-                            key={setting}
-                            onClick={() => handleSettingClick(setting)}
-                            className="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all"
-                          >
-                            <div className="font-medium text-gray-900 capitalize">
-                              {setting.replace('-', ' ')}
-                            </div>
-                          </button>
-                        ))}
+                        {availableSettings.map(setting => {
+                          const getSettingInfo = (settingKey: string) => {
+                            switch (settingKey) {
+                              case 'excel-upload':
+                                return { title: 'Excel Upload', description: 'Auslastungs- und Einsatzplandaten hochladen' };
+                              case 'profiler-import':
+                                return { title: 'Profiler Import', description: 'Bulk-Import aller Mitarbeiter-Profile aus dem Profiler' };
+                              case 'user-management':
+                                return { title: 'Benutzerverwaltung', description: 'Benutzer und Berechtigungen verwalten' };
+                              case 'role-management':
+                                return { title: 'Rollenverwaltung', description: 'Rollen und Zugriffskontrolle verwalten' };
+                              case 'technical-skills':
+                                return { title: 'Technical Skills', description: 'Technische Fähigkeiten verwalten' };
+                              case 'soft-skills':
+                                return { title: 'Soft Skills', description: 'Soziale Kompetenzen verwalten' };
+                              case 'hierarchical-roles':
+                                return { title: 'Hierarchische Rollen', description: 'Organisationsrollen verwalten' };
+                              case 'customer-projects':
+                                return { title: 'Kundenprojekte', description: 'Projekte und Kunden verwalten' };
+                              case 'auslastungserklaerung':
+                                return { title: 'Auslastungserklärung', description: 'Auslastungskommentare verwalten' };
+                              case 'help':
+                                return { title: 'Hilfe', description: 'Benutzeranleitung und Support' };
+                              default:
+                                return { title: setting.replace('-', ' '), description: '' };
+                            }
+                          };
+                          
+                          const settingInfo = getSettingInfo(setting);
+                          
+                          return (
+                            <button
+                              key={setting}
+                              onClick={() => handleSettingClick(setting)}
+                              className="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all"
+                            >
+                              <div className="font-medium text-gray-900">
+                                {settingInfo.title}
+                              </div>
+                              {settingInfo.description && (
+                                <div className="text-sm text-gray-600 mt-1">
+                                  {settingInfo.description}
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
                       </div>
                       
                       <button

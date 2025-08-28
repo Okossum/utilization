@@ -23,6 +23,7 @@ import AdminSetup from './components/generated/AdminSetup';
 import RestoreAdminRole from './components/generated/RestoreAdminRole';
 import EmergencyAdminCreator from './components/generated/EmergencyAdminCreator';
 import FirebaseAuthBulkSetup from './components/generated/FirebaseAuthBulkSetup';
+import { ProfilerManagementModal } from './components/generated/ProfilerManagementModal';
 
 import { CustomerProvider } from './contexts/CustomerContext';
 import { AuthProvider } from './contexts/AuthContext';
@@ -69,16 +70,28 @@ function App() {
     // Standard-View basierend auf Benutzerrolle setzen
     const getDefaultView = (): 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects' => {
       // Prüfe verfügbare Views für die aktuelle Rolle
-      if (canAccessView('sales')) {
-        return 'sales'; // Sales-View wenn verfügbar
+      
+      // Sales-Rolle: Nur Sales-View anzeigen
+      if (role === 'sales' && canAccessView('sales')) {
+        return 'sales';
       }
+      
+      // Admin & Führungskraft: Utilization-View als Standard
       if (canAccessView('utilization')) {
-        return 'utilization'; // Utilization-View wenn verfügbar
+        return 'utilization';
       }
+      
+      // Fallback für andere Rollen
       if (canAccessView('employees')) {
-        return 'employees'; // Employee-View als Fallback
+        return 'employees';
       }
-      return 'utilization'; // Letzter Fallback
+      
+      // Letzter Fallback für Sales-Rolle falls Utilization nicht verfügbar
+      if (canAccessView('sales')) {
+        return 'sales';
+      }
+      
+      return 'utilization'; // Absoluter Fallback
     };
     
     const [currentView, setCurrentView] = useState<'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects'>(getDefaultView());
@@ -87,7 +100,7 @@ function App() {
     useEffect(() => {
       const defaultView = getDefaultView();
       if (role !== 'unknown' && currentView !== defaultView) {
-        console.log(`🎯 Rolle "${role}" erkannt - wechsle zu View: ${defaultView}`);
+        console.log(`🎯 Rolle "${role}" erkannt - wechsle zu Standard-View: ${defaultView}`);
         setCurrentView(defaultView);
       }
     }, [role, canAccessView]);
@@ -153,6 +166,7 @@ function App() {
   const [isAdminSetupOpen, setIsAdminSetupOpen] = useState(false);
   const [isRestoreAdminOpen, setIsRestoreAdminOpen] = useState(false);
   const [isFirebaseAuthSetupOpen, setIsFirebaseAuthSetupOpen] = useState(false);
+  const [isProfilerManagementOpen, setIsProfilerManagementOpen] = useState(false);
 
     
     // Help Modal State
@@ -311,6 +325,7 @@ function App() {
             onAdminSetup={() => setIsAdminSetupOpen(true)}
             onRestoreAdmin={() => setIsRestoreAdminOpen(true)}
             onFirebaseAuthSetup={() => setIsFirebaseAuthSetupOpen(true)}
+            onProfilerImport={() => setIsProfilerManagementOpen(true)}
 
             onProjectRolesDemo={() => safeSetCurrentView('project-roles-demo')}
             onProjectSkillsDemo={() => safeSetCurrentView('project-skills-demo')}
@@ -836,7 +851,11 @@ function App() {
             </div>
           )}
 
-
+          {/* Profiler Management Modal */}
+          <ProfilerManagementModal
+            isOpen={isProfilerManagementOpen}
+            onClose={() => setIsProfilerManagementOpen(false)}
+          />
 
                     <AdminUserManagementModal isOpen={isAdminModalOpen} onClose={() => setAdminModalOpen(false)} />
 

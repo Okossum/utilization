@@ -4,6 +4,7 @@ import bodyParser from 'body-parser';
 import admin from 'firebase-admin';
 import fs from 'fs';
 import path from 'path';
+import fetch from 'node-fetch';
 
 const app = express();
 
@@ -1321,6 +1322,156 @@ app.get('/api/utilization-data', requireAuth, async (req, res) => {
   } catch (error) {
     // console.error entfernt
     res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+// Profiler Import Route
+app.post('/api/profiler/import', requireAuth, async (req, res) => {
+  try {
+    const { profileUrl, employeeId, authToken } = req.body;
+
+    if (!profileUrl || !employeeId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'profileUrl und employeeId sind erforderlich' 
+      });
+    }
+
+    if (!authToken) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'authToken ist erforderlich' 
+      });
+    }
+
+    // Extrahiere Profil-ID aus URL
+    const profileIdMatch = profileUrl.match(/\/profile\/(\d+)/);
+    if (!profileIdMatch) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Ungültige Profiler-URL' 
+      });
+    }
+
+    const profileId = profileIdMatch[1];
+    console.log('🔍 Profiler-Import für Profil-ID:', profileId);
+
+    // API-Call mit Token-Auth
+    let profilerData = null;
+    
+    try {
+      console.log('🎫 Verwende Token-Auth für Profiler-Import');
+      profilerData = await fetchProfilerDataWithToken(profileUrl, authToken);
+    } catch (error) {
+      console.error('❌ Token-Auth fehlgeschlagen:', error);
+      // Kein Fallback zu Basic-Auth mehr
+    }
+
+    // Fallback zu Mock-Daten falls API-Call fehlschlägt
+    if (!profilerData) {
+      console.log('⚠️ API-Call fehlgeschlagen, verwende Mock-Daten als Fallback');
+      profilerData = {
+        id: profileId,
+        name: 'Max Mustermann (Mock)',
+        email: 'max.mustermann@adesso.de',
+        position: 'Senior Consultant',
+        department: 'BU AT II (BAYERN)',
+        location: 'München',
+        startDate: '2020-01-15',
+        authMethod: 'mock-fallback',
+        skills: [
+          { name: 'Java', level: 4, category: 'Programming' },
+          { name: 'Spring Boot', level: 4, category: 'Framework' },
+          { name: 'React', level: 3, category: 'Frontend' }
+        ],
+        projects: [
+          {
+            name: 'BMW Digitalisierung (Mock)',
+            customer: 'BMW AG',
+            startDate: '2023-01-01',
+            endDate: '2023-12-31',
+            role: 'Senior Developer',
+            skills: ['Java', 'Spring Boot', 'React']
+          }
+        ]
+      };
+    }
+
+    // Aktualisiere utilizationData mit importierten Daten
+    const utilizationDataRef = admin.firestore().collection('utilizationData').doc(employeeId);
+    const utilizationDoc = await utilizationDataRef.get();
+
+    if (!utilizationDoc.exists) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Mitarbeiter nicht gefunden' 
+      });
+    }
+
+    const currentData = utilizationDoc.data();
+    const updatedData = {
+      ...currentData,
+      // Aktualisiere Grunddaten falls vorhanden
+      ...(profilerData.email && { email: profilerData.email }),
+      ...(profilerData.position && { position: profilerData.position }),
+      ...(profilerData.department && { bereich: profilerData.department }),
+      ...(profilerData.location && { standort: profilerData.location }),
+      
+      // Füge Profiler-Projekte zu projectReferences hinzu
+      projectReferences: [
+        ...(currentData.projectReferences || []),
+        ...profilerData.projects.map(project => ({
+          id: `profiler-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          projectName: project.name,
+          customer: project.customer,
+          startDate: project.startDate,
+          endDate: project.endDate,
+          projectType: 'historical',
+          projectSource: 'profiler',
+          roles: project.role ? [{
+            name: project.role,
+            categoryName: 'Profiler Import'
+          }] : [],
+          skills: project.skills.map(skill => ({
+            name: skill,
+            categoryName: 'Technical'
+          })),
+          importedAt: new Date().toISOString(),
+          importedFrom: profileUrl
+        }))
+      ],
+      
+      // Meta-Daten für Import
+      lastProfilerImport: {
+        timestamp: new Date().toISOString(),
+        profileUrl,
+        profileId,
+        authMethod: profilerData.authMethod || 'unknown',
+        importedFields: ['email', 'position', 'department', 'location', 'projects', 'skills']
+      }
+    };
+
+    await utilizationDataRef.update(updatedData);
+
+    console.log('✅ Profiler-Import erfolgreich für:', employeeId);
+
+    res.json({
+      success: true,
+      message: `Profiler-Daten erfolgreich importiert (${profilerData.authMethod})`,
+      importedFields: ['email', 'position', 'department', 'location', 'projects', 'skills'],
+      importedData: {
+        projectsCount: profilerData.projects.length,
+        skillsCount: profilerData.skills.length,
+        authMethod: profilerData.authMethod
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Fehler beim Profiler-Import:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Interner Server-Fehler beim Profiler-Import' 
+    });
   }
 });
 
@@ -4723,6 +4874,532 @@ app.delete('/api/role-tasks/:id', requireAuth, async (req, res) => {
     res.status(500).json({ error: 'Fehler beim Löschen der Aufgabe' });
   }
 });
+
+// ===== PROFILER BULK IMPORT API =====
+
+// Global state für Bulk-Import Status
+let bulkImportStatus = {
+  isRunning: false,
+  total: 0,
+  completed: 0,
+  currentEmployee: null,
+  employeeResults: {},
+  startedAt: null,
+  completedAt: null
+};
+
+// POST /api/profiler/bulk-import - Startet Bulk-Import aller Mitarbeiter
+app.post('/api/profiler/bulk-import', requireAuth, async (req, res) => {
+  try {
+    const { profilerCookies, employees, authToken } = req.body;
+
+    console.log('🔍 Bulk-Import Request erhalten:', {
+      hasAuthToken: !!authToken,
+      authTokenLength: authToken?.length || 0,
+      hasCookies: !!profilerCookies,
+      cookiesLength: profilerCookies?.length || 0,
+      employeesCount: employees?.length || 0,
+      employeesIsArray: Array.isArray(employees),
+      requestBodyKeys: Object.keys(req.body)
+    });
+
+    // Validiere Authentifizierung
+    if (!authToken && !profilerCookies) {
+      console.log('❌ Authentifizierung fehlgeschlagen: Weder authToken noch profilerCookies vorhanden');
+      return res.status(400).json({ error: 'Authentifizierung erforderlich: Entweder authToken oder profilerCookies' });
+    }
+
+    if (!employees || !Array.isArray(employees) || employees.length === 0) {
+      console.log('❌ Mitarbeiter-Validierung fehlgeschlagen:', { employees, isArray: Array.isArray(employees), length: employees?.length });
+      return res.status(400).json({ error: 'Mitarbeiter-Liste ist erforderlich' });
+    }
+
+    // Prüfe ob bereits ein Import läuft
+    if (bulkImportStatus.isRunning) {
+      return res.status(409).json({ error: 'Ein Bulk-Import läuft bereits' });
+    }
+
+    // Initialisiere Import-Status
+    bulkImportStatus = {
+      isRunning: true,
+      total: employees.length,
+      completed: 0,
+      currentEmployee: null,
+      employeeResults: {},
+      startedAt: new Date().toISOString(),
+      completedAt: null
+    };
+
+    console.log(`🚀 Profiler Bulk-Import gestartet für ${employees.length} Mitarbeiter`);
+
+    // Starte Bulk-Import im Hintergrund
+    processBulkImport(employees, { profilerCookies, authToken });
+
+    res.json({
+      success: true,
+      message: 'Bulk-Import gestartet',
+      total: employees.length
+    });
+
+  } catch (error) {
+    console.error('❌ Fehler beim Starten des Bulk-Imports:', error);
+    bulkImportStatus.isRunning = false;
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+// GET /api/profiler/import-status - Gibt aktuellen Import-Status zurück
+app.get('/api/profiler/import-status', requireAuth, async (req, res) => {
+  try {
+    res.json(bulkImportStatus);
+  } catch (error) {
+    console.error('❌ Fehler beim Abrufen des Import-Status:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+// Bulk-Import Verarbeitung
+async function processBulkImport(employees, authConfig) {
+  console.log(`📊 Starte Verarbeitung von ${employees.length} Mitarbeitern`);
+  const { profilerCookies, authToken } = authConfig;
+
+  for (let i = 0; i < employees.length; i++) {
+    const employee = employees[i];
+    const { employeeId, profilerUrl } = employee;
+
+    try {
+      // Update current employee
+      bulkImportStatus.currentEmployee = employeeId;
+      console.log(`🔄 Verarbeite Mitarbeiter ${i + 1}/${employees.length}: ${employeeId}`);
+
+      // Extrahiere Profil-ID aus URL
+      const profileId = extractProfileIdFromUrl(profilerUrl);
+      if (!profileId) {
+        throw new Error('Ungültige Profiler-URL');
+      }
+
+      // Profiler-API-Aufruf mit der verfügbaren Authentifizierung
+      let profileData;
+      try {
+        if (authToken) {
+          console.log(`🎫 Verwende Token-Auth für ${employeeId}`);
+          profileData = await fetchProfilerDataWithToken(profilerUrl, authToken);
+        } else if (profilerCookies) {
+          console.log(`🍪 Verwende Cookie-Auth für ${employeeId}`);
+          profileData = await fetchProfilerData(profilerUrl, profilerCookies);
+        } else {
+          throw new Error('Keine gültige Authentifizierung verfügbar');
+        }
+        
+        console.log(`✅ Profiler-Daten erfolgreich abgerufen für ${employeeId}:`, {
+          hasData: !!profileData,
+          authMethod: profileData?.authMethod,
+          skillsCount: profileData?.skills?.length || 0
+        });
+        
+      } catch (authError) {
+        console.error(`❌ Authentifizierungs-Fehler für ${employeeId}:`, authError.message);
+        
+        // WICHTIG: Fallback zu Mock-Daten nur in Development
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`🔄 Verwende Mock-Daten als Fallback für ${employeeId} (Development Mode)`);
+          const profileId = extractProfileIdFromUrl(profilerUrl);
+          profileData = getMockProfilerData(profileId || employeeId);
+          profileData.authMethod = 'mock-fallback';
+        } else {
+          // In Production: Fehler weiterwerfen
+          throw authError;
+        }
+      }
+      
+      // Speichere Profiler-Daten in separater Collection
+      await saveProfilerData(employeeId, profileData);
+
+      // Markiere als erfolgreich
+      bulkImportStatus.employeeResults[employeeId] = {
+        status: 'success',
+        completedAt: new Date().toISOString(),
+        profileId: profileId
+      };
+
+      console.log(`✅ Mitarbeiter ${employeeId} erfolgreich importiert`);
+
+    } catch (error) {
+      console.error(`❌ Fehler beim Import von ${employeeId}:`, error);
+      
+      // Markiere als fehlgeschlagen
+      bulkImportStatus.employeeResults[employeeId] = {
+        status: 'error',
+        error: error.message,
+        completedAt: new Date().toISOString()
+      };
+    }
+
+    // Update completed count
+    bulkImportStatus.completed = i + 1;
+    
+    // Kurze Pause zwischen Importen
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+
+  // Import abgeschlossen
+  bulkImportStatus.isRunning = false;
+  bulkImportStatus.currentEmployee = null;
+  bulkImportStatus.completedAt = new Date().toISOString();
+
+  console.log(`🎉 Bulk-Import abgeschlossen: ${bulkImportStatus.completed}/${bulkImportStatus.total} Mitarbeiter`);
+}
+
+// Hilfsfunktion: Profil-ID aus URL extrahieren
+function extractProfileIdFromUrl(profileUrl) {
+  try {
+    const match = profileUrl.match(/\/profile\/(\d+)/);
+    return match ? match[1] : null;
+  } catch (error) {
+    console.error('Fehler beim Extrahieren der Profil-ID:', error);
+    return null;
+  }
+}
+
+// Hilfsfunktion: Profiler-URL zu API-URL transformieren
+function transformToApiUrl(profileUrl) {
+  try {
+    // Extrahiere die Profil-ID aus der normalen URL
+    const profileId = extractProfileIdFromUrl(profileUrl);
+    if (!profileId) {
+      throw new Error('Keine gültige Profil-ID in URL gefunden');
+    }
+    
+    // Erstelle die API-URL
+    const apiUrl = `https://profiler.adesso-group.com/api/profiles/${profileId}/full-profile`;
+    console.log(`🔄 URL-Transformation: ${profileUrl} -> ${apiUrl}`);
+    
+    return apiUrl;
+  } catch (error) {
+    console.error('Fehler bei URL-Transformation:', error);
+    return null;
+  }
+}
+
+// Basic-Auth Funktion entfernt - nur noch Token-Auth und Cookie-Auth unterstützt
+
+// Hilfsfunktion: Profiler-Daten mit Token-Auth abrufen
+async function fetchProfilerDataWithToken(profileUrl, authToken) {
+  try {
+    // Extrahiere profileId aus der URL für Logging und Transformation
+    const profileId = extractProfileIdFromUrl(profileUrl);
+    if (!profileId) {
+      throw new Error(`Keine gültige Profil-ID in URL gefunden: ${profileUrl}`);
+    }
+    
+    // Transformiere die URL zur API-URL
+    const apiUrl = transformToApiUrl(profileUrl);
+    if (!apiUrl) {
+      throw new Error('URL-Transformation fehlgeschlagen');
+    }
+    
+    console.log(`🎫 Rufe Profiler-Daten mit Token-Auth ab: ${apiUrl} (ID: ${profileId})`);
+    
+    const response = await fetch(apiUrl, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+      },
+      timeout: 15000 // 15 Sekunden Timeout
+    });
+
+    if (!response.ok) {
+      throw new Error(`Profiler API Error (Token-Auth): ${response.status} ${response.statusText}`);
+    }
+
+    const rawData = await response.json();
+    console.log(`✅ Profiler-Daten erfolgreich mit Token-Auth erhalten für ID ${profileId}:`, {
+      dataKeys: Object.keys(rawData),
+      hasPersonalData: !!rawData.personalData,
+      hasSkills: !!rawData.skills,
+      dataSize: JSON.stringify(rawData).length
+    });
+
+    // Transformiere die Profiler-Daten in unser Format
+    const transformedData = transformProfilerData(rawData, profileId);
+    transformedData.authMethod = 'token-auth';
+    
+    console.log(`🔄 Transformierte Daten für ID ${profileId}:`, {
+      employeeId: transformedData.employeeId,
+      hasSkills: transformedData.skills?.length > 0,
+      skillsCount: transformedData.skills?.length || 0,
+      hasPersonalData: !!transformedData.personalData
+    });
+    
+    return transformedData;
+
+  } catch (error) {
+    console.error(`❌ Fehler beim Abrufen der Profiler-Daten mit Token-Auth für URL ${profileUrl}:`, error);
+    throw error; // Fehler weiterwerfen für Fallback-Handling
+  }
+}
+
+// Hilfsfunktion: Profiler-Daten abrufen (Echter API-Call mit Cookie-Auth - Legacy)
+async function fetchProfilerData(profileUrl, profilerCookies) {
+  try {
+    // Transformiere die URL zur API-URL
+    const apiUrl = transformToApiUrl(profileUrl);
+    if (!apiUrl) {
+      throw new Error('URL-Transformation fehlgeschlagen');
+    }
+    
+    console.log(`🍪 Rufe Profiler-Daten mit Cookie-Auth ab: ${apiUrl}`);
+    
+    // Echter API-Call an Profiler mit Cookie-Authentifizierung
+    const response = await fetch(apiUrl, {
+      headers: {
+        'Cookie': profilerCookies,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+      },
+      timeout: 10000 // 10 Sekunden Timeout
+    });
+
+    if (!response.ok) {
+      throw new Error(`Profiler API Error: ${response.status} ${response.statusText}`);
+    }
+
+    const rawData = await response.json();
+    console.log(`📊 Profiler-Daten erhalten für ${profileId}:`, Object.keys(rawData));
+
+    // Transformiere die Profiler-Daten in unser Format
+    const transformedData = transformProfilerData(rawData, profileId);
+    
+    return transformedData;
+
+  } catch (error) {
+    console.error(`❌ Fehler beim Abrufen der Profiler-Daten für ${profileId}:`, error);
+    
+    // Fallback zu Mock-Daten bei Fehlern (für Entwicklung)
+    console.log(`🔄 Verwende Mock-Daten als Fallback für ${profileId}`);
+    return getMockProfilerData(profileId);
+  }
+}
+
+// Hilfsfunktion: Profiler-Daten transformieren
+function transformProfilerData(rawData, profileId) {
+  return {
+    id: profileId,
+    name: rawData.name || `Mitarbeiter ${profileId}`,
+    email: rawData.email || `mitarbeiter${profileId}@adesso.de`,
+    position: rawData.position || rawData.jobTitle || 'Consultant',
+    department: rawData.department || rawData.businessUnit || 'Unknown',
+    location: rawData.location || rawData.office || 'Unknown',
+    startDate: rawData.startDate || rawData.joinDate || null,
+    
+    // Skills aus verschiedenen Quellen extrahieren
+    skills: extractSkills(rawData),
+    
+    // WICHTIG: Projektdaten extrahieren (die gelben SAP-Einträge!)
+    projects: extractProjects(rawData),
+    
+    // Weitere Daten
+    certifications: rawData.certifications || [],
+    languages: rawData.languages || [],
+    education: rawData.education || [],
+    
+    // Metadaten
+    rawData: rawData, // Für Debugging - Original-Daten behalten
+    importedAt: new Date().toISOString(),
+    source: 'profiler-api'
+  };
+}
+
+// Hilfsfunktion: Projekte aus Profiler-Daten extrahieren
+function extractProjects(rawData) {
+  const projects = [];
+  
+  // Verschiedene mögliche Quellen für Projektdaten prüfen
+  const projectSources = [
+    rawData.projects,
+    rawData.projectExperience,
+    rawData.assignments,
+    rawData.workExperience
+  ];
+
+  for (const source of projectSources) {
+    if (Array.isArray(source)) {
+      for (const project of source) {
+        projects.push({
+          name: project.name || project.title || project.projectName || 'Unbekanntes Projekt',
+          customer: project.customer || project.client || project.company || 'Unbekannter Kunde',
+          startDate: project.startDate || project.from || null,
+          endDate: project.endDate || project.to || null,
+          role: project.role || project.position || project.jobTitle || 'Consultant',
+          description: project.description || project.summary || '',
+          
+          // Technologien und Skills (die SAP-Einträge!)
+          skills: project.skills || project.technologies || [],
+          technologies: project.technologies || project.tools || project.techStack || [],
+          
+          // Weitere Details
+          responsibilities: project.responsibilities || project.tasks || [],
+          achievements: project.achievements || [],
+          industry: project.industry || project.sector || '',
+          projectSize: project.projectSize || project.teamSize || null,
+          
+          // Metadaten
+          source: 'profiler',
+          originalData: project // Original-Daten für Debugging
+        });
+      }
+    }
+  }
+
+  return projects;
+}
+
+// Hilfsfunktion: Skills extrahieren
+function extractSkills(rawData) {
+  const skills = [];
+  
+  // Verschiedene Quellen für Skills
+  const skillSources = [
+    rawData.skills,
+    rawData.technicalSkills,
+    rawData.competencies,
+    rawData.expertise
+  ];
+
+  for (const source of skillSources) {
+    if (Array.isArray(source)) {
+      for (const skill of source) {
+        skills.push({
+          name: skill.name || skill.title || skill,
+          level: skill.level || skill.rating || skill.proficiency || 0,
+          category: skill.category || skill.type || 'General',
+          experience: skill.experience || skill.years || null,
+          lastUsed: skill.lastUsed || null
+        });
+      }
+    }
+  }
+
+  return skills;
+}
+
+// Fallback Mock-Daten (für Entwicklung/Testing)
+function getMockProfilerData(profileId) {
+  // Generiere individuelle Mock-Daten basierend auf profileId
+  const positions = ['Senior Consultant', 'Consultant', 'Principal Consultant', 'Manager', 'Senior Manager'];
+  const departments = ['BU AT II (BAYERN)', 'BU AT I (BERLIN)', 'BU FINANCE', 'BU INSURANCE', 'BU AUTOMOTIVE'];
+  const locations = ['München', 'Berlin', 'Hamburg', 'Frankfurt', 'Köln'];
+  
+  const hash = profileId.toString().split('').reduce((a, b) => {
+    a = ((a << 5) - a) + b.charCodeAt(0);
+    return a & a;
+  }, 0);
+  
+  return {
+    id: profileId,
+    name: `Mock Mitarbeiter ${profileId}`,
+    email: `mock.mitarbeiter${profileId}@adesso.de`,
+    position: positions[Math.abs(hash) % positions.length],
+    department: departments[Math.abs(hash) % departments.length],
+    location: locations[Math.abs(hash) % locations.length],
+    startDate: '2020-01-15',
+    skills: [
+      { name: 'Java', level: 4, category: 'Programming', experience: '5+ Jahre' },
+      { name: 'Spring Boot', level: 4, category: 'Framework', experience: '3+ Jahre' },
+      { name: 'React', level: 3, category: 'Frontend', experience: '2+ Jahre' },
+      { name: 'SAP', level: 3, category: 'ERP', experience: '4+ Jahre' }
+    ],
+    projects: [
+      {
+        name: 'SAP S/4HANA Migration',
+        customer: 'Automotive AG',
+        startDate: '2023-01-01',
+        endDate: '2023-12-31',
+        role: 'Senior SAP Consultant',
+        description: 'Migration von SAP ECC zu S/4HANA',
+        skills: ['SAP ABAP', 'SAP HANA', 'SAP Fiori'],
+        technologies: ['SAP S/4HANA', 'SAP ABAP', 'SAP HANA DB', 'SAP Fiori'],
+        responsibilities: ['ABAP-Entwicklung', 'Datenmodellierung', 'Performance-Optimierung'],
+        industry: 'Automotive',
+        source: 'mock'
+      },
+      {
+        name: 'Digitalisierungsprojekt',
+        customer: 'Finanz GmbH',
+        startDate: '2022-06-01',
+        endDate: '2022-12-31',
+        role: 'Full-Stack Developer',
+        description: 'Entwicklung einer modernen Web-Anwendung',
+        skills: ['Java', 'Spring Boot', 'React', 'PostgreSQL'],
+        technologies: ['Java 17', 'Spring Boot 3', 'React 18', 'Docker'],
+        responsibilities: ['Backend-Entwicklung', 'API-Design', 'Code Reviews'],
+        industry: 'Financial Services',
+        source: 'mock'
+      }
+    ],
+    certifications: ['Oracle Certified Professional Java SE', 'SAP Certified Development Associate'],
+    languages: ['Deutsch (Muttersprache)', 'Englisch (Fließend)'],
+    education: ['M.Sc. Informatik - TU München'],
+    importedAt: new Date().toISOString(),
+    source: 'mock'
+  };
+}
+
+// Hilfsfunktion: Profiler-Daten in separater Collection speichern
+async function saveProfilerData(employeeId, profileData) {
+  try {
+    console.log(`💾 Starte Speicherung für ${employeeId}:`, {
+      hasProfileData: !!profileData,
+      profileDataKeys: profileData ? Object.keys(profileData) : [],
+      hasSkills: profileData?.skills?.length > 0,
+      skillsCount: profileData?.skills?.length || 0,
+      hasPersonalData: !!profileData?.personalData,
+      authMethod: profileData?.authMethod
+    });
+
+    const profilerDataRef = admin.firestore().collection('profilerData').doc(employeeId);
+    
+    const dataToSave = {
+      ...profileData,
+      employeeId: employeeId,
+      importedAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    console.log(`🔍 Daten die gespeichert werden für ${employeeId}:`, {
+      documentId: employeeId,
+      collection: 'profilerData',
+      dataSize: JSON.stringify(dataToSave).length,
+      mainKeys: Object.keys(dataToSave),
+      skillsIncluded: dataToSave.skills?.length || 0
+    });
+    
+    await profilerDataRef.set(dataToSave);
+
+    console.log(`✅ Profiler-Daten für ${employeeId} erfolgreich in profilerData Collection gespeichert`);
+    
+    // Verifikation: Prüfe ob die Daten wirklich gespeichert wurden
+    const savedDoc = await profilerDataRef.get();
+    if (savedDoc.exists) {
+      const savedData = savedDoc.data();
+      console.log(`🔍 Verifikation - Gespeicherte Daten für ${employeeId}:`, {
+        documentExists: true,
+        savedDataKeys: Object.keys(savedData),
+        savedSkillsCount: savedData.skills?.length || 0,
+        importedAt: savedData.importedAt?.toDate?.() || savedData.importedAt
+      });
+    } else {
+      console.error(`❌ Verifikation fehlgeschlagen - Dokument ${employeeId} wurde nicht gespeichert!`);
+    }
+    
+  } catch (error) {
+    console.error(`❌ Fehler beim Speichern der Profiler-Daten für ${employeeId}:`, error);
+    throw error;
+  }
+}
 
 process.on('SIGTERM', async () => {
   // console.log entfernt

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { ArrowLeft, User, Mail, MapPin, Calendar, Clock, Star, TrendingUp, MessageSquare, Edit3, Video, UserPlus, FileText, ChevronDown, Award, Edit, Trash2, Plus, ThumbsUp, ThumbsDown, Briefcase, Building, Pencil, Grid3X3, List, BarChart3, Heart } from 'lucide-react';
+import { ArrowLeft, User, Mail, MapPin, Calendar, Clock, Star, TrendingUp, MessageSquare, Edit3, Video, UserPlus, FileText, ChevronDown, Award, Edit, Trash2, Plus, ThumbsUp, ThumbsDown, Briefcase, Building, Pencil, Grid3X3, List, BarChart3, Heart, Download } from 'lucide-react';
 import { collection, getDocs, limit, query, where } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 
@@ -30,6 +30,10 @@ import type { ProjectHistoryItem } from '../../lib/types';
 import { ProjectsByType } from '../../types/projects';
 import { filterProjectsByType } from '../../utils/projectUtils';
 import { createProjectNotification } from '../../utils/projectBusinessLogic';
+import { ProfilerImportModal } from './ProfilerImportModal';
+import { ProfilerTokenManager } from './ProfilerTokenManager';
+import { useProfilerToken } from '../../hooks/useProfilerToken';
+import { profilerService } from '../../services/profilerService';
 export interface EmployeeDetailViewProps {
   // Treats employeeId as personId (MVP)
   employeeId: string;
@@ -47,6 +51,7 @@ interface Employee {
   standort: string;
   startDate: string;
   status: string;
+  linkZumProfilUrl?: string;
   utilization: number;
   skills: Array<{
     name: string;
@@ -179,6 +184,13 @@ export default function EmployeeDetailView({
   const [isProjectCreationModalOpen, setProjectCreationModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<ProjectHistoryItem | null>(null);
   const [newProjectType, setNewProjectType] = useState<'historical' | 'planned'>('historical');
+  const [isProfilerImportModalOpen, setIsProfilerImportModalOpen] = useState(false);
+  const [isTokenManagerOpen, setIsTokenManagerOpen] = useState(false);
+  const [isLoadingProfilerData, setIsLoadingProfilerData] = useState(false);
+  const [preloadedProfilerData, setPreloadedProfilerData] = useState(null);
+
+  // Token-Management Hook
+  const { currentToken, isTokenValid, saveToken, loadToken } = useProfilerToken();
   
   // Dossier-Daten State
   const [assignedRoles, setAssignedRoles] = useState<any[]>([]);
@@ -869,6 +881,163 @@ export default function EmployeeDetailView({
     setEditingProject(null);
   };
 
+  const handleTokenSaved = async (profilerToken: string) => {
+    saveToken(profilerToken);
+    loadToken();
+    
+    // Nach Token-Speicherung automatisch Import starten mit dem neuen Token
+    console.log('🔄 Token gespeichert - starte automatisch Profiler-Import');
+    
+    // URL-Validierung
+    const personRecord = databaseData?.utilizationData?.find(record => record.id === employeeId);
+    const profileUrl = personRecord?.linkZumProfilUrl;
+    if (!profileUrl) {
+      console.log('❌ Keine Profiler-URL vorhanden - öffne Import-Modal');
+      setIsProfilerImportModalOpen(true);
+      return;
+    }
+    
+    // Direkter Import mit dem neuen Token
+    setIsLoadingProfilerData(true);
+    
+    try {
+      console.log('🔍 EmployeeDetailView: Starte Profiler-Import mit:', {
+        profileUrl,
+        employeeId,
+        hasFirebaseToken: !!token,
+        hasProfilerToken: !!profilerToken,
+        firebaseTokenLength: token?.length || 0,
+        profilerTokenLength: profilerToken?.length || 0
+      });
+      
+      const result = await profilerService.performFullImport(profileUrl, employeeId, token, profilerToken);
+      
+      console.log('🔍 EmployeeDetailView: Profiler-Import Result:', {
+        success: result.success,
+        error: result.error,
+        hasProfile: !!result.profile
+      });
+      
+      if (result.success) {
+        console.log('✅ Profiler-Daten geladen - öffne Preview');
+        setPreloadedProfilerData(result);
+        setIsProfilerImportModalOpen(true);
+      } else {
+        console.error('❌ Profiler-Import fehlgeschlagen:', result.error);
+        showToast({
+          type: 'error',
+          title: 'Import fehlgeschlagen',
+          message: result.error || 'Fehler beim Laden der Profiler-Daten'
+        });
+      }
+    } catch (error) {
+      console.error('❌ Fehler beim Profiler-Import:', error);
+      showToast({
+        type: 'error',
+        title: 'Import fehlgeschlagen',
+        message: 'Unerwarteter Fehler beim Laden der Profiler-Daten'
+      });
+    } finally {
+      setIsLoadingProfilerData(false);
+    }
+  };
+
+  const handleProfilerImportClick = async () => {
+    console.log('🔍 Profiler-Import Button geklickt');
+    
+    // 1. Token-Validierung - IMMER Token-Manager öffnen wenn Token ungültig
+    if (!isTokenValid) {
+      console.log('❌ Kein gültiger Token - öffne Token-Manager');
+      setIsTokenManagerOpen(true);
+      return;
+    }
+    
+    // 2. URL-Validierung
+    const personRecord = databaseData?.utilizationData?.find(record => record.id === employeeId);
+    const profileUrl = personRecord?.linkZumProfilUrl;
+    if (!profileUrl) {
+      console.log('❌ Keine Profiler-URL vorhanden - öffne Import-Modal');
+      setIsProfilerImportModalOpen(true);
+      return;
+    }
+    
+    // 3. Direkter Import mit Preview
+    console.log('✅ Token und URL vorhanden - lade Profiler-Daten');
+    setIsLoadingProfilerData(true);
+    
+    try {
+      console.log('🔍 EmployeeDetailView: Starte Profiler-Import (Button-Click) mit:', {
+        profileUrl,
+        employeeId,
+        hasFirebaseToken: !!token,
+        hasCurrentToken: !!currentToken,
+        firebaseTokenLength: token?.length || 0,
+        currentTokenLength: currentToken?.length || 0
+      });
+      
+      const result = await profilerService.performFullImport(profileUrl, employeeId, token, currentToken || undefined);
+      
+      console.log('🔍 EmployeeDetailView: Profiler-Import Result (Button-Click):', {
+        success: result.success,
+        error: result.error,
+        hasProfile: !!result.profile
+      });
+      
+      if (result.success) {
+        console.log('✅ Profiler-Daten geladen - öffne Preview');
+        setPreloadedProfilerData(result);
+        setIsProfilerImportModalOpen(true);
+      } else {
+        console.error('❌ Profiler-Import fehlgeschlagen:', result.error);
+        showToast({
+          type: 'error',
+          title: 'Import fehlgeschlagen',
+          message: result.error || 'Fehler beim Laden der Profiler-Daten'
+        });
+      }
+    } catch (error) {
+      console.error('❌ Fehler beim Profiler-Import:', error);
+      showToast({
+        type: 'error',
+        title: 'Import fehlgeschlagen',
+        message: 'Unerwarteter Fehler beim Laden der Profiler-Daten'
+      });
+    } finally {
+      setIsLoadingProfilerData(false);
+    }
+  };
+
+  const handleProfilerImport = async (importedData: any) => {
+    console.log('📥 Profiler-Import empfangen:', importedData);
+    
+    try {
+      // Der Import wurde bereits im Backend durchgeführt
+      // Hier laden wir nur die Daten neu
+      
+      // 1. Daten neu laden
+      await refreshUtilizationDataContext();
+      await refreshDossierData();
+      
+      // 2. Success-Toast anzeigen
+      showToast({
+        type: 'success',
+        title: 'Profiler-Import erfolgreich',
+        message: `Daten für ${personName} wurden erfolgreich aus dem Profiler importiert`
+      });
+      
+      // 3. Preloaded Data zurücksetzen
+      setPreloadedProfilerData(null);
+      
+    } catch (error) {
+      console.error('❌ Fehler beim Profiler-Import:', error);
+      showToast({
+        type: 'error',
+        title: 'Import fehlgeschlagen',
+        message: 'Fehler beim Importieren der Profiler-Daten'
+      });
+    }
+  };
+
   const handleDeleteProject = async (projectId: string) => {
     console.log('🗑️ Deleting project from utilizationData Hub:', projectId);
     
@@ -1198,6 +1367,25 @@ export default function EmployeeDetailView({
             <button onClick={() => setRoleAssignOpen(true)} className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
               <Edit3 className="w-4 h-4" />
               <span>Rollen</span>
+            </button>
+            <button 
+              onClick={handleProfilerImportClick} 
+              disabled={isLoadingProfilerData}
+              className="flex items-center space-x-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isLoadingProfilerData ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              <span>
+                {isLoadingProfilerData 
+                  ? 'Lade...' 
+                  : isTokenValid 
+                    ? 'Profiler-Import' 
+                    : 'Profiler-Import (Token erforderlich)'
+                }
+              </span>
             </button>
           </div>
         </div>
@@ -1847,6 +2035,28 @@ export default function EmployeeDetailView({
           />
         )}
       </AnimatePresence>
+
+      {/* Profiler Import Modal */}
+      <ProfilerImportModal
+        isOpen={isProfilerImportModalOpen}
+        onClose={() => {
+          setIsProfilerImportModalOpen(false);
+          setPreloadedProfilerData(null);
+        }}
+        employeeId={employeeId}
+        employeeName={personName}
+        profileUrl={databaseData?.utilizationData?.find(record => record.id === employeeId)?.linkZumProfilUrl}
+        onImportComplete={handleProfilerImport}
+        preloadedData={preloadedProfilerData}
+      />
+
+      {/* Token Manager Modal */}
+      <ProfilerTokenManager
+        isOpen={isTokenManagerOpen}
+        onClose={() => setIsTokenManagerOpen(false)}
+        onTokenSaved={handleTokenSaved}
+        currentToken={currentToken || undefined}
+      />
 
       {/* Toast Notifications */}
       <ProjectToast

@@ -84,6 +84,7 @@ export const ALL_SETTINGS = [
   'hierarchical-roles',
   'customer-projects',
   'auslastungserklaerung',
+  'profiler-import',
   'general-settings',
   'data-management',
   'help'
@@ -100,8 +101,8 @@ export const SETTINGS_CATEGORIES = {
   'data': {
     title: 'Daten-Management',
     icon: 'Database',
-    settings: ['excel-upload', 'data-management'],
-    description: 'Excel-Upload und Datenmanagement'
+    settings: ['excel-upload', 'profiler-import', 'data-management'],
+    description: 'Excel-Upload, Profiler-Import und Datenmanagement'
   },
   'users': {
     title: 'Benutzerverwaltung',

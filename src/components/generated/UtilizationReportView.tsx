@@ -34,6 +34,7 @@ import {
 
 import { auslastungserklaerungService, personAuslastungserklaerungService, personActionItemService } from '../../lib/firebase-services';
 import { RoleBasedSettingsModal } from './RoleBasedSettingsModal';
+import { ProfilerManagementModal } from './ProfilerManagementModal';
 interface UtilizationData {
   person: string;
   week: string;
@@ -92,6 +93,9 @@ export function UtilizationReportView({
   // State für geplante Projekte
   const [plannedProjects, setPlannedProjects] = useState<PlannedProjectData[]>([]);
   const [isLoadingPlanned, setIsLoadingPlanned] = useState(false);
+  
+  // State für Profiler Management Modal
+  const [isProfilerManagementModalOpen, setIsProfilerManagementModalOpen] = useState(false);
 
   // Lade geplante Projekte für Kalendervisualisierung
   const loadPlannedProjectsForUtilization = async () => {
@@ -2552,6 +2556,7 @@ export function UtilizationReportView({
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
         onOpenExcelUpload={() => setIsAdminUploadModalOpen(true)}
+        onOpenProfilerImport={() => setIsProfilerManagementModalOpen(true)}
         onOpenUserManagement={() => {/* TODO: Implement */}}
         onOpenRoleManagement={() => {/* TODO: Implement */}}
         onOpenTechnicalSkills={() => {/* TODO: Implement */}}
@@ -2559,6 +2564,18 @@ export function UtilizationReportView({
         onOpenHierarchicalRoles={() => {/* TODO: Implement */}}
         onOpenCustomerProjects={() => {/* TODO: Implement */}}
         onOpenAuslastungserklaerung={() => {/* TODO: Implement */}}
+      />
+
+      {/* Profiler Management Modal */}
+      <ProfilerManagementModal
+        isOpen={isProfilerManagementModalOpen}
+        onClose={() => setIsProfilerManagementModalOpen(false)}
+      />
+
+      {/* Admin Data Upload Modal */}
+      <AdminDataUploadModal
+        isOpen={isAdminUploadModalOpen}
+        onClose={() => setIsAdminUploadModalOpen(false)}
       />
 
       {/* Old Settings Modal - Hidden */}

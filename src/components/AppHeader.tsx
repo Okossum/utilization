@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Settings, Database, TrendingUp, Target, User, Ticket, BarChart3, Users, FileText, ChevronDown, LogOut, Minus, Plus, MessageSquare, HelpCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { ProfilerTokenStatus } from './generated/ProfilerTokenStatus';
 
 interface AppHeaderProps {
   currentView: 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects';
@@ -34,6 +35,7 @@ interface AppHeaderProps {
   onAdminSetup?: () => void;
   onRestoreAdmin?: () => void;
   onFirebaseAuthSetup?: () => void;
+  onProfilerImport?: () => void;
 
 }
 
@@ -65,7 +67,8 @@ export function AppHeader({
   onUserRoleManagement,
   onAdminSetup,
   onRestoreAdmin,
-  onFirebaseAuthSetup
+  onFirebaseAuthSetup,
+  onProfilerImport
 }: AppHeaderProps) {
   const { user, profile, role, canAccessView, canAccessSettings } = useAuth();
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
@@ -226,6 +229,16 @@ export function AppHeader({
                             className="w-full px-3 py-2 text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 text-left font-medium"
                           >
                             📊 Excel Upload
+                          </button>
+                        )}
+                        
+                        {/* Profiler Import - nur für Admins */}
+                        {canAccessSettings('profiler-import') && onProfilerImport && (
+                          <button
+                            onClick={() => { onProfilerImport(); setIsSettingsMenuOpen(false); }}
+                            className="w-full px-3 py-2 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 text-left font-medium"
+                          >
+                            🔗 Profiler Import
                           </button>
                         )}
                       </div>
@@ -470,6 +483,11 @@ export function AppHeader({
                   <div className="text-xs text-gray-500">Angemeldet als</div>
                   <div className="text-sm font-medium text-gray-900 truncate">{profile?.displayName || user?.email || '—'}</div>
                   <div className="text-xs text-gray-600">Rolle: {String(profile?.role || 'unknown')}</div>
+                </div>
+                
+                {/* Profiler Token Status */}
+                <div className="mb-3 pb-3 border-b border-gray-200">
+                  <ProfilerTokenStatus showLabel={true} />
                 </div>
                 {profile?.role === 'admin' && (
                   <button
