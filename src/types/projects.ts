@@ -29,6 +29,7 @@ export interface ProjectFormData {
   plannedUtilization?: number;
   startDate?: string;
   endDate?: string;
+  dueDate?: string;                     // ✨ NEU: Follow-up Datum für Vertrieb
   internalContact?: string;
   customerContact?: string;
   jiraTicketId?: string;

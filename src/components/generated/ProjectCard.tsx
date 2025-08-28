@@ -160,6 +160,16 @@ export function ProjectCard({
           </div>
         )}
 
+        {/* Due Date - Follow-up Datum für geplante Projekte */}
+        {project.dueDate && type === 'planned' && (
+          <div className="flex items-center space-x-2">
+            <Clock className="w-4 h-4 text-orange-500 flex-shrink-0" />
+            <span className="text-sm">
+              Follow-up: <span className="font-medium">{new Date(project.dueDate).toLocaleDateString('de-DE')}</span>
+            </span>
+          </div>
+        )}
+
         {/* JIRA Ticket */}
         {project.jiraTicketId && (
           <div className="flex items-center space-x-2">
@@ -359,6 +369,15 @@ export function MiniProjectCard({ project, type, onEdit, onView, onDelete }: Pro
               <span className="text-gray-400">•</span>
               <span className="text-blue-600 text-xs font-mono bg-blue-50 px-1.5 py-0.5 rounded">
                 {project.jiraTicketId}
+              </span>
+            </>
+          )}
+          {project.dueDate && type === 'planned' && (
+            <>
+              <span className="text-gray-400">•</span>
+              <span className="text-orange-600 text-xs bg-orange-50 px-1.5 py-0.5 rounded flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                {formatShortDate(project.dueDate)}
               </span>
             </>
           )}

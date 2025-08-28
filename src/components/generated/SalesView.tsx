@@ -31,6 +31,7 @@ interface Project {
   projectSource?: 'regular' | 'jira';
   dailyRate?: number;
   plannedUtilization?: number;
+  dueDate?: string; // Follow-up Datum für geplante Projekte
   internalContact?: string;
   customerContact?: string;
   jiraTicketId?: string;
@@ -295,6 +296,7 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
             projectSource: ref.projectSource || 'regular',
             dailyRate: ref.dailyRate || undefined,
             plannedUtilization: ref.plannedUtilization || undefined,
+            dueDate: ref.dueDate || undefined, // Follow-up Datum (falls vorhanden)
             duration: ref.duration || undefined,
             activities: ref.activities || [],
             roles: ref.roles || [],
@@ -411,6 +413,7 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
             projectSource: ref.projectSource || 'regular',
             dailyRate: ref.dailyRate || undefined,
             plannedUtilization: ref.plannedUtilization || undefined,
+            dueDate: ref.dueDate || undefined, // Follow-up Datum
             roles: ref.roles || [],
             skills: ref.skills || []
           });
@@ -471,6 +474,7 @@ export const SalesView = ({ actionItems }: SalesViewProps) => {
             projectSource: 'regular',
             dailyRate: ref.dailyRate || undefined,
             plannedUtilization: ref.plannedUtilization || undefined,
+            dueDate: ref.dueDate || undefined, // ✅ WICHTIG: Follow-up Datum für Vertrieb
             roles: ref.roles || [],
             skills: ref.skills || []
           });

@@ -29,6 +29,7 @@ interface FilterState {
   lbs: string[];            // Laufbahn Stufe
   mainRole: string[];       // Hauptrolle
   status: string[];
+  dueDate: string[];        // Follow-up Status (überfällig, bald fällig, etc.)
 }
 
 // @component: SalesFilterBar
@@ -38,11 +39,36 @@ export const SalesFilterBar = ({ employees, onFilterChange }: SalesFilterBarProp
     team: [],
     lbs: [],
     mainRole: [],
-    status: []
+    status: [],
+    dueDate: []
   });
 
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+
+  // Due Date Status berechnen
+  const getDueDateStatus = (employee: Employee): string[] => {
+    const statuses: string[] = [];
+    const today = new Date();
+    const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+    
+    // Alle geplanten Projekte mit Due Date prüfen
+    employee.plannedProjects?.forEach(project => {
+      if (project.dueDate) {
+        const dueDate = new Date(project.dueDate);
+        
+        if (dueDate < today) {
+          statuses.push('Überfällig');
+        } else if (dueDate <= nextWeek) {
+          statuses.push('Bald fällig');
+        } else {
+          statuses.push('Geplant');
+        }
+      }
+    });
+    
+    return [...new Set(statuses)]; // Duplikate entfernen
+  };
 
   // Eindeutige Werte aus Mitarbeiterdaten extrahieren
   const getUniqueValues = (key: keyof Employee) => {
@@ -66,7 +92,8 @@ export const SalesFilterBar = ({ employees, onFilterChange }: SalesFilterBarProp
     team: getUniqueValues('team'),
     lbs: getUniqueValues('lbs'),
     mainRole: getUniqueValues('mainRole'),
-    status: getUniqueValues('status')
+    status: getUniqueValues('status'),
+    dueDate: ['Überfällig', 'Bald fällig', 'Geplant', 'Kein Follow-up']
   };
 
   // Click outside handler
@@ -94,8 +121,21 @@ export const SalesFilterBar = ({ employees, onFilterChange }: SalesFilterBarProp
       const matchesLBS = filters.lbs.length === 0 || filters.lbs.includes(employee.lbs);
       const matchesMainRole = filters.mainRole.length === 0 || filters.mainRole.includes(employee.mainRole);
       const matchesStatus = filters.status.length === 0 || filters.status.includes(employee.status || 'Aktiv');
+      
+      // Due Date Filter
+      const matchesDueDate = filters.dueDate.length === 0 || (() => {
+        const employeeDueDateStatuses = getDueDateStatus(employee);
+        
+        // Wenn keine geplanten Projekte mit Due Date vorhanden sind
+        if (employeeDueDateStatuses.length === 0) {
+          return filters.dueDate.includes('Kein Follow-up');
+        }
+        
+        // Prüfe ob einer der Employee-Status mit den Filter-Kriterien übereinstimmt
+        return employeeDueDateStatuses.some(status => filters.dueDate.includes(status));
+      })();
 
-      return matchesCC && matchesTeam && matchesLBS && matchesMainRole && matchesStatus;
+      return matchesCC && matchesTeam && matchesLBS && matchesMainRole && matchesStatus && matchesDueDate;
     });
 
     onFilterChange(filteredEmployees);
@@ -118,7 +158,8 @@ export const SalesFilterBar = ({ employees, onFilterChange }: SalesFilterBarProp
       team: [],
       lbs: [],
       mainRole: [],
-      status: []
+      status: [],
+      dueDate: []
     });
   };
 
@@ -238,6 +279,7 @@ export const SalesFilterBar = ({ employees, onFilterChange }: SalesFilterBarProp
             {renderFilterDropdown('lbs', 'LBS', filterOptions.lbs)}
             {renderFilterDropdown('mainRole', 'Rolle', filterOptions.mainRole)}
             {renderFilterDropdown('status', 'Status', filterOptions.status)}
+            {renderFilterDropdown('dueDate', 'Follow-up Status', filterOptions.dueDate)}
 
             {/* Alle Filter zurücksetzen */}
             {activeFiltersCount > 0 && (
@@ -270,7 +312,8 @@ export const SalesFilterBar = ({ employees, onFilterChange }: SalesFilterBarProp
                       {filterKey === 'cc' ? 'CC' :
                        filterKey === 'team' ? 'Team' :
                        filterKey === 'lbs' ? 'LBS' :
-                       filterKey === 'mainRole' ? 'Rolle' : 'Status'}:
+                       filterKey === 'mainRole' ? 'Rolle' :
+                       filterKey === 'status' ? 'Status' : 'Follow-up'}:
                     </span>
                     <span>{value}</span>
                     <button

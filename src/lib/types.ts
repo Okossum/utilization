@@ -289,6 +289,7 @@ export interface ProjectHistoryItem {
   dailyRate?: number; // €/Tag
   startDate?: string; // ISO Date
   endDate?: string; // ISO Date
+  dueDate?: string; // ISO Date - Follow-up Datum für geplante Projekte
   internalContact?: string; // Mitarbeiter-ID
   customerContact?: string; // Freitext
   jiraTicketId?: string; // JIRA-12345

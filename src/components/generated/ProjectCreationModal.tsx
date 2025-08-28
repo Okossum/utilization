@@ -69,6 +69,7 @@ export function ProjectCreationModal({
         dailyRate: project.dailyRate,
         startDate: project.startDate,
         endDate: project.endDate,
+        dueDate: project.dueDate,
         internalContact: project.internalContact,
         customerContact: project.customerContact,
         jiraTicketId: project.jiraTicketId,
@@ -561,6 +562,24 @@ export function ProjectCreationModal({
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                           </div>
+                        </div>
+
+                        {/* Due Date - Follow-up Datum für Vertrieb */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Follow-up Datum
+                            <span className="text-xs text-gray-500 ml-2">(Wann soll nachgefasst werden?)</span>
+                          </label>
+                          <input
+                            type="date"
+                            value={formData.dueDate || ''}
+                            onChange={e => updateFormData({ dueDate: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Datum für Nachfass-Termin"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Hilft dem Vertrieb bei der Nachverfolgung von Angeboten
+                          </p>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
