@@ -16,6 +16,8 @@ import {
   Award, 
   BookOpen, 
   Code,
+  User,
+  Globe,
   Users,
   Download,
   RefreshCw,
