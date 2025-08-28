@@ -24,6 +24,7 @@ import RestoreAdminRole from './components/generated/RestoreAdminRole';
 import EmergencyAdminCreator from './components/generated/EmergencyAdminCreator';
 import FirebaseAuthBulkSetup from './components/generated/FirebaseAuthBulkSetup';
 import { ProfilerManagementModal } from './components/generated/ProfilerManagementModal';
+import { ProfilerDataView } from './components/generated/ProfilerDataView';
 
 import { CustomerProvider } from './contexts/CustomerContext';
 import { AuthProvider } from './contexts/AuthContext';
@@ -68,7 +69,7 @@ function App() {
     const [isMenuOpen, setMenuOpen] = useState(false);
     
     // Standard-View basierend auf Benutzerrolle setzen
-    const getDefaultView = (): 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects' => {
+    const getDefaultView = (): 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects' | 'profiler-data' => {
       // Prüfe verfügbare Views für die aktuelle Rolle
       
       // Sales-Rolle: Nur Sales-View anzeigen
@@ -94,7 +95,7 @@ function App() {
       return 'utilization'; // Absoluter Fallback
     };
     
-    const [currentView, setCurrentView] = useState<'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects'>(getDefaultView());
+    const [currentView, setCurrentView] = useState<'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects' | 'profiler-data'>(getDefaultView());
     
     // Aktualisiere View wenn sich die Rolle ändert
     useEffect(() => {
@@ -442,6 +443,12 @@ function App() {
                 </div>
               )}
             </>
+          )}
+
+          {currentView === 'profiler-data' && (
+            <ProfilerDataView 
+              onBack={() => safeSetCurrentView('utilization')}
+            />
           )}
 
           {currentView === 'projects' && (

@@ -4,8 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { ProfilerTokenStatus } from './generated/ProfilerTokenStatus';
 
 interface AppHeaderProps {
-  currentView: 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects';
-  setCurrentView: (view: 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects') => void;
+  currentView: 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects' | 'profiler-data';
+  setCurrentView: (view: 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects' | 'profiler-data') => void;
 
   logout: () => Promise<void>;
   setAdminModalOpen: (open: boolean) => void;
@@ -239,6 +239,16 @@ export function AppHeader({
                             className="w-full px-3 py-2 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 text-left font-medium"
                           >
                             🔗 Profiler Import
+                          </button>
+                        )}
+                        
+                        {/* Profiler Daten Ansicht - nur für Admins */}
+                        {canAccessSettings('profiler-import') && (
+                          <button
+                            onClick={() => { setCurrentView('profiler-data'); setIsSettingsMenuOpen(false); }}
+                            className="w-full px-3 py-2 text-sm text-orange-700 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 text-left font-medium"
+                          >
+                            📊 Profiler Daten
                           </button>
                         )}
                       </div>
