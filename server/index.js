@@ -5169,6 +5169,40 @@ async function fetchProfilerDataWithToken(profileUrl, authToken) {
       dataSize: JSON.stringify(rawData).length
     });
 
+    // VOLLSTÄNDIGE DATENSTRUKTUR-ANALYSE
+    console.log(`🔬 VOLLSTÄNDIGE DATENSTRUKTUR-ANALYSE für ID ${profileId}:`);
+    console.log(`📋 user-Objekt:`, rawData.user ? {
+      keys: Object.keys(rawData.user),
+      email: rawData.user.email,
+      emailAddress: rawData.user.emailAddress,
+      name: rawData.user.name,
+      displayName: rawData.user.displayName,
+      firstName: rawData.user.firstName,
+      lastName: rawData.user.lastName,
+      sample: JSON.stringify(rawData.user).substring(0, 200) + '...'
+    } : 'NICHT VORHANDEN');
+    
+    console.log(`📚 projects-Array:`, rawData.projects ? {
+      length: rawData.projects.length,
+      firstProject: rawData.projects[0] ? Object.keys(rawData.projects[0]) : 'LEER',
+      sample: rawData.projects[0] ? JSON.stringify(rawData.projects[0]).substring(0, 200) + '...' : 'KEINE DATEN'
+    } : 'NICHT VORHANDEN');
+    
+    console.log(`🎓 education-Array:`, rawData.education ? {
+      length: rawData.education.length,
+      firstEducation: rawData.education[0] ? Object.keys(rawData.education[0]) : 'LEER'
+    } : 'NICHT VORHANDEN');
+    
+    console.log(`🏆 certifications-Array:`, rawData.certifications ? {
+      length: rawData.certifications.length,
+      firstCert: rawData.certifications[0] ? Object.keys(rawData.certifications[0]) : 'LEER'
+    } : 'NICHT VORHANDEN');
+    
+    console.log(`🌍 languageRatings-Array:`, rawData.languageRatings ? {
+      length: rawData.languageRatings.length,
+      firstLang: rawData.languageRatings[0] ? Object.keys(rawData.languageRatings[0]) : 'LEER'
+    } : 'NICHT VORHANDEN');
+
     // Transformiere die Profiler-Daten in unser Format
     const transformedData = transformProfilerData(rawData, profileId);
     transformedData.authMethod = 'token-auth';

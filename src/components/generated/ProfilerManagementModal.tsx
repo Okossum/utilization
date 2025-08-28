@@ -121,45 +121,54 @@ function ProfileDataPreview({ data }: { data: any }) {
         </div>
       )}
 
-      {/* Recent Projects */}
+      {/* ALLE Projekte anzeigen */}
       {data.projects && data.projects.length > 0 && (
         <div>
           <div className="flex items-center gap-1 text-gray-600 mb-2">
             <Briefcase className="w-3 h-3" />
-            <span className="font-medium">Aktuelle Projekte:</span>
+            <span className="font-medium">Alle Projekte ({data.projects.length}):</span>
           </div>
-          <div className="space-y-1">
-            {data.projects.slice(0, 2).map((project: any, index: number) => (
-              <div key={index} className="p-2 bg-gray-50 rounded text-xs">
-                <div className="font-medium">{project.name}</div>
-                <div className="text-gray-600">{project.customer} • {project.role}</div>
+          <div className="space-y-1 max-h-32 overflow-y-auto">
+            {data.projects.map((project: any, index: number) => (
+              <div key={index} className="p-2 bg-gray-50 rounded text-xs border">
+                <div className="font-medium">{project.name || project.title || 'Unbenanntes Projekt'}</div>
+                <div className="text-gray-600">
+                  {project.customer && <span>Kunde: {project.customer}</span>}
+                  {project.role && <span> • Rolle: {project.role}</span>}
+                  {project.startDate && <span> • Start: {project.startDate}</span>}
+                  {project.endDate && <span> • Ende: {project.endDate}</span>}
+                </div>
+                {project.description && (
+                  <div className="text-gray-500 mt-1 truncate">{project.description}</div>
+                )}
+                {project.technologies && (
+                  <div className="mt-1">
+                    <span className="text-gray-600">Tech: </span>
+                    <span className="text-blue-600">{Array.isArray(project.technologies) ? project.technologies.join(', ') : project.technologies}</span>
+                  </div>
+                )}
               </div>
             ))}
-            {data.projects.length > 2 && (
-              <div className="text-xs text-gray-500">+{data.projects.length - 2} weitere Projekte</div>
-            )}
           </div>
         </div>
       )}
 
-      {/* Certifications */}
+      {/* ALLE Zertifizierungen */}
       {data.certifications && data.certifications.length > 0 && (
         <div>
           <div className="flex items-center gap-1 text-gray-600 mb-2">
             <Award className="w-3 h-3" />
-            <span className="font-medium">Zertifizierungen:</span>
+            <span className="font-medium">Alle Zertifizierungen ({data.certifications.length}):</span>
           </div>
-          <div className="flex flex-wrap gap-1">
-            {data.certifications.slice(0, 3).map((cert: any, index: number) => (
-              <span key={index} className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">
-                {cert.name || cert}
-              </span>
+          <div className="space-y-1 max-h-24 overflow-y-auto">
+            {data.certifications.map((cert: any, index: number) => (
+              <div key={index} className="p-2 bg-purple-50 rounded text-xs border">
+                <div className="font-medium">{cert.name || cert.title || cert}</div>
+                {cert.issuer && <div className="text-gray-600">Aussteller: {cert.issuer}</div>}
+                {cert.date && <div className="text-gray-600">Datum: {cert.date}</div>}
+                {cert.validUntil && <div className="text-gray-600">Gültig bis: {cert.validUntil}</div>}
+              </div>
             ))}
-            {data.certifications.length > 3 && (
-              <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
-                +{data.certifications.length - 3} weitere
-              </span>
-            )}
           </div>
         </div>
       )}
@@ -180,6 +189,40 @@ function ProfileDataPreview({ data }: { data: any }) {
           </div>
         </div>
       )}
+
+      {/* RAW-DATEN DEBUGGING */}
+      <div className="mt-4 pt-3 border-t border-gray-300">
+        <div className="flex items-center gap-1 text-gray-600 mb-2">
+          <Code className="w-3 h-3" />
+          <span className="font-medium">Raw-Daten Struktur (Debug):</span>
+        </div>
+        <div className="bg-gray-100 p-2 rounded text-xs font-mono max-h-32 overflow-y-auto">
+          <div><strong>Verfügbare Keys:</strong> {data.rawData ? Object.keys(data.rawData).join(', ') : 'Keine rawData'}</div>
+          {data.rawData?.user && (
+            <div className="mt-1">
+              <strong>user-Objekt Keys:</strong> {Object.keys(data.rawData.user).join(', ')}
+            </div>
+          )}
+          {data.rawData?.projects && (
+            <div className="mt-1">
+              <strong>projects Array:</strong> {data.rawData.projects.length} Einträge
+              {data.rawData.projects[0] && (
+                <div className="ml-2">Erstes Projekt Keys: {Object.keys(data.rawData.projects[0]).join(', ')}</div>
+              )}
+            </div>
+          )}
+          {data.rawData?.certifications && (
+            <div className="mt-1">
+              <strong>certifications Array:</strong> {data.rawData.certifications.length} Einträge
+            </div>
+          )}
+          {data.rawData?.languageRatings && (
+            <div className="mt-1">
+              <strong>languageRatings Array:</strong> {data.rawData.languageRatings.length} Einträge
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
