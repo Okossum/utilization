@@ -40,42 +40,42 @@ function ProfileDataPreview({ data }: { data: any }) {
             <User className="w-3 h-3" />
             <span className="font-medium">Name:</span>
           </div>
-          <div className="text-gray-900">{data.name || 'Nicht verfügbar'}</div>
+          <div className="text-gray-900">{typeof data.name === 'object' && data.name !== null ? Object.values(data.name).join('/') : (data.name || 'Nicht verfügbar')}</div>
         </div>
         <div>
           <div className="flex items-center gap-1 text-gray-600 mb-1">
             <Mail className="w-3 h-3" />
             <span className="font-medium">E-Mail:</span>
           </div>
-          <div className="text-gray-900">{data.email || 'Nicht verfügbar'}</div>
+          <div className="text-gray-900">{typeof data.email === 'object' && data.email !== null ? Object.values(data.email).join('/') : (data.email || 'Nicht verfügbar')}</div>
         </div>
         <div>
           <div className="flex items-center gap-1 text-gray-600 mb-1">
             <Briefcase className="w-3 h-3" />
             <span className="font-medium">Position:</span>
           </div>
-          <div className="text-gray-900">{data.position || 'Nicht verfügbar'}</div>
+          <div className="text-gray-900">{typeof data.position === 'object' && data.position !== null ? Object.values(data.position).join('/') : (data.position || 'Nicht verfügbar')}</div>
         </div>
         <div>
           <div className="flex items-center gap-1 text-gray-600 mb-1">
             <Building className="w-3 h-3" />
             <span className="font-medium">Abteilung:</span>
           </div>
-          <div className="text-gray-900">{data.department || 'Nicht verfügbar'}</div>
+          <div className="text-gray-900">{typeof data.department === 'object' && data.department !== null ? Object.values(data.department).join('/') : (data.department || 'Nicht verfügbar')}</div>
         </div>
         <div>
           <div className="flex items-center gap-1 text-gray-600 mb-1">
             <MapPin className="w-3 h-3" />
             <span className="font-medium">Standort:</span>
           </div>
-          <div className="text-gray-900">{data.location || 'Nicht verfügbar'}</div>
+          <div className="text-gray-900">{typeof data.location === 'object' && data.location !== null ? Object.values(data.location).join('/') : (data.location || 'Nicht verfügbar')}</div>
         </div>
         <div>
           <div className="flex items-center gap-1 text-gray-600 mb-1">
             <Calendar className="w-3 h-3" />
             <span className="font-medium">Startdatum:</span>
           </div>
-          <div className="text-gray-900">{data.startDate || 'Nicht verfügbar'}</div>
+          <div className="text-gray-900">{typeof data.startDate === 'object' && data.startDate !== null ? Object.values(data.startDate).join('/') : (data.startDate || 'Nicht verfügbar')}</div>
         </div>
       </div>
 
@@ -109,7 +109,7 @@ function ProfileDataPreview({ data }: { data: any }) {
           <div className="flex flex-wrap gap-1">
             {data.skills.slice(0, 5).map((skill: any, index: number) => (
               <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
-                {skill.name} {skill.level ? `(${skill.level})` : ''}
+                {typeof skill === 'string' ? skill : (typeof skill.name === 'object' && skill.name !== null ? Object.values(skill.name).join('/') : (skill.name || 'Skill'))} {skill.level ? `(${typeof skill.level === 'object' && skill.level !== null ? Object.values(skill.level).join('/') : skill.level})` : ''}
               </span>
             ))}
             {data.skills.length > 5 && (
@@ -131,20 +131,30 @@ function ProfileDataPreview({ data }: { data: any }) {
           <div className="space-y-1 max-h-32 overflow-y-auto">
             {data.projects.map((project: any, index: number) => (
               <div key={index} className="p-2 bg-gray-50 rounded text-xs border">
-                <div className="font-medium">{typeof project === 'string' ? project : (project.name || project.title || 'Unbenanntes Projekt')}</div>
+                <div className="font-medium">{typeof project === 'string' ? project : (
+                  typeof project.name === 'object' && project.name !== null ? Object.values(project.name).join('/') : 
+                  typeof project.title === 'object' && project.title !== null ? Object.values(project.title).join('/') : 
+                  (project.name || project.title || 'Unbenanntes Projekt')
+                )}</div>
                 <div className="text-gray-600">
-                  {project.customer && <span>Kunde: {project.customer}</span>}
-                  {project.role && <span> • Rolle: {project.role}</span>}
-                  {project.startDate && <span> • Start: {project.startDate}</span>}
-                  {project.endDate && <span> • Ende: {project.endDate}</span>}
+                  {project.customer && <span>Kunde: {typeof project.customer === 'object' && project.customer !== null ? Object.values(project.customer).join('/') : project.customer}</span>}
+                  {project.role && <span> • Rolle: {typeof project.role === 'object' && project.role !== null ? Object.values(project.role).join('/') : project.role}</span>}
+                  {project.startDate && <span> • Start: {typeof project.startDate === 'object' && project.startDate !== null ? Object.values(project.startDate).join('/') : project.startDate}</span>}
+                  {project.endDate && <span> • Ende: {typeof project.endDate === 'object' && project.endDate !== null ? Object.values(project.endDate).join('/') : project.endDate}</span>}
                 </div>
                 {project.description && (
-                  <div className="text-gray-500 mt-1 truncate">{project.description}</div>
+                  <div className="text-gray-500 mt-1 truncate">{typeof project.description === 'object' && project.description !== null ? Object.values(project.description).join(' ') : project.description}</div>
                 )}
                 {project.technologies && (
                   <div className="mt-1">
                     <span className="text-gray-600">Tech: </span>
-                    <span className="text-blue-600">{Array.isArray(project.technologies) ? project.technologies.join(', ') : project.technologies}</span>
+                    <span className="text-blue-600">
+                      {Array.isArray(project.technologies) 
+                        ? project.technologies.join(', ') 
+                        : typeof project.technologies === 'object' && project.technologies !== null
+                        ? Object.values(project.technologies).join(', ')
+                        : project.technologies}
+                    </span>
                   </div>
                 )}
               </div>
@@ -163,84 +173,31 @@ function ProfileDataPreview({ data }: { data: any }) {
           <div className="space-y-1 max-h-24 overflow-y-auto">
             {data.certifications.map((cert: any, index: number) => (
               <div key={index} className="p-2 bg-purple-50 rounded text-xs border">
-                <div className="font-medium">{typeof cert === 'string' ? cert : (cert.name || cert.title || JSON.stringify(cert))}</div>
-                {cert.issuer && <div className="text-gray-600">Aussteller: {cert.issuer}</div>}
-                {cert.date && <div className="text-gray-600">Datum: {cert.date}</div>}
-                {cert.validUntil && <div className="text-gray-600">Gültig bis: {cert.validUntil}</div>}
+                <div className="font-medium">{typeof cert === 'string' ? cert : (
+                  typeof cert.name === 'object' && cert.name !== null ? Object.values(cert.name).join('/') : 
+                  typeof cert.title === 'object' && cert.title !== null ? Object.values(cert.title).join('/') : 
+                  (cert.name || cert.title || 'Zertifikat')
+                )}</div>
+                {cert.issuer && <div className="text-gray-600">Aussteller: {typeof cert.issuer === 'object' && cert.issuer !== null ? Object.values(cert.issuer).join('/') : cert.issuer}</div>}
+                {cert.date && <div className="text-gray-600">Datum: {typeof cert.date === 'object' && cert.date !== null ? Object.values(cert.date).join('/') : cert.date}</div>}
+                {cert.validUntil && <div className="text-gray-600">Gültig bis: {typeof cert.validUntil === 'object' && cert.validUntil !== null ? Object.values(cert.validUntil).join('/') : cert.validUntil}</div>}
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Languages */}
-      {data.languages && data.languages.length > 0 && (
-        <div>
-          <div className="flex items-center gap-1 text-gray-600 mb-2">
-            <Globe className="w-3 h-3" />
-            <span className="font-medium">Sprachen:</span>
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {data.languages.map((lang: any, index: number) => {
-              // Sichere Extraktion des Sprach-Namens
-              let languageName = 'Unbekannte Sprache';
-              
-              if (typeof lang === 'string') {
-                languageName = lang;
-              } else if (lang && typeof lang === 'object') {
-                if (lang.name && typeof lang.name === 'string') {
-                  languageName = lang.name;
-                } else if (lang.language) {
-                  if (typeof lang.language === 'string') {
-                    languageName = lang.language;
-                  } else if (typeof lang.language === 'object' && lang.language !== null) {
-                    // Objekt mit Übersetzungen: {de: "Deutsch", en: "English"}
-                    languageName = lang.language.de || lang.language.en || Object.values(lang.language)[0] || 'Unbekannte Sprache';
-                  }
-                }
-              }
-              
-              return (
-                <span key={index} className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded">
-                  {languageName} {lang && lang.level ? `(${lang.level})` : ''}
-                </span>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* Languages: KOMPLETT ENTFERNT auf User-Wunsch */}
 
-      {/* RAW-DATEN DEBUGGING */}
+      {/* Einfache Datenübersicht */}
       <div className="mt-4 pt-3 border-t border-gray-300">
         <div className="flex items-center gap-1 text-gray-600 mb-2">
           <Code className="w-3 h-3" />
-          <span className="font-medium">Raw-Daten Struktur (Debug):</span>
+          <span className="font-medium">Datenübersicht:</span>
         </div>
-        <div className="bg-gray-100 p-2 rounded text-xs font-mono max-h-32 overflow-y-auto">
-          <div><strong>Verfügbare Keys:</strong> {data.rawData ? Object.keys(data.rawData).join(', ') : 'Keine rawData'}</div>
-          {data.rawData?.user && (
-            <div className="mt-1">
-              <strong>user-Objekt Keys:</strong> {Object.keys(data.rawData.user).join(', ')}
-            </div>
-          )}
-          {data.rawData?.projects && (
-            <div className="mt-1">
-              <strong>projects Array:</strong> {data.rawData.projects.length} Einträge
-              {data.rawData.projects[0] && (
-                <div className="ml-2">Erstes Projekt Keys: {Object.keys(data.rawData.projects[0]).join(', ')}</div>
-              )}
-            </div>
-          )}
-          {data.rawData?.certifications && (
-            <div className="mt-1">
-              <strong>certifications Array:</strong> {data.rawData.certifications.length} Einträge
-            </div>
-          )}
-          {data.rawData?.languageRatings && (
-            <div className="mt-1">
-              <strong>languageRatings Array:</strong> {data.rawData.languageRatings.length} Einträge
-            </div>
-          )}
+        <div className="bg-gray-100 p-2 rounded text-xs">
+          <div><strong>Datenfelder:</strong> {Object.keys(data).filter(key => key !== 'rawData').join(', ')}</div>
+          <div className="mt-1"><strong>Status:</strong> Import erfolgreich ✅</div>
         </div>
       </div>
     </div>
@@ -580,7 +537,7 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
       case 'success':
         return employee.lastImported ? `Erfolgreich (${new Date(employee.lastImported).toLocaleString('de-DE')})` : 'Erfolgreich';
       case 'error':
-        return employee.error || 'Fehler';
+        return typeof employee.error === 'object' && employee.error !== null ? Object.values(employee.error).join(' ') : (employee.error || 'Fehler');
       default:
         return 'Unbekannt';
     }
@@ -741,7 +698,7 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
                   >
                     {/* Header */}
                     <div className="flex items-center justify-between mb-3">
-                      <div className="font-medium text-gray-900">{result.employee}</div>
+                      <div className="font-medium text-gray-900">{typeof result.employee === 'object' && result.employee !== null ? Object.values(result.employee).join('/') : result.employee}</div>
                       <div className="flex items-center gap-2">
                         {result.success ? (
                           <CheckCircle className="w-4 h-4 text-green-600" />
@@ -758,10 +715,10 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
                     {result.success && result.previewData ? (
                       <ProfileDataPreview data={result.previewData} />
                     ) : (
-                      <div className="text-sm text-red-600">{result.message}</div>
+                      <div className="text-sm text-red-600">{typeof result.message === 'object' && result.message !== null ? Object.values(result.message).join(' ') : result.message}</div>
                     )}
                     
-                    <div className="mt-2 text-xs text-gray-500">Auth: {result.authMethod}</div>
+                    <div className="mt-2 text-xs text-gray-500">Auth: {typeof result.authMethod === 'object' && result.authMethod !== null ? Object.values(result.authMethod).join('/') : result.authMethod}</div>
                   </div>
                 ))}
               </div>
@@ -873,7 +830,7 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
                       <div className="flex-1">
                         <div className="flex items-center gap-3">
                           <div className="font-medium text-gray-900">
-                            {employee.employeeName}
+                            {typeof employee.employeeName === 'object' && employee.employeeName !== null ? Object.values(employee.employeeName).join('/') : employee.employeeName}
                           </div>
                           {getStatusIcon(employee.status)}
                           <div className="text-sm text-gray-600">
@@ -883,7 +840,7 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
                         <div className="flex items-center gap-2 mt-1">
                           <Link2 className="w-3 h-3 text-gray-400" />
                           <div className="text-xs text-gray-500 truncate">
-                            {employee.profilerUrl}
+                            {typeof employee.profilerUrl === 'object' && employee.profilerUrl !== null ? Object.values(employee.profilerUrl).join('/') : employee.profilerUrl}
                           </div>
                         </div>
                       </div>
