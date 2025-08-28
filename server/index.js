@@ -5269,7 +5269,9 @@ async function fetchProfilerData(profileUrl, profilerCookies) {
 function transformProfilerData(rawData, profileId) {
   // Extrahiere E-Mail aus verschiedenen möglichen Quellen
   const extractEmail = (data) => {
-    const email = data.user?.email || 
+    const email = data.user?.employee?.email || 
+                  data.user?.employee?.emailAddress || 
+                  data.user?.email || 
                   data.user?.emailAddress || 
                   data.personalData?.email ||
                   data.contact?.email ||
@@ -5277,6 +5279,8 @@ function transformProfilerData(rawData, profileId) {
     
     // Debug-Logging für E-Mail-Extraktion
     console.log(`📧 E-Mail-Extraktion für ID ${profileId}:`, {
+      userEmployeeEmail: data.user?.employee?.email,
+      userEmployeeEmailAddress: data.user?.employee?.emailAddress,
       userEmail: data.user?.email,
       userEmailAddress: data.user?.emailAddress,
       personalDataEmail: data.personalData?.email,
@@ -5291,7 +5295,13 @@ function transformProfilerData(rawData, profileId) {
 
   // Extrahiere Name aus verschiedenen Quellen
   const extractName = (data) => {
-    return data.user?.displayName ||
+    const employeeName = data.user?.employee ? 
+      `${data.user.employee.firstName || ''} ${data.user.employee.lastName || ''}`.trim() : '';
+    
+    return employeeName ||
+           data.user?.employee?.displayName ||
+           data.user?.employee?.fullName ||
+           data.user?.displayName ||
            data.user?.fullName ||
            data.user?.name ||
            data.personalData?.name ||
@@ -5304,10 +5314,10 @@ function transformProfilerData(rawData, profileId) {
     id: profileId,
     name: extractName(rawData),
     email: extractEmail(rawData),
-    position: rawData.user?.position || rawData.position || rawData.jobTitle || 'Consultant',
-    department: rawData.user?.department || rawData.department || rawData.businessUnit || 'Unknown',
-    location: rawData.user?.location || rawData.location || rawData.office || 'Unknown',
-    startDate: rawData.user?.startDate || rawData.startDate || rawData.joinDate || null,
+    position: rawData.user?.employee?.position || rawData.user?.position || rawData.position || rawData.jobTitle || 'Consultant',
+    department: rawData.user?.employee?.department || rawData.user?.department || rawData.department || rawData.businessUnit || 'Unknown',
+    location: rawData.user?.employee?.location || rawData.user?.location || rawData.location || rawData.office || 'Unknown',
+    startDate: rawData.user?.employee?.startDate || rawData.user?.startDate || rawData.startDate || rawData.joinDate || null,
     
     // Skills aus verschiedenen Quellen extrahieren
     skills: extractSkills(rawData),
@@ -5317,7 +5327,19 @@ function transformProfilerData(rawData, profileId) {
     
     // Weitere Daten
     certifications: rawData.certifications || [],
-    languages: rawData.languages || [],
+    languages: rawData.languageRatings ? rawData.languageRatings.map(lang => {
+      // Sprache kann ein Objekt mit Übersetzungen sein: {de: "Deutsch", en: "English"}
+      let languageName = lang.language;
+      if (typeof languageName === 'object' && languageName !== null) {
+        // Bevorzuge deutsche Übersetzung, dann englische, dann erste verfügbare
+        languageName = languageName.de || languageName.en || Object.values(languageName)[0] || 'Unbekannte Sprache';
+      }
+      
+      return {
+        name: languageName || lang.name || 'Unbekannte Sprache',
+        level: lang.level || lang.rating || null
+      };
+    }) : [],
     education: rawData.education || [],
     
     // Metadaten
