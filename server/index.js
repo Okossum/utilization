@@ -5186,14 +5186,47 @@ async function fetchProfilerData(profileUrl, profilerCookies) {
 
 // Hilfsfunktion: Profiler-Daten transformieren
 function transformProfilerData(rawData, profileId) {
+  // Extrahiere E-Mail aus verschiedenen möglichen Quellen
+  const extractEmail = (data) => {
+    const email = data.user?.email || 
+                  data.user?.emailAddress || 
+                  data.personalData?.email ||
+                  data.contact?.email ||
+                  data.email;
+    
+    // Debug-Logging für E-Mail-Extraktion
+    console.log(`📧 E-Mail-Extraktion für ID ${profileId}:`, {
+      userEmail: data.user?.email,
+      userEmailAddress: data.user?.emailAddress,
+      personalDataEmail: data.personalData?.email,
+      contactEmail: data.contact?.email,
+      directEmail: data.email,
+      extractedEmail: email,
+      fallbackUsed: !email
+    });
+    
+    return email || `mitarbeiter${profileId}@adesso.de`; // Fallback nur wenn wirklich nichts gefunden
+  };
+
+  // Extrahiere Name aus verschiedenen Quellen
+  const extractName = (data) => {
+    return data.user?.displayName ||
+           data.user?.fullName ||
+           data.user?.name ||
+           data.personalData?.name ||
+           data.name ||
+           `${data.user?.firstName || ''} ${data.user?.lastName || ''}`.trim() ||
+           `Mitarbeiter ${profileId}`;
+  };
+
   return {
     id: profileId,
-    name: rawData.name || `Mitarbeiter ${profileId}`,
-    email: rawData.email || `mitarbeiter${profileId}@adesso.de`,
-    position: rawData.position || rawData.jobTitle || 'Consultant',
-    department: rawData.department || rawData.businessUnit || 'Unknown',
-    location: rawData.location || rawData.office || 'Unknown',
-    startDate: rawData.startDate || rawData.joinDate || null,
+    name: extractName(rawData),
+    email: extractEmail(rawData),
+    position: rawData.user?.position || rawData.position || rawData.jobTitle || 'Consultant',
+    department: rawData.user?.department || rawData.department || rawData.businessUnit || 'Unknown',
+    location: rawData.user?.location || rawData.location || rawData.office || 'Unknown',
+    startDate: rawData.user?.startDate || rawData.startDate || rawData.joinDate || null,
     
     // Skills aus verschiedenen Quellen extrahieren
     skills: extractSkills(rawData),
