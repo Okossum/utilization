@@ -268,7 +268,7 @@ function ProfileDataPreview({ data }: { data: any }) {
     </div>
   );
 }
-import { useUtilizationData } from '../../contexts/UtilizationDataContext';
+
 
 interface ProfilerManagementModalProps {
   isOpen: boolean;
@@ -293,7 +293,6 @@ interface ImportProgress {
 
 export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementModalProps) {
   const { token } = useAuth();
-  const { databaseData } = useUtilizationData();
   
   // State Management
   const [profilerCookies, setProfilerCookies] = useState('');
@@ -308,17 +307,41 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
   const [useTokenAuth, setUseTokenAuth] = useState(true);
 
-  // Lade Mitarbeiter mit Profiler-URLs
+  // Neue States für Batch-Import
+  const [batchMode, setBatchMode] = useState(false);
+  const [batchProgress, setBatchProgress] = useState({
+    currentBatch: 0,
+    totalBatches: 0,
+    waitingForToken: false,
+    batchSize: 100
+  });
+  const [newAuthToken, setNewAuthToken] = useState('');
+  const [showTokenInput, setShowTokenInput] = useState(false);
+
+  // Lade Mitarbeiter mit Profiler-URLs aus der mitarbeiter Collection
   const loadEmployeesWithProfilerUrls = async () => {
-    if (!databaseData?.utilizationData) return;
+    if (!token) return;
     
     setIsLoadingEmployees(true);
     try {
-      const employeesWithUrls = databaseData.utilizationData
+      // Lade Mitarbeiter aus der mitarbeiter Collection
+      const response = await fetch('http://localhost:3001/api/employees', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const mitarbeiterData = await response.json();
+      
+      const employeesWithUrls = mitarbeiterData
         .filter(emp => emp.linkZumProfilUrl && emp.linkZumProfilUrl.trim() !== '')
         .map(emp => ({
           employeeId: emp.id,
-          employeeName: emp.person,
+          employeeName: emp.name || emp.vorname + ' ' + emp.nachname || 'Unbekannt',
           profilerUrl: emp.linkZumProfilUrl,
           status: 'pending' as const
         }));
@@ -330,9 +353,9 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
         isRunning: false
       });
       
-      console.log(`📊 Profiler Management: ${employeesWithUrls.length} Mitarbeiter mit Profiler-URLs gefunden`);
+      console.log(`📊 Profiler Management: ${employeesWithUrls.length} Mitarbeiter mit Profiler-URLs aus mitarbeiter Collection gefunden`);
     } catch (error) {
-      console.error('❌ Fehler beim Laden der Mitarbeiter:', error);
+      console.error('❌ Fehler beim Laden der Mitarbeiter aus mitarbeiter Collection:', error);
     } finally {
       setIsLoadingEmployees(false);
     }
@@ -340,10 +363,10 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
 
   // Lade Mitarbeiter beim Öffnen des Modals
   useEffect(() => {
-    if (isOpen && databaseData?.utilizationData) {
+    if (isOpen && token) {
       loadEmployeesWithProfilerUrls();
     }
-  }, [isOpen, databaseData]);
+  }, [isOpen, token]);
 
   // State für Preview-Test
   const [isTestingPreview, setIsTestingPreview] = useState(false);
@@ -473,7 +496,9 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
     setImportProgress(prev => ({ ...prev, isRunning: true, completed: 0 }));
     
     try {
-      // Rufe Backend-API für Bulk-Import auf
+      // Wähle zwischen normalem und Batch-Import
+      const apiEndpoint = batchMode ? '/api/profiler/batch-import' : '/api/profiler/bulk-import';
+      
       const requestBody: any = {
         employees: employees.map(emp => ({
           employeeId: emp.employeeId,
@@ -488,16 +513,22 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
         requestBody.profilerCookies = profilerCookies;
       }
 
-      console.log('🚀 Sende Bulk-Import Request:', {
-        url: 'http://localhost:3001/api/profiler/bulk-import',
+      // Füge Batch-spezifische Parameter hinzu
+      if (batchMode) {
+        requestBody.batchSize = batchProgress.batchSize;
+      }
+
+      console.log(`🚀 Sende ${batchMode ? 'Batch-' : ''}Import Request:`, {
+        url: `http://localhost:3001${apiEndpoint}`,
         employeesCount: requestBody.employees.length,
+        batchMode,
+        batchSize: requestBody.batchSize,
         useTokenAuth,
         hasAuthToken: !!requestBody.authToken,
-        hasCookies: !!requestBody.profilerCookies,
         requestBody: { ...requestBody, authToken: requestBody.authToken ? '[REDACTED]' : undefined }
       });
 
-      const response = await fetch('http://localhost:3001/api/profiler/bulk-import', {
+      const response = await fetch(`http://localhost:3001${apiEndpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -550,6 +581,21 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
           isRunning: status.isRunning
         });
 
+        // Update Batch-Progress wenn im Batch-Modus
+        if (status.batchMode) {
+          setBatchProgress({
+            currentBatch: status.currentBatch,
+            totalBatches: status.totalBatches,
+            waitingForToken: status.waitingForToken,
+            batchSize: status.batchSize
+          });
+
+          // Zeige Token-Eingabe wenn nötig
+          if (status.waitingForToken && !showTokenInput) {
+            setShowTokenInput(true);
+          }
+        }
+
         // Update employee status
         if (status.employeeResults) {
           setEmployees(prev => prev.map(emp => {
@@ -573,6 +619,44 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
       }
     } catch (error) {
       console.error('❌ Fehler beim Abrufen des Import-Status:', error);
+    }
+  };
+
+  // Batch-Import mit neuem Token fortsetzen
+  const handleContinueBatch = async () => {
+    if (!newAuthToken.trim()) {
+      alert('Bitte geben Sie einen neuen Token ein.');
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:3001/api/profiler/continue-batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ authToken: newAuthToken })
+      });
+
+      if (!response.ok) {
+        const errorResult = await response.json().catch(() => ({ error: 'Unbekannter Fehler' }));
+        throw new Error(`HTTP ${response.status}: ${errorResult.error || response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Batch-Import wird fortgesetzt:', result);
+      
+      // Verstecke Token-Eingabe und setze Token zurück
+      setShowTokenInput(false);
+      setNewAuthToken('');
+      
+      // Starte Status-Polling neu
+      pollImportStatus();
+      
+    } catch (error) {
+      console.error('❌ Fehler beim Fortsetzen des Batch-Imports:', error);
+      alert(`Fehler beim Fortsetzen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
     }
   };
 
@@ -741,6 +825,43 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
                 </button>
               </div>
             )}
+
+            {/* Batch-Modus Auswahl */}
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <RefreshCw className="w-4 h-4 text-blue-600" />
+                <span className="font-medium text-blue-800">Batch-Modus</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={batchMode}
+                    onChange={(e) => setBatchMode(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-blue-700">100er-Pakete mit Token-Pausen</span>
+                </label>
+                {batchMode && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-blue-600">Batch-Größe:</span>
+                    <input
+                      type="number"
+                      value={batchProgress.batchSize}
+                      onChange={(e) => setBatchProgress(prev => ({ ...prev, batchSize: parseInt(e.target.value) || 100 }))}
+                      min="50"
+                      max="200"
+                      className="w-16 px-2 py-1 text-sm border border-blue-300 rounded focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                )}
+              </div>
+              {batchMode && (
+                <p className="text-xs text-blue-600 mt-2">
+                  💡 Lädt Profile in {batchProgress.batchSize}er-Paketen und wartet auf neuen Token zwischen den Batches
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Detailed Preview Results */}
@@ -930,6 +1051,55 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
             <div className="text-center py-8">
               <RefreshCw className="w-8 h-8 mx-auto mb-3 text-blue-500 animate-spin" />
               <p className="text-gray-600">Lade Mitarbeiter...</p>
+            </div>
+          )}
+
+          {/* Token-Eingabe für Batch-Fortsetzung */}
+          {showTokenInput && batchProgress.waitingForToken && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+                <div className="flex items-center gap-3 mb-4">
+                  <Key className="w-6 h-6 text-blue-600" />
+                  <h3 className="text-lg font-semibold text-gray-900">Neuer Token erforderlich</h3>
+                </div>
+                
+                <div className="mb-4">
+                  <p className="text-gray-600 mb-3">
+                    Batch {batchProgress.currentBatch - 1}/{batchProgress.totalBatches} abgeschlossen. 
+                    Für den nächsten Batch wird ein neuer Token benötigt.
+                  </p>
+                  
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Neuer Bearer Token
+                  </label>
+                  <textarea
+                    value={newAuthToken}
+                    onChange={(e) => setNewAuthToken(e.target.value)}
+                    placeholder="Geben Sie Ihren neuen Profiler Bearer Token ein..."
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                  />
+                </div>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleContinueBatch}
+                    disabled={!newAuthToken.trim()}
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Download fortsetzen
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowTokenInput(false);
+                      setNewAuthToken('');
+                    }}
+                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                  >
+                    Abbrechen
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
