@@ -226,3 +226,4 @@ Diese Anleitung wurde zuletzt am **[Datum]** aktualisiert und entspricht der akt
 
 *Diese Anleitung ist speziell für **Sales-Mitarbeiter** erstellt und fokussiert sich auf Ihre verfügbaren Funktionen in der Sales-View.*
 
+

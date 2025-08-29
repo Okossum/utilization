@@ -626,7 +626,7 @@ function EmployeeDetailModal({
           className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
         >
           <div className="flex items-center gap-3">
-            <Icon className="w-5 h-5 text-blue-600" />
+            {Icon && <Icon className="w-5 h-5 text-blue-600" />}
             <h3 className="font-medium text-gray-900">{title}</h3>
             {Array.isArray(data) && (
               <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
@@ -758,7 +758,7 @@ function EmployeeDetailModal({
             {employee.user && renderSection('User-Daten (Struktur)', User, 'userData', employee.user)}
             
             {/* Employee Object */}
-            {employee.user?.employee && renderSection('Employee-Daten (Struktur)', Building2, 'employeeData', employee.user.employee)}
+            {employee.user?.employee && renderSection('Employee-Daten (Struktur)', null, 'employeeData', employee.user.employee)}
             
             {/* Raw Data Section */}
             {renderSection('Vollständige Rohdaten (JSON)', Settings, 'rawData', employee)}

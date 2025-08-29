@@ -2239,7 +2239,6 @@ app.post('/api/profiler/preview', requireAuth, async (req, res) => {
 
 // Profiler Import Route
 app.post('/api/profiler/import', requireAuth, async (req, res) => {
-  logger.info('🔄 Profiler Import gestartet', { profileUrl: req.body.profileUrl, employeeId: req.body.employeeId });
   try {
     const { profileUrl, employeeId, authToken } = req.body;
 
@@ -5891,20 +5890,378 @@ let bulkImportStatus = {
   currentEmployee: null,
   employeeResults: {},
   startedAt: null,
-  completedAt: null,
-  // Neue Batch-Felder
-  batchMode: false,
-  batchSize: 100,
-  currentBatch: 0,
-  totalBatches: 0,
-  waitingForToken: false,
-  remainingEmployees: [],
-  currentAuthToken: null,
-  // Token-Refresh Felder
-  tokenRefreshRequested: false,
-  tokenRefreshCount: 0,
-  lastTokenRefresh: null
+  completedAt: null
 };
+
+// POST /api/profiler/batch-import - Startet Batch-Import mit Token-Refresh
+app.post('/api/profiler/batch-import', requireAuth, async (req, res) => {
+  try {
+    const { employees, authToken, batchSize = 5 } = req.body;
+
+    console.log('🔍 Batch-Import Request erhalten:', {
+      hasAuthToken: !!authToken,
+      authTokenLength: authToken?.length || 0,
+      employeesCount: employees?.length || 0,
+      batchSize,
+      requestBodyKeys: Object.keys(req.body)
+    });
+
+    // Validiere Authentifizierung
+    if (!authToken) {
+      console.log('❌ Authentifizierung fehlgeschlagen: authToken erforderlich für Batch-Import');
+      return res.status(400).json({ error: 'authToken ist für Batch-Import erforderlich' });
+    }
+
+    if (!employees || !Array.isArray(employees) || employees.length === 0) {
+      console.log('❌ Mitarbeiter-Validierung fehlgeschlagen:', { employees, isArray: Array.isArray(employees), length: employees?.length });
+      return res.status(400).json({ error: 'Mitarbeiter-Liste ist erforderlich' });
+    }
+
+    // Prüfe ob bereits ein Import läuft
+    if (bulkImportStatus.isRunning) {
+      return res.status(409).json({ error: 'Ein Import läuft bereits' });
+    }
+
+    // Initialisiere Batch-Import-Status
+    bulkImportStatus = {
+      isRunning: true,
+      batchMode: true,
+      total: employees.length,
+      completed: 0,
+      currentBatch: 1,
+      totalBatches: Math.ceil(employees.length / batchSize),
+      batchSize: batchSize,
+      remainingEmployees: employees,
+      currentAuthToken: authToken,
+      waitingForToken: false,
+      currentEmployee: null,
+      employeeResults: {},
+      startedAt: new Date().toISOString(),
+      tokenRefreshRequested: false,
+      tokenRefreshCount: 0,
+      lastTokenRefresh: null
+    };
+
+    console.log(`🚀 Batch-Import gestartet: ${employees.length} Mitarbeiter in ${bulkImportStatus.totalBatches} Batches (Größe: ${batchSize})`);
+
+    // Starte ersten Batch
+    processBatchImport(employees, { authToken }, batchSize);
+
+    res.json({
+      success: true,
+      message: `Batch-Import gestartet für ${employees.length} Mitarbeiter`,
+      batchInfo: {
+        totalBatches: bulkImportStatus.totalBatches,
+        batchSize: batchSize,
+        currentBatch: 1
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Fehler beim Batch-Import:', error);
+    bulkImportStatus.isRunning = false;
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+// POST /api/profiler/continue-batch - Setzt Batch-Import mit neuem Token fort
+app.post('/api/profiler/continue-batch', requireAuth, async (req, res) => {
+  try {
+    const { authToken } = req.body;
+
+    if (!bulkImportStatus.isRunning) {
+      return res.status(400).json({ 
+        error: 'Kein aktiver Batch-Import gefunden',
+        status: bulkImportStatus 
+      });
+    }
+
+    if (!bulkImportStatus.waitingForToken) {
+      return res.status(400).json({ 
+        error: 'Import wartet nicht auf Token',
+        status: bulkImportStatus 
+      });
+    }
+
+    if (!authToken) {
+      return res.status(400).json({ error: 'Neuer authToken erforderlich' });
+    }
+
+    console.log(`🔄 Setze Batch-Import fort mit neuem Token (Batch ${bulkImportStatus.currentBatch}/${bulkImportStatus.totalBatches})`);
+
+    // Aktualisiere Token und setze Import fort
+    bulkImportStatus.currentAuthToken = authToken;
+    bulkImportStatus.waitingForToken = false;
+    bulkImportStatus.tokenRefreshRequested = false;
+
+    // Setze Import fort
+    const employees = bulkImportStatus.remainingEmployees || [];
+    const batchSize = bulkImportStatus.batchSize || 100;
+    
+    // Starte Verarbeitung im Hintergrund fort
+    setImmediate(() => {
+      processBatchImport(employees, { authToken }, batchSize);
+    });
+
+    res.json({
+      success: true,
+      message: `Batch-Import fortgesetzt mit Batch ${bulkImportStatus.currentBatch}/${bulkImportStatus.totalBatches}`,
+      status: {
+        currentBatch: bulkImportStatus.currentBatch,
+        totalBatches: bulkImportStatus.totalBatches,
+        completed: bulkImportStatus.completed,
+        total: bulkImportStatus.total
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Fehler beim Fortsetzen des Batch-Imports:', error);
+    res.status(500).json({ error: 'Interner Server-Fehler' });
+  }
+});
+
+// Batch-Import Verarbeitung mit Token-Refresh
+async function processBatchImport(employees, authConfig, batchSize) {
+  console.log(`📦 Starte Batch-Verarbeitung: ${employees.length} Mitarbeiter, Batch-Größe: ${batchSize}`);
+  const { authToken } = authConfig;
+
+  try {
+    const startIndex = (bulkImportStatus.currentBatch - 1) * batchSize;
+    const endIndex = Math.min(startIndex + batchSize, employees.length);
+    const currentBatchEmployees = employees.slice(startIndex, endIndex);
+
+    console.log(`📦 Verarbeite Batch ${bulkImportStatus.currentBatch}/${bulkImportStatus.totalBatches}: Mitarbeiter ${startIndex + 1}-${endIndex}`);
+
+    for (let i = 0; i < currentBatchEmployees.length; i++) {
+      const employee = currentBatchEmployees[i];
+      const { employeeId, profilerUrl } = employee;
+      const globalIndex = startIndex + i + 1;
+      let profileData = null; // Definiere außerhalb des try-blocks
+      let employeeName = `ID: ${employeeId}`; // Fallback-Name
+
+      try {
+        bulkImportStatus.currentEmployee = employeeId;
+        console.log(`🔄 Verarbeite Mitarbeiter ${globalIndex}/${bulkImportStatus.total}: ${employeeId}`);
+
+        // Extrahiere Profil-ID aus URL
+        const profileId = extractProfileIdFromUrl(profilerUrl);
+        if (!profileId) {
+          throw new Error('Ungültige Profiler-URL');
+        }
+
+        // Profiler-Import mit Token UND Skills
+        const currentToken = bulkImportStatus.currentAuthToken || authToken;
+        
+        // 1. Basis-Profiler-Daten abrufen
+        profileData = await fetchProfilerDataWithToken(profilerUrl, currentToken);
+        
+        // Extrahiere Mitarbeitername für besseres Logging
+        employeeName = profileData?.name || profileData?.user?.name || profileData?.user?.employee?.personalData?.firstName + ' ' + profileData?.user?.employee?.personalData?.lastName || `ID: ${employeeId}`;
+        
+        // 2. Skills-API-Aufrufe hinzufügen
+        console.log(`🔍 Starte Skills-API-Analyse für ${employeeId} (ID: ${profileId})`);
+        let skillsData = null;
+        const skillsEndpoints = [
+          `https://profiler.adesso-group.com/api/profiles/${profileId}/skill-ratings`,
+          `https://profiler.adesso-group.com/api/skills/autocomplete/DE`,
+          `https://profiler.adesso-group.com/api/user`,
+          `https://profiler.adesso-group.com/api/employee-availability/${profileData.user?.employee?.id}`,
+          `https://profiler.adesso-group.com/api/skill-ratings/${profileId}`,
+          `https://profiler.adesso-group.com/api/profiles/${profileId}/skills`
+        ];
+
+        // Token für Skills-API bereinigen
+        const cleanToken = currentToken.replace(/^Bearer\s+/i, '').trim();
+        console.log(`🧹 Token für Skills-API bereinigt: Länge ${cleanToken.length}, erste 20 Zeichen: ${cleanToken.substring(0, 20)}...`);
+
+        for (const [index, skillsUrl] of skillsEndpoints.entries()) {
+          try {
+            console.log(`🔗 [${index + 1}/${skillsEndpoints.length}] Teste Skills-URL: ${skillsUrl}`);
+            
+            const testConfigs = [
+              {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${cleanToken}`,
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json'
+                }
+              }
+            ];
+
+            for (const [configIndex, config] of testConfigs.entries()) {
+              try {
+                console.log(`🧪 [${index + 1}.${configIndex + 1}] Teste Konfiguration:`, {
+                  method: config.method,
+                  hasAuth: !!config.headers.Authorization,
+                  authLength: config.headers.Authorization?.length || 0
+                });
+
+                const skillsResponse = await fetch(skillsUrl, {
+                  ...config,
+                  timeout: 10000
+                });
+
+                console.log(`📡 [${index + 1}.${configIndex + 1}] Skills-Response:`, {
+                  status: skillsResponse.status,
+                  statusText: skillsResponse.statusText,
+                  ok: skillsResponse.ok,
+                  contentType: skillsResponse.headers.get('content-type')
+                });
+
+                if (skillsResponse.ok) {
+                  const responseText = await skillsResponse.text();
+                  console.log(`📄 [${index + 1}.${configIndex + 1}] Response-Text (erste 200 Zeichen):`, responseText.substring(0, 200));
+
+                  try {
+                    const skillsJson = JSON.parse(responseText);
+                    if (Array.isArray(skillsJson) && skillsJson.length > 0) {
+                      skillsData = {
+                        data: skillsJson,
+                        source: skillsUrl,
+                        method: config.method,
+                        configIndex: configIndex + 1
+                      };
+                      console.log(`✅ [${index + 1}.${configIndex + 1}] Skills gefunden! ${skillsJson.length} Skills von ${skillsUrl}`);
+                      break; // Erfolg - beende innere Schleife
+                    } else {
+                      console.log(`⚠️ [${index + 1}.${configIndex + 1}] Leere Skills-Liste oder ungültiges Format`);
+                    }
+                  } catch (parseError) {
+                    console.log(`❌ [${index + 1}.${configIndex + 1}] JSON-Parse-Fehler:`, parseError.message);
+                  }
+                } else {
+                  console.log(`❌ [${index + 1}.${configIndex + 1}] Skills-API-Fehler: ${skillsResponse.status} ${skillsResponse.statusText}`);
+                }
+              } catch (skillsError) {
+                console.log(`❌ [${index + 1}.${configIndex + 1}] Fehler beim Skills-API-Call: ${skillsError.message}`);
+              }
+            }
+
+            if (skillsData) break; // Erfolg - beende äußere Schleife
+          } catch (skillsError) {
+            console.log(`❌ [${index + 1}] Fehler beim Skills-API-Call: ${skillsError.message}`);
+          }
+        }
+        console.log('🏁 Skills-API-Analyse abgeschlossen. Gefundene Daten:', !!skillsData);
+
+        // 3. Skills in Profiler-Daten integrieren
+        if (skillsData && skillsData.data && Array.isArray(skillsData.data)) {
+          console.log(`🔗 Integriere ${skillsData.data.length} Skills aus ${skillsData.source} in Profiler-Daten`);
+          
+          profileData.skills = skillsData.data;
+          profileData.skillsCount = skillsData.data.length;
+          profileData.hasSkills = true;
+          profileData.skillsSource = skillsData.source;
+          profileData.skillsMethod = skillsData.method;
+          
+          console.log(`✅ Skills erfolgreich integriert: ${skillsData.data.length} Skills hinzugefügt`);
+        } else {
+          console.log(`⚠️ Keine Skills-Daten gefunden - Profiler-Daten bleiben ohne zusätzliche Skills`);
+        }
+
+        // 4. Prüfe Dokumentgröße vor dem Speichern
+        const dataSize = JSON.stringify(profileData).length;
+        const maxFirebaseSize = 1048576; // 1 MB in Bytes
+        
+        if (dataSize > maxFirebaseSize) {
+          console.warn(`⚠️ Dokument zu groß für Firebase: ${dataSize} bytes (Max: ${maxFirebaseSize})`);
+          console.log(`🔧 Versuche Daten-Komprimierung für ${employeeName} (${employeeId})`);
+          
+          // Komprimiere Daten durch Entfernen nicht-essentieller Felder
+          const compressedData = compressProfileDataForFirebase(profileData);
+          const compressedSize = JSON.stringify(compressedData).length;
+          
+          if (compressedSize <= maxFirebaseSize) {
+            console.log(`✅ Daten erfolgreich komprimiert: ${dataSize} → ${compressedSize} bytes`);
+            await saveProfilerData(employeeId, compressedData);
+          } else {
+            throw new Error(`Document too large even after compression: ${compressedSize} bytes exceeds ${maxFirebaseSize} bytes`);
+          }
+        } else {
+          // 5. Speichere in Firebase (normale Größe)
+          await saveProfilerData(employeeId, profileData);
+        }
+
+        // Markiere als erfolgreich
+        bulkImportStatus.employeeResults[employeeId] = {
+          status: 'success',
+          completedAt: new Date().toISOString()
+        };
+
+        bulkImportStatus.completed++;
+        console.log(`✅ Mitarbeiter ${employeeName} (${employeeId}) erfolgreich verarbeitet (${bulkImportStatus.completed}/${bulkImportStatus.total})`);
+
+      } catch (error) {
+        console.error(`❌ Fehler bei Mitarbeiter ${employeeName} (${employeeId}):`, error);
+        
+        // 🔍 Spezifische Fehlerbehandlung
+        if (error.message.includes('exceeds the maximum allowed size')) {
+          console.error(`📊 Firebase Dokumentgröße-Fehler bei ${employeeName} (${employeeId}):`, {
+            error: error.message,
+            employeeId,
+            name: employeeName,
+            dataSize: profileData ? JSON.stringify(profileData).length : 'unbekannt'
+          });
+          
+          // Markiere als fehlgeschlagen wegen Größe
+          bulkImportStatus.employeeResults[employeeId] = {
+            status: 'failed',
+            error: 'Document too large for Firebase',
+            employeeName: employeeName,
+            completedAt: new Date().toISOString()
+          };
+          
+          // Überspringe diesen Mitarbeiter und mache weiter
+          console.log(`⏭️ Überspringe ${employeeName} (${employeeId}) wegen Dokumentgröße und setze Import fort...`);
+          
+        } else if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+          console.warn(`🔄 Token abgelaufen bei ${employeeName} (${employeeId}). Pausiere Import für Token-Refresh...`);
+          
+          // Markiere Token-Refresh als erforderlich
+          bulkImportStatus.tokenRefreshRequested = true;
+          bulkImportStatus.tokenRefreshCount++;
+          bulkImportStatus.lastTokenRefresh = new Date().toISOString();
+          bulkImportStatus.currentEmployee = employeeId;
+          bulkImportStatus.waitingForToken = true;
+          
+          console.log('⏸️ Import pausiert - warte auf neuen Token');
+          return; // Beende Funktion, warte auf Token-Refresh
+        }
+
+        bulkImportStatus.employeeResults[employeeId] = {
+          status: 'error',
+          error: error.message,
+          completedAt: new Date().toISOString()
+        };
+
+        bulkImportStatus.completed++;
+      }
+    }
+
+    // Nächster Batch oder Abschluss
+    if (bulkImportStatus.currentBatch < bulkImportStatus.totalBatches) {
+      // Nächster Batch
+      bulkImportStatus.currentBatch++;
+      bulkImportStatus.waitingForToken = true;
+      bulkImportStatus.currentEmployee = null;
+
+      console.log(`⏸️ Batch ${bulkImportStatus.currentBatch - 1} abgeschlossen. Warte auf neuen Token für Batch ${bulkImportStatus.currentBatch}/${bulkImportStatus.totalBatches}`);
+    } else {
+      // Import abgeschlossen
+      bulkImportStatus.isRunning = false;
+      bulkImportStatus.completedAt = new Date().toISOString();
+      bulkImportStatus.currentEmployee = null;
+
+      console.log(`🎉 Batch-Import abgeschlossen! ${bulkImportStatus.completed}/${bulkImportStatus.total} Mitarbeiter verarbeitet`);
+    }
+
+  } catch (error) {
+    console.error('❌ Fehler in Batch-Verarbeitung:', error);
+    bulkImportStatus.isRunning = false;
+    bulkImportStatus.waitingForToken = false;
+  }
+}
 
 // POST /api/profiler/bulk-import - Startet Bulk-Import aller Mitarbeiter
 app.post('/api/profiler/bulk-import', requireAuth, async (req, res) => {
@@ -5945,14 +6302,7 @@ app.post('/api/profiler/bulk-import', requireAuth, async (req, res) => {
       currentEmployee: null,
       employeeResults: {},
       startedAt: new Date().toISOString(),
-      completedAt: null,
-      // Token-Refresh Felder
-      tokenRefreshRequested: false,
-      tokenRefreshCount: 0,
-      lastTokenRefresh: null,
-      pausedAtIndex: 0,
-      remainingEmployees: employees, // Speichere für Token-Refresh
-      currentAuthToken: authToken
+      completedAt: null
     };
 
     console.log(`🚀 Profiler Bulk-Import gestartet für ${employees.length} Mitarbeiter`);
@@ -5973,223 +6323,12 @@ app.post('/api/profiler/bulk-import', requireAuth, async (req, res) => {
   }
 });
 
-// GET /api/profiler/count - Zählt Datensätze in profilerData Collection
-app.get('/api/profiler/count', async (req, res) => {
-  try {
-    const snapshot = await admin.firestore().collection('profilerData').get();
-    res.json({ 
-      count: snapshot.size,
-      message: `${snapshot.size} Datensätze in profilerData Collection gefunden`
-    });
-  } catch (error) {
-    logger.error('❌ Fehler beim Zählen der Profiler-Daten:', error);
-    res.status(500).json({ error: 'Fehler beim Zählen der Datensätze' });
-  }
-});
-
-// GET /api/profiler/analyze-sizes - Analysiert Dokumentgrößen
-app.get('/api/profiler/analyze-sizes', async (req, res) => {
-  try {
-    const snapshot = await admin.firestore().collection('profilerData').get();
-    console.log('📊 Analysiere', snapshot.size, 'Dokumente...');
-    
-    const sizes = [];
-    snapshot.docs.forEach(doc => {
-      const data = doc.data();
-      const jsonString = JSON.stringify(data);
-      const sizeInBytes = Buffer.byteLength(jsonString, 'utf8');
-      
-      sizes.push({
-        id: doc.id,
-        employeeId: data.employeeId || 'unbekannt',
-        name: data.name || 'unbekannt',
-        sizeInBytes: sizeInBytes,
-        sizeInKB: Math.round(sizeInBytes / 1024),
-        sizeInMB: (sizeInBytes / (1024 * 1024)).toFixed(2)
-      });
-    });
-    
-    // Sortiere nach Größe (größte zuerst)
-    sizes.sort((a, b) => b.sizeInBytes - a.sizeInBytes);
-    
-    const tooLarge = sizes.filter(doc => doc.sizeInBytes > 1048576);
-    
-    res.json({
-      totalDocuments: snapshot.size,
-      largestDocuments: sizes.slice(0, 10),
-      documentsOverLimit: tooLarge,
-      overLimitCount: tooLarge.length,
-      maxSizeBytes: 1048576,
-      analysis: {
-        largest: sizes[0] || null,
-        smallest: sizes[sizes.length - 1] || null,
-        averageSize: sizes.length > 0 ? Math.round(sizes.reduce((sum, doc) => sum + doc.sizeInBytes, 0) / sizes.length) : 0
-      }
-    });
-  } catch (error) {
-    logger.error('❌ Fehler bei der Größenanalyse:', error);
-    res.status(500).json({ error: 'Fehler bei der Größenanalyse' });
-  }
-});
-
 // GET /api/profiler/import-status - Gibt aktuellen Import-Status zurück
 app.get('/api/profiler/import-status', requireAuth, async (req, res) => {
   try {
     res.json(bulkImportStatus);
   } catch (error) {
     console.error('❌ Fehler beim Abrufen des Import-Status:', error);
-    res.status(500).json({ error: 'Interner Server-Fehler' });
-  }
-});
-
-// POST /api/profiler/batch-import - Startet Batch-Import mit Token-Pausen
-app.post('/api/profiler/batch-import', requireAuth, async (req, res) => {
-  try {
-    const { profilerCookies, employees, authToken, batchSize = 100 } = req.body;
-
-    logger.info('🔄 Batch-Import gestartet', { 
-      employeesCount: employees?.length, 
-      batchSize,
-      hasAuthToken: !!authToken 
-    });
-
-    // Validierung
-    if (!authToken && !profilerCookies) {
-      return res.status(400).json({ error: 'Authentifizierung erforderlich: Token oder Cookies' });
-    }
-
-    if (!employees || !Array.isArray(employees) || employees.length === 0) {
-      return res.status(400).json({ error: 'Mitarbeiter-Liste ist erforderlich' });
-    }
-
-    // Prüfe ob bereits ein Import läuft
-    if (bulkImportStatus.isRunning) {
-      return res.status(409).json({ error: 'Ein Import läuft bereits' });
-    }
-
-    // Initialisiere Batch-Import-Status
-    const totalBatches = Math.ceil(employees.length / batchSize);
-    
-    bulkImportStatus = {
-      isRunning: true,
-      total: employees.length,
-      completed: 0,
-      currentEmployee: null,
-      employeeResults: {},
-      startedAt: new Date().toISOString(),
-      completedAt: null,
-      // Batch-spezifische Felder
-      batchMode: true,
-      batchSize: batchSize,
-      currentBatch: 1,
-      totalBatches: totalBatches,
-      waitingForToken: false,
-      remainingEmployees: [...employees],
-      currentAuthToken: authToken
-    };
-
-    logger.info(`🚀 Batch-Import gestartet: ${employees.length} Mitarbeiter in ${totalBatches} Batches à ${batchSize}`);
-
-    // Starte ersten Batch
-    processBatchImport({ profilerCookies, authToken });
-
-    res.json({
-      success: true,
-      message: 'Batch-Import gestartet',
-      total: employees.length,
-      totalBatches: totalBatches,
-      batchSize: batchSize
-    });
-
-  } catch (error) {
-    logger.error('❌ Fehler beim Starten des Batch-Imports:', error);
-    bulkImportStatus.isRunning = false;
-    res.status(500).json({ error: 'Interner Server-Fehler' });
-  }
-});
-
-// POST /api/profiler/continue-batch - Setzt Batch-Import mit neuem Token fort
-app.post('/api/profiler/continue-batch', requireAuth, async (req, res) => {
-  try {
-    const { authToken } = req.body;
-
-    logger.info('🔄 Batch-Import Fortsetzung angefordert', { hasAuthToken: !!authToken });
-
-    if (!authToken) {
-      return res.status(400).json({ error: 'Neuer Auth-Token erforderlich' });
-    }
-
-    if (!bulkImportStatus.batchMode || !bulkImportStatus.waitingForToken) {
-      return res.status(400).json({ error: 'Kein Batch-Import wartet auf Token' });
-    }
-
-    // Update Token und setze fort
-    bulkImportStatus.currentAuthToken = authToken;
-    bulkImportStatus.waitingForToken = false;
-
-    logger.info(`🔄 Setze Batch ${bulkImportStatus.currentBatch}/${bulkImportStatus.totalBatches} fort`);
-
-    // Setze Import fort
-    processBatchImport({ authToken });
-
-    res.json({
-      success: true,
-      message: 'Batch-Import wird fortgesetzt',
-      currentBatch: bulkImportStatus.currentBatch,
-      totalBatches: bulkImportStatus.totalBatches
-    });
-
-  } catch (error) {
-    logger.error('❌ Fehler beim Fortsetzen des Batch-Imports:', error);
-    res.status(500).json({ error: 'Interner Server-Fehler' });
-  }
-});
-
-// POST /api/profiler/refresh-token - Erneuert Token für laufenden Import
-app.post('/api/profiler/refresh-token', requireAuth, async (req, res) => {
-  try {
-    const { authToken } = req.body;
-
-    console.log('🔄 Token-Refresh angefordert', { 
-      hasAuthToken: !!authToken,
-      isRunning: bulkImportStatus.isRunning,
-      tokenRefreshRequested: bulkImportStatus.tokenRefreshRequested
-    });
-
-    if (!authToken) {
-      return res.status(400).json({ error: 'Neuer Auth-Token ist erforderlich' });
-    }
-
-    if (!bulkImportStatus.isRunning || !bulkImportStatus.tokenRefreshRequested) {
-      return res.status(400).json({ error: 'Kein Import wartet auf Token-Refresh' });
-    }
-
-    // Update Token und setze Import fort
-    bulkImportStatus.currentAuthToken = authToken;
-    bulkImportStatus.tokenRefreshRequested = false;
-    bulkImportStatus.lastTokenRefresh = new Date().toISOString();
-
-    console.log(`🔄 Token erneuert. Setze Import fort ab Mitarbeiter: ${bulkImportStatus.currentEmployee}`);
-
-    // Hole ursprüngliche Parameter für Fortsetzung
-    const employees = bulkImportStatus.remainingEmployees || [];
-    const pausedIndex = bulkImportStatus.pausedAtIndex || 0;
-    
-    // Setze Import fort ab pausiertem Index
-    if (employees.length > 0 && pausedIndex < employees.length) {
-      const remainingEmployees = employees.slice(pausedIndex);
-      processBulkImport(remainingEmployees, { authToken });
-    }
-
-    res.json({
-      success: true,
-      message: 'Token erneuert, Import wird fortgesetzt',
-      refreshCount: bulkImportStatus.tokenRefreshCount,
-      currentEmployee: bulkImportStatus.currentEmployee
-    });
-
-  } catch (error) {
-    console.error('❌ Fehler beim Token-Refresh:', error);
     res.status(500).json({ error: 'Interner Server-Fehler' });
   }
 });
@@ -6220,120 +6359,7 @@ app.post('/api/consolidate-with-profiler', requireAuth, async (req, res) => {
   }
 });
 
-// Batch-Import Verarbeitung mit Token-Pausen
-async function processBatchImport(authConfig) {
-  try {
-    const { profilerCookies, authToken } = authConfig;
-    
-    // Hole aktuellen Batch
-    const startIndex = (bulkImportStatus.currentBatch - 1) * bulkImportStatus.batchSize;
-    const endIndex = Math.min(startIndex + bulkImportStatus.batchSize, bulkImportStatus.remainingEmployees.length);
-    const currentBatchEmployees = bulkImportStatus.remainingEmployees.slice(startIndex, endIndex);
-    
-    logger.info(`📦 Verarbeite Batch ${bulkImportStatus.currentBatch}/${bulkImportStatus.totalBatches}`, {
-      startIndex,
-      endIndex,
-      batchSize: currentBatchEmployees.length
-    });
-
-    // Verarbeite aktuellen Batch
-    for (let i = 0; i < currentBatchEmployees.length; i++) {
-      const employee = currentBatchEmployees[i];
-      const { employeeId, profilerUrl } = employee;
-      const globalIndex = startIndex + i + 1;
-
-      try {
-        bulkImportStatus.currentEmployee = employeeId;
-        logger.info(`🔄 Verarbeite Mitarbeiter ${globalIndex}/${bulkImportStatus.total}: ${employeeId}`);
-
-        // Extrahiere Profil-ID aus URL
-        const profileId = extractProfileIdFromUrl(profilerUrl);
-        if (!profileId) {
-          throw new Error('Ungültige Profiler-URL');
-        }
-
-        // Profiler-API-Aufruf
-        let profileData;
-        const currentToken = bulkImportStatus.currentAuthToken || authToken;
-        
-        if (currentToken) {
-          logger.info(`🎫 Verwende Token-Auth für ${employeeId}`);
-          profileData = await fetchProfilerDataWithToken(profilerUrl, currentToken);
-        } else if (profilerCookies) {
-          logger.info(`🍪 Verwende Cookie-Auth für ${employeeId}`);
-          profileData = await fetchProfilerData(profilerUrl, profilerCookies);
-        } else {
-          throw new Error('Keine gültige Authentifizierung verfügbar');
-        }
-
-        // Speichere in Firebase profilerData Collection
-        logger.info(`💾 Speichere Profiler-Daten in Firebase für ${employeeId}`, {
-          skillsCount: profileData?.skills?.length || 0,
-          hasPersonalData: !!profileData?.personalData,
-          authMethod: profileData?.authMethod
-        });
-
-        const profilerDataRef = admin.firestore().collection('profilerData').doc(employeeId);
-        
-        const dataToSave = {
-          ...profileData,
-          firebaseDocumentId: employeeId,
-          importedAt: admin.firestore.FieldValue.serverTimestamp(),
-          lastUpdated: admin.firestore.FieldValue.serverTimestamp()
-        };
-
-        await profilerDataRef.set(dataToSave, { merge: true });
-        logger.info(`✅ Profiler-Daten erfolgreich in Firebase gespeichert für ${employeeId}`);
-
-        // Speichere Ergebnis im Status
-        bulkImportStatus.employeeResults[employeeId] = {
-          success: true,
-          data: profileData,
-          processedAt: new Date().toISOString()
-        };
-
-        bulkImportStatus.completed++;
-        logger.info(`✅ Mitarbeiter ${employeeId} erfolgreich verarbeitet (${bulkImportStatus.completed}/${bulkImportStatus.total})`);
-
-      } catch (error) {
-        logger.error(`❌ Fehler bei Mitarbeiter ${employeeId}:`, error.message);
-        
-        bulkImportStatus.employeeResults[employeeId] = {
-          success: false,
-          error: error.message,
-          processedAt: new Date().toISOString()
-        };
-        
-        bulkImportStatus.completed++;
-      }
-    }
-
-    // Prüfe ob weitere Batches vorhanden
-    if (bulkImportStatus.currentBatch < bulkImportStatus.totalBatches) {
-      // Warte auf neuen Token
-      bulkImportStatus.currentBatch++;
-      bulkImportStatus.waitingForToken = true;
-      bulkImportStatus.currentEmployee = null;
-      
-      logger.info(`⏸️ Batch ${bulkImportStatus.currentBatch - 1} abgeschlossen. Warte auf neuen Token für Batch ${bulkImportStatus.currentBatch}/${bulkImportStatus.totalBatches}`);
-      
-    } else {
-      // Alle Batches abgeschlossen
-      bulkImportStatus.isRunning = false;
-      bulkImportStatus.completedAt = new Date().toISOString();
-      bulkImportStatus.currentEmployee = null;
-      
-      logger.success(`🎉 Batch-Import abgeschlossen! ${bulkImportStatus.completed}/${bulkImportStatus.total} Mitarbeiter verarbeitet`);
-    }
-
-  } catch (error) {
-    logger.error('❌ Fehler beim Batch-Import:', error);
-    bulkImportStatus.isRunning = false;
-    bulkImportStatus.waitingForToken = false;
-  }
-}
-
-// Bulk-Import Verarbeitung (Original)
+// Bulk-Import Verarbeitung
 async function processBulkImport(employees, authConfig) {
   console.log(`📊 Starte Verarbeitung von ${employees.length} Mitarbeitern`);
   const { profilerCookies, authToken } = authConfig;
@@ -6373,22 +6399,6 @@ async function processBulkImport(employees, authConfig) {
         });
         
       } catch (authError) {
-        // 🔄 Token-Refresh bei 401-Fehlern
-        if (authError.isTokenExpired && authToken) {
-          console.warn(`🔄 Token abgelaufen bei ${employeeId}. Pausiere Import für Token-Refresh...`);
-          
-          // Markiere Token-Refresh als erforderlich
-          bulkImportStatus.tokenRefreshRequested = true;
-          bulkImportStatus.tokenRefreshCount++;
-          bulkImportStatus.lastTokenRefresh = new Date().toISOString();
-          bulkImportStatus.currentEmployee = employeeId; // Merke aktuellen Mitarbeiter
-          bulkImportStatus.pausedAtIndex = i; // Merke Index für Fortsetzung
-          
-          // Pausiere Import - Frontend soll neuen Token bereitstellen
-          console.log(`⏸️ Import pausiert bei Mitarbeiter ${i + 1}/${employees.length}. Warte auf neuen Token...`);
-          return; // Beende Funktion, warte auf Token-Refresh
-        }
-        
         console.error(`❌ Authentifizierungs-Fehler für ${employeeId}:`, authError.message);
         
         // WICHTIG: Fallback zu Mock-Daten nur in Development
@@ -6539,31 +6549,7 @@ async function processBulkImport(employees, authConfig) {
       }
       
       // Speichere Profiler-Daten in separater Collection
-      try {
-        // 🔍 Prüfe Datengröße vor Speicherung
-        const jsonString = JSON.stringify(profileData);
-        const sizeInBytes = Buffer.byteLength(jsonString, 'utf8');
-        const sizeInKB = Math.round(sizeInBytes / 1024);
-        const sizeInMB = (sizeInBytes / (1024 * 1024)).toFixed(2);
-        
-        console.log(`📏 Datengröße für ${employeeId}: ${sizeInKB}KB (${sizeInMB}MB)`);
-        
-        // ⚠️ Warnung bei großen Dokumenten
-        if (sizeInBytes > 800 * 1024) { // 800KB Warnung
-          console.warn(`⚠️ GROSSE DATEI für ${employeeId}: ${sizeInKB}KB - nahe Firebase-Limit!`);
-        }
-        
-        // 🚨 Fehler bei zu großen Dokumenten
-        if (sizeInBytes > 1048576) { // 1MB Firebase-Limit
-          throw new Error(`Dokument zu groß: ${sizeInMB}MB (Limit: 1MB)`);
-        }
-        
-        await saveProfilerData(employeeId, profileData);
-        console.log(`✅ SPEICHERUNG ERFOLGREICH für ${employeeId} (${sizeInKB}KB)`);
-      } catch (saveError) {
-        console.error(`❌ SPEICHERUNG FEHLGESCHLAGEN für ${employeeId}:`, saveError);
-        throw saveError; // Re-throw damit der Mitarbeiter als fehlgeschlagen markiert wird
-      }
+      await saveProfilerData(employeeId, profileData);
 
       // Markiere als erfolgreich
       bulkImportStatus.employeeResults[employeeId] = {
@@ -6612,6 +6598,76 @@ function extractProfileIdFromUrl(profileUrl) {
     console.error('Fehler beim Extrahieren der Profil-ID:', error);
     return null;
   }
+}
+
+// Hilfsfunktion zur Komprimierung von Profiler-Daten für Firebase
+function compressProfileDataForFirebase(profileData) {
+  console.log('🗜️ Starte Daten-Komprimierung (nur unwichtige Felder)...');
+  
+  const compressed = { ...profileData };
+  
+  // Entferne nur unwichtige/technische Felder - KEINE fachlichen Inhalte!
+  const fieldsToRemove = [
+    'rawApiResponse',
+    'debugInfo', 
+    'fullUserObject',
+    'apiCallDetails',
+    'requestMetadata',
+    'responseHeaders',
+    'fetchTimestamp',
+    'apiVersion',
+    'requestId',
+    'sessionId',
+    'clientInfo',
+    'browserInfo',
+    'deviceInfo',
+    'networkInfo',
+    'performanceMetrics',
+    'cacheInfo',
+    'validationErrors',
+    'warnings',
+    'internalFlags',
+    'systemMetadata',
+    'auditTrail',
+    'tempData',
+    'processingLog',
+    'importLog',
+    'transformationLog'
+  ];
+  
+  let removedFields = [];
+  let totalSizeReduction = 0;
+  
+  fieldsToRemove.forEach(field => {
+    if (compressed[field]) {
+      const fieldSize = JSON.stringify(compressed[field]).length;
+      totalSizeReduction += fieldSize;
+      removedFields.push(`${field} (${fieldSize} bytes)`);
+      delete compressed[field];
+    }
+  });
+  
+  // Entferne auch unwichtige Felder aus Unterobjekten
+  if (compressed.user) {
+    ['debugInfo', 'rawData', 'apiMetadata'].forEach(field => {
+      if (compressed.user[field]) {
+        const fieldSize = JSON.stringify(compressed.user[field]).length;
+        totalSizeReduction += fieldSize;
+        removedFields.push(`user.${field} (${fieldSize} bytes)`);
+        delete compressed.user[field];
+      }
+    });
+  }
+  
+  const originalSize = JSON.stringify(profileData).length;
+  const compressedSize = JSON.stringify(compressed).length;
+  const reduction = ((originalSize - compressedSize) / originalSize * 100).toFixed(1);
+  
+  console.log(`📊 Komprimierung abgeschlossen: ${originalSize} → ${compressedSize} bytes (${reduction}% Reduktion)`);
+  console.log(`🗑️ Entfernte unwichtige Felder: ${removedFields.length > 0 ? removedFields.join(', ') : 'keine gefunden'}`);
+  console.log(`✅ Alle fachlichen Inhalte bleiben vollständig erhalten!`);
+  
+  return compressed;
 }
 
 // Hilfsfunktion: Profiler-URL zu API-URL transformieren
@@ -6695,13 +6751,6 @@ async function fetchProfilerDataWithToken(profileUrl, authToken) {
         errorDetails = errorBody.substring(0, 200); // Erste 200 Zeichen der Fehlermeldung
       } catch (e) {
         errorDetails = 'Fehler beim Lesen der Antwort';
-      }
-      
-      // 🔄 Spezielle Behandlung für 401-Fehler (Token abgelaufen)
-      if (response.status === 401) {
-        const tokenExpiredError = new Error(`Token abgelaufen: ${response.status} ${response.statusText} - ${errorDetails}`);
-        tokenExpiredError.isTokenExpired = true; // Markierung für Token-Refresh
-        throw tokenExpiredError;
       }
       
       throw new Error(`Profiler API Error (Token-Auth): ${response.status} ${response.statusText} - ${errorDetails}`);
@@ -6991,35 +7040,47 @@ function transformProfilerData(rawData, profileId) {
       } : null
     },
     
-    // ✅ Biography - NUR DEUTSCHE SPRACHE (DE-only Optimierung)
+    // ✅ Biography - KORREKTE Struktur mit translation-Objekt (bereinigt von #%# Trennzeichen)
     biography: rawData.biography ? {
       translation: {
-        de: rawData.biography.translation?.de ? rawData.biography.translation.de.replace(/#%#/g, ' • ').trim() : null
+        de: rawData.biography.translation?.de ? rawData.biography.translation.de.replace(/#%#/g, ' • ').trim() : null,
+        en: rawData.biography.translation?.en ? rawData.biography.translation.en.replace(/#%#/g, ' • ').trim() : null,
+        tr: rawData.biography.translation?.tr ? rawData.biography.translation.tr.replace(/#%#/g, ' • ').trim() : null,
+        hu: rawData.biography.translation?.hu ? rawData.biography.translation.hu.replace(/#%#/g, ' • ').trim() : null
       }
     } : null,
     
-    // ✅ Education - NUR DEUTSCHE SPRACHE (DE-only Optimierung)
+    // ✅ Education - KORREKTE Struktur mit translation-Objekt (bereinigt von #%# Trennzeichen)
     education: rawData.education ? {
       translation: {
-        de: rawData.education.translation?.de ? rawData.education.translation.de.replace(/#%#/g, ' • ').trim() : null
+        de: rawData.education.translation?.de ? rawData.education.translation.de.replace(/#%#/g, ' • ').trim() : null,
+        en: rawData.education.translation?.en ? rawData.education.translation.en.replace(/#%#/g, ' • ').trim() : null,
+        tr: rawData.education.translation?.tr ? rawData.education.translation.tr.replace(/#%#/g, ' • ').trim() : null,
+        hu: rawData.education.translation?.hu ? rawData.education.translation.hu.replace(/#%#/g, ' • ').trim() : null
       }
     } : null,
     
-    // ✅ Publications - NUR DEUTSCHE SPRACHE (DE-only Optimierung)
+    // ✅ Publications - KORREKTE Struktur mit translation-Objekt (bereinigt von #%# Trennzeichen)
     publications: rawData.publications ? {
       translation: {
-        de: rawData.publications.translation?.de ? rawData.publications.translation.de.replace(/#%#/g, ' • ').trim() : null
+        de: rawData.publications.translation?.de ? rawData.publications.translation.de.replace(/#%#/g, ' • ').trim() : null,
+        en: rawData.publications.translation?.en ? rawData.publications.translation.en.replace(/#%#/g, ' • ').trim() : null,
+        tr: rawData.publications.translation?.tr ? rawData.publications.translation.tr.replace(/#%#/g, ' • ').trim() : null,
+        hu: rawData.publications.translation?.hu ? rawData.publications.translation.hu.replace(/#%#/g, ' • ').trim() : null
       }
     } : null,
     
     // ✅ Presentations
     presentations: rawData.presentations || null,
     
-    // ✅ ALLGEMEINE SKILLS - NUR DEUTSCHE SPRACHE (DE-only Optimierung)
+    // ✅ ALLGEMEINE SKILLS (nicht projektspezifisch) - FEHLTEN KOMPLETT!
     skills: Array.isArray(rawData.skills) ? rawData.skills.map(skill => ({
       id: skill.id || null,
       name: skill.name ? {
-        de: skill.name.de || null
+        de: skill.name.de || null,
+        en: skill.name.en || null,
+        tr: skill.name.tr || null,
+        hu: skill.name.hu || null
       } : null,
       level: skill.level || null,
       category: skill.category || null,
@@ -7038,11 +7099,14 @@ function transformProfilerData(rawData, profileId) {
       url: cert.url || null
     })) : [],
     
-    // ✅ Language Ratings - NUR DEUTSCHE SPRACHE (DE-only Optimierung)
+    // ✅ Language Ratings vollständig - KORREKTE Struktur mit language-Objekt
     languageRatings: Array.isArray(rawData.languageRatings) ? rawData.languageRatings.map(lang => ({
       id: lang.id || null,
       language: {
-        de: lang.language?.de || null
+        de: lang.language?.de || null,
+        en: lang.language?.en || null,
+        tr: lang.language?.tr || null,
+        hu: lang.language?.hu || null
       },
       level: lang.level || null
     })) : [],
@@ -7066,13 +7130,16 @@ function transformProfilerData(rawData, profileId) {
       customer: project.customer || '',
       exportCustomer: project.exportCustomer || false,
       
-      // ✅ Skills - NUR DEUTSCHE SPRACHE (DE-only Optimierung)
+      // ✅ Skills vollständig - KORREKTE Struktur mit name-Objekt + Referenz-Auflösung
       skills: resolveSkillReferences(
         Array.isArray(project.skills) ? project.skills : [],
         Array.isArray(rawData.skills) ? rawData.skills : []
       ).map(skill => ({
         name: {
-          de: skill.name?.de || null
+          de: skill.name?.de || null,
+          en: skill.name?.en || null,
+          tr: skill.name?.tr || null,
+          hu: skill.name?.hu || null
         },
         skillId: skill.skillId || null,
         category: skill.category || null,
@@ -7317,6 +7384,122 @@ async function saveProfilerData(employeeId, profileData) {
     throw error;
   }
 }
+
+// GET /api/profiler/analyze-skills - Analysiert Skills in gespeicherten Daten
+app.get('/api/profiler/analyze-skills', async (req, res) => {
+  try {
+    const snapshot = await admin.firestore().collection('profilerData').limit(10).get();
+    const analysis = [];
+    
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      const skillsInfo = {
+        employeeId: doc.id,
+        name: data.name || 'Unbekannt',
+        hasSkills: !!data.skills,
+        skillsCount: data.skills?.length || 0,
+        skillsSource: data.skillsSource || 'nicht verfügbar',
+        skillsMethod: data.skillsMethod || 'nicht verfügbar',
+        hasSkillsProperty: data.hasOwnProperty('skills'),
+        skillsSample: data.skills?.slice(0, 3) || []
+      };
+      analysis.push(skillsInfo);
+    });
+    
+    const summary = {
+      totalAnalyzed: analysis.length,
+      withSkills: analysis.filter(a => a.hasSkills).length,
+      withoutSkills: analysis.filter(a => !a.hasSkills).length,
+      averageSkillsCount: analysis.reduce((sum, a) => sum + a.skillsCount, 0) / analysis.length
+    };
+    
+    res.json({ 
+      summary,
+      analysis,
+      message: `Skills-Analyse von ${analysis.length} Datensätzen abgeschlossen`
+    });
+  } catch (error) {
+    console.error('❌ Fehler bei Skills-Analyse:', error);
+    res.status(500).json({ error: 'Fehler bei der Skills-Analyse' });
+  }
+});
+
+// GET /api/profiler/find-employee/:id - Findet Mitarbeiter-Namen anhand ID
+app.get('/api/profiler/find-employee/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Suche in mitarbeiter Collection
+    const mitarbeiterSnapshot = await admin.firestore().collection('mitarbeiter').get();
+    let foundEmployee = null;
+    
+    mitarbeiterSnapshot.forEach(doc => {
+      if (doc.id === id) {
+        foundEmployee = {
+          id: doc.id,
+          name: doc.data().person || 'Unbekannt',
+          data: doc.data()
+        };
+      }
+    });
+    
+    if (foundEmployee) {
+      res.json(foundEmployee);
+    } else {
+      res.status(404).json({ error: 'Mitarbeiter nicht gefunden', id });
+    }
+  } catch (error) {
+    console.error('❌ Fehler beim Suchen des Mitarbeiters:', error);
+    res.status(500).json({ error: 'Server-Fehler beim Suchen des Mitarbeiters' });
+  }
+});
+
+// GET /api/profiler/check-firebase/:id - Prüft Firebase profilerData Collection
+app.get('/api/profiler/check-firebase/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    console.log(`🔍 Prüfe Firebase profilerData für ID: ${id}`);
+    
+    // Prüfe profilerData Collection
+    const profilerDoc = await admin.firestore().collection('profilerData').doc(id).get();
+    
+    if (profilerDoc.exists) {
+      const data = profilerDoc.data();
+      const dataString = JSON.stringify(data);
+      const sizeInBytes = Buffer.byteLength(dataString, 'utf8');
+      
+      console.log(`📊 Dokument gefunden: ${sizeInBytes} bytes`);
+      
+      res.json({
+        exists: true,
+        id: profilerDoc.id,
+        sizeInBytes,
+        sizeInMB: (sizeInBytes / 1024 / 1024).toFixed(2),
+        firebaseLimit: 1048576,
+        exceedsLimit: sizeInBytes > 1048576,
+        name: data.name || 'Unbekannt',
+        hasSkills: !!data.skills,
+        skillsCount: data.skills?.length || 0,
+        dataKeys: Object.keys(data),
+        largestFields: Object.keys(data).map(key => ({
+          field: key,
+          size: Buffer.byteLength(JSON.stringify(data[key]), 'utf8')
+        })).sort((a, b) => b.size - a.size).slice(0, 5)
+      });
+    } else {
+      console.log(`❌ Dokument nicht gefunden für ID: ${id}`);
+      res.json({
+        exists: false,
+        id,
+        message: 'Dokument nicht in profilerData Collection gefunden'
+      });
+    }
+  } catch (error) {
+    console.error('❌ Fehler beim Prüfen der Firebase-Datenbank:', error);
+    res.status(500).json({ error: 'Server-Fehler beim Prüfen der Firebase-Datenbank', details: error.message });
+  }
+});
 
 process.on('SIGTERM', async () => {
   // console.log entfernt
