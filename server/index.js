@@ -1325,6 +1325,355 @@ app.get('/api/utilization-data', requireAuth, async (req, res) => {
   }
 });
 
+// Master-Daten-Fetcher für Referenz-Auflösung
+async function fetchMasterData(authToken) {
+  const masterData = {
+    skills: [],
+    trainings: [],
+    projectRoles: [],
+    certificates: [],
+    languages: []
+  };
+
+  try {
+    console.log('🔍 Lade Master-Daten...');
+
+    // Skills Master-Daten
+    try {
+      const skillsResponse = await fetch('https://profiler.adesso-group.com/api/project-skills', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      if (skillsResponse.ok) {
+        masterData.skills = await skillsResponse.json();
+        console.log(`✅ Skills geladen: ${masterData.skills.length}`);
+      } else {
+        console.log(`⚠️ Skills nicht verfügbar: ${skillsResponse.status}`);
+      }
+    } catch (error) {
+      console.log('⚠️ Skills-Fehler:', error.message);
+    }
+
+    // Trainings Master-Daten
+    try {
+      const trainingsResponse = await fetch('https://profiler.adesso-group.com/api/trainings', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      if (trainingsResponse.ok) {
+        masterData.trainings = await trainingsResponse.json();
+        console.log(`✅ Trainings geladen: ${masterData.trainings.length}`);
+      } else {
+        console.log(`⚠️ Trainings nicht verfügbar: ${trainingsResponse.status}`);
+      }
+    } catch (error) {
+      console.log('⚠️ Trainings-Fehler:', error.message);
+    }
+
+    // Project-Roles Master-Daten
+    try {
+      const rolesResponse = await fetch('https://profiler.adesso-group.com/api/project-roles', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      if (rolesResponse.ok) {
+        masterData.projectRoles = await rolesResponse.json();
+        console.log(`✅ Project-Roles geladen: ${masterData.projectRoles.length}`);
+      } else {
+        console.log(`⚠️ Project-Roles nicht verfügbar: ${rolesResponse.status}`);
+      }
+    } catch (error) {
+      console.log('⚠️ Project-Roles-Fehler:', error.message);
+    }
+
+    return masterData;
+  } catch (error) {
+    console.error('❌ Fehler beim Laden der Master-Daten:', error);
+    return masterData; // Leere Struktur zurückgeben
+  }
+}
+
+// Referenz-Auflöser für Skills
+function resolveSkillReferences(skills, masterSkills) {
+  if (!Array.isArray(skills) || !Array.isArray(masterSkills)) {
+    return skills;
+  }
+
+  return skills.map(skill => {
+    if (skill.skillId) {
+      const masterSkill = masterSkills.find(ms => ms.skillId === skill.skillId);
+      if (masterSkill) {
+        return {
+          ...skill,
+          resolvedName: masterSkill.name,
+          masterData: masterSkill
+        };
+      }
+    }
+    return skill;
+  });
+}
+
+// Referenz-Auflöser für Trainings
+function resolveTrainingReferences(trainings, masterTrainings) {
+  if (!Array.isArray(trainings) || !Array.isArray(masterTrainings)) {
+    return trainings;
+  }
+
+  return trainings.map(training => {
+    if (training.id) {
+      const masterTraining = masterTrainings.find(mt => mt.id === training.id);
+      if (masterTraining) {
+        return {
+          ...training,
+          resolvedName: masterTraining.name,
+          masterData: masterTraining
+        };
+      }
+    }
+    return training;
+  });
+}
+
+// Erweiterte Transformation mit Master-Daten-Auflösung
+function transformProfilerDataWithMasterData(rawData, profileId, masterData) {
+  console.log('🔄 Starte erweiterte Transformation mit Master-Daten...');
+  
+  // Basis-Transformation
+  const baseTransformed = transformProfilerData(rawData, profileId);
+  
+  // Master-Daten-Auflösung
+  const enhanced = { ...baseTransformed };
+  
+  // Skills in Projekten auflösen
+  if (enhanced.projects && Array.isArray(enhanced.projects)) {
+    enhanced.projects = enhanced.projects.map(project => ({
+      ...project,
+      skills: resolveSkillReferences(project.skills, masterData.skills)
+    }));
+  }
+  
+  // Allgemeine Skills auflösen
+  if (enhanced.skills) {
+    enhanced.skills = resolveSkillReferences(enhanced.skills, masterData.skills);
+  }
+  
+  // Training-Teilnahmen auflösen
+  if (enhanced.trainingParticipations) {
+    enhanced.trainingParticipations = resolveTrainingReferences(
+      enhanced.trainingParticipations, 
+      masterData.trainings
+    );
+  }
+  
+  // Master-Daten-Statistiken hinzufügen
+  enhanced.masterDataStats = {
+    skillsAvailable: masterData.skills.length,
+    trainingsAvailable: masterData.trainings.length,
+    projectRolesAvailable: masterData.projectRoles.length,
+    resolvedSkillsInProjects: enhanced.projects ? 
+      enhanced.projects.reduce((sum, p) => sum + (p.skills?.filter(s => s.resolvedName)?.length || 0), 0) : 0,
+    resolvedGeneralSkills: enhanced.skills?.filter(s => s.resolvedName)?.length || 0,
+    resolvedTrainings: enhanced.trainingParticipations?.filter(t => t.resolvedName)?.length || 0
+  };
+  
+  console.log('✅ Erweiterte Transformation abgeschlossen:', enhanced.masterDataStats);
+  return enhanced;
+}
+
+// Speichern in Test-Collection
+async function saveProfilerTestData(employeeId, profileData) {
+  try {
+    console.log(`💾 Starte Test-Speicherung für ${employeeId}:`, {
+      hasProfileData: !!profileData,
+      hasMasterDataStats: !!profileData?.masterDataStats
+    });
+
+    const testDataRef = admin.firestore().collection('profilerTestData').doc(employeeId);
+    const dataToSave = {
+      ...profileData,
+      firebaseDocumentId: employeeId,
+      importedAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+      testImport: true
+    };
+
+    await testDataRef.set(dataToSave);
+    console.log(`✅ Test-Profiler-Daten für ${employeeId} erfolgreich in profilerTestData Collection gespeichert`);
+    
+    return true;
+  } catch (error) {
+    console.error(`❌ Fehler beim Speichern der Test-Profiler-Daten für ${employeeId}:`, error);
+    throw error;
+  }
+}
+
+// POST /api/profiler/test-preview - Test-Vorschau mit Master-Daten-Auflösung
+app.post('/api/profiler/test-preview', requireAuth, async (req, res) => {
+  try {
+    const { profileUrl, employeeId, authToken } = req.body;
+
+    console.log('🧪 Profiler-Test-Preview Request:', {
+      employeeId,
+      profileUrl,
+      hasAuthToken: !!authToken
+    });
+
+    // Validierung
+    if (!profileUrl || !employeeId || !authToken) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'profileUrl, employeeId und authToken sind erforderlich' 
+      });
+    }
+
+    const profileId = extractProfileIdFromUrl(profileUrl);
+    if (!profileId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Ungültige Profiler-URL - keine Profil-ID gefunden' 
+      });
+    }
+
+    console.log(`🎯 Verarbeite Test-Preview für Profil-ID: ${profileId}`);
+
+    // 1. Master-Daten laden
+    const masterData = await fetchMasterData(authToken);
+
+    // 2. Profil-Daten abrufen
+    const profileData = await fetchProfilerDataWithToken(profileUrl, authToken);
+    if (!profileData) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Profiler-Daten konnten nicht abgerufen werden' 
+      });
+    }
+
+    // 3. Erweiterte Transformation mit Master-Daten
+    const transformedData = transformProfilerDataWithMasterData(profileData, profileId, masterData);
+
+    // 4. Finale Datenstruktur für Preview
+    const finalDataForDatabase = {
+      ...transformedData,
+      firebaseDocumentId: employeeId,
+      importedAt: new Date().toISOString(),
+      lastUpdated: new Date().toISOString(),
+      testImport: true
+    };
+
+    console.log(`✅ Test-Preview-Daten erfolgreich abgerufen für ${employeeId}`);
+
+    res.json({
+      success: true,
+      message: 'Test-Preview-Daten mit Master-Daten-Auflösung erfolgreich abgerufen',
+      previewData: finalDataForDatabase,
+      employeeId: employeeId,
+      masterDataInfo: {
+        skillsLoaded: masterData.skills.length,
+        trainingsLoaded: masterData.trainings.length,
+        projectRolesLoaded: masterData.projectRoles.length
+      },
+      statistics: {
+        totalDataSize: JSON.stringify(finalDataForDatabase).length,
+        hasUser: !!finalDataForDatabase.user,
+        hasBiography: !!finalDataForDatabase.biography?.translation?.de,
+        projectsCount: finalDataForDatabase.projects?.length || 0,
+        skillsCount: finalDataForDatabase.skills?.length || 0,
+        resolvedSkillsInProjects: finalDataForDatabase.masterDataStats?.resolvedSkillsInProjects || 0,
+        resolvedGeneralSkills: finalDataForDatabase.masterDataStats?.resolvedGeneralSkills || 0,
+        resolvedTrainings: finalDataForDatabase.masterDataStats?.resolvedTrainings || 0
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Fehler beim Test-Preview:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Interner Server-Fehler beim Test-Preview',
+      details: error.message 
+    });
+  }
+});
+
+// POST /api/profiler/test-import - Test-Import mit Master-Daten in separate Collection
+app.post('/api/profiler/test-import', requireAuth, async (req, res) => {
+  try {
+    const { profileUrl, employeeId, authToken } = req.body;
+
+    console.log('🧪 Profiler-Test-Import Request:', {
+      employeeId,
+      profileUrl,
+      hasAuthToken: !!authToken
+    });
+
+    // Validierung
+    if (!profileUrl || !employeeId || !authToken) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'profileUrl, employeeId und authToken sind erforderlich' 
+      });
+    }
+
+    const profileId = extractProfileIdFromUrl(profileUrl);
+    if (!profileId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Ungültige Profiler-URL - keine Profil-ID gefunden' 
+      });
+    }
+
+    console.log(`🎯 Verarbeite Test-Import für Profil-ID: ${profileId}`);
+
+    // 1. Master-Daten laden
+    const masterData = await fetchMasterData(authToken);
+
+    // 2. Profil-Daten abrufen
+    const profileData = await fetchProfilerDataWithToken(profileUrl, authToken);
+    if (!profileData) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Profiler-Daten konnten nicht abgerufen werden' 
+      });
+    }
+
+    // 3. Erweiterte Transformation mit Master-Daten
+    const transformedData = transformProfilerDataWithMasterData(profileData, profileId, masterData);
+
+    // 4. In Test-Collection speichern
+    await saveProfilerTestData(employeeId, transformedData);
+
+    console.log(`✅ Test-Import erfolgreich abgeschlossen für ${employeeId}`);
+
+    res.json({
+      success: true,
+      message: 'Test-Import mit Master-Daten-Auflösung erfolgreich abgeschlossen',
+      employeeId: employeeId,
+      collection: 'profilerTestData',
+      masterDataInfo: {
+        skillsLoaded: masterData.skills.length,
+        trainingsLoaded: masterData.trainings.length,
+        projectRolesLoaded: masterData.projectRoles.length
+      },
+      importedData: {
+        totalDataSize: JSON.stringify(transformedData).length,
+        projectsCount: transformedData.projects?.length || 0,
+        skillsCount: transformedData.skills?.length || 0,
+        resolvedSkillsInProjects: transformedData.masterDataStats?.resolvedSkillsInProjects || 0,
+        resolvedGeneralSkills: transformedData.masterDataStats?.resolvedGeneralSkills || 0,
+        resolvedTrainings: transformedData.masterDataStats?.resolvedTrainings || 0,
+        certificationsCount: transformedData.certifications?.length || 0,
+        languageRatingsCount: transformedData.languageRatings?.length || 0,
+        trainingParticipationsCount: transformedData.trainingParticipations?.length || 0
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Fehler beim Test-Import:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Interner Server-Fehler beim Test-Import',
+      details: error.message 
+    });
+  }
+});
+
 // POST /api/profiler/preview - Vorschau der Profiler-Daten ohne Speicherung
 app.post('/api/profiler/preview', requireAuth, async (req, res) => {
   try {
@@ -1399,13 +1748,45 @@ app.post('/api/profiler/preview', requireAuth, async (req, res) => {
       throw new Error(`Daten-Transformations-Fehler: ${transformError.message}`);
     }
     
-    console.log(`✅ Preview-Daten erfolgreich abgerufen für ${employeeId}`);
+    // ✅ WICHTIG: Erstelle exakt die gleichen Daten wie sie in der Datenbank gespeichert werden
+    const finalDataForDatabase = {
+      ...transformedData,
+      // ✅ BEHALTE die echte employeeId aus der Profiler-API
+      firebaseDocumentId: employeeId, // Firebase Document ID separat speichern
+      importedAt: new Date().toISOString(), // Simuliere Timestamp
+      lastUpdated: new Date().toISOString()  // Simuliere Timestamp
+    };
+    
+    console.log(`✅ Preview-Daten (1:1 wie Datenbank) erfolgreich erstellt für ${employeeId}:`, {
+      dataSize: JSON.stringify(finalDataForDatabase).length,
+      mainKeys: Object.keys(finalDataForDatabase),
+      projectsCount: finalDataForDatabase.projects?.length || 0,
+      certificationsCount: finalDataForDatabase.certifications?.length || 0,
+      languageRatingsCount: finalDataForDatabase.languageRatings?.length || 0,
+      professionalExperiencesCount: finalDataForDatabase.professionalExperiences?.length || 0
+    });
     
     res.json({
       success: true,
-      message: 'Preview-Daten erfolgreich abgerufen',
-      previewData: transformedData, // TRANSFORMIERTE Daten für Preview!
-      employeeId: employeeId
+      message: 'Preview-Daten (1:1 wie Datenbank-Import) erfolgreich abgerufen',
+      previewData: finalDataForDatabase,
+      employeeId: employeeId,
+      // ✅ Zusätzliche Statistiken für bessere Übersicht
+      statistics: {
+        totalDataSize: JSON.stringify(finalDataForDatabase).length,
+        projectsCount: finalDataForDatabase.projects?.length || 0,
+        certificationsCount: finalDataForDatabase.certifications?.length || 0,
+        languageRatingsCount: finalDataForDatabase.languageRatings?.length || 0,
+        trainingParticipationsCount: finalDataForDatabase.trainingParticipations?.length || 0,
+        professionalExperiencesCount: finalDataForDatabase.professionalExperiences?.length || 0,
+        hasUserData: !!finalDataForDatabase.user,
+        hasEmployeeData: !!finalDataForDatabase.user?.employee,
+        hasPersonalData: !!finalDataForDatabase.user?.employee?.personalData,
+        hasEmploymentInformation: !!finalDataForDatabase.user?.employee?.employmentInformation,
+        hasBiography: !!finalDataForDatabase.biography,
+        hasEducation: !!finalDataForDatabase.education,
+        hasPublications: !!finalDataForDatabase.publications
+      }
     });
 
   } catch (error) {
@@ -1494,71 +1875,29 @@ app.post('/api/profiler/import', requireAuth, async (req, res) => {
       };
     }
 
-    // Aktualisiere utilizationData mit importierten Daten
-    const utilizationDataRef = admin.firestore().collection('utilizationData').doc(employeeId);
-    const utilizationDoc = await utilizationDataRef.get();
-
-    if (!utilizationDoc.exists) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Mitarbeiter nicht gefunden' 
-      });
-    }
-
-    const currentData = utilizationDoc.data();
-    const updatedData = {
-      ...currentData,
-      // Aktualisiere Grunddaten falls vorhanden
-      ...(profilerData.email && { email: profilerData.email }),
-      ...(profilerData.position && { position: profilerData.position }),
-      ...(profilerData.department && { bereich: profilerData.department }),
-      ...(profilerData.location && { standort: profilerData.location }),
-      
-      // Füge Profiler-Projekte zu projectReferences hinzu
-      projectReferences: [
-        ...(currentData.projectReferences || []),
-        ...profilerData.projects.map(project => ({
-          id: `profiler-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          projectName: project.name,
-          customer: project.customer,
-          startDate: project.startDate,
-          endDate: project.endDate,
-          projectType: 'historical',
-          projectSource: 'profiler',
-          roles: project.role ? [{
-            name: project.role,
-            categoryName: 'Profiler Import'
-          }] : [],
-          skills: project.skills.map(skill => ({
-            name: skill,
-            categoryName: 'Technical'
-          })),
-          importedAt: new Date().toISOString(),
-          importedFrom: profileUrl
-        }))
-      ],
-      
-      // Meta-Daten für Import
-      lastProfilerImport: {
-        timestamp: new Date().toISOString(),
-        profileUrl,
-        profileId,
-        authMethod: profilerData.authMethod || 'unknown',
-        importedFields: ['email', 'position', 'department', 'location', 'projects', 'skills']
-      }
-    };
-
-    await utilizationDataRef.update(updatedData);
+    // ✅ Profiler-Daten in profilerData Collection speichern
+    await saveProfilerData(employeeId, profilerData);
 
     console.log('✅ Profiler-Import erfolgreich für:', employeeId);
 
     res.json({
       success: true,
       message: `Profiler-Daten erfolgreich importiert (${profilerData.authMethod})`,
-      importedFields: ['email', 'position', 'department', 'location', 'projects', 'skills'],
+      importedFields: [
+        'employeeId', 'globalExternalId', 'keycloakIdentifier', 'name', 'email', 'title', 'firstName', 'lastName',
+        'position', 'department', 'location', 'company', 'competenceCenter', 'lineOfBusiness', 'teamName',
+        'careerStage', 'careerLevel', 'careerRole', 'careerIsManager', 'supervisorId', 'jobCategory', 'dateOfExit',
+        'active', 'supervisor', 'startDate', 'importType', 'visible', 'external', 'stillActive', 'lastModifiedDate',
+        'experienceSinceYear', 'lastUpdated', 'actuality', 'microsoftCertifiedProfessional', 'lastCertificationFileUpdate',
+        'canEditProfile', 'canEditAvailability', 'skills', 'projects', 'certifications', 'education', 'biography',
+        'languageRatings', 'trainingParticipations', 'professionalExperiences', 'publications', 'presentations'
+      ],
       importedData: {
-        projectsCount: profilerData.projects.length,
-        skillsCount: profilerData.skills.length,
+        projectsCount: profilerData.projects?.length || 0,
+        skillsCount: profilerData.skills?.length || 0,
+        certificationsCount: profilerData.certifications?.length || 0,
+        languageRatingsCount: profilerData.languageRatings?.length || 0,
+        professionalExperiencesCount: profilerData.professionalExperiences?.length || 0,
         authMethod: profilerData.authMethod
       }
     });
@@ -5055,6 +5394,32 @@ app.get('/api/profiler/import-status', requireAuth, async (req, res) => {
   }
 });
 
+// ✅ NEU: Trigger Konsolidierung mit profilerData statt mitarbeiter
+app.post('/api/consolidate-with-profiler', requireAuth, async (req, res) => {
+  try {
+    console.log('🔄 Starte Konsolidierung mit profilerData...');
+    
+    // Dynamischer Import der Frontend-Konsolidierungslogik
+    const { consolidateAllData } = await import('../src/lib/consolidation.js');
+    
+    await consolidateAllData();
+    
+    console.log('✅ Konsolidierung mit profilerData erfolgreich abgeschlossen');
+    
+    res.json({
+      success: true,
+      message: 'Konsolidierung mit profilerData erfolgreich abgeschlossen'
+    });
+    
+  } catch (error) {
+    console.error('❌ Fehler bei der Konsolidierung:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Fehler bei der Konsolidierung: ' + error.message 
+    });
+  }
+});
+
 // Bulk-Import Verarbeitung
 async function processBulkImport(employees, authConfig) {
   console.log(`📊 Starte Verarbeitung von ${employees.length} Mitarbeitern`);
@@ -5313,6 +5678,7 @@ async function fetchProfilerDataWithToken(profileUrl, authToken) {
     
     console.log(`🔄 Transformierte Daten für ID ${profileId}:`, {
       employeeId: transformedData.employeeId,
+      globalExternalId: transformedData.globalExternalId,
       name: transformedData.name,
       email: transformedData.email,
       hasSkills: transformedData.skills?.length > 0,
@@ -5323,6 +5689,17 @@ async function fetchProfilerDataWithToken(profileUrl, authToken) {
       hasCertifications: transformedData.certifications?.length > 0,
       certificationsCount: transformedData.certifications?.length || 0,
       languagesStatus: 'KOMPLETT ENTFERNT auf User-Wunsch'
+    });
+    
+    // ✅ EXTRA DEBUG für employeeId
+    console.log(`🔍 EMPLOYEE ID DEBUG für ${profileId}:`, {
+      rawEmployeeId: rawData.user?.employee?.id,
+      rawGlobalExternalId: rawData.user?.employee?.globalExternalId,
+      transformedEmployeeId: transformedData.employeeId,
+      hasUserEmployee: !!rawData.user?.employee,
+      userEmployeeKeys: rawData.user?.employee ? Object.keys(rawData.user.employee) : 'NICHT VORHANDEN',
+      // ✅ VOLLSTÄNDIGES Employee-Objekt für Debugging
+      fullEmployeeObject: rawData.user?.employee ? JSON.stringify(rawData.user.employee, null, 2) : 'NICHT VORHANDEN'
     });
     
     return transformedData;
@@ -5376,7 +5753,9 @@ async function fetchProfilerData(profileUrl, profilerCookies) {
   }
 }
 
-// Hilfsfunktion: Profiler-Daten transformieren
+// ✅ Hilfsfunktion: Skills-Referenzen auflösen (entfernt - bereits oben definiert)
+
+// ✅ NEUE Hilfsfunktion: Profiler-Daten 1:1 übernehmen (nur deutsche Sprache) + Referenz-Auflösung
 function transformProfilerData(rawData, profileId) {
   // Validiere Input-Daten
   if (!rawData || typeof rawData !== 'object') {
@@ -5393,10 +5772,12 @@ function transformProfilerData(rawData, profileId) {
     throw new Error('Profil-ID ist erforderlich für Daten-Transformation');
   }
 
-  console.log(`🔄 Transformiere Profiler-Daten für ID ${profileId}:`, {
+  console.log(`🔄 Transformiere Profiler-Daten 1:1 für ID ${profileId}:`, {
     dataKeys: Object.keys(rawData),
     hasUser: !!rawData.user,
-    hasPersonalData: !!rawData.personalData
+    hasPersonalData: !!rawData.personalData,
+    hasProjects: !!rawData.projects,
+    projectsCount: rawData.projects?.length || 0
   });
 
   // Extrahiere E-Mail aus verschiedenen möglichen Quellen
@@ -5449,151 +5830,275 @@ function transformProfilerData(rawData, profileId) {
            `Mitarbeiter ${profileId}`;
   };
 
-  return {
-    id: profileId,
-    name: extractName(rawData),
-    email: extractEmail(rawData),
-    position: extractSafeString(rawData.user?.employee?.position || rawData.user?.position || rawData.position || rawData.jobTitle) || 'Consultant',
-    department: extractSafeString(rawData.user?.employee?.department || rawData.user?.department || rawData.department || rawData.businessUnit) || 'Unknown',
-    location: extractSafeString(rawData.user?.employee?.location || rawData.user?.location || rawData.location || rawData.office) || 'Unknown',
-    startDate: extractSafeString(rawData.user?.employee?.startDate || rawData.user?.startDate || rawData.startDate || rawData.joinDate) || null,
+  // ✅ VOLLSTÄNDIGE 1:1 Übernahme der JSON-Struktur (nur deutsche Sprache)
+  const transformedData = {
+    // ✅ User-Daten komplett übernehmen
+    user: {
+      experienceSinceYear: rawData.user?.experienceSinceYear || null,
+      lastUpdated: rawData.user?.lastUpdated || null,
+      actuality: rawData.user?.actuality || 0,
+      microsoftCertifiedProfessional: rawData.user?.microsoftCertifiedProfessional || false,
+      canEditProfile: rawData.user?.canEditProfile || false,
+      canEditAvailability: rawData.user?.canEditAvailability || false,
+      
+      // ✅ Employee-Daten vollständig
+      employee: rawData.user?.employee ? {
+        id: rawData.user.employee.id || null,
+        globalExternalId: rawData.user.employee.globalExternalId || null,
+        login: rawData.user.employee.login || null,
+        keycloakIdentifier: rawData.user.employee.keycloakIdentifier || null,
+        
+        // ✅ Personal Data vollständig
+        personalData: rawData.user.employee.personalData ? {
+          title: rawData.user.employee.personalData.title || '',
+          firstName: rawData.user.employee.personalData.firstName || '',
+          lastName: rawData.user.employee.personalData.lastName || '',
+          email: rawData.user.employee.personalData.email || ''
+        } : null,
+        
+        // ✅ Employment Information vollständig
+        employmentInformation: rawData.user.employee.employmentInformation ? {
+          company: rawData.user.employee.employmentInformation.company || '',
+          lineOfBusiness: rawData.user.employee.employmentInformation.lineOfBusiness || '',
+          competenceCenter: rawData.user.employee.employmentInformation.competenceCenter || '',
+          teamName: rawData.user.employee.employmentInformation.teamName || '',
+          location: rawData.user.employee.employmentInformation.location || '',
+          dateOfExit: rawData.user.employee.employmentInformation.dateOfExit || '',
+          careerStage: rawData.user.employee.employmentInformation.careerStage || '',
+          careerLevel: rawData.user.employee.employmentInformation.careerLevel || '',
+          careerRole: rawData.user.employee.employmentInformation.careerRole || '',
+          careerIsManager: rawData.user.employee.employmentInformation.careerIsManager || false,
+          supervisorId: rawData.user.employee.employmentInformation.supervisorId || null,
+          jobCategory: rawData.user.employee.employmentInformation.jobCategory || '',
+          active: rawData.user.employee.employmentInformation.active || true,
+          supervisor: rawData.user.employee.employmentInformation.supervisor || false
+        } : null,
+        
+        importType: rawData.user.employee.importType || '',
+        visible: rawData.user.employee.visible || true,
+        external: rawData.user.employee.external || false,
+        
+        // ✅ Profile vollständig
+        profile: rawData.user.employee.profile ? {
+          id: rawData.user.employee.profile.id || null,
+          experienceSinceYear: rawData.user.employee.profile.experienceSinceYear || null,
+          lastUpdated: rawData.user.employee.profile.lastUpdated || null,
+          microsoftCertifiedProfessional: rawData.user.employee.profile.microsoftCertifiedProfessional || false,
+          lastCertificationFileUpdate: rawData.user.employee.profile.lastCertificationFileUpdate || null,
+          actuality: rawData.user.employee.profile.actuality || 0
+        } : null,
+        
+        lastModifiedDate: rawData.user.employee.lastModifiedDate || null,
+        stillActive: rawData.user.employee.stillActive || true
+      } : null
+    },
     
-    // Skills aus verschiedenen Quellen extrahieren
-    skills: extractSkills(rawData),
+    // ✅ Biography - KORREKTE Struktur mit translation-Objekt
+    biography: rawData.biography ? {
+      translation: {
+        de: rawData.biography.translation?.de || null,
+        en: rawData.biography.translation?.en || null,
+        tr: rawData.biography.translation?.tr || null,
+        hu: rawData.biography.translation?.hu || null
+      }
+    } : null,
     
-    // WICHTIG: Projektdaten extrahieren (die gelben SAP-Einträge!)
-    projects: extractProjects(rawData),
+    // ✅ Education - KORREKTE Struktur mit translation-Objekt
+    education: rawData.education ? {
+      translation: {
+        de: rawData.education.translation?.de || null,
+        en: rawData.education.translation?.en || null,
+        tr: rawData.education.translation?.tr || null,
+        hu: rawData.education.translation?.hu || null
+      }
+    } : null,
     
-    // Weitere Daten - TRANSFORMIERT um Sprach-Objekte zu vermeiden
-    certifications: extractCertifications(rawData),
-    // languages: [], // KOMPLETT ENTFERNT auf User-Wunsch - keine Sprachen mehr importieren
-    education: extractEducation(rawData),
+    // ✅ Publications - KORREKTE Struktur mit translation-Objekt
+    publications: rawData.publications ? {
+      translation: {
+        de: rawData.publications.translation?.de || null,
+        en: rawData.publications.translation?.en || null,
+        tr: rawData.publications.translation?.tr || null,
+        hu: rawData.publications.translation?.hu || null
+      }
+    } : null,
     
-    // Metadaten
-    // rawData: rawData, // ENTFERNT - verursacht React-Render-Fehler mit Sprach-Objekten
+    // ✅ Presentations
+    presentations: rawData.presentations || null,
+    
+    // ✅ ALLGEMEINE SKILLS (nicht projektspezifisch) - FEHLTEN KOMPLETT!
+    skills: Array.isArray(rawData.skills) ? rawData.skills.map(skill => ({
+      id: skill.id || null,
+      name: skill.name ? {
+        de: skill.name.de || null,
+        en: skill.name.en || null,
+        tr: skill.name.tr || null,
+        hu: skill.name.hu || null
+      } : null,
+      level: skill.level || null,
+      category: skill.category || null,
+      experience: skill.experience || null,
+      lastUsed: skill.lastUsed || null,
+      verified: skill.verified || false,
+      skillId: skill.skillId || null
+    })) : [],
+    
+    // ✅ Certifications vollständig
+    certifications: Array.isArray(rawData.certifications) ? rawData.certifications.map(cert => ({
+      id: cert.id || null,
+      issueDate: cert.issueDate || null,
+      expirationDate: cert.expirationDate || null,
+      name: cert.name || '',
+      url: cert.url || null
+    })) : [],
+    
+    // ✅ Language Ratings vollständig - KORREKTE Struktur mit language-Objekt
+    languageRatings: Array.isArray(rawData.languageRatings) ? rawData.languageRatings.map(lang => ({
+      id: lang.id || null,
+      language: {
+        de: lang.language?.de || null,
+        en: lang.language?.en || null,
+        tr: lang.language?.tr || null,
+        hu: lang.language?.hu || null
+      },
+      level: lang.level || null
+    })) : [],
+    
+    // ✅ Projects vollständig mit allen verschachtelten Strukturen
+    projects: Array.isArray(rawData.projects) ? rawData.projects.map(project => ({
+      id: project.id || null,
+      
+      // ✅ ProjectPoolProject vollständig
+      projectPoolProject: project.projectPoolProject ? {
+        id: project.projectPoolProject.id || null,
+        externalProjectId: project.projectPoolProject.externalProjectId || null,
+        name: project.projectPoolProject.name || '',
+        customer: project.projectPoolProject.customer || '',
+        description: project.projectPoolProject.description || '',
+        englishDescription: project.projectPoolProject.englishDescription || null,
+        technologies: project.projectPoolProject.technologies || []
+      } : null,
+      
+      title: project.title || '',
+      customer: project.customer || '',
+      exportCustomer: project.exportCustomer || false,
+      
+      // ✅ Skills vollständig - KORREKTE Struktur mit name-Objekt + Referenz-Auflösung
+      skills: resolveSkillReferences(
+        Array.isArray(project.skills) ? project.skills : [],
+        Array.isArray(rawData.skills) ? rawData.skills : []
+      ).map(skill => ({
+        name: {
+          de: skill.name?.de || null,
+          en: skill.name?.en || null,
+          tr: skill.name?.tr || null,
+          hu: skill.name?.hu || null
+        },
+        skillId: skill.skillId || null,
+        category: skill.category || null,
+        level: skill.level || null
+      })),
+      
+      // ✅ Range vollständig
+      range: project.range ? {
+        start: project.range.start ? {
+          year: project.range.start.year || null,
+          month: project.range.start.month || null
+        } : null,
+        end: project.range.end ? {
+          year: project.range.end.year || null,
+          month: project.range.end.month || null
+        } : null
+      } : null,
+      
+      // ✅ Roles vollständig mit Übersetzungen (nur deutsch, aber richtige Struktur)
+      roles: Array.isArray(project.roles) ? project.roles.map(role => ({
+        value: role.value || null,
+        translation: {
+          de: role.translation?.de || null,
+          en: role.translation?.en || null,
+          tr: role.translation?.tr || null,
+          hu: role.translation?.hu || null
+        }
+      })) : [],
+      
+      realization: project.realization || null,
+      
+      // ✅ Tasks und Description - vollständige Struktur (nur deutsch)
+      tasks: {
+        de: project.tasks?.de || '',
+        en: project.tasks?.en || null,
+        tr: project.tasks?.tr || null,
+        hu: project.tasks?.hu || null
+      },
+      description: {
+        de: project.description?.de || '',
+        en: project.description?.en || null,
+        tr: project.description?.tr || null,
+        hu: project.description?.hu || null
+      }
+    })) : [],
+    
+    // ✅ Training Participations vollständig - KORREKTE Struktur mit name-Objekt
+    trainingParticipations: Array.isArray(rawData.trainingParticipations) ? rawData.trainingParticipations.map(training => ({
+      id: training.id || null,
+      asTutor: training.asTutor || false,
+      yearMonth: training.yearMonth || null,
+      name: {
+        de: training.name?.de || null,
+        en: training.name?.en || null,
+        tr: training.name?.tr || null,
+        hu: training.name?.hu || null
+      }
+    })) : [],
+    
+    // ✅ Professional Experiences vollständig
+    professionalExperiences: Array.isArray(rawData.professionalExperiences) ? rawData.professionalExperiences.map(exp => ({
+      id: exp.id || null,
+      range: exp.range ? {
+        start: exp.range.start ? {
+          year: exp.range.start.year || null,
+          month: exp.range.start.month || null
+        } : null,
+        end: exp.range.end ? {
+          year: exp.range.end.year || null,
+          month: exp.range.end.month || null
+        } : null
+      } : null,
+      role: exp.role || '',
+      employer: exp.employer || ''
+    })) : [],
+    
+    // ✅ Metadaten
     importedAt: new Date().toISOString(),
-    source: 'profiler-api'
+    source: 'profiler-api',
+    profileId: profileId
   };
+  
+  // ✅ Legacy-Felder für Frontend-Kompatibilität hinzufügen
+  transformedData.employeeId = rawData.user?.employee?.id || null;
+  transformedData.globalExternalId = rawData.user?.employee?.globalExternalId || null;
+  transformedData.name = extractName(rawData);
+  transformedData.email = extractEmail(rawData);
+  
+  return transformedData;
 }
 
-// Hilfsfunktion: Projekte aus Profiler-Daten extrahieren
-function extractProjects(rawData) {
-  const projects = [];
-  
-  // Verschiedene mögliche Quellen für Projektdaten prüfen
-  const projectSources = [
-    rawData.projects,
-    rawData.projectExperience,
-    rawData.assignments,
-    rawData.workExperience
-  ];
+// ✅ ENTFERNT: extractProjects - wird nicht mehr benötigt, da 1:1 Übernahme
 
-  for (const source of projectSources) {
-    if (Array.isArray(source)) {
-      for (const project of source) {
-        projects.push({
-          name: extractSafeString(project.name || project.title || project.projectName) || 'Unbekanntes Projekt',
-          customer: extractSafeString(project.customer || project.client || project.company) || 'Unbekannter Kunde',
-          startDate: extractSafeString(project.startDate || project.from) || null,
-          endDate: extractSafeString(project.endDate || project.to) || null,
-          role: extractSafeString(project.role || project.position || project.jobTitle) || 'Consultant',
-          description: extractSafeString(project.description || project.summary) || '',
-          
-          // Technologien und Skills (die SAP-Einträge!) - SICHER TRANSFORMIERT
-          skills: Array.isArray(project.skills) ? project.skills.map(skill => extractSafeString(skill)) : [],
-          technologies: Array.isArray(project.technologies) ? project.technologies.map(tech => extractSafeString(tech)) : 
-                       Array.isArray(project.tools) ? project.tools.map(tech => extractSafeString(tech)) :
-                       Array.isArray(project.techStack) ? project.techStack.map(tech => extractSafeString(tech)) : [],
-          
-          // Weitere Details - SICHER TRANSFORMIERT mit Array-Validierung
-          responsibilities: Array.isArray(project.responsibilities) ? project.responsibilities.map(resp => extractSafeString(resp)) : 
-                           Array.isArray(project.tasks) ? project.tasks.map(task => extractSafeString(task)) : [],
-          achievements: Array.isArray(project.achievements) ? project.achievements.map(ach => extractSafeString(ach)) : [],
-          industry: extractSafeString(project.industry || project.sector) || '',
-          projectSize: project.projectSize || project.teamSize || null,
-          
-          // Metadaten
-          source: 'profiler'
-          // originalData: project // ENTFERNT - könnte Sprach-Objekte enthalten
-        });
-      }
-    }
-  }
+// ✅ ENTFERNT: extractSkills - wird nicht mehr benötigt, da 1:1 Übernahme
 
-  return projects;
-}
+// ✅ ENTFERNT: extractCertifications - wird nicht mehr benötigt, da 1:1 Übernahme
 
-// Hilfsfunktion: Skills extrahieren
-function extractSkills(rawData) {
-  const skills = [];
-  
-  // Verschiedene Quellen für Skills
-  const skillSources = [
-    rawData.skills,
-    rawData.technicalSkills,
-    rawData.competencies,
-    rawData.expertise
-  ];
+// ✅ ENTFERNT: extractEducation - wird nicht mehr benötigt, da 1:1 Übernahme
 
-  for (const source of skillSources) {
-    if (Array.isArray(source)) {
-      for (const skill of source) {
-        skills.push({
-          name: skill.name || skill.title || skill,
-          level: skill.level || skill.rating || skill.proficiency || 0,
-          category: skill.category || skill.type || 'General',
-          experience: skill.experience || skill.years || null,
-          lastUsed: skill.lastUsed || null
-        });
-      }
-    }
-  }
+// ✅ ENTFERNT: extractBiography - wird nicht mehr benötigt, da 1:1 Übernahme
 
-  return skills;
-}
+// ✅ ENTFERNT: extractLanguageRatings - wird nicht mehr benötigt, da 1:1 Übernahme
 
-// Hilfsfunktion: Zertifikate sicher extrahieren (ohne Sprach-Objekte)
-function extractCertifications(rawData) {
-  const certifications = [];
-  
-  if (Array.isArray(rawData.certifications)) {
-    for (const cert of rawData.certifications) {
-      // Transformiere Zertifikat zu sicherem Format
-      const safeCert = {
-        name: extractSafeString(cert.name) || 'Zertifikat',
-        issuer: extractSafeString(cert.issuer) || cert.issueDate || '',
-        date: cert.issueDate || cert.date || '',
-        validUntil: cert.expirationDate || cert.validUntil || '',
-        url: cert.url || ''
-      };
-      
-      certifications.push(safeCert);
-    }
-  }
-  
-  return certifications;
-}
+// ✅ ENTFERNT: extractTrainingParticipations - wird nicht mehr benötigt, da 1:1 Übernahme
 
-// Hilfsfunktion: Bildung sicher extrahieren (ohne Sprach-Objekte)
-function extractEducation(rawData) {
-  const education = [];
-  
-  if (Array.isArray(rawData.education)) {
-    for (const edu of rawData.education) {
-      // Transformiere Bildung zu sicherem Format
-      const safeEdu = {
-        degree: extractSafeString(edu.degree) || extractSafeString(edu.title) || 'Abschluss',
-        institution: extractSafeString(edu.institution) || extractSafeString(edu.school) || '',
-        year: edu.year || edu.graduationYear || '',
-        field: extractSafeString(edu.field) || extractSafeString(edu.major) || ''
-      };
-      
-      education.push(safeEdu);
-    }
-  }
-  
-  return education;
-}
+// ✅ ENTFERNT: extractProfessionalExperiences - wird nicht mehr benötigt, da 1:1 Übernahme
 
 // Hilfsfunktion: Sichere String-Extraktion (verhindert Sprach-Objekte)
 function extractSafeString(value) {
@@ -5694,7 +6199,9 @@ async function saveProfilerData(employeeId, profileData) {
     
     const dataToSave = {
       ...profileData,
-      employeeId: employeeId,
+      // ✅ BEHALTE die echte employeeId aus der Profiler-API (126795)
+      // employeeId wird NICHT überschrieben - bleibt bei profileData.employeeId
+      firebaseDocumentId: employeeId, // Firebase Document ID separat speichern
       importedAt: admin.firestore.FieldValue.serverTimestamp(),
       lastUpdated: admin.firestore.FieldValue.serverTimestamp()
     };

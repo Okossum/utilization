@@ -26,14 +26,16 @@ async function sid(input: string): Promise<string> {
 type PersonIndex = { byNameCc: Map<string,string>; byName: Map<string, Set<string>>; };
 
 async function buildPersonIndexFromDB(): Promise<PersonIndex> {
-  const snap = await getDocs(query(collection(db, "mitarbeiter")));
+  // ✅ Verwende profilerData Collection statt mitarbeiter Collection
+  const snap = await getDocs(query(collection(db, "profilerData")));
   const byNameCc = new Map<string,string>();
   const byName   = new Map<string, Set<string>>();
   snap.forEach(d=>{
     const data = d.data() as any;
-    const display = data.person ?? `${data.nachname ?? ""}, ${data.vorname ?? ""}`;
+    // ✅ Profiler-Daten haben 'name' Feld und strukturierte Daten
+    const display = data.name ?? `${data.lastName ?? ""}, ${data.firstName ?? ""}`;
     const nameKey = normName(display);
-    const ccKey   = normCc(String(data.cc ?? ""));
+    const ccKey   = normCc(String(data.competenceCenter ?? data.cc ?? ""));
     byNameCc.set(`${nameKey}|${ccKey}`, d.id);
     const set = byName.get(nameKey) ?? new Set<string>(); set.add(d.id); byName.set(nameKey, set);
   });

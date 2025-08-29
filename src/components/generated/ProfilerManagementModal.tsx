@@ -79,6 +79,53 @@ function ProfileDataPreview({ data }: { data: any }) {
         </div>
       </div>
 
+      {/* ALLE IMPORT-FELDER */}
+      <div className="bg-blue-50 p-3 rounded mb-3">
+        <h4 className="font-medium text-blue-800 mb-2">📋 Import-Details</h4>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div>
+            <span className="font-medium text-blue-700">Employee-ID:</span>
+            <div className="text-blue-900">{data.employeeId || 'Nicht verfügbar'}</div>
+          </div>
+          <div>
+            <span className="font-medium text-blue-700">Profiler-ID:</span>
+            <div className="text-blue-900">{data.id || 'Nicht verfügbar'}</div>
+          </div>
+          <div>
+            <span className="font-medium text-blue-700">Quelle:</span>
+            <div className="text-blue-900">{data.source || 'Nicht verfügbar'}</div>
+          </div>
+          <div>
+            <span className="font-medium text-blue-700">Auth-Methode:</span>
+            <div className="text-blue-900">{data.authMethod || 'Nicht verfügbar'}</div>
+          </div>
+          <div>
+            <span className="font-medium text-blue-700">Importiert am:</span>
+            <div className="text-blue-900">{data.importedAt ? new Date(data.importedAt).toLocaleString('de-DE') : 'Nicht verfügbar'}</div>
+          </div>
+          <div>
+            <span className="font-medium text-blue-700">Zuletzt aktualisiert:</span>
+            <div className="text-blue-900">{data.lastUpdated ? new Date(data.lastUpdated).toLocaleString('de-DE') : 'Nicht verfügbar'}</div>
+          </div>
+          <div>
+            <span className="font-medium text-blue-700">Competence Center:</span>
+            <div className="text-blue-900">{data.competenceCenter || 'Nicht verfügbar'}</div>
+          </div>
+          <div>
+            <span className="font-medium text-blue-700">Line of Business:</span>
+            <div className="text-blue-900">{data.lineOfBusiness || 'Nicht verfügbar'}</div>
+          </div>
+          <div>
+            <span className="font-medium text-blue-700">Team:</span>
+            <div className="text-blue-900">{data.team || 'Nicht verfügbar'}</div>
+          </div>
+          <div>
+            <span className="font-medium text-blue-700">Unternehmen:</span>
+            <div className="text-blue-900">{data.company || 'Nicht verfügbar'}</div>
+          </div>
+        </div>
+      </div>
+
       {/* Statistiken */}
       <div className="grid grid-cols-4 gap-2 pt-2 border-t border-gray-200">
         <div className="text-center p-2 bg-blue-50 rounded">
@@ -98,6 +145,24 @@ function ProfileDataPreview({ data }: { data: any }) {
           <div className="text-xs text-orange-600">Sprachen</div>
         </div>
       </div>
+
+      {/* Bildung/Ausbildung */}
+      {data.education && data.education.length > 0 && (
+        <div>
+          <div className="flex items-center gap-1 text-gray-600 mb-2">
+            <span className="font-medium">🎓 Bildung/Ausbildung ({data.education.length}):</span>
+          </div>
+          <div className="space-y-1 max-h-24 overflow-y-auto">
+            {data.education.map((edu: any, index: number) => (
+              <div key={index} className="p-2 bg-gray-50 rounded text-xs border">
+                <div className="font-medium">{typeof edu === 'string' ? edu : (edu.degree || edu.title || edu.name || 'Ausbildung')}</div>
+                {edu.institution && <div className="text-gray-600">Institution: {edu.institution}</div>}
+                {edu.year && <div className="text-gray-600">Jahr: {edu.year}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Top Skills */}
       {data.skills && data.skills.length > 0 && (

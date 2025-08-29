@@ -117,40 +117,40 @@ function transformEinsatzplanValues(einsatzplanValues: Record<string, any[]>): R
 }
 
 function mergePersonData(
-  mitarbeiterData: any,
+  profilerData: any,
   auslastungData: any,
   einsatzplanData: any
 ): ConsolidatedUtilizationData {
-  // Person-Name mit Priorität: Mitarbeiter > Einsatzplan > Auslastung
-  const personName = mitarbeiterData?.person || einsatzplanData?.person || auslastungData?.person || "";
+  // ✅ Person-Name mit Priorität: Profiler > Einsatzplan > Auslastung
+  const personName = profilerData?.name || einsatzplanData?.person || auslastungData?.person || "";
   const { nachname, vorname } = parsePersonName(personName);
   
   const now = new Date();
   
   return {
-    // Person-Identifikation
-    id: mitarbeiterData?.id || einsatzplanData?.personId || auslastungData?.personId || "",
+    // ✅ Person-Identifikation aus Profiler-Daten
+    id: profilerData?.employeeId || profilerData?.globalExternalId || einsatzplanData?.personId || auslastungData?.personId || "",
     person: personName,
     nachname,
     vorname,
     
-    // Organisationsdaten mit Smart-Merge
-    email: mitarbeiterData?.email || "",
-    firma: mitarbeiterData?.firma || "",
-    lob: mitarbeiterData?.lob || einsatzplanData?.lob || "",
-    bereich: einsatzplanData?.bereich || mitarbeiterData?.bereich || "",
-    cc: mitarbeiterData?.cc || einsatzplanData?.cc || auslastungData?.cc || "",
-    team: einsatzplanData?.team || mitarbeiterData?.team || "",
-    standort: mitarbeiterData?.standort || "",
+    // ✅ Organisationsdaten mit Profiler-Priorität
+    email: profilerData?.email || "",
+    firma: profilerData?.company || "adesso SE",
+    lob: profilerData?.lineOfBusiness || einsatzplanData?.lob || "",
+    bereich: profilerData?.department || einsatzplanData?.bereich || "",
+    cc: profilerData?.competenceCenter || einsatzplanData?.cc || auslastungData?.cc || "",
+    team: profilerData?.teamName || einsatzplanData?.team || "",
+    standort: profilerData?.location || "",
     location: einsatzplanData?.location || "", // ✅ Geschäftsstelle aus Einsatzplan
     
-    // Personal-Informationen
-    lbs: mitarbeiterData?.lbs || einsatzplanData?.lbs || "",
+    // ✅ Personal-Informationen aus Profiler-Daten
+    lbs: profilerData?.careerLevel || einsatzplanData?.lbs || "",
     vg: einsatzplanData?.vg || "",
-    erfahrungSeitJahr: mitarbeiterData?.erfahrungSeitJahr || "",
-    verfuegbarAb: mitarbeiterData?.verfuegbarAb || einsatzplanData?.verfuegbarAb || "",
-    verfuegbarFuerStaffing: mitarbeiterData?.verfuegbarFuerStaffing ?? einsatzplanData?.verfuegbarFuerStaffing ?? false,
-    linkZumProfilUrl: mitarbeiterData?.linkZumProfilUrl || "",
+    erfahrungSeitJahr: profilerData?.experienceSinceYear || "",
+    verfuegbarAb: profilerData?.dateOfExit || einsatzplanData?.verfuegbarAb || "",
+    verfuegbarFuerStaffing: profilerData?.active ?? einsatzplanData?.verfuegbarFuerStaffing ?? false,
+    linkZumProfilUrl: profilerData?.profileUrl || "",
     
     // Zeitdaten
     auslastung: auslastungData?.values || {},
@@ -184,21 +184,21 @@ export async function consolidatePersonData(personId: string): Promise<void> {
   // logger statement entfernt
   
   try {
-    // Lade Daten aus allen drei Collections
-    const [mitarbeiterDoc, auslastungDoc, einsatzplanDoc] = await Promise.all([
-      getDocs(query(collection(db, "mitarbeiter"), where("__name__", "==", personId))),
+    // ✅ Lade Daten aus profilerData (statt mitarbeiter) + auslastung + einsatzplan
+    const [profilerDoc, auslastungDoc, einsatzplanDoc] = await Promise.all([
+      getDoc(doc(db, "profilerData", personId)), // Direkt per Document ID
       getDocs(query(collection(db, "auslastung"), where("personId", "==", personId))),
       getDocs(query(collection(db, "einsatzplan"), where("personId", "==", personId)))
     ]);
     
-    const mitarbeiterData = mitarbeiterDoc.docs[0]?.data();
+    const profilerData = profilerDoc.exists() ? profilerDoc.data() : null;
     const auslastungData = auslastungDoc.docs[0]?.data();
     const einsatzplanData = einsatzplanDoc.docs[0]?.data();
     
 
     
     // Skip wenn keine Daten vorhanden
-    if (!mitarbeiterData && !auslastungData && !einsatzplanData) {
+    if (!profilerData && !auslastungData && !einsatzplanData) {
       // logger statement entfernt
       return;
     }
@@ -216,7 +216,7 @@ export async function consolidatePersonData(personId: string): Promise<void> {
     } : {};
     
     // Merge Daten
-    const consolidatedData = mergePersonData(mitarbeiterData, auslastungData, einsatzplanData);
+    const consolidatedData = mergePersonData(profilerData, auslastungData, einsatzplanData);
     
     // 🔐 User-Rollen wieder hinzufügen (überschreibt nicht!)
     const finalData = {
@@ -244,17 +244,17 @@ export async function consolidateAllData(): Promise<void> {
   // logger statement entfernt
   
   try {
-    // Sammle alle eindeutigen PersonIds aus allen Collections
-    const [mitarbeiterSnap, auslastungSnap, einsatzplanSnap] = await Promise.all([
-      getDocs(collection(db, "mitarbeiter")),
+    // ✅ Sammle alle eindeutigen PersonIds aus profilerData + auslastung + einsatzplan
+    const [profilerSnap, auslastungSnap, einsatzplanSnap] = await Promise.all([
+      getDocs(collection(db, "profilerData")),
       getDocs(collection(db, "auslastung")),
       getDocs(collection(db, "einsatzplan"))
     ]);
     
     const personIds = new Set<string>();
     
-    // PersonIds aus Mitarbeiter (Document ID = personId)
-    mitarbeiterSnap.docs.forEach(doc => personIds.add(doc.id));
+    // ✅ PersonIds aus profilerData (Document ID = personId)
+    profilerSnap.docs.forEach(doc => personIds.add(doc.id));
     
     // PersonIds aus Auslastung (Field: personId)
     auslastungSnap.docs.forEach(doc => {

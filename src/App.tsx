@@ -25,6 +25,7 @@ import EmergencyAdminCreator from './components/generated/EmergencyAdminCreator'
 import FirebaseAuthBulkSetup from './components/generated/FirebaseAuthBulkSetup';
 import { ProfilerManagementModal } from './components/generated/ProfilerManagementModal';
 import { ProfilerDataView } from './components/generated/ProfilerDataView';
+import ProfilerTestImport from './components/generated/ProfilerTestImport';
 
 import { CustomerProvider } from './contexts/CustomerContext';
 import { AuthProvider } from './contexts/AuthContext';
@@ -633,6 +634,14 @@ function App() {
                             <div className="text-sm font-medium text-blue-900">Cache leeren</div>
                             <div className="text-xs text-blue-600">Gespeicherte Daten und Einstellungen zurücksetzen</div>
                           </button>
+                        </div>
+                      </div>
+                      
+                      {/* Profiler Test-Import Sektion */}
+                      <div className="border-t pt-6">
+                        <h4 className="text-md font-medium text-gray-900 mb-4">🧪 Profiler Test-Import</h4>
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                          <ProfilerTestImport />
                         </div>
                       </div>
                     </div>

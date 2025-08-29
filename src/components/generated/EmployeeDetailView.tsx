@@ -190,6 +190,11 @@ export default function EmployeeDetailView({
   const [dossierLoading, setDossierLoading] = useState(false);
   const [dossierData, setDossierData] = useState<any>(null);
 
+  // Profiler-Projekte State
+  const [profilerProjects, setProfilerProjects] = useState<any[]>([]);
+  const [profilerProjectsLoading, setProfilerProjectsLoading] = useState(false);
+  const [selectedProfilerProject, setSelectedProfilerProject] = useState<any | null>(null);
+
   // Projekte nach Typen filtern - DIREKT AUS FIRESTORE (KEIN CACHE)
   const [freshPersonData, setFreshPersonData] = useState<any>(null);
   
@@ -233,6 +238,50 @@ export default function EmployeeDetailView({
     };
     
     loadFreshPersonData();
+  }, [employeeId]);
+
+  // Lade Profiler-Projekte für diesen Mitarbeiter
+  useEffect(() => {
+    const loadProfilerProjects = async () => {
+      if (!employeeId) return;
+      
+      setProfilerProjectsLoading(true);
+      try {
+        console.log('🔄 Loading profiler projects for employee:', employeeId);
+        const { collection, doc, getDoc } = await import('firebase/firestore');
+        
+        // Lade profilerData für diesen Mitarbeiter
+        const profilerDocRef = doc(db, 'profilerData', employeeId);
+        const profilerDoc = await getDoc(profilerDocRef);
+        
+        if (profilerDoc.exists()) {
+          const profilerData = profilerDoc.data();
+          const projects = profilerData.projects || [];
+          
+          console.log('✅ Profiler projects loaded:', {
+            employeeId,
+            projectsCount: projects.length,
+            projects: projects.slice(0, 3).map(p => ({ 
+              id: p.id, 
+              title: p.title, 
+              customer: p.customer 
+            }))
+          });
+          
+          setProfilerProjects(projects);
+        } else {
+          console.log('❌ No profiler data found for employee:', employeeId);
+          setProfilerProjects([]);
+        }
+      } catch (error) {
+        console.error('❌ Error loading profiler projects:', error);
+        setProfilerProjects([]);
+      } finally {
+        setProfilerProjectsLoading(false);
+      }
+    };
+    
+    loadProfilerProjects();
   }, [employeeId]);
 
   const projectsByType: ProjectsByType = React.useMemo(() => {
@@ -746,6 +795,65 @@ export default function EmployeeDetailView({
     // Determine project type based on project data
     const projectType = project.projectType || 'historical';
     setSelectedProjectType(projectType as 'active' | 'planned' | 'historical');
+    setIsProjectDetailModalOpen(true);
+  };
+
+  // Profiler-Projekt anzeigen - konvertiere zu ProjectHistoryItem Format
+  const handleViewProfilerProject = (profilerProject: any) => {
+    if (!profilerProject) {
+      console.error('❌ Profiler-Projekt ist null oder undefined');
+      return;
+    }
+
+    console.log('🔍 Converting profiler project:', profilerProject);
+    
+    // Konvertiere Profiler-Projekt zu ProjectHistoryItem Format
+    const convertedProject: ProjectHistoryItem = {
+      id: profilerProject.id || `profiler-${Date.now()}`,
+      projectName: profilerProject.title || 'Unbekanntes Projekt',
+      customer: profilerProject.customer || '',
+      projectType: 'historical', // Zeige Profiler-Projekte als historisch an
+      description: profilerProject.description?.de || profilerProject.tasks?.de || '',
+      
+      // Zeitraum aus range extrahieren
+      startDate: profilerProject.range?.start ? 
+        `${profilerProject.range.start.year}-${String(profilerProject.range.start.month).padStart(2, '0')}-01` : '',
+      endDate: profilerProject.range?.end ? 
+        `${profilerProject.range.end.year}-${String(profilerProject.range.end.month).padStart(2, '0')}-01` : '',
+      duration: profilerProject.range ? 
+        `${profilerProject.range.start?.month}/${profilerProject.range.start?.year} - ${profilerProject.range.end ? `${profilerProject.range.end.month}/${profilerProject.range.end.year}` : 'laufend'}` : '',
+      
+      // Rollen extrahieren - als Array für ProjectHistoryItem
+      roles: profilerProject.roles?.filter((role: any) => role && (role.translation?.de || role.value)).map((role: any) => ({
+        name: role.translation?.de || role.value || '',
+        description: ''
+      })) || [],
+      
+      // Skills extrahieren - als Array für ProjectHistoryItem
+      skills: profilerProject.skills?.filter((skill: any) => skill && skill.name).map((skill: any) => ({
+        name: skill.name?.de || skill.name || '',
+        level: 0
+      })) || [],
+      
+      // Zusätzliche Informationen in description integrieren
+      // tasks und realization werden bereits in description verwendet
+      
+      // Standard-Felder für Kompatibilität
+      dailyRate: 0,
+      probability: 100,
+      internalContact: '',
+      customerContact: '',
+      projectSource: 'regular', // Verwende 'regular' da 'profiler' nicht erlaubt ist
+      jiraTicketId: `profiler-${profilerProject.id}`, // Kennzeichnung als Profiler-Projekt
+      
+      // Pflichtfelder für ProjectHistoryItem
+      employeeId: employeeId,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    setSelectedProject(convertedProject);
+    setSelectedProjectType('historical'); // Zeige als historisches Projekt an
     setIsProjectDetailModalOpen(true);
   };
 
@@ -1621,6 +1729,75 @@ export default function EmployeeDetailView({
 
             {/* ========== RECHTE SPALTE: Projektvergangenheit ========== */}
             <div className="lg:col-span-1 xl:col-span-1 2xl:col-span-2 space-y-3">
+              
+              {/* 🎯 Profiler-Projekte Dropdown */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <Building className="w-5 h-5 text-purple-600" />
+                  <h3 className="text-lg font-semibold text-gray-900">Profiler-Projekte</h3>
+                  <span className="text-xs font-medium text-white bg-purple-500 px-2 py-0.5 rounded-full">
+                    {profilerProjects.length}
+                  </span>
+                </div>
+                
+                {profilerProjectsLoading ? (
+                  <div className="text-sm text-gray-500">Lade Profiler-Projekte...</div>
+                ) : profilerProjects.length === 0 ? (
+                  <div className="text-sm text-gray-500 italic">Keine Profiler-Projekte gefunden</div>
+                ) : (
+                  <div className="max-h-96 overflow-y-auto">
+                    <div className="space-y-1">
+                      {profilerProjects.map((project, index) => (
+                        <div 
+                          key={project.id || index} 
+                          className="p-3 bg-purple-50 rounded-lg border border-purple-200 hover:bg-purple-100 cursor-pointer transition-colors"
+                          onClick={() => handleViewProfilerProject(project)}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h4 className="text-sm font-medium text-gray-900 hover:text-purple-700">
+                                {project.title}
+                              </h4>
+                              {project.customer && (
+                                <p className="text-xs text-gray-600 mt-1">
+                                  <Building className="w-3 h-3 inline mr-1" />
+                                  {project.customer}
+                                </p>
+                              )}
+                              {project.description?.de && (
+                                <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                                  {project.description.de}
+                                </p>
+                              )}
+                              {project.range && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  <Calendar className="w-3 h-3 inline mr-1" />
+                                  {project.range.start?.month}/{project.range.start?.year} - {project.range.end ? `${project.range.end.month}/${project.range.end.year}` : 'laufend'}
+                                </p>
+                              )}
+                              {project.roles && project.roles.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-2">
+                                  {project.roles.slice(0, 3).map((role, roleIndex) => (
+                                    <span key={roleIndex} className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full">
+                                      {role.translation?.de || role.value}
+                                    </span>
+                                  ))}
+                                  {project.roles.length > 3 && (
+                                    <span className="text-xs text-gray-500">+{project.roles.length - 3} weitere</span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                            <div className="ml-2 text-purple-400">
+                              <ChevronDown className="w-4 h-4 transform -rotate-90" />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
               
               {/* 📜 Projektvergangenheit - Neues Design */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
