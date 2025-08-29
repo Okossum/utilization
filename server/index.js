@@ -1511,8 +1511,8 @@ app.post('/api/profiler/test-preview', requireAuth, async (req, res) => {
     const { profileUrl, employeeId, authToken } = req.body;
 
     console.log('🧪 Profiler-Test-Preview Request:', {
-      employeeId,
       profileUrl,
+      employeeId,
       hasAuthToken: !!authToken
     });
 
@@ -1532,7 +1532,7 @@ app.post('/api/profiler/test-preview', requireAuth, async (req, res) => {
       });
     }
 
-    console.log(`🎯 Verarbeite Test-Preview für Profil-ID: ${profileId}`);
+    console.log(`🎯 Verarbeite Test-Preview für Employee-ID: ${employeeId}`);
 
     // 1. Master-Daten laden
     const masterData = await fetchMasterData(authToken);
@@ -1546,6 +1546,132 @@ app.post('/api/profiler/test-preview', requireAuth, async (req, res) => {
       });
     }
 
+    // 2.5. 🆕 ECHTE SKILLS-API-ANALYSE (aus Browser Network Tab)
+    console.log('🎯 Starte Analyse der ECHTEN Skills-API-Endpoints für ID', profileId);
+    let skillsData = null;
+    
+    // 🧹 Token bereinigen für Skills-API-Calls
+    const cleanToken = authToken.trim().replace(/[\r\n\t]/g, '');
+    console.log(`🧹 Token für Skills-API bereinigt: Länge ${cleanToken.length}, erste 20 Zeichen: ${cleanToken.substring(0, 20)}...`);
+    
+    const skillsEndpoints = [
+      // ✅ ECHTER Endpoint aus Browser Network Tab:
+      `https://profiler.adesso-group.com/api/profiles/${profileId}/skill-ratings`,
+      // 🔍 Weitere echte Endpoints:
+      `https://profiler.adesso-group.com/api/skills/autocomplete/DE`,
+      `https://profiler.adesso-group.com/api/user`,
+      `https://profiler.adesso-group.com/api/employee-availability/${profileData.user?.employee?.id}`,
+      // 🧪 Fallback-Tests:
+      `https://profiler.adesso-group.com/api/skill-ratings/${profileId}`,
+      `https://profiler.adesso-group.com/api/profiles/${profileId}/skills`
+    ];
+    
+    for (const [index, skillsUrl] of skillsEndpoints.entries()) {
+      try {
+        console.log(`🔗 [${index + 1}/${skillsEndpoints.length}] Teste Skills-URL:`, skillsUrl);
+        
+        // 🔄 Teste verschiedene HTTP-Methods und Header-Kombinationen
+        const testConfigs = [
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${cleanToken}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            }
+          },
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${cleanToken}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            }
+          },
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${cleanToken}`,
+              'Accept': 'application/json',
+              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+            }
+          }
+        ];
+        
+        let skillsResponse = null;
+        let usedConfig = null;
+        
+        for (const [configIndex, config] of testConfigs.entries()) {
+          try {
+            console.log(`   🧪 [${configIndex + 1}/3] Teste ${config.method} mit Headers:`, Object.keys(config.headers));
+            skillsResponse = await fetch(skillsUrl, config);
+            console.log(`   📡 [${configIndex + 1}] Response:`, {
+              status: skillsResponse.status,
+              statusText: skillsResponse.statusText,
+              ok: skillsResponse.ok,
+              headers: {
+                contentType: skillsResponse.headers.get('content-type'),
+                contentLength: skillsResponse.headers.get('content-length')
+              }
+            });
+            
+            if (skillsResponse.ok) {
+              usedConfig = config;
+              console.log(`   ✅ [${configIndex + 1}] ERFOLGREICHE Konfiguration gefunden!`);
+              break;
+            }
+          } catch (configError) {
+            console.log(`   ❌ [${configIndex + 1}] Config-Test fehlgeschlagen:`, configError.message);
+          }
+        }
+        
+        if (!skillsResponse) {
+          console.log(`❌ [${index + 1}] Alle Konfigurationen fehlgeschlagen für:`, skillsUrl);
+          continue;
+        }
+        
+        if (skillsResponse.ok) {
+          const skillsText = await skillsResponse.text();
+          console.log(`📄 [${index + 1}] Response-Text (erste 200 Zeichen):`, skillsText.substring(0, 200));
+          
+          if (skillsText.trim() && skillsText !== '[]' && skillsText !== '{}') {
+            try {
+              const parsedSkills = JSON.parse(skillsText);
+              console.log(`✅ [${index + 1}] SKILLS GEFUNDEN!`, {
+                url: skillsUrl,
+                method: usedConfig?.method || 'unknown',
+                skillsCount: Array.isArray(parsedSkills) ? parsedSkills.length : 'nicht Array',
+                skillsKeys: typeof parsedSkills === 'object' ? Object.keys(parsedSkills) : 'nicht Objekt',
+                skillsType: typeof parsedSkills,
+                hasData: !!parsedSkills && (Array.isArray(parsedSkills) ? parsedSkills.length > 0 : Object.keys(parsedSkills).length > 0)
+              });
+              
+              // Verwende die ersten gefundenen Skills-Daten
+              if (!skillsData && parsedSkills) {
+                skillsData = {
+                  source: skillsUrl,
+                  method: usedConfig?.method || 'unknown',
+                  headers: usedConfig?.headers || {},
+                  data: parsedSkills
+                };
+                console.log(`🎉 ERSTE SKILLS-DATEN GESPEICHERT von URL [${index + 1}]:`, skillsUrl, 'mit Method:', usedConfig?.method);
+              }
+            } catch (parseError) {
+              console.log(`❌ [${index + 1}] JSON-Parse-Fehler:`, parseError.message);
+            }
+          } else {
+            console.log(`⚠️ [${index + 1}] Response ist leer oder nur leere Struktur`);
+          }
+        } else {
+          console.log(`❌ [${index + 1}] API-Call fehlgeschlagen:`, skillsResponse.status, skillsResponse.statusText);
+        }
+      } catch (skillsError) {
+        console.log(`❌ [${index + 1}] Fehler beim Skills-API-Call:`, skillsError.message);
+      }
+    }
+    
+    console.log('🏁 Skills-API-Analyse abgeschlossen. Gefundene Daten:', !!skillsData);
+
     // 3. Erweiterte Transformation mit Master-Daten
     const transformedData = transformProfilerDataWithMasterData(profileData, profileId, masterData);
 
@@ -1558,11 +1684,29 @@ app.post('/api/profiler/test-preview', requireAuth, async (req, res) => {
       testImport: true
     };
 
+    // 🆕 SKILLS-INTEGRATION: Integriere gefundene Skills in finale Datenstruktur
+    if (skillsData && skillsData.data && Array.isArray(skillsData.data)) {
+      console.log(`🔗 Integriere ${skillsData.data.length} Skills aus ${skillsData.source} in finale Datenstruktur`);
+      
+      // Erweitere die finale Datenstruktur um die gefundenen Skills
+      finalDataForDatabase.skills = skillsData.data;
+      finalDataForDatabase.skillsCount = skillsData.data.length;
+      finalDataForDatabase.hasSkills = true;
+      finalDataForDatabase.skillsSource = skillsData.source;
+      finalDataForDatabase.skillsMethod = skillsData.method;
+      
+      console.log(`✅ Skills erfolgreich integriert: ${skillsData.data.length} Skills hinzugefügt`);
+    } else {
+      console.log(`⚠️ Keine Skills-Daten zum Integrieren gefunden`);
+    }
+
     console.log(`✅ Test-Preview-Daten erfolgreich abgerufen für ${employeeId}`);
 
     res.json({
       success: true,
       message: 'Test-Preview-Daten mit Master-Daten-Auflösung erfolgreich abgerufen',
+      rawProfileData: profileData,
+      skillsApiData: skillsData, // 🆕 Skills-API-Daten hinzugefügt
       previewData: finalDataForDatabase,
       employeeId: employeeId,
       masterDataInfo: {
@@ -1579,6 +1723,33 @@ app.post('/api/profiler/test-preview', requireAuth, async (req, res) => {
         resolvedSkillsInProjects: finalDataForDatabase.masterDataStats?.resolvedSkillsInProjects || 0,
         resolvedGeneralSkills: finalDataForDatabase.masterDataStats?.resolvedGeneralSkills || 0,
         resolvedTrainings: finalDataForDatabase.masterDataStats?.resolvedTrainings || 0
+      },
+      // 🔍 VOLLSTÄNDIGE ROHDATEN FÜR TEST-ZWECKE
+      rawProfileData: profileData,
+      rawMasterData: {
+        skillsCount: masterData.skills.length,
+        trainingsCount: masterData.trainings.length,
+        projectRolesCount: masterData.projectRoles.length,
+        skillsSample: masterData.skills.slice(0, 10),
+        trainingsSample: masterData.trainings.slice(0, 10),
+        projectRolesSample: masterData.projectRoles.slice(0, 10)
+      },
+      transformationDebug: {
+        originalSkills: profileData.skills || 'NICHT VORHANDEN',
+        originalProjects: profileData.projects?.map(p => ({
+          id: p.id,
+          title: p.title,
+          skills: p.skills,
+          skillsCount: p.skills?.length || 0
+        })) || 'NICHT VORHANDEN',
+        originalTrainingParticipations: profileData.trainingParticipations || 'NICHT VORHANDEN',
+        transformedSkills: finalDataForDatabase.skills || 'NICHT TRANSFORMIERT',
+        transformedProjects: finalDataForDatabase.projects?.map(p => ({
+          id: p.id,
+          title: p.title,
+          skills: p.skills,
+          skillsCount: p.skills?.length || 0
+        })) || 'NICHT TRANSFORMIERT'
       }
     });
 
@@ -1598,8 +1769,8 @@ app.post('/api/profiler/test-import', requireAuth, async (req, res) => {
     const { profileUrl, employeeId, authToken } = req.body;
 
     console.log('🧪 Profiler-Test-Import Request:', {
-      employeeId,
       profileUrl,
+      employeeId,
       hasAuthToken: !!authToken
     });
 
@@ -1619,7 +1790,7 @@ app.post('/api/profiler/test-import', requireAuth, async (req, res) => {
       });
     }
 
-    console.log(`🎯 Verarbeite Test-Import für Profil-ID: ${profileId}`);
+    console.log(`🎯 Verarbeite Test-Import für Employee-ID: ${employeeId}`);
 
     // 1. Master-Daten laden
     const masterData = await fetchMasterData(authToken);
@@ -5515,7 +5686,10 @@ async function processBulkImport(employees, authConfig) {
 // Hilfsfunktion: Profil-ID aus URL extrahieren
 function extractProfileIdFromUrl(profileUrl) {
   try {
-    const match = profileUrl.match(/\/profile\/(\d+)/);
+    // Unterstütze beide URL-Formate:
+    // - /profile/123456 (alte Format)
+    // - /api/profiles/123456/full-profile (API Format)
+    const match = profileUrl.match(/\/(?:api\/)?profiles?\/(\d+)/);
     return match ? match[1] : null;
   } catch (error) {
     console.error('Fehler beim Extrahieren der Profil-ID:', error);

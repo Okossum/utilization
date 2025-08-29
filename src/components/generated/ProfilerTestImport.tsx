@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface MasterDataInfo {
   skillsLoaded: number;
@@ -32,6 +33,7 @@ interface TestResponse {
 }
 
 export default function ProfilerTestImport() {
+  const { token } = useAuth();
   const [profileUrl, setProfileUrl] = useState('');
   const [employeeId, setEmployeeId] = useState('');
   const [authToken, setAuthToken] = useState('');
@@ -46,12 +48,18 @@ export default function ProfilerTestImport() {
       return;
     }
 
+    if (!token) {
+      alert('Nicht authentifiziert - bitte neu anmelden');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const response = await fetch('/api/profiler/test-preview', {
+      const response = await fetch('http://localhost:3001/api/profiler/test-preview', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           profileUrl,
@@ -81,12 +89,18 @@ export default function ProfilerTestImport() {
       return;
     }
 
+    if (!token) {
+      alert('Nicht authentifiziert - bitte neu anmelden');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const response = await fetch('/api/profiler/test-import', {
+      const response = await fetch('http://localhost:3001/api/profiler/test-import', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           profileUrl,
@@ -283,13 +297,90 @@ export default function ProfilerTestImport() {
                         </div>
                       )}
 
-                      {previewResult.previewData && (
+                      {previewResult.rawProfileData && (
                         <div>
-                          <h3 className="text-lg font-semibold mb-3">Preview-Daten (Auszug)</h3>
+                          <h3 className="text-lg font-semibold mb-3">🔍 VOLLSTÄNDIGE ROHDATEN (Original von Profiler-API)</h3>
                           <div className="bg-gray-50 p-4 rounded-lg max-h-96 overflow-auto">
                             <pre className="text-xs">
-                              {JSON.stringify(previewResult.previewData, null, 2).substring(0, 2000)}
-                              {JSON.stringify(previewResult.previewData, null, 2).length > 2000 && '\n... (gekürzt)'}
+                              {JSON.stringify(previewResult.rawProfileData, null, 2)}
+                            </pre>
+                          </div>
+                        </div>
+                      )}
+
+                      {previewResult.skillsApiData !== undefined && (
+                        <div>
+                          <h3 className="text-lg font-semibold mb-3">🎯 SKILLS-API-DATEN (Separater API-Call)</h3>
+                          <div className="bg-blue-50 p-4 rounded-lg max-h-96 overflow-auto">
+                            {previewResult.skillsApiData ? (
+                              <pre className="text-xs">
+                                {JSON.stringify(previewResult.skillsApiData, null, 2)}
+                              </pre>
+                            ) : (
+                              <p className="text-red-600 font-medium">❌ Skills-API hat keine Daten zurückgegeben (leer)</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {previewResult.transformationDebug && (
+                        <div>
+                          <h3 className="text-lg font-semibold mb-3">🔄 TRANSFORMATION DEBUG</h3>
+                          <div className="space-y-4">
+                            <div>
+                              <h4 className="font-medium mb-2">Original Skills:</h4>
+                              <div className="bg-red-50 p-3 rounded text-xs">
+                                <pre>{JSON.stringify(previewResult.transformationDebug.originalSkills, null, 2)}</pre>
+                              </div>
+                            </div>
+                            <div>
+                              <h4 className="font-medium mb-2">Transformierte Skills:</h4>
+                              <div className="bg-green-50 p-3 rounded text-xs">
+                                <pre>{JSON.stringify(previewResult.transformationDebug.transformedSkills, null, 2)}</pre>
+                              </div>
+                            </div>
+                            <div>
+                              <h4 className="font-medium mb-2">Original Projekte (mit Skills):</h4>
+                              <div className="bg-blue-50 p-3 rounded text-xs max-h-64 overflow-auto">
+                                <pre>{JSON.stringify(previewResult.transformationDebug.originalProjects, null, 2)}</pre>
+                              </div>
+                            </div>
+                            <div>
+                              <h4 className="font-medium mb-2">Original Training Participations:</h4>
+                              <div className="bg-yellow-50 p-3 rounded text-xs max-h-64 overflow-auto">
+                                <pre>{JSON.stringify(previewResult.transformationDebug.originalTrainingParticipations, null, 2)}</pre>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {previewResult.rawMasterData && (
+                        <div>
+                          <h3 className="text-lg font-semibold mb-3">📚 MASTER-DATEN SAMPLES</h3>
+                          <div className="space-y-4">
+                            <div>
+                              <h4 className="font-medium mb-2">Skills Sample (erste 10):</h4>
+                              <div className="bg-purple-50 p-3 rounded text-xs max-h-32 overflow-auto">
+                                <pre>{JSON.stringify(previewResult.rawMasterData.skillsSample, null, 2)}</pre>
+                              </div>
+                            </div>
+                            <div>
+                              <h4 className="font-medium mb-2">Trainings Sample (erste 10):</h4>
+                              <div className="bg-orange-50 p-3 rounded text-xs max-h-32 overflow-auto">
+                                <pre>{JSON.stringify(previewResult.rawMasterData.trainingsSample, null, 2)}</pre>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {previewResult.previewData && (
+                        <div>
+                          <h3 className="text-lg font-semibold mb-3">💾 FINALE DATENBANK-DATEN</h3>
+                          <div className="bg-gray-50 p-4 rounded-lg max-h-96 overflow-auto">
+                            <pre className="text-xs">
+                              {JSON.stringify(previewResult.previewData, null, 2)}
                             </pre>
                           </div>
                         </div>
