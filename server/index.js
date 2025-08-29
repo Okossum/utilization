@@ -1804,8 +1804,140 @@ app.post('/api/profiler/test-import', requireAuth, async (req, res) => {
       });
     }
 
+    // 2.5. 🆕 ECHTE SKILLS-API-ANALYSE (aus Browser Network Tab)
+    console.log('🎯 Starte Analyse der ECHTEN Skills-API-Endpoints für ID', profileId);
+    let skillsData = null;
+    const skillsEndpoints = [
+      // ✅ ECHTER Endpoint aus Browser Network Tab:
+      `https://profiler.adesso-group.com/api/profiles/${profileId}/skill-ratings`,
+      // 🔍 Weitere echte Endpoints:
+      `https://profiler.adesso-group.com/api/skills/autocomplete/DE`,
+      `https://profiler.adesso-group.com/api/user`,
+      `https://profiler.adesso-group.com/api/employee-availability/${profileData.user?.employee?.id}`,
+      // 🧪 Fallback-Tests:
+      `https://profiler.adesso-group.com/api/skill-ratings/${profileId}`,
+      `https://profiler.adesso-group.com/api/profiles/${profileId}/skills`
+    ];
+
+    // Token für Skills-API bereinigen
+    const cleanToken = authToken.trim().replace(/^Bearer\s+/i, '');
+    console.log('🧹 Token für Skills-API bereinigt: Länge', cleanToken.length, ', erste 20 Zeichen:', cleanToken.substring(0, 20) + '...');
+
+    for (const [index, skillsUrl] of skillsEndpoints.entries()) {
+      try {
+        console.log(`🔗 [${index + 1}/${skillsEndpoints.length}] Teste Skills-URL:`, skillsUrl);
+        
+        // 🔄 Teste verschiedene HTTP-Methods und Header-Kombinationen
+        const testConfigs = [
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${cleanToken}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            }
+          },
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${cleanToken}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            }
+          },
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${cleanToken}`,
+              'Accept': 'application/json',
+              'User-Agent': 'Mozilla/5.0 (compatible; ProfilerImporter/1.0)'
+            }
+          }
+        ];
+
+        let skillsResponse = null;
+        for (const [configIndex, config] of testConfigs.entries()) {
+          try {
+            console.log(`   🧪 [${configIndex + 1}/${testConfigs.length}] Teste ${config.method} mit Headers:`, Object.keys(config.headers));
+            skillsResponse = await fetch(skillsUrl, config);
+            
+            console.log(`   📡 [${configIndex + 1}] Response:`, {
+              status: skillsResponse.status,
+              statusText: skillsResponse.statusText,
+              ok: skillsResponse.ok,
+              headers: {
+                contentType: skillsResponse.headers.get('content-type'),
+                contentLength: skillsResponse.headers.get('content-length')
+              }
+            });
+
+            if (skillsResponse.ok) {
+              console.log(`   ✅ [${configIndex + 1}] ERFOLGREICHE Konfiguration gefunden!`);
+              break; // Erfolgreiche Konfiguration gefunden
+            }
+          } catch (configError) {
+            console.log(`   ❌ [${configIndex + 1}] Config-Fehler:`, configError.message);
+          }
+        }
+
+        if (skillsResponse && skillsResponse.ok) {
+          const skillsText = await skillsResponse.text();
+          console.log(`📄 [${index + 1}] Response-Text (erste 200 Zeichen):`, skillsText.substring(0, 200));
+          
+          if (skillsText.trim() && skillsText !== '[]' && skillsText !== '{}') {
+            try {
+              const parsedSkills = JSON.parse(skillsText);
+              console.log(`✅ [${index + 1}] SKILLS GEFUNDEN!`, {
+                url: skillsUrl,
+                method: skillsResponse.method || 'GET',
+                skillsCount: Array.isArray(parsedSkills) ? parsedSkills.length : 'nicht Array',
+                skillsKeys: typeof parsedSkills === 'object' ? Object.keys(parsedSkills) : 'nicht Objekt',
+                skillsType: typeof parsedSkills,
+                hasData: !!parsedSkills && (Array.isArray(parsedSkills) ? parsedSkills.length > 0 : Object.keys(parsedSkills).length > 0)
+              });
+              
+              // Verwende die ersten gefundenen Skills-Daten
+              if (!skillsData && parsedSkills) {
+                skillsData = {
+                  source: skillsUrl,
+                  method: skillsResponse.method || 'GET',
+                  data: parsedSkills
+                };
+                console.log(`🎉 ERSTE SKILLS-DATEN GESPEICHERT von URL [${index + 1}]:`, skillsUrl, 'mit Method:', skillsData.method);
+              }
+            } catch (parseError) {
+              console.log(`❌ [${index + 1}] JSON-Parse-Fehler:`, parseError.message);
+            }
+          } else {
+            console.log(`⚠️ [${index + 1}] Response ist leer oder nur Platzhalter`);
+          }
+        } else {
+          console.log(`❌ [${index + 1}] API-Call fehlgeschlagen:`, skillsResponse ? skillsResponse.status : 'Keine Response');
+        }
+      } catch (skillsError) {
+        console.log(`❌ [${index + 1}] Fehler beim Skills-API-Call:`, skillsError.message);
+      }
+    }
+    console.log('🏁 Skills-API-Analyse abgeschlossen. Gefundene Daten:', !!skillsData);
+
     // 3. Erweiterte Transformation mit Master-Daten
     const transformedData = transformProfilerDataWithMasterData(profileData, profileId, masterData);
+
+    // 3.5. 🆕 SKILLS-INTEGRATION: Integriere gefundene Skills in finale Datenstruktur
+    if (skillsData && skillsData.data && Array.isArray(skillsData.data)) {
+      console.log(`🔗 Integriere ${skillsData.data.length} Skills aus ${skillsData.source} in finale Datenstruktur`);
+      
+      // Erweitere die finale Datenstruktur um die gefundenen Skills
+      transformedData.skills = skillsData.data;
+      transformedData.skillsCount = skillsData.data.length;
+      transformedData.hasSkills = true;
+      transformedData.skillsApiSource = skillsData.source;
+      transformedData.skillsApiMethod = skillsData.method;
+      
+      console.log(`✅ Skills erfolgreich integriert: ${skillsData.data.length} Skills hinzugefügt`);
+    } else {
+      console.log('⚠️ Keine Skills-Daten zum Integrieren gefunden');
+    }
 
     // 4. In Test-Collection speichern
     await saveProfilerTestData(employeeId, transformedData);
