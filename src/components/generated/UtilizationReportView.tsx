@@ -2172,7 +2172,7 @@ export function UtilizationReportView({
                                   <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center text-xs text-gray-600 font-medium">
                                     X
                                   </div>
-                                  <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-[10px] rounded px-2 py-1 whitespace-nowrap">
+                                  <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 -mt-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-[10px] rounded px-2 py-1 whitespace-nowrap z-50">
                                     Keine Führungskraft
                                   </div>
                                 </div>
@@ -2184,7 +2184,7 @@ export function UtilizationReportView({
                                 <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-xs text-white font-medium">
                                   {initials}
                                 </div>
-                                <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-[10px] rounded px-2 py-1 whitespace-nowrap">
+                                <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 -mt-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-[10px] rounded px-2 py-1 whitespace-nowrap z-50">
                                   {manager}
                                 </div>
                               </div>

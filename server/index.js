@@ -1400,9 +1400,19 @@ function resolveSkillReferences(skills, masterSkills) {
     if (skill.skillId) {
       const masterSkill = masterSkills.find(ms => ms.skillId === skill.skillId);
       if (masterSkill) {
+        // 🛠️ SICHERER SKILL-NAME: Behandle sowohl String als auch mehrsprachige Objekte
+        let resolvedName = 'Unbekannter Skill';
+        
+        if (typeof masterSkill.name === 'string') {
+          resolvedName = masterSkill.name;
+        } else if (typeof masterSkill.name === 'object' && masterSkill.name !== null) {
+          // Mehrsprachiges Objekt - verwende deutsche Version mit Fallbacks
+          resolvedName = masterSkill.name.de || 'Unbekannter Skill';
+        }
+        
         return {
           ...skill,
-          resolvedName: masterSkill.name,
+          resolvedName: resolvedName,
           masterData: masterSkill
         };
       }
@@ -1421,9 +1431,19 @@ function resolveTrainingReferences(trainings, masterTrainings) {
     if (training.id) {
       const masterTraining = masterTrainings.find(mt => mt.id === training.id);
       if (masterTraining) {
+        // 🛠️ SICHERER TRAINING-NAME: Behandle sowohl String als auch mehrsprachige Objekte
+        let resolvedName = 'Unbekanntes Training';
+        
+        if (typeof masterTraining.name === 'string') {
+          resolvedName = masterTraining.name;
+        } else if (typeof masterTraining.name === 'object' && masterTraining.name !== null) {
+          // Mehrsprachiges Objekt - verwende deutsche Version mit Fallbacks
+          resolvedName = masterTraining.name.de || 'Unbekanntes Training';
+        }
+        
         return {
           ...training,
-          resolvedName: masterTraining.name,
+          resolvedName: resolvedName,
           masterData: masterTraining
         };
       }
@@ -1432,51 +1452,8 @@ function resolveTrainingReferences(trainings, masterTrainings) {
   });
 }
 
-// Erweiterte Transformation mit Master-Daten-Auflösung
-function transformProfilerDataWithMasterData(rawData, profileId, masterData) {
-  console.log('🔄 Starte erweiterte Transformation mit Master-Daten...');
-  
-  // Basis-Transformation
-  const baseTransformed = transformProfilerData(rawData, profileId);
-  
-  // Master-Daten-Auflösung
-  const enhanced = { ...baseTransformed };
-  
-  // Skills in Projekten auflösen
-  if (enhanced.projects && Array.isArray(enhanced.projects)) {
-    enhanced.projects = enhanced.projects.map(project => ({
-      ...project,
-      skills: resolveSkillReferences(project.skills, masterData.skills)
-    }));
-  }
-  
-  // Allgemeine Skills auflösen
-  if (enhanced.skills) {
-    enhanced.skills = resolveSkillReferences(enhanced.skills, masterData.skills);
-  }
-  
-  // Training-Teilnahmen auflösen
-  if (enhanced.trainingParticipations) {
-    enhanced.trainingParticipations = resolveTrainingReferences(
-      enhanced.trainingParticipations, 
-      masterData.trainings
-    );
-  }
-  
-  // Master-Daten-Statistiken hinzufügen
-  enhanced.masterDataStats = {
-    skillsAvailable: masterData.skills.length,
-    trainingsAvailable: masterData.trainings.length,
-    projectRolesAvailable: masterData.projectRoles.length,
-    resolvedSkillsInProjects: enhanced.projects ? 
-      enhanced.projects.reduce((sum, p) => sum + (p.skills?.filter(s => s.resolvedName)?.length || 0), 0) : 0,
-    resolvedGeneralSkills: enhanced.skills?.filter(s => s.resolvedName)?.length || 0,
-    resolvedTrainings: enhanced.trainingParticipations?.filter(t => t.resolvedName)?.length || 0
-  };
-  
-  console.log('✅ Erweiterte Transformation abgeschlossen:', enhanced.masterDataStats);
-  return enhanced;
-}
+// ✅ ENTFERNT: transformProfilerDataWithMasterData - nicht mehr benötigt
+// Test-Endpunkte verwenden jetzt die gleiche Transformation wie der normale Bulk-Import
 
 // Speichern in Test-Collection
 async function saveProfilerTestData(employeeId, profileData) {
@@ -1672,8 +1649,39 @@ app.post('/api/profiler/test-preview', requireAuth, async (req, res) => {
     
     console.log('🏁 Skills-API-Analyse abgeschlossen. Gefundene Daten:', !!skillsData);
 
-    // 3. Erweiterte Transformation mit Master-Daten
-    const transformedData = transformProfilerDataWithMasterData(profileData, profileId, masterData);
+    // 3. ✅ NEUE Transformation (exakt wie beim normalen Bulk-Import)
+    const transformedData = transformProfilerData(profileData, profileId);
+    transformedData.authMethod = 'token-auth';
+
+    // 3.5. 🆕 SKILLS-INTEGRATION: Integriere gefundene Skills in finale Datenstruktur (MIT SPRACHEXTRAKTION)
+    if (skillsData && skillsData.data && Array.isArray(skillsData.data)) {
+      console.log(`🔗 Integriere ${skillsData.data.length} Skills aus ${skillsData.source} in Profiler-Daten`);
+      
+      // ✅ TRANSFORMIERE SKILLS: Extrahiere nur deutsche Namen (wie in transformProfilerData)
+      const transformedSkills = skillsData.data.map(skill => ({
+        id: skill.id || null,
+        name: skill.name ? skill.name.de : null, // 🎯 NUR DEUTSCH!
+        level: skill.level || null,
+        rating: skill.rating || null,
+        skillId: skill.skillId || null,
+        lastUsedInYear: skill.lastUsedInYear || null,
+        experienceInYears: skill.experienceInYears || null,
+        technologyVersion: (skill.technologyVersion || '').replace(/#%#/g, ' • ').trim() || null,
+        details: (skill.details || '').replace(/#%#/g, ' • ').trim() || null,
+        category: skill.category || null
+      }));
+      
+      // Ersetze die Skills im transformierten Objekt
+      transformedData.skills = transformedSkills;
+      transformedData.skillsCount = transformedSkills.length;
+      transformedData.hasSkills = true;
+      transformedData.skillsSource = skillsData.source;
+      transformedData.skillsMethod = skillsData.method;
+      
+      console.log('✅ Skills erfolgreich integriert:', skillsData.data.length, 'Skills hinzugefügt');
+    } else {
+      console.log('⚠️ Keine Skills-Daten zum Integrieren gefunden');
+    }
 
     // 4. Finale Datenstruktur für Preview
     const finalDataForDatabase = {
@@ -1920,16 +1928,31 @@ app.post('/api/profiler/test-import', requireAuth, async (req, res) => {
     }
     console.log('🏁 Skills-API-Analyse abgeschlossen. Gefundene Daten:', !!skillsData);
 
-    // 3. Erweiterte Transformation mit Master-Daten
-    const transformedData = transformProfilerDataWithMasterData(profileData, profileId, masterData);
+    // 3. ✅ NEUE Transformation (exakt wie beim normalen Bulk-Import)
+    const transformedData = transformProfilerData(profileData, profileId);
+    transformedData.authMethod = 'token-auth';
 
-    // 3.5. 🆕 SKILLS-INTEGRATION: Integriere gefundene Skills in finale Datenstruktur
+    // 3.5. 🆕 SKILLS-INTEGRATION: Integriere gefundene Skills in finale Datenstruktur (MIT SPRACHEXTRAKTION)
     if (skillsData && skillsData.data && Array.isArray(skillsData.data)) {
       console.log(`🔗 Integriere ${skillsData.data.length} Skills aus ${skillsData.source} in finale Datenstruktur`);
       
-      // Erweitere die finale Datenstruktur um die gefundenen Skills
-      transformedData.skills = skillsData.data;
-      transformedData.skillsCount = skillsData.data.length;
+      // ✅ TRANSFORMIERE SKILLS: Extrahiere nur deutsche Namen (wie in transformProfilerData)
+      const transformedSkills = skillsData.data.map(skill => ({
+        id: skill.id || null,
+        name: skill.name ? skill.name.de : null, // 🎯 NUR DEUTSCH!
+        level: skill.level || null,
+        rating: skill.rating || null,
+        skillId: skill.skillId || null,
+        lastUsedInYear: skill.lastUsedInYear || null,
+        experienceInYears: skill.experienceInYears || null,
+        technologyVersion: (skill.technologyVersion || '').replace(/#%#/g, ' • ').trim() || null,
+        details: (skill.details || '').replace(/#%#/g, ' • ').trim() || null,
+        category: skill.category || null
+      }));
+      
+      // Erweitere die finale Datenstruktur um die transformierten Skills
+      transformedData.skills = transformedSkills;
+      transformedData.skillsCount = transformedSkills.length;
       transformedData.hasSkills = true;
       transformedData.skillsApiSource = skillsData.source;
       transformedData.skillsApiMethod = skillsData.method;
@@ -5880,6 +5903,132 @@ app.delete('/api/role-tasks/:id', requireAuth, async (req, res) => {
   }
 });
 
+// ===== PROFILER SINGLE IMPORT (für Test) =====
+app.post('/api/profiler/single-import', requireAuth, async (req, res) => {
+  try {
+    const { employeeId, token } = req.body;
+    
+    if (!employeeId || !token) {
+      return res.status(400).json({
+        success: false,
+        error: 'employeeId und token sind erforderlich'
+      });
+    }
+
+    console.log(`🎯 SINGLE IMPORT: Starte für Employee ID: ${employeeId}`);
+
+    // Verwende EXAKT die gleiche Logik wie beim Bulk-Import
+    const results = [];
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+      console.log(`🔄 Verarbeite Employee: ${employeeId}`);
+      
+      // EXAKT die gleiche API-Logik wie beim Bulk-Import
+      const profileResponse = await fetch(`https://profiler.adesso-group.com/api/profiles/${employeeId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!profileResponse.ok) {
+        throw new Error(`Profile API Error: ${profileResponse.status}`);
+      }
+
+      const profileData = await profileResponse.json();
+      console.log(`✅ Profil-Daten erhalten für ${employeeId}`);
+
+      // EXAKT die gleiche Transformation wie beim Bulk-Import
+      const transformedData = transformProfilerData(profileData, employeeId);
+      transformedData.authMethod = 'token-auth';
+
+      // Skills-API Integration (EXAKT wie beim Bulk-Import)
+      try {
+        const skillsResponse = await fetch(`https://profiler.adesso-group.com/api/profiles/${employeeId}/skill-ratings`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        });
+
+        if (skillsResponse.ok) {
+          const skillsData = await skillsResponse.json();
+          console.log(`✅ Skills erhalten für ${employeeId}: ${skillsData.length} Skills`);
+          
+          // EXAKT die gleiche Skills-Transformation wie beim Bulk-Import
+          if (Array.isArray(skillsData) && skillsData.length > 0) {
+            transformedData.skills = skillsData.map(skill => ({
+              id: skill.id || null,
+              name: skill.name ? skill.name.de : null, // 🎯 NUR DEUTSCH!
+              level: skill.level || null,
+              rating: skill.rating || null,
+              skillId: skill.skillId || null,
+              lastUsedInYear: skill.lastUsedInYear || null,
+              experienceInYears: skill.experienceInYears || null,
+              technologyVersion: skill.technologyVersion || null,
+              details: skill.details || null,
+              category: skill.category || null
+            }));
+            transformedData.skillsCount = skillsData.length;
+            transformedData.hasSkills = true;
+          }
+        }
+      } catch (skillsError) {
+        console.log(`⚠️ Skills-API Fehler für ${employeeId}:`, skillsError.message);
+      }
+
+      // EXAKT die gleiche Speicherung wie beim Bulk-Import
+      const docRef = doc(db, 'profilerData', transformedData.firebaseDocumentId);
+      await updateDoc(docRef, {
+        ...transformedData,
+        importedAt: new Date().toISOString(),
+        lastUpdated: new Date().toISOString()
+      });
+
+      console.log(`✅ Gespeichert: ${employeeId}`);
+      results.push({
+        employeeId: employeeId,
+        status: 'success',
+        data: transformedData
+      });
+      successCount++;
+
+    } catch (error) {
+      console.error(`❌ Fehler bei ${employeeId}:`, error.message);
+      results.push({
+        employeeId: employeeId,
+        status: 'error',
+        error: error.message
+      });
+      errorCount++;
+    }
+
+    res.json({
+      success: true,
+      message: `Single Import abgeschlossen: ${successCount} erfolgreich, ${errorCount} Fehler`,
+      results: results,
+      statistics: {
+        total: 1,
+        successful: successCount,
+        failed: errorCount
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Single Import Fehler:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // ===== PROFILER BULK IMPORT API =====
 
 // Global state für Bulk-Import Status
@@ -7042,32 +7191,26 @@ function transformProfilerData(rawData, profileId) {
     
     // ✅ Biography - KORREKTE Struktur mit translation-Objekt (bereinigt von #%# Trennzeichen)
     biography: rawData.biography ? {
-      translation: {
-        de: rawData.biography.translation?.de ? rawData.biography.translation.de.replace(/#%#/g, ' • ').trim() : null,
-        en: rawData.biography.translation?.en ? rawData.biography.translation.en.replace(/#%#/g, ' • ').trim() : null,
-        tr: rawData.biography.translation?.tr ? rawData.biography.translation.tr.replace(/#%#/g, ' • ').trim() : null,
-        hu: rawData.biography.translation?.hu ? rawData.biography.translation.hu.replace(/#%#/g, ' • ').trim() : null
-      }
+      translation: rawData.biography.translation?.de ? rawData.biography.translation.de.replace(/#%#/g, ' • ').trim() : 
+                   rawData.biography.translation?.en ? rawData.biography.translation.en.replace(/#%#/g, ' • ').trim() :
+                   rawData.biography.translation?.tr ? rawData.biography.translation.tr.replace(/#%#/g, ' • ').trim() :
+                   rawData.biography.translation?.hu ? rawData.biography.translation.hu.replace(/#%#/g, ' • ').trim() : null
     } : null,
     
     // ✅ Education - KORREKTE Struktur mit translation-Objekt (bereinigt von #%# Trennzeichen)
     education: rawData.education ? {
-      translation: {
-        de: rawData.education.translation?.de ? rawData.education.translation.de.replace(/#%#/g, ' • ').trim() : null,
-        en: rawData.education.translation?.en ? rawData.education.translation.en.replace(/#%#/g, ' • ').trim() : null,
-        tr: rawData.education.translation?.tr ? rawData.education.translation.tr.replace(/#%#/g, ' • ').trim() : null,
-        hu: rawData.education.translation?.hu ? rawData.education.translation.hu.replace(/#%#/g, ' • ').trim() : null
-      }
+      translation: rawData.education.translation?.de ? rawData.education.translation.de.replace(/#%#/g, ' • ').trim() : 
+                   rawData.education.translation?.en ? rawData.education.translation.en.replace(/#%#/g, ' • ').trim() :
+                   rawData.education.translation?.tr ? rawData.education.translation.tr.replace(/#%#/g, ' • ').trim() :
+                   rawData.education.translation?.hu ? rawData.education.translation.hu.replace(/#%#/g, ' • ').trim() : null
     } : null,
     
     // ✅ Publications - KORREKTE Struktur mit translation-Objekt (bereinigt von #%# Trennzeichen)
     publications: rawData.publications ? {
-      translation: {
-        de: rawData.publications.translation?.de ? rawData.publications.translation.de.replace(/#%#/g, ' • ').trim() : null,
-        en: rawData.publications.translation?.en ? rawData.publications.translation.en.replace(/#%#/g, ' • ').trim() : null,
-        tr: rawData.publications.translation?.tr ? rawData.publications.translation.tr.replace(/#%#/g, ' • ').trim() : null,
-        hu: rawData.publications.translation?.hu ? rawData.publications.translation.hu.replace(/#%#/g, ' • ').trim() : null
-      }
+      translation: rawData.publications.translation?.de ? rawData.publications.translation.de.replace(/#%#/g, ' • ').trim() : 
+                   rawData.publications.translation?.en ? rawData.publications.translation.en.replace(/#%#/g, ' • ').trim() :
+                   rawData.publications.translation?.tr ? rawData.publications.translation.tr.replace(/#%#/g, ' • ').trim() :
+                   rawData.publications.translation?.hu ? rawData.publications.translation.hu.replace(/#%#/g, ' • ').trim() : null
     } : null,
     
     // ✅ Presentations
@@ -7076,12 +7219,7 @@ function transformProfilerData(rawData, profileId) {
     // ✅ ALLGEMEINE SKILLS (nicht projektspezifisch) - FEHLTEN KOMPLETT!
     skills: Array.isArray(rawData.skills) ? rawData.skills.map(skill => ({
       id: skill.id || null,
-      name: skill.name ? {
-        de: skill.name.de || null,
-        en: skill.name.en || null,
-        tr: skill.name.tr || null,
-        hu: skill.name.hu || null
-      } : null,
+      name: skill.name ? skill.name.de : null,
       level: skill.level || null,
       category: skill.category || null,
       experience: skill.experience || null,
@@ -7095,19 +7233,14 @@ function transformProfilerData(rawData, profileId) {
       id: cert.id || null,
       issueDate: cert.issueDate || null,
       expirationDate: cert.expirationDate || null,
-      name: cert.name || '',
+      name: (cert.name || '').replace(/#%#/g, ' • ').trim(),
       url: cert.url || null
     })) : [],
     
     // ✅ Language Ratings vollständig - KORREKTE Struktur mit language-Objekt
     languageRatings: Array.isArray(rawData.languageRatings) ? rawData.languageRatings.map(lang => ({
       id: lang.id || null,
-      language: {
-        de: lang.language?.de || null,
-        en: lang.language?.en || null,
-        tr: lang.language?.tr || null,
-        hu: lang.language?.hu || null
-      },
+      language: lang.language ? lang.language.de : null,
       level: lang.level || null
     })) : [],
     
@@ -7135,12 +7268,7 @@ function transformProfilerData(rawData, profileId) {
         Array.isArray(project.skills) ? project.skills : [],
         Array.isArray(rawData.skills) ? rawData.skills : []
       ).map(skill => ({
-        name: {
-          de: skill.name?.de || null,
-          en: skill.name?.en || null,
-          tr: skill.name?.tr || null,
-          hu: skill.name?.hu || null
-        },
+        name: skill.name ? skill.name.de : null,
         skillId: skill.skillId || null,
         category: skill.category || null,
         level: skill.level || null
@@ -7161,29 +7289,14 @@ function transformProfilerData(rawData, profileId) {
       // ✅ Roles vollständig mit Übersetzungen (nur deutsch, aber richtige Struktur)
       roles: Array.isArray(project.roles) ? project.roles.map(role => ({
         value: role.value || null,
-        translation: {
-          de: role.translation?.de || null,
-          en: role.translation?.en || null,
-          tr: role.translation?.tr || null,
-          hu: role.translation?.hu || null
-        }
+        translation: role.translation ? role.translation.de : null
       })) : [],
       
       realization: project.realization || null,
       
-      // ✅ Tasks und Description - vollständige Struktur (nur deutsch)
-      tasks: {
-        de: project.tasks?.de || '',
-        en: project.tasks?.en || null,
-        tr: project.tasks?.tr || null,
-        hu: project.tasks?.hu || null
-      },
-      description: {
-        de: project.description?.de || '',
-        en: project.description?.en || null,
-        tr: project.description?.tr || null,
-        hu: project.description?.hu || null
-      }
+      // ✅ Tasks und Description - vollständige Struktur (nur deutsch, #%# → Bullet Points)
+      tasks: project.tasks ? (project.tasks.de || '').replace(/#%#/g, ' • ').trim() : '',
+      description: project.description ? (project.description.de || '').replace(/#%#/g, ' • ').trim() : ''
     })) : [],
     
     // ✅ Training Participations vollständig - KORREKTE Struktur mit name-Objekt
@@ -7191,12 +7304,7 @@ function transformProfilerData(rawData, profileId) {
       id: training.id || null,
       asTutor: training.asTutor || false,
       yearMonth: training.yearMonth || null,
-      name: {
-        de: training.name?.de || null,
-        en: training.name?.en || null,
-        tr: training.name?.tr || null,
-        hu: training.name?.hu || null
-      }
+      name: training.name ? training.name.de : null
     })) : [],
     
     // ✅ Professional Experiences vollständig
@@ -7212,8 +7320,8 @@ function transformProfilerData(rawData, profileId) {
           month: exp.range.end.month || null
         } : null
       } : null,
-      role: exp.role || '',
-      employer: exp.employer || ''
+      role: (exp.role || '').replace(/#%#/g, ' • ').trim(),
+      employer: (exp.employer || '').replace(/#%#/g, ' • ').trim()
     })) : [],
     
     // ✅ Metadaten
@@ -7254,18 +7362,26 @@ function extractSafeString(value) {
   }
   
   if (typeof value === 'object' && value !== null) {
-    // Wenn es ein Sprach-Objekt ist, bevorzuge deutsche Übersetzung
-    if (value.de) return value.de;
-    if (value.en) return value.en;
+    // Prüfe ob es wirklich ein mehrsprachiges Objekt ist (hat de/en/tr/hu Schlüssel)
+    const hasLanguageKeys = value.hasOwnProperty('de') || value.hasOwnProperty('en') || value.hasOwnProperty('tr') || value.hasOwnProperty('hu');
     
-    // Sonst ersten verfügbaren Wert nehmen
-    const firstValue = Object.values(value)[0];
-    if (typeof firstValue === 'string') {
-      return firstValue;
+    if (hasLanguageKeys) {
+      // Es ist ein mehrsprachiges Objekt - extrahiere deutsche Version mit Fallbacks
+      return value.de || value.en || value.tr || value.hu || null;
+    } else {
+      // Es ist ein normales Objekt - konvertiere zu String oder gib null zurück
+      return String(value);
     }
   }
   
   return null;
+}
+
+// Hilfsfunktion: Prüft ob ein Wert ein mehrsprachiges Objekt ist
+function isMultiLanguageObject(value) {
+  return typeof value === 'object' && 
+         value !== null && 
+         (value.hasOwnProperty('de') || value.hasOwnProperty('en') || value.hasOwnProperty('tr') || value.hasOwnProperty('hu'));
 }
 
 // Fallback Mock-Daten (für Entwicklung/Testing)

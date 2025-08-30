@@ -318,6 +318,11 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
   const [newAuthToken, setNewAuthToken] = useState('');
   const [showTokenInput, setShowTokenInput] = useState(false);
 
+  // Neue States für Import-Modi
+  const [importMode, setImportMode] = useState<'bulk' | 'batch' | 'single'>('bulk');
+  const [singleEmployeeId, setSingleEmployeeId] = useState('');
+  const [singleImportLoading, setSingleImportLoading] = useState(false);
+
   // Lade Mitarbeiter mit Profiler-URLs aus der mitarbeiter Collection
   const loadEmployeesWithProfilerUrls = async () => {
     if (!token) return;
@@ -473,6 +478,71 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
     }
   };
 
+  // Single-Person Import
+  const handleSingleImport = async () => {
+    if (!singleEmployeeId.trim()) {
+      alert('Bitte geben Sie eine Employee-ID ein.');
+      return;
+    }
+
+    // Validiere Authentifizierung
+    if (useTokenAuth) {
+      if (!authToken.trim()) {
+        alert('Bitte geben Sie einen Token ein.');
+        return;
+      }
+    } else {
+      if (!profilerCookies.trim()) {
+        alert('Bitte geben Sie zuerst die Profiler-Cookies ein.');
+        return;
+      }
+    }
+
+    setSingleImportLoading(true);
+    
+    try {
+      const requestBody: any = {
+        employeeId: singleEmployeeId.trim()
+      };
+
+      // Füge Authentifizierungsdaten hinzu
+      if (useTokenAuth) {
+        requestBody.token = authToken;
+      } else {
+        requestBody.profilerCookies = profilerCookies;
+      }
+
+      console.log(`🎯 Sende Single-Import Request für Employee ID: ${singleEmployeeId}`);
+
+      const response = await fetch('http://localhost:3001/api/profiler/single-import', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        const errorResult = await response.json().catch(() => ({ error: 'Unbekannter Fehler' }));
+        console.error('❌ Single-Import Fehler:', errorResult);
+        throw new Error(`HTTP ${response.status}: ${errorResult.error || response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Single-Import erfolgreich:', result);
+      
+      alert(`✅ Import erfolgreich für Employee ID: ${singleEmployeeId}`);
+      setSingleEmployeeId(''); // Reset input
+      
+    } catch (error) {
+      console.error('❌ Fehler beim Single-Import:', error);
+      alert(`Fehler beim Single-Import: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
+    } finally {
+      setSingleImportLoading(false);
+    }
+  };
+
   // Bulk Import starten
   const handleStartImport = async () => {
     // Validiere Authentifizierung
@@ -497,7 +567,7 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
     
     try {
       // Wähle zwischen normalem und Batch-Import
-      const apiEndpoint = batchMode ? '/api/profiler/batch-import' : '/api/profiler/bulk-import';
+      const apiEndpoint = importMode === 'batch' ? '/api/profiler/batch-import' : '/api/profiler/bulk-import';
       
       const requestBody: any = {
         employees: employees.map(emp => ({
@@ -514,14 +584,14 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
       }
 
       // Füge Batch-spezifische Parameter hinzu
-      if (batchMode) {
+      if (importMode === 'batch') {
         requestBody.batchSize = batchProgress.batchSize;
       }
 
-      console.log(`🚀 Sende ${batchMode ? 'Batch-' : ''}Import Request:`, {
+      console.log(`🚀 Sende ${importMode === 'batch' ? 'Batch-' : 'Bulk-'}Import Request:`, {
         url: `http://localhost:3001${apiEndpoint}`,
         employeesCount: requestBody.employees.length,
-        batchMode,
+        importMode,
         batchSize: requestBody.batchSize,
         useTokenAuth,
         hasAuthToken: !!requestBody.authToken,
@@ -550,13 +620,13 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
       }
 
       const result = await response.json();
-      console.log('✅ Bulk-Import gestartet:', result);
+      console.log('✅ Import gestartet:', result);
       
       // Starte Status-Polling
       pollImportStatus();
       
     } catch (error) {
-      console.error('❌ Fehler beim Starten des Bulk-Imports:', error);
+      console.error('❌ Fehler beim Starten des Imports:', error);
       setImportProgress(prev => ({ ...prev, isRunning: false }));
       alert(`Fehler beim Starten des Imports: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
     }
@@ -826,41 +896,115 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
               </div>
             )}
 
-            {/* Batch-Modus Auswahl */}
+            {/* Import-Modus Auswahl */}
             <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-3">
                 <RefreshCw className="w-4 h-4 text-blue-600" />
-                <span className="font-medium text-blue-800">Batch-Modus</span>
+                <span className="font-medium text-blue-800">Import-Modus</span>
               </div>
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2">
+              
+              {/* 3 Import-Optionen */}
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <button
+                  onClick={() => setImportMode('bulk')}
+                  className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    importMode === 'bulk'
+                      ? 'bg-blue-600 text-white border border-blue-600'
+                      : 'bg-white text-blue-700 border border-blue-300 hover:bg-blue-50'
+                  }`}
+                >
+                  🚀 Bulk-Import
+                  <div className="text-xs opacity-75">Alle {employees.length} Personen</div>
+                </button>
+                
+                <button
+                  onClick={() => setImportMode('batch')}
+                  className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    importMode === 'batch'
+                      ? 'bg-blue-600 text-white border border-blue-600'
+                      : 'bg-white text-blue-700 border border-blue-300 hover:bg-blue-50'
+                  }`}
+                >
+                  📦 Batch-Import
+                  <div className="text-xs opacity-75">100er-Pakete</div>
+                </button>
+                
+                <button
+                  onClick={() => setImportMode('single')}
+                  className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    importMode === 'single'
+                      ? 'bg-blue-600 text-white border border-blue-600'
+                      : 'bg-white text-blue-700 border border-blue-300 hover:bg-blue-50'
+                  }`}
+                >
+                  🎯 Single-Import
+                  <div className="text-xs opacity-75">Nur 1 Person</div>
+                </button>
+              </div>
+
+              {/* Batch-Größe Einstellung */}
+              {importMode === 'batch' && (
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-sm text-blue-600">Batch-Größe:</span>
                   <input
-                    type="checkbox"
-                    checked={batchMode}
-                    onChange={(e) => setBatchMode(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                    type="number"
+                    value={batchProgress.batchSize}
+                    onChange={(e) => setBatchProgress(prev => ({ ...prev, batchSize: parseInt(e.target.value) || 100 }))}
+                    min="50"
+                    max="200"
+                    className="w-16 px-2 py-1 text-sm border border-blue-300 rounded focus:ring-1 focus:ring-blue-500"
                   />
-                  <span className="text-sm text-blue-700">100er-Pakete mit Token-Pausen</span>
-                </label>
-                {batchMode && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-blue-600">Batch-Größe:</span>
+                  <span className="text-xs text-blue-600">Personen pro Batch</span>
+                </div>
+              )}
+
+              {/* Single-Import Employee-ID Input */}
+              {importMode === 'single' && (
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-blue-700">
+                    Employee-ID (z.B. 2002136571):
+                  </label>
+                  <div className="flex gap-2">
                     <input
-                      type="number"
-                      value={batchProgress.batchSize}
-                      onChange={(e) => setBatchProgress(prev => ({ ...prev, batchSize: parseInt(e.target.value) || 100 }))}
-                      min="50"
-                      max="200"
-                      className="w-16 px-2 py-1 text-sm border border-blue-300 rounded focus:ring-1 focus:ring-blue-500"
+                      type="text"
+                      value={singleEmployeeId}
+                      onChange={(e) => setSingleEmployeeId(e.target.value)}
+                      placeholder="Employee-ID eingeben..."
+                      className="flex-1 px-3 py-2 text-sm border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
+                    <button
+                      onClick={handleSingleImport}
+                      disabled={!singleEmployeeId.trim() || singleImportLoading || (useTokenAuth ? !authToken.trim() : !profilerCookies.trim())}
+                      className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      {singleImportLoading ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          Importiert...
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-4 h-4" />
+                          Import
+                        </>
+                      )}
+                    </button>
                   </div>
+                </div>
+              )}
+
+              {/* Beschreibungen */}
+              <div className="mt-3 text-xs text-blue-600">
+                {importMode === 'bulk' && (
+                  <p>💡 Importiert alle Mitarbeiter in einem Durchgang (schnell, aber Token-intensiv)</p>
+                )}
+                {importMode === 'batch' && (
+                  <p>💡 Lädt Profile in {batchProgress.batchSize}er-Paketen und wartet auf neuen Token zwischen den Batches</p>
+                )}
+                {importMode === 'single' && (
+                  <p>💡 Importiert nur eine einzelne Person - perfekt zum Testen ohne Token zu verschwenden</p>
                 )}
               </div>
-              {batchMode && (
-                <p className="text-xs text-blue-600 mt-2">
-                  💡 Lädt Profile in {batchProgress.batchSize}er-Paketen und wartet auf neuen Token zwischen den Batches
-                </p>
-              )}
             </div>
           </div>
 
@@ -945,24 +1089,26 @@ export function ProfilerManagementModal({ isOpen, onClose }: ProfilerManagementM
                 </div>
               </div>
 
-              {/* Haupt-Import Button */}
-              <button
-                onClick={handleStartImport}
-                disabled={importProgress.isRunning || (useTokenAuth ? !authToken.trim() : !profilerCookies.trim()) || employees.length === 0}
-                className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-medium"
-              >
-                {importProgress.isRunning ? (
-                  <>
-                    <RefreshCw className="w-5 h-5 animate-spin" />
-                    Import läuft... ({importProgress.completed}/{importProgress.total})
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-5 h-5" />
-                    Profiler-Import starten ({employees.length} Mitarbeiter)
-                  </>
-                )}
-              </button>
+              {/* Haupt-Import Button - nur für Bulk/Batch */}
+              {importMode !== 'single' && (
+                <button
+                  onClick={handleStartImport}
+                  disabled={importProgress.isRunning || (useTokenAuth ? !authToken.trim() : !profilerCookies.trim()) || employees.length === 0}
+                  className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-medium"
+                >
+                  {importProgress.isRunning ? (
+                    <>
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                      {importMode === 'batch' ? 'Batch-' : 'Bulk-'}Import läuft... ({importProgress.completed}/{importProgress.total})
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-5 h-5" />
+                      {importMode === 'batch' ? '📦 Batch-Import' : '🚀 Bulk-Import'} starten ({employees.length} Mitarbeiter)
+                    </>
+                  )}
+                </button>
+              )}
               
               {employees.length === 0 && (
                 <p className="text-sm text-gray-500 text-center">
