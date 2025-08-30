@@ -910,7 +910,11 @@ function ProjectCard({ project, renderMultiLanguageValue, formatProjectDate }: P
         />
         <InfoItem
           label="Rolle"
-          value={renderMultiLanguageValue(project.role)}
+          value={project.roles && project.roles.length > 0 
+            ? project.roles.map((role: any) => 
+                role.translation || role.roleName || role.value || 'Unbekannte Rolle'
+              ).join(', ')
+            : renderMultiLanguageValue(project.role) || 'Keine Rolle angegeben'}
         />
         <InfoItem
           label="Zeitraum"
@@ -926,6 +930,23 @@ function ProjectCard({ project, renderMultiLanguageValue, formatProjectDate }: P
         <div className="pt-4 border-t border-gray-200">
           <div className="text-sm text-gray-700 leading-relaxed">
             <BulletPointList text={project.description} />
+          </div>
+        </div>
+      )}
+      
+      {/* Rollen Section - wenn mehrere Rollen vorhanden */}
+      {project.roles && project.roles.length > 1 && (
+        <div className="pt-4 border-t border-gray-200">
+          <h5 className="font-medium text-gray-900 mb-2">Rollen in diesem Projekt:</h5>
+          <div className="flex flex-wrap gap-2">
+            {project.roles.map((role: any, index: number) => (
+              <span 
+                key={index}
+                className="bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full"
+              >
+                {role.translation || role.roleName || role.value || 'Unbekannte Rolle'}
+              </span>
+            ))}
           </div>
         </div>
       )}

@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings, Database, TrendingUp, Target, User, Ticket, BarChart3, Users, FileText, ChevronDown, LogOut, Minus, Plus, MessageSquare, HelpCircle } from 'lucide-react';
+import { Settings, Database, TrendingUp, Target, User, Ticket, BarChart3, Users, FileText, ChevronDown, LogOut, Minus, Plus, MessageSquare, HelpCircle, Building2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { ProfilerTokenStatus } from './generated/ProfilerTokenStatus';
 
 interface AppHeaderProps {
-  currentView: 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects' | 'profiler-data';
-  setCurrentView: (view: 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects' | 'profiler-data') => void;
+  currentView: 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects' | 'profiler-data' | 'einsatzplan' | 'team-management';
+  setCurrentView: (view: 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects' | 'profiler-data' | 'einsatzplan' | 'team-management') => void;
 
   logout: () => Promise<void>;
   setAdminModalOpen: (open: boolean) => void;
@@ -120,7 +120,10 @@ export function AppHeader({
             {currentView === 'auslastung-comments' && 'Auslastung mit Kommentaren'}
             {currentView === 'sales' && 'Sales View'}
             {currentView === 'employee-detail' && 'Mitarbeiter Detail'}
+            {currentView === 'einsatzplan' && 'Einsatzplan-Management'}
             {currentView === 'projects' && 'Projekt Management'}
+            {currentView === 'team-management' && 'Team-Verwaltung'}
+            {currentView === 'profiler-data' && 'Profiler-Daten'}
           </h1>
         </div>
         
@@ -157,6 +160,40 @@ export function AppHeader({
             >
               <Target className="w-4 h-4" />
               Sales View
+            </button>
+          )}
+
+          {/* Team-Verwaltung Button - für Führungskräfte */}
+          {(canAccessView('utilization') || canAccessView('employees')) && (
+            <button
+              onClick={() => setCurrentView('team-management')}
+              className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
+                currentView === 'team-management' 
+                  ? 'text-blue-700 bg-blue-50 border-blue-200' 
+                  : 'text-gray-700 bg-gray-50 border-gray-200 hover:bg-gray-100'
+              } border rounded-lg`}
+              style={{ zIndex: 40 }}
+              title="Team-Verwaltung"
+            >
+              <Users className="w-4 h-4" />
+              Team
+            </button>
+          )}
+
+          {/* Einsatzplan Button ausgeblendet - API-Endpunkte nicht verfügbar */}
+          {false && canAccessView('utilization') && (
+            <button
+              onClick={() => setCurrentView('einsatzplan')}
+              className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
+                currentView === 'einsatzplan' 
+                  ? 'text-blue-700 bg-blue-50 border-blue-200' 
+                  : 'text-gray-700 bg-gray-50 border-gray-200 hover:bg-gray-100'
+              } border rounded-lg`}
+              style={{ zIndex: 40 }}
+              title="Einsatzplan-Management"
+            >
+              <Building2 className="w-4 h-4" />
+              Einsatzplan
             </button>
           )}
           

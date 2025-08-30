@@ -25,7 +25,9 @@ import EmergencyAdminCreator from './components/generated/EmergencyAdminCreator'
 import FirebaseAuthBulkSetup from './components/generated/FirebaseAuthBulkSetup';
 import { ProfilerManagementModal } from './components/generated/ProfilerManagementModal';
 import { ProfilerDataView } from './components/generated/ProfilerDataView';
+import { TeamManagementView } from './components/generated/TeamManagementView';
 import ProfilerTestImport from './components/generated/ProfilerTestImport';
+import EinsatzplanManagement from './components/generated/EinsatzplanManagement';
 
 import { CustomerProvider } from './contexts/CustomerContext';
 import { AuthProvider } from './contexts/AuthContext';
@@ -70,7 +72,7 @@ function App() {
     const [isMenuOpen, setMenuOpen] = useState(false);
     
     // Standard-View basierend auf Benutzerrolle setzen
-    const getDefaultView = (): 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects' | 'profiler-data' => {
+    const getDefaultView = (): 'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects' | 'profiler-data' | 'einsatzplan' | 'team-management' => {
       // Prüfe verfügbare Views für die aktuelle Rolle
       
       // Sales-Rolle: Nur Sales-View anzeigen
@@ -96,7 +98,7 @@ function App() {
       return 'utilization'; // Absoluter Fallback
     };
     
-    const [currentView, setCurrentView] = useState<'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects' | 'profiler-data'>(getDefaultView());
+    const [currentView, setCurrentView] = useState<'utilization' | 'employees' | 'knowledge' | 'auslastung-comments' | 'sales' | 'project-roles-demo' | 'project-skills-demo' | 'employee-detail' | 'projects' | 'profiler-data' | 'einsatzplan' | 'team-management'>(getDefaultView());
     
     // Aktualisiere View wenn sich die Rolle ändert
     useEffect(() => {
@@ -119,7 +121,9 @@ function App() {
         'project-roles-demo': 'utilization',
         'project-skills-demo': 'utilization', 
         'employee-detail': 'employees',
-        'projects': 'utilization'
+        'projects': 'utilization',
+        'einsatzplan': 'utilization',
+        'team-management': 'employees'
       };
       
       // Zugriffskontrolle aktiviert
@@ -237,6 +241,7 @@ function App() {
     };
 
     const handleEmployeeSelected = (personId: string) => {
+      localStorage.setItem('previousView', 'employees');
       setSelectedPersonId(personId);
       safeSetCurrentView('employee-detail');
     };
@@ -349,6 +354,7 @@ function App() {
                 isColumnsMenuOpen={isColumnsMenuOpen}
                 setIsColumnsMenuOpen={setIsColumnsMenuOpen}
                 onEmployeeDetailNavigation={(employeeId) => {
+                  localStorage.setItem('previousView', 'utilization');
                   setSelectedPersonId(employeeId);
                   safeSetCurrentView('employee-detail');
                 }}
@@ -424,7 +430,15 @@ function App() {
               {selectedPersonId ? (
                 <EmployeeDetailView
                   employeeId={selectedPersonId}
-                  onBack={() => safeSetCurrentView('employees')}
+                  onBack={() => {
+                    // Intelligente Zurück-Navigation basierend auf vorheriger View
+                    const previousView = localStorage.getItem('previousView');
+                    if (previousView === 'team-management') {
+                      safeSetCurrentView('team-management');
+                    } else {
+                      safeSetCurrentView('employees');
+                    }
+                  }}
                 />
               ) : (
                 <div className="p-6">
@@ -449,6 +463,22 @@ function App() {
           {currentView === 'profiler-data' && (
             <ProfilerDataView 
               onBack={() => safeSetCurrentView('utilization')}
+            />
+          )}
+
+          {currentView === 'einsatzplan' && canAccessView('utilization') && (
+            <EinsatzplanManagement />
+          )}
+
+          {currentView === 'team-management' && canAccessView('employees') && (
+            <TeamManagementView 
+              onBack={() => safeSetCurrentView('utilization')}
+              onEmployeeClick={(employeeId) => {
+                // Speichere aktuelle View für intelligente Zurück-Navigation
+                localStorage.setItem('previousView', 'team-management');
+                setSelectedPersonId(employeeId);
+                safeSetCurrentView('employee-detail');
+              }}
             />
           )}
 

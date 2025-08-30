@@ -19,6 +19,16 @@ const FieldValue = admin.firestore.FieldValue;
 const PORT = process.env.PORT || 3001;
 
 // ==========================================
+// EINSATZPLAN API CONFIGURATION
+// ==========================================
+
+const EINSATZPLAN_CONFIG = {
+  baseUrl: 'https://einsatzplan.adesso-group.com/api',
+  clientId: '642d98b1374b7f7fba41adcc', // adesso SE
+  // Bearer Token wird vom Frontend übertragen
+};
+
+// ==========================================
 // LOGGING & MONITORING SYSTEM
 // ==========================================
 
@@ -7614,6 +7624,539 @@ app.get('/api/profiler/check-firebase/:id', async (req, res) => {
   } catch (error) {
     console.error('❌ Fehler beim Prüfen der Firebase-Datenbank:', error);
     res.status(500).json({ error: 'Server-Fehler beim Prüfen der Firebase-Datenbank', details: error.message });
+  }
+});
+
+// ==========================================
+// EINSATZPLAN API INTEGRATION
+// ==========================================
+
+// Einsatzplan API Service Funktionen
+class EinsatzplanService {
+  constructor(bearerToken) {
+    this.bearerToken = bearerToken;
+    this.baseUrl = EINSATZPLAN_CONFIG.baseUrl;
+    this.clientId = EINSATZPLAN_CONFIG.clientId;
+  }
+
+  async makeRequest(endpoint, options = {}) {
+    const url = `${this.baseUrl}${endpoint}`;
+    const headers = {
+      'Authorization': `Bearer ${this.bearerToken}`,
+      'Content-Type': 'application/json',
+      ...options.headers
+    };
+
+    logger.info(`Einsatzplan API Request: ${options.method || 'GET'} ${url}`);
+
+    try {
+      const response = await fetch(url, {
+        method: options.method || 'GET',
+        headers,
+        body: options.body ? JSON.stringify(options.body) : undefined
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        return await response.json();
+      } else {
+        const text = await response.text();
+        // Prüfe ob HTML zurückgegeben wird (Fehlerfall)
+        if (text.includes('<!DOCTYPE html>')) {
+          throw new Error('API returned HTML instead of JSON - possibly authentication issue');
+        }
+        return text;
+      }
+    } catch (error) {
+      logger.error(`Einsatzplan API Error for ${url}:`, error);
+      throw error;
+    }
+  }
+
+  // Alle verfügbaren Clients abrufen
+  async getClients() {
+    return await this.makeRequest('/client/all');
+  }
+
+  // Alle Line of Business für einen Client abrufen
+  async getLobs(clientId = null) {
+    const id = clientId || this.clientId;
+    return await this.makeRequest(`/lob/filtered?clientId=${id}`);
+  }
+
+  // Bereiche für einen Client abrufen
+  async getSections(clientId = null) {
+    const id = clientId || this.clientId;
+    return await this.makeRequest(`/section/filtered?clientId=${id}`);
+  }
+
+  // Competence Centers für einen Client abrufen
+  async getCompetenceCenters(clientId = null) {
+    const id = clientId || this.clientId;
+    return await this.makeRequest(`/competenceCenter/filtered?clientId=${id}`);
+  }
+
+  // Teams für einen Client abrufen
+  async getTeams(clientId = null) {
+    const id = clientId || this.clientId;
+    return await this.makeRequest(`/team/filtered?clientId=${id}`);
+  }
+
+  // Departments für einen Client abrufen
+  async getDepartments(clientId = null) {
+    const id = clientId || this.clientId;
+    return await this.makeRequest(`/department/filtered?clientId=${id}`);
+  }
+
+  // Career Levels für einen Client abrufen
+  async getCareerLevels(clientId = null) {
+    const id = clientId || this.clientId;
+    return await this.makeRequest(`/careerLevel/filtered?clientId=${id}`);
+  }
+
+  // Manager für einen Client abrufen
+  async getManagers(clientId = null) {
+    const id = clientId || this.clientId;
+    return await this.makeRequest(`/employee/managers/filtered?clientId=${id}`);
+  }
+
+  // Assignment Types abrufen
+  async getAssignmentTypes() {
+    return await this.makeRequest('/employee/assignmentTypes');
+  }
+
+  // Mitarbeiter-Statistiken für Kalenderwochen abrufen
+  async getEmployeeStatistics(startDate, amountCW) {
+    return await this.makeRequest(`/employee/statistics/cw?startDate=${startDate}&amountCW=${amountCW}`);
+  }
+
+  // Alle Mitarbeiter für einen Client abrufen
+  async getEmployees(clientId = null) {
+    const id = clientId || this.clientId;
+    return await this.makeRequest(`/staffing/employee/filtered?clientId=${id}`);
+  }
+
+  // Mitarbeiter-Details abrufen
+  async getEmployeeDetails(employeeId) {
+    return await this.makeRequest(`/staffing/employee/${employeeId}`);
+  }
+
+  // Mitarbeiter-Zuweisungen abrufen
+  async getEmployeeAssignments(employeeId, startDate, endDate) {
+    return await this.makeRequest(`/staffing/employee/${employeeId}/assignments?startDate=${startDate}&endDate=${endDate}`);
+  }
+
+  // Mitarbeiter-Verfügbarkeit abrufen
+  async getEmployeeAvailability(employeeId, startDate, endDate) {
+    return await this.makeRequest(`/staffing/employee/${employeeId}/availability?startDate=${startDate}&endDate=${endDate}`);
+  }
+
+  // Alle Projekte/Assignments abrufen
+  async getAssignments(clientId = null) {
+    const id = clientId || this.clientId;
+    return await this.makeRequest(`/staffing/assignment/filtered?clientId=${id}`);
+  }
+
+  // Virtuelle Teams abrufen
+  async getVirtualTeams() {
+    return await this.makeRequest('/virtualTeam/all');
+  }
+
+  // Vollständige Organisationsstruktur für einen Client abrufen
+  async getFullOrganizationStructure(clientId = null) {
+    const id = clientId || this.clientId;
+    
+    logger.info(`Lade vollständige Organisationsstruktur für Client: ${id}`);
+    
+    try {
+      const [lobs, sections, competenceCenters, teams, departments, careerLevels, managers] = await Promise.all([
+        this.getLobs(id),
+        this.getSections(id),
+        this.getCompetenceCenters(id),
+        this.getTeams(id),
+        this.getDepartments(id),
+        this.getCareerLevels(id),
+        this.getManagers(id)
+      ]);
+
+      return {
+        clientId: id,
+        lobs,
+        sections,
+        competenceCenters,
+        teams,
+        departments,
+        careerLevels,
+        managers,
+        loadedAt: new Date().toISOString()
+      };
+    } catch (error) {
+      logger.error('Fehler beim Laden der Organisationsstruktur:', error);
+      throw error;
+    }
+  }
+}
+
+// ===== EINSATZPLAN API ENDPOINTS =====
+
+// Spezielle Middleware für Einsatzplan-Endpoints (nur Bearer Token prüfen)
+function requireEinsatzplanAuth(req, res, next) {
+  const bearerToken = req.headers.authorization?.replace('Bearer ', '');
+  if (!bearerToken) {
+    return res.status(401).json({ error: 'Bearer Token erforderlich für Einsatzplan-API' });
+  }
+  next();
+}
+
+// GET /api/einsatzplan/clients - Alle verfügbaren Clients abrufen
+app.get('/api/einsatzplan/clients', requireEinsatzplanAuth, async (req, res) => {
+  try {
+    const bearerToken = req.headers.authorization?.replace('Bearer ', '');
+    if (!bearerToken) {
+      return res.status(401).json({ error: 'Bearer Token erforderlich' });
+    }
+
+    const service = new EinsatzplanService(bearerToken);
+    const clients = await service.getClients();
+    
+    logger.success(`Clients erfolgreich abgerufen: ${clients.length} Einträge`);
+    res.json(clients);
+  } catch (error) {
+    logger.error('Fehler beim Abrufen der Clients:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Clients', details: error.message });
+  }
+});
+
+// GET /api/einsatzplan/lobs - Line of Business für Client abrufen
+app.get('/api/einsatzplan/lobs', requireEinsatzplanAuth, async (req, res) => {
+  const bearerToken = req.headers.authorization?.replace('Bearer ', '');
+  const { clientId } = req.query;
+  
+  try {
+    if (!bearerToken) {
+      return res.status(401).json({ error: 'Bearer Token erforderlich' });
+    }
+
+    const service = new EinsatzplanService(bearerToken);
+    const lobs = await service.getLobs(clientId);
+    
+    logger.success(`LoB-Daten erfolgreich abgerufen: ${lobs.length} Einträge`);
+    res.json(lobs);
+  } catch (error) {
+    logger.error('Fehler beim Abrufen der LoB-Daten:', {
+      message: error.message,
+      stack: error.stack,
+      clientId,
+      bearerTokenLength: bearerToken?.length
+    });
+    res.status(500).json({ 
+      error: 'Fehler beim Abrufen der LoB-Daten', 
+      details: error.message,
+      clientId: clientId
+    });
+  }
+});
+
+// GET /api/einsatzplan/organization - Vollständige Organisationsstruktur (default client)
+app.get('/api/einsatzplan/organization', requireEinsatzplanAuth, async (req, res) => {
+  try {
+    const bearerToken = req.headers.authorization?.replace('Bearer ', '');
+    if (!bearerToken) {
+      return res.status(401).json({ error: 'Bearer Token erforderlich' });
+    }
+
+    const service = new EinsatzplanService(bearerToken);
+    const organization = await service.getFullOrganizationStructure();
+    
+    logger.success(`Organisationsstruktur erfolgreich abgerufen für Default Client: ${organization.clientId}`);
+    res.json(organization);
+  } catch (error) {
+    logger.error('Fehler beim Abrufen der Organisationsstruktur:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Organisationsstruktur', details: error.message });
+  }
+});
+
+// GET /api/einsatzplan/organization/:clientId - Vollständige Organisationsstruktur
+app.get('/api/einsatzplan/organization/:clientId', requireEinsatzplanAuth, async (req, res) => {
+  try {
+    const bearerToken = req.headers.authorization?.replace('Bearer ', '');
+    if (!bearerToken) {
+      return res.status(401).json({ error: 'Bearer Token erforderlich' });
+    }
+
+    const { clientId } = req.params;
+    const service = new EinsatzplanService(bearerToken);
+    const organization = await service.getFullOrganizationStructure(clientId);
+    
+    logger.success(`Organisationsstruktur erfolgreich abgerufen für Client: ${organization.clientId}`);
+    res.json(organization);
+  } catch (error) {
+    logger.error('Fehler beim Abrufen der Organisationsstruktur:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Organisationsstruktur', details: error.message });
+  }
+});
+
+// POST /api/einsatzplan/import-lob-data - Importiere Daten für ausgewählte LoB
+app.post('/api/einsatzplan/import-lob-data', requireEinsatzplanAuth, async (req, res) => {
+  try {
+    const bearerToken = req.headers.authorization?.replace('Bearer ', '');
+    if (!bearerToken) {
+      return res.status(401).json({ error: 'Bearer Token erforderlich' });
+    }
+
+    const { selectedLobs, clientId, importOptions = {} } = req.body;
+    
+    if (!selectedLobs || !Array.isArray(selectedLobs) || selectedLobs.length === 0) {
+      return res.status(400).json({ error: 'Mindestens eine LoB muss ausgewählt werden' });
+    }
+
+    logger.info(`Starte LoB-Datenimport für ${selectedLobs.length} LoB(s)`, { selectedLobs, clientId });
+
+    const service = new EinsatzplanService(bearerToken);
+    const importResults = {
+      clientId: clientId || EINSATZPLAN_CONFIG.clientId,
+      selectedLobs,
+      importedData: {},
+      statistics: {
+        totalLobs: selectedLobs.length,
+        successfulImports: 0,
+        failedImports: 0,
+        totalRecords: 0
+      },
+      startedAt: new Date().toISOString(),
+      completedAt: null,
+      errors: []
+    };
+
+    // Organisationsstruktur laden
+    try {
+      const organization = await service.getFullOrganizationStructure(clientId);
+      importResults.importedData.organization = organization;
+      
+      // Filtere LoB-spezifische Daten
+      const filteredLobs = organization.lobs.filter(lob => 
+        selectedLobs.some(selectedLob => selectedLob.id === lob.id)
+      );
+      
+      importResults.importedData.filteredLobs = filteredLobs;
+      importResults.statistics.totalRecords += filteredLobs.length;
+      importResults.statistics.successfulImports++;
+      
+      logger.success(`Organisationsdaten erfolgreich importiert: ${filteredLobs.length} LoB(s)`);
+    } catch (error) {
+      logger.error('Fehler beim Import der Organisationsdaten:', error);
+      importResults.errors.push({
+        type: 'organization',
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+      importResults.statistics.failedImports++;
+    }
+
+    // Mitarbeiter-Statistiken laden
+    if (importOptions.includeStatistics) {
+      try {
+        logger.info('Lade Mitarbeiter-Statistiken...');
+        
+        // Aktuelles Datum und 52 Wochen (1 Jahr)
+        const startDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        const amountCW = 52;
+        
+        const employeeStats = await service.getEmployeeStatistics(startDate, amountCW);
+        
+        importResults.employeeStatistics = {
+          startDate,
+          amountCW,
+          data: employeeStats,
+          loadedAt: new Date().toISOString()
+        };
+        
+        logger.success(`Mitarbeiter-Statistiken erfolgreich geladen: ${employeeStats?.length || 0} Einträge`);
+      } catch (error) {
+        logger.error('Fehler beim Laden der Mitarbeiter-Statistiken:', error);
+        importResults.errors.push({
+          type: 'employeeStatistics',
+          error: error.message,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+
+    // Vollständige Mitarbeiter-Daten laden
+    if (importOptions.includeEmployeeData !== false) { // Standardmäßig aktiviert
+      try {
+        logger.info('Lade vollständige Mitarbeiter-Daten...');
+      
+      // 1. Alle Mitarbeiter laden
+      const employees = await service.getEmployees(selectedLobs[0]?.clientId);
+      logger.info(`Mitarbeiter geladen: ${employees?.length || 0} Einträge`);
+      
+      // 2. Assignment Types laden
+      const assignmentTypes = await service.getAssignmentTypes();
+      logger.info(`Assignment Types geladen: ${assignmentTypes?.length || 0} Einträge`);
+      
+      // 3. Alle Assignments/Projekte laden
+      const assignments = await service.getAssignments(selectedLobs[0]?.clientId);
+      logger.info(`Assignments geladen: ${assignments?.length || 0} Einträge`);
+      
+      // 4. Virtuelle Teams laden
+      const virtualTeams = await service.getVirtualTeams();
+      logger.info(`Virtuelle Teams geladen: ${virtualTeams?.length || 0} Einträge`);
+      
+      importResults.employeeData = {
+        employees: employees || [],
+        assignmentTypes: assignmentTypes || [],
+        assignments: assignments || [],
+        virtualTeams: virtualTeams || [],
+        loadedAt: new Date().toISOString()
+      };
+      
+      logger.success(`Vollständige Mitarbeiter-Daten erfolgreich geladen:`, {
+        employees: employees?.length || 0,
+        assignmentTypes: assignmentTypes?.length || 0,
+        assignments: assignments?.length || 0,
+        virtualTeams: virtualTeams?.length || 0
+      });
+      
+    } catch (error) {
+      logger.error('Fehler beim Laden der Mitarbeiter-Daten:', error);
+      importResults.errors.push({
+        type: 'employeeData',
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+    }
+
+    importResults.completedAt = new Date().toISOString();
+
+    // Speichere Import-Ergebnisse in Firestore für spätere Visualisierung
+    try {
+      // Reduziere Dokument-Größe für Firestore (1MB Limit)
+      const compactImportResults = {
+        clientId: importResults.clientId,
+        selectedLobs: importResults.selectedLobs.map(lob => ({
+          id: lob.id,
+          name: lob.name,
+          supervisor: lob.supervisor || 'Nicht verfügbar'
+        })), // Nur wichtige Felder
+        statistics: importResults.statistics,
+        startedAt: importResults.startedAt,
+        completedAt: importResults.completedAt,
+        errors: importResults.errors,
+        // Kompakte Organisationsdaten
+        organizationSummary: {
+          totalLobs: importResults.importedData.organization?.lobs?.length || 0,
+          totalSections: importResults.importedData.organization?.sections?.length || 0,
+          totalTeams: importResults.importedData.organization?.teams?.length || 0,
+          totalDepartments: importResults.importedData.organization?.departments?.length || 0,
+          loadedAt: importResults.importedData.organization?.loadedAt
+        },
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        userId: 'einsatzplan-api-user'
+      };
+      
+      // Prüfe Dokument-Größe vor dem Speichern
+      const docSize = Buffer.byteLength(JSON.stringify(compactImportResults), 'utf8');
+      logger.info(`Firestore Dokument-Größe: ${docSize} bytes (${(docSize/1024/1024).toFixed(2)} MB)`);
+      
+      if (docSize > 1000000) { // 1MB Limit mit Puffer
+        logger.warning('Dokument zu groß für Firestore - speichere nur Metadaten');
+        const metadataOnly = {
+          clientId: importResults.clientId,
+          selectedLobCount: importResults.selectedLobs.length,
+          selectedLobNames: importResults.selectedLobs.map(lob => lob.name || 'Unbekannt'),
+          statistics: importResults.statistics,
+          startedAt: importResults.startedAt,
+          completedAt: importResults.completedAt,
+          errorCount: importResults.errors.length,
+          organizationSummary: compactImportResults.organizationSummary,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          userId: 'einsatzplan-api-user',
+          note: 'Vollständige Daten zu groß für Firestore - nur Metadaten gespeichert'
+        };
+        
+        const docRef = await db.collection('einsatzplan_imports').add(metadataOnly);
+        importResults.firebaseDocId = docRef.id;
+        logger.success(`Import-Metadaten in Firestore gespeichert: ${docRef.id}`);
+      } else {
+        const docRef = await db.collection('einsatzplan_imports').add(compactImportResults);
+        importResults.firebaseDocId = docRef.id;
+        logger.success(`Import-Ergebnisse in Firestore gespeichert: ${docRef.id}`);
+      }
+    } catch (error) {
+      logger.error('Fehler beim Speichern in Firestore:', error);
+      importResults.errors.push({
+        type: 'firestore',
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    logger.success(`LoB-Datenimport abgeschlossen`, {
+      totalLobs: importResults.statistics.totalLobs,
+      successful: importResults.statistics.successfulImports,
+      failed: importResults.statistics.failedImports,
+      totalRecords: importResults.statistics.totalRecords
+    });
+
+    res.json(importResults);
+  } catch (error) {
+    logger.error('Fehler beim LoB-Datenimport:', error);
+    res.status(500).json({ error: 'Fehler beim LoB-Datenimport', details: error.message });
+  }
+});
+
+// GET /api/einsatzplan/imports - Alle Import-Historie abrufen
+app.get('/api/einsatzplan/imports', requireEinsatzplanAuth, async (req, res) => {
+  try {
+    const { limit = 10 } = req.query;
+    
+    const snapshot = await db.collection('einsatzplan_imports')
+      .orderBy('createdAt', 'desc')
+      .limit(parseInt(limit))
+      .get();
+    
+    const imports = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt
+    }));
+    
+    logger.success(`Import-Historie abgerufen: ${imports.length} Einträge`);
+    res.json(imports);
+  } catch (error) {
+    logger.error('Fehler beim Abrufen der Import-Historie:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Import-Historie', details: error.message });
+  }
+});
+
+// GET /api/einsatzplan/imports/:id - Spezifischen Import abrufen
+app.get('/api/einsatzplan/imports/:id', requireEinsatzplanAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const doc = await db.collection('einsatzplan_imports').doc(id).get();
+    
+    if (!doc.exists) {
+      return res.status(404).json({ error: 'Import nicht gefunden' });
+    }
+    
+    const importData = {
+      id: doc.id,
+      ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt
+    };
+    
+    logger.success(`Import-Details abgerufen: ${id}`);
+    res.json(importData);
+  } catch (error) {
+    logger.error('Fehler beim Abrufen der Import-Details:', error);
+    res.status(500).json({ error: 'Fehler beim Abrufen der Import-Details', details: error.message });
   }
 });
 
